@@ -157,10 +157,13 @@ async function scrapeWebsiteOrchestrator(url) {
     console.warn(`[Research Orchestrator] Unified scraper failed:`, error.message);
   }
 
-  // Fallback: Basic fetch
+  // Fallback: Basic fetch with timeout
   try {
     console.log('[Research Orchestrator] Trying basic fetch fallback');
-    const response = await fetch(url);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
     if (response.ok) {
       const html = await response.text();
       return {

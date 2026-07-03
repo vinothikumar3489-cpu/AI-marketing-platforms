@@ -7,6 +7,24 @@ import fetch from 'node-fetch';
 
 const PAGESPEED_API_KEY = process.env.PAGESPEED_API_KEY;
 const PAGESPEED_API_URL = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
+const FETCH_TIMEOUT = 30000;
+
+/**
+ * Fetch with timeout
+ */
+async function fetchWithTimeout(url, timeoutMs = FETCH_TIMEOUT) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+    console.log('[PageSpeed] timeout');
+  }, timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    return response;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /**
  * Get PageSpeed audit for a URL
@@ -17,52 +35,71 @@ export async function getPageSpeedAudit(url, strategy = 'mobile') {
   }
 
   if (!PAGESPEED_API_KEY) {
-    console.warn('⚠️ PageSpeed API key not configured');
+    console.warn('[PageSpeed] API key not configured');
     return { success: false, error: 'PageSpeed API key not configured' };
   }
 
   try {
     const apiUrl = `${PAGESPEED_API_URL}?url=${encodeURIComponent(url)}&strategy=${strategy}&key=${PAGESPEED_API_KEY}`;
-    console.log(`🔍 [PageSpeed] Requesting ${strategy} audit for: ${url}`);
-    
-    const response = await fetch(apiUrl);
-    
+    const startTime = Date.now();
+    console.log('[PageSpeed]', strategy, 'started');
+
+    const response = await fetchWithTimeout(apiUrl, FETCH_TIMEOUT);
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`❌ [PageSpeed] API error: ${response.status} - ${errorText}`);
+      console.log('[PageSpeed] failed - API error:', response.status);
       return { success: false, error: `API error: ${response.status}` };
     }
 
     const data = await response.json();
-    console.log(`✅ [PageSpeed] ${strategy} audit successful`);
-    
+    const duration = Date.now() - startTime;
+    console.log('[PageSpeed]', strategy, 'finished', 'duration:', duration, 'ms');
+
     const normalized = normalizePageSpeedResult(data, strategy);
     return { success: true, data: normalized };
   } catch (error) {
-    console.error(`❌ [PageSpeed] Request failed:`, error.message);
+    if (error.name === 'AbortError') {
+      console.log('[PageSpeed] failed - timeout');
+      return { success: false, error: 'timeout' };
+    }
+    console.log('[PageSpeed] failed:', error.message);
     return { success: false, error: error.message };
   }
 }
 
 /**
  * Get both desktop and mobile PageSpeed audits
+ * Runs mobile first, then desktop.
+ * If mobile fails, continues with desktop.
+ * If desktop fails, continues with mobile.
+ * If both fail, returns success:false.
  */
 export async function getDesktopAndMobilePageSpeed(url) {
   if (!url) {
     return { success: false, error: 'URL is required' };
   }
 
+  const totalStart = Date.now();
+
   const [mobileResult, desktopResult] = await Promise.all([
     getPageSpeedAudit(url, 'mobile'),
-    getPageSpeedAudit(url, 'desktop')
+    getPageSpeedAudit(url, 'desktop'),
   ]);
+
+  const totalDuration = Date.now() - totalStart;
+  console.log('[PageSpeed] total duration:', totalDuration, 'ms');
+
+  if (!mobileResult.success && !desktopResult.success) {
+    return { success: false, reason: 'PageSpeed unavailable' };
+  }
 
   return {
     success: mobileResult.success || desktopResult.success,
     data: {
       mobile: mobileResult.success ? mobileResult.data : null,
-      desktop: desktopResult.success ? desktopResult.data : null
-    }
+      desktop: desktopResult.success ? desktopResult.data : null,
+    },
   };
 }
 
