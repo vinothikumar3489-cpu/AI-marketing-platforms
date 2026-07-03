@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Runtime files - never commit
+runtime/
+generated/
+logs/
+reports/
+exports/
+uploads/
+tmp/
+cache/
+
+# Generated files
+*.log
+*.csv
+*.pdf
+*.xlsx
+*.json.tmp
+*.md.tmp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+.nyc_output/
+
+# Debug
+error.txt
+output.txt
+debug.log

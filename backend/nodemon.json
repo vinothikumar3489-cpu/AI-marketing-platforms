@@ -1,0 +1,31 @@
+{
+  "watch": [
+    "src"
+  ],
+  "ignore": [
+    "src/**/*.test.js",
+    "src/**/*.spec.js",
+    "runtime/**",
+    "generated/**",
+    "node_modules/**",
+    "**/*.log",
+    "**/*.md",
+    "**/*.json",
+    "**/*.csv",
+    "**/*.pdf",
+    "**/*.xlsx",
+    "logs/**",
+    "reports/**",
+    "exports/**",
+    "uploads/**",
+    "tmp/**",
+    "cache/**",
+    "*.txt"
+  ],
+  "ext": "js",
+  "exec": "node src/server.js",
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "delay": 1000
+}
