@@ -4,7 +4,8 @@ import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 
 const registerSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1).optional(),
+  fullName: z.string().min(1).optional(),
   email: z.string().email(),
   password: z.string().min(8),
 });
@@ -27,7 +28,11 @@ export const register = async (req, res) => {
     return res.status(400).json({ success: false, error: parseResult.error.errors[0].message });
   }
 
-  const { name, email, password } = parseResult.data;
+  const { name: rawName, fullName, email, password } = parseResult.data;
+  const name = rawName || fullName;
+  if (!name) {
+    return res.status(400).json({ success: false, error: "Name is required" });
+  }
   console.log("auth/register received email=", email);
 
   const existing = await prisma.user.findUnique({ where: { email } });
@@ -37,6 +42,8 @@ export const register = async (req, res) => {
 
   const hashedPassword = bcrypt.hashSync(password, 10);
   const user = await prisma.user.create({ data: { name, email, password: hashedPassword } });
+  console.log("auth/register user created true");
+
   const token = signToken(user);
 
   return res.status(201).json({ success: true, user: { id: user.id, name: user.name, email: user.email }, token });
