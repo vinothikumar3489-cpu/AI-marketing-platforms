@@ -1146,7 +1146,7 @@ function KeywordIntelligence({ data }: { data: any }) {
     console.log('clusters count:', (data?.clusters || []).length);
     console.log('===== END TAB: KeywordIntelligence =====');
   }
-  if (!data || Object.keys(data).length === 0) return <EmptyState title="No Keyword Intelligence" text="Run SEO analysis first." />;
+  if (!data || Object.keys(data).length === 0) return <EmptyState title="No Keyword Intelligence" text="No verified keyword data available." />;
   
   // Filter out irrelevant brand/competitor keyword pollution
   const pollutedTerms = ['canva', 'semrush', 'wix', 'wordpress', 'shopify', 'squarespace', 'godaddy', 'weebly', 'joomla', 'magento', 'clickfunnels', 'unbounce', 'leadpages', 'instapage', 'landingi'];
@@ -1281,7 +1281,7 @@ function CompetitorSEO({ data }: { data: any }) {
     console.log('contentGaps count:', (data?.contentGaps || []).length);
     console.log('===== END TAB: CompetitorSEO =====');
   }
-  if (!data || Object.keys(data).length === 0) return <EmptyState title="No Competitor SEO" text="Run analysis first." />;
+  if (!data || Object.keys(data).length === 0) return <EmptyState title="No Competitor SEO" text="No verified competitor data available." />;
 
   // Read competitorProfiles from CompetitorSeoRecord (canonical shape from backend controller)
   const competitorProfiles = asArray(data.competitorProfiles || data.competitors || []);
@@ -1405,7 +1405,7 @@ function ContentGaps({ data }: { data: any }) {
     console.log('comparisonPageIdeas count:', asArray(data?.comparisonPageIdeas || []).length);
     console.log('===== END TAB: ContentGaps =====');
   }
-  if (!data || Object.keys(data).length === 0) return <EmptyState title="No Content Gaps" text="Run analysis first." />;
+  if (!data || Object.keys(data).length === 0) return <EmptyState title="No Content Gaps" text="No verified content gap data available." />;
 
   // Use canonical field paths from contract
   const contentGaps = asArray(data.contentGaps || []);
@@ -1432,7 +1432,7 @@ function ContentGaps({ data }: { data: any }) {
         <Card>
           <h3><LayoutList size={18} /> Content Gap Analysis</h3>
           <p style={{ color: '#9aa7bd', marginTop: '15px' }}>
-            {data.metadata?.message || 'Real content gap data unavailable until keyword/SERP data is available'}
+            No verified content gap data available from current data sources.
           </p>
         </Card>
       )}
@@ -1509,7 +1509,7 @@ function GeoIntelligence({ data }: { data: any }) {
     console.log('entities count:', (data?.entities || []).length);
     console.log('===== END TAB: GeoIntelligence =====');
   }
-  if (!data || Object.keys(data).length === 0) return <EmptyState title="No GEO Intelligence" text="Run analysis first." />;
+  if (!data || Object.keys(data).length === 0) return <EmptyState title="No GEO Intelligence" text="No verified GEO intelligence data available." />;
 
   // Use canonical field paths from contract
   const aiVisibilityScore = data.aiVisibilityScore || null;
@@ -1600,7 +1600,7 @@ function BlogIntelligence({ data }: { data: any }) {
     console.log('blogClusters count:', asArray(data?.blogClusters || []).length);
     console.log('===== END TAB: BlogIntelligence =====');
   }
-  if (!data || Object.keys(data).length === 0) return <EmptyState title="No Blog Intelligence" text="Run analysis first." />;
+  if (!data || Object.keys(data).length === 0) return <EmptyState title="No Blog Intelligence" text="No verified blog intelligence data available." />;
 
   // Filter out weak/generic keywords that pollute results
   const weakKeywords = ['general', 'account', 'semrush', 'competitors', 'alternatives', 'sign up', 'login', 'pricing', 'demo', 'free trial', 'contact us', 'about us', 'template', 'download', 'gallery', 'canva', 'wix', 'wordpress', 'shopify', 'squarespace', 'godaddy', 'weebly', 'started', 'daily', 'alerts', 'outlier', 'research', 'content', 'data', 'credits', 'what', 'manage'];
@@ -1625,7 +1625,7 @@ function BlogIntelligence({ data }: { data: any }) {
         <Card>
           <h3><FileText size={18} /> Blog Intelligence</h3>
           <p style={{ color: '#9aa7bd', marginTop: '15px' }}>
-            No validated blog ideas available from current data. Blog intelligence requires high-confidence keyword data (confidence ≥ 70 or DataForSEO verified).
+            No verified blog ideas available from current data sources.
           </p>
         </Card>
       )}

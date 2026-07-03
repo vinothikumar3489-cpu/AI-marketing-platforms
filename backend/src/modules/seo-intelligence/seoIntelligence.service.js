@@ -172,7 +172,8 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
       console.error('❌ [SEO Intelligence] Keyword intelligence failed:', kwError);
       keywordIntelligence = { primaryKeywords: [], secondaryKeywords: [], longTailKeywords: [], questionKeywords: [], clusters: [], competitorKeywords: [], contentOpportunities: [], geoKeywords: [], metadata: { totalKeywords: 0, clustersCount: 0, opportunitiesCount: 0 } };
     }
-    console.log('[SEO API] DataForSEO:', (keywordIntelligence?.metadata?.isFromDataForSEO || keywordIntelligence?.isFromDataForSEO) ? 'success' : 'fail/fallback');
+    console.log('[SEO API] DataForSEO:', (keywordIntelligence?.metadata?.isFromDataForSEO || keywordIntelligence?.isFromDataForSEO) ? 'success' : 'fail/unavailable');
+    console.log('[SEO API] Keyword primary count:', keywordIntelligence?.primaryKeywords?.length || 0, '| secondary:', keywordIntelligence?.secondaryKeywords?.length || 0, '| clusters:', keywordIntelligence?.clusters?.length || 0);
     if (process.env.NODE_ENV !== 'production') {
       // ==== DEBUG: Keyword Intel output ====
       console.log('===== KEYWORD INTELLIGENCE OUTPUT =====');
@@ -254,7 +255,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
         }
       };
     }
-    console.log('[SEO API] Competitor SEO generated count:', competitorIntelligence?.metadata?.totalCompetitors || (competitorIntelligence?.competitorProfiles || []).length || (competitorIntelligence?.competitors || []).length || 0);
+    console.log('[SEO API] Competitor SEO count:', competitorIntelligence?.metadata?.totalCompetitors || (competitorIntelligence?.competitorProfiles || []).length || (competitorIntelligence?.competitors || []).length || 0, '| profiles:', (competitorIntelligence?.competitorProfiles || []).length);
     if (process.env.NODE_ENV !== 'production') {
       // ==== DEBUG: Competitor Intel output ====
       console.log('===== COMPETITOR INTELLIGENCE OUTPUT =====');

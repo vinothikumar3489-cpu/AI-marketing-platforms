@@ -360,112 +360,7 @@ async function extractKeywordsFromWebsite({
   
   const allText = `${title}\n${description}\n${h1}\n${text.substring(0, 3000)}`;
   
-  // Detect product category from title/meta/H1/content
-  const detectCategory = () => {
-    const content = allText.toLowerCase();
-
-    // Canva category: graphic design, social media design, presentation maker
-    if (content.includes('canva') || (content.includes('graphic design') && content.includes('social media'))) {
-      return 'canva';
-    }
-
-    // Gamma category: AI presentation maker, AI presentation tool
-    if (content.includes('gamma') || (content.includes('ai presentation') && (content.includes('maker') || content.includes('tool')))) {
-      return 'gamma';
-    }
-
-    // Figma category: collaborative design tool, UI design software
-    if (content.includes('figma') || (content.includes('design') && (content.includes('prototyp') || content.includes('collaborat') || content.includes('ui') || content.includes('ux')))) {
-      return 'figma';
-    }
-
-    // Notion category: productivity workspace, project management tool
-    if (content.includes('notion') || content.includes('workspace') || content.includes('productivity') || content.includes('wiki') || content.includes('knowledge base') || content.includes('collaborative docs') || content.includes('project management workspace')) {
-      return 'notion';
-    }
-
-    // Orkyn category: custom software development, ERP consulting
-    if (content.includes('orkyn') || content.includes('software development') || content.includes('erp') || content.includes('salesforce') || content.includes('crm') || content.includes('custom software') || content.includes('consulting')) {
-      return 'orkyn';
-    }
-
-    // Virlo category: social media analytics, short-form video analytics, creator tools
-    if (content.includes('virlo') || content.includes('analytics') || content.includes('social listening') || content.includes('creator analytics') || content.includes('short form video') || content.includes('trend tracking') || content.includes('influencer')) {
-      return 'virlo';
-    }
-
-    return 'general';
-  };
-
-  const category = detectCategory();
-  console.log('🔍 [Keyword Extraction] Detected category:', category);
-
-  // Category-based seed keywords for fallback/enrichment (from requirements)
-  const categorySeedKeywords = {
-    canva: [
-      'graphic design tool',
-      'online design platform',
-      'AI design tool',
-      'presentation maker',
-      'social media design tool',
-      'logo maker',
-      'brand kit software',
-      'Canva alternatives',
-      'Canva pricing',
-      'Canva vs Adobe Express'
-    ],
-    gamma: [
-      'AI presentation maker',
-      'AI presentation tool',
-      'presentation software',
-      'Gamma alternatives',
-      'Gamma vs Canva',
-      'AI website builder',
-      'slide deck generator'
-    ],
-    figma: [
-      'collaborative design tool',
-      'UI design software',
-      'UX design tool',
-      'design prototyping tool',
-      'design system tool',
-      'Figma alternatives'
-    ],
-    notion: [
-      'productivity workspace',
-      'project management tool',
-      'Notion alternatives',
-      'team wiki software',
-      'knowledge base software'
-    ],
-    orkyn: [
-      'custom software development',
-      'ERP consulting',
-      'Salesforce consulting',
-      'business automation',
-      'CRM integration services'
-    ],
-    virlo: [
-      'tiktok analytics tool',
-      'short form video analytics',
-      'creator analytics platform',
-      'social media trend tracking',
-      'influencer marketing platform',
-      'viral video analytics',
-      'social listening platform',
-      'instagram reels analytics',
-      'youtube shorts analytics',
-      'competitor video analysis'
-    ],
-    general: [
-      'software solution',
-      'business tool',
-      'productivity software',
-      'collaboration platform'
-    ]
-  };
-  
-  const seedKeywords = categorySeedKeywords[category] || [];
+  const seedKeywords = [];
   
   if (GROQ_API_KEY) {
     try {
@@ -474,8 +369,7 @@ async function extractKeywordsFromWebsite({
 Website Content:
 ${allText}
 
-Detected Category: ${category}
-Category Seed Keywords (use these as inspiration for relevant keywords): ${seedKeywords.join(', ')}
+Detected keywords should be based strictly on the website content provided
 
 CRITICAL: DO NOT return basic word-frequency terms like "software", "business", or "custom". DO NOT return weak words like "free", "features", "best", "premium", "plan", "month", software alone, or product name alone. DO NOT return sentence fragments like "platform for building", "the collaborative interface", "for building meaningful". DO NOT return bad keywords like "general", "account", "semrush", "competitors", "tools". Extract REAL, high-value, long-tail, commercial, and question-based keywords that a user would actually search for.
 
@@ -609,186 +503,12 @@ Provide exactly 8 primary, 10 secondary, 10 longTail, and 8 question keywords to
         }
       }
     } catch (e) {
-      console.log('⚠️ [Keyword Extraction] AI extraction failed, falling back to legacy algorithm:', e.message);
+      console.log('⚠️ [Keyword Extraction] AI extraction failed:', e.message);
     }
   }
 
-  // Fallback to category-based seed generation (deterministic, business-specific)
-  console.log('⚠️ [Keyword Extraction] AI extraction failed, using category-based seed keywords');
-
-  // Category-based seed keywords for known domains (from requirements)
-  const categorySeeds = {
-    'canva.com': [
-      'graphic design tool',
-      'online design platform',
-      'AI design tool',
-      'presentation maker',
-      'social media design tool',
-      'logo maker',
-      'brand kit software',
-      'Canva alternatives',
-      'Canva pricing',
-      'Canva vs Adobe Express'
-    ],
-    'gamma.app': [
-      'AI presentation maker',
-      'AI presentation tool',
-      'presentation software',
-      'Gamma alternatives',
-      'Gamma vs Canva',
-      'AI website builder',
-      'slide deck generator'
-    ],
-    'figma.com': [
-      'collaborative design tool',
-      'UI design software',
-      'UX design tool',
-      'design prototyping tool',
-      'design system tool',
-      'Figma alternatives'
-    ],
-    'notion.so': [
-      'workspace productivity app',
-      'project management workspace',
-      'team knowledge base',
-      'collaborative docs',
-      'wiki software',
-      'note taking app',
-      'Notion templates',
-      'Notion alternatives',
-      'Notion pricing'
-    ],
-    'orkyn.ai': [
-      'custom software development',
-      'ERP implementation services',
-      'Salesforce consulting',
-      'CRM integration services',
-      'API integration services',
-      'business process automation',
-      'custom ERP software',
-      'software development company UAE',
-      'software development company India',
-      'Salesforce implementation partner'
-    ],
-    'virlo.ai': [
-      'tiktok analytics tool',
-      'short form video analytics',
-      'social media trend tracking',
-      'creator analytics platform',
-      'influencer marketing platform',
-      'viral video analytics',
-      'social listening tool',
-      'instagram reels analytics',
-      'youtube shorts analytics',
-      'competitor video analysis',
-      'trend forecasting tool',
-      'content analytics platform'
-    ]
-  };
-  
-  // Get domain from URL
-  const domain = identity.domain || websiteData.url || '';
-  const normalizedDomain = domain.replace('www.', '').replace(/^https?:\/\//, '').split('/')[0].toLowerCase();
-  
-  // Use category-based seeds if available, otherwise use generic business terms
-  let fallbackSeedKeywords = categorySeeds[normalizedDomain];
-  
-  if (!fallbackSeedKeywords) {
-    // Generic business seeds based on industry/category
-    if (identity.category === 'SaaS' || identity.businessCategory === 'Technology') {
-      fallbackSeedKeywords = [
-        'custom software development',
-        'software implementation services',
-        'business automation solutions',
-        'enterprise software solutions',
-        'software consulting services',
-        'digital transformation services',
-        'cloud software solutions',
-        'business process optimization',
-        'software integration services',
-        'enterprise software platform'
-      ];
-    } else {
-      fallbackSeedKeywords = [
-        'business solutions',
-        'professional services',
-        'enterprise solutions',
-        'business software',
-        'digital solutions',
-        'technology solutions',
-        'business platform',
-        'professional software',
-        'enterprise platform',
-        'business technology'
-      ];
-    }
-  }
-  
-  // Filter out any weak terms from seeds
-  const weakTerms = ['general', 'account', 'tools', 'competitors', 'alternatives', 'platform for', 'for building', 'the collaborative'];
-  fallbackSeedKeywords = fallbackSeedKeywords.filter(kw => !weakTerms.some(wt => kw.toLowerCase().includes(wt)));
-  
-  console.log('🔍 [Keyword Extraction] Using category-based seeds:', fallbackSeedKeywords.slice(0, 5));
-  
-  const primary = [];
-  const secondary = [];
-  const longTail = [];
-  const questions = [];
-  
-  fallbackSeedKeywords.forEach(term => {
-    const wordCount = term.split(' ').length;
-    const shared = {
-      keyword: term,
-      searchVolume: null,
-      keywordDifficulty: null,
-      cpc: null,
-      source: 'CategorySeed',
-      confidence: wordCount >= 3 ? 65 : 70,
-      contentType: wordCount >= 3 ? 'Blog Post' : 'Landing Page',
-      opportunityScore: wordCount >= 3 ? 65 : 70
-    };
-    
-    if (wordCount === 1) {
-      primary.push({ 
-        ...shared,
-        intent: 'commercial',
-      });
-    } else if (wordCount === 2) {
-      secondary.push({ 
-        ...shared,
-        intent: 'commercial',
-      });
-    } else if (wordCount === 3) {
-      longTail.push({ 
-        ...shared,
-        intent: 'commercial',
-      });
-    } else {
-      // 4+ word phrases
-      longTail.push({ 
-        ...shared,
-        intent: 'informational',
-        confidence: 60,
-        opportunityScore: 60
-      });
-    }
-  });
-
-  const result = {
-    primary: primary.slice(0, 10),
-    secondary: secondary.slice(0, 15),
-    longTail: longTail.slice(0, 20),
-    questions: questions.slice(0, 10)
-  };
-  
-  console.log('✅ [Keyword Extraction] Category-based seed keywords generated:', {
-    primary: result.primary.length,
-    secondary: result.secondary.length,
-    longTail: result.longTail.length,
-    questions: result.questions.length
-  });
-  
-  return result;
+  console.log('⚠️ [Keyword Extraction] No verified keyword data available from AI extraction');
+  return { primary: [], secondary: [], longTail: [], questions: [] };
 }
 
 function extractPhrases(text) {
@@ -925,10 +645,9 @@ async function researchIndustryKeywords(industry, productName) {
     }
   }
 
-  // Strategy 3: If no external data, generate smart keyword variations
+  // Strategy 3: If no external data found, return empty
   if (allKeywords.length < 5) {
-    console.log('🔄 [Fallback] Generating smart keyword variations...');
-    allKeywords.push(...generateSmartKeywordVariations(productName, industry));
+    console.log('⚠️ [Industry Research] Insufficient external keyword data, returning available results');
   }
 
   // Deduplicate and rank by relevance
@@ -992,72 +711,6 @@ function extractKeywordsFromResearch(text, productName, industry) {
   });
 
   return keywords;
-}
-
-// Generate smart keyword variations when external research unavailable
-function generateSmartKeywordVariations(productName, industry) {
-  const variations = [];
-  const baseName = productName.toLowerCase();
-  const baseIndustry = industry.toLowerCase();
-
-  // Commercial intent keywords
-  const commercialModifiers = ['best', 'top', 'vs', 'alternative', 'review', 'pricing', 'cost', 'free'];
-  commercialModifiers.forEach(modifier => {
-    variations.push({
-      keyword: `${modifier} ${baseName}`,
-      intent: 'commercial',
-      difficulty: 'medium',
-      opportunity: 'high',
-      confidenceScore: 80,
-      reason: 'High commercial intent variation'
-    });
-  });
-
-  // Informational keywords
-  const informationalModifiers = ['how to use', 'what is', 'guide', 'tutorial', 'tips'];
-  informationalModifiers.forEach(modifier => {
-    variations.push({
-      keyword: `${modifier} ${baseName}`,
-      intent: 'informational',
-      difficulty: 'easy',
-      opportunity: 'high',
-      confidenceScore: 75,
-      reason: 'Informational content opportunity'
-    });
-  });
-
-  // Industry-specific keywords
-  variations.push({
-    keyword: `${baseName} for ${baseIndustry}`,
-    intent: 'commercial',
-    difficulty: 'medium',
-    opportunity: 'high',
-    confidenceScore: 85,
-    reason: 'Industry-targeted keyword'
-  });
-
-  variations.push({
-    keyword: `${baseName} ${baseIndustry} solution`,
-    intent: 'commercial',
-    difficulty: 'medium',
-    opportunity: 'high',
-    confidenceScore: 80,
-    reason: 'Solution-focused keyword'
-  });
-
-  // Feature-based keywords
-  ['features', 'benefits', 'advantages', 'capabilities'].forEach(term => {
-    variations.push({
-      keyword: `${baseName} ${term}`,
-      intent: 'informational',
-      difficulty: 'easy',
-      opportunity: 'medium',
-      confidenceScore: 70,
-      reason: 'Feature discovery keyword'
-    });
-  });
-
-  return variations;
 }
 
 // Classify search intent more accurately
@@ -1235,45 +888,14 @@ async function analyzeCompetitorKeywords(competitorData, ownKeywords, productNam
     }
   }
 
-  // Strategy 3: If still no data, generate smart competitive keywords
+  // Strategy 3: If still no data, return empty
   if (competitorKeywords.length < 5) {
-    console.log('🔄 [Fallback] Generating competitive keyword alternatives...');
-    competitorKeywords.push(...generateCompetitiveKeywords(productName, ownKeywordSet));
+    console.log('⚠️ [Competitor Analysis] Insufficient competitor keyword data available');
   }
 
   // Deduplicate and return top opportunities
   const unique = deduplicateKeywords(competitorKeywords);
   return unique.slice(0, 20);
-}
-
-function generateCompetitiveKeywords(productName, ownKeywords) {
-  const competitive = [];
-  const baseName = productName.toLowerCase();
-
-  // Competitive comparison keywords
-  const comparisonTerms = [
-    { keyword: `${baseName} alternative`, reason: 'Users searching for alternatives to your product' },
-    { keyword: `${baseName} vs competitors`, reason: 'Direct comparison searches' },
-    { keyword: `best ${baseName} alternatives`, reason: 'Competitive landscape research' },
-    { keyword: `${baseName} competitor comparison`, reason: 'Feature comparison searches' },
-    { keyword: `similar to ${baseName}`, reason: 'Product discovery searches' }
-  ];
-
-  comparisonTerms.forEach(term => {
-    if (!ownKeywords.has(term.keyword)) {
-      competitive.push({
-        keyword: term.keyword,
-        competitorUsing: 'Industry competitors',
-        reason: term.reason,
-        opportunity: 'high',
-        intent: 'commercial',
-        difficulty: 'medium',
-        confidenceScore: 75
-      });
-    }
-  });
-
-  return competitive;
 }
 
 // ============================================

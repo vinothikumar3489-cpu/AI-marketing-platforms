@@ -33,7 +33,6 @@ export async function generateCompetitorSeoIntelligence({
   const domain = safeIdentity.domain || "";
   const category = safeIdentity.category || safeIdentity.industry || "";
   const industry = safeIdentity.industry || category;
-  const expectedCompetitors = getCategoryCompetitors({ brandName, productName, companyName, domain, category });
 
   try {
     // Step 1: Discover competitors (use orchestrator data if available)
@@ -50,27 +49,6 @@ export async function generateCompetitorSeoIntelligence({
     
     // Filter self-links and bad competitors even for orchestrator-sourced data
     let competitors = filterAllCompetitors(rawCompetitors, identity);
-
-    // Category fallback: if filtering removed all competitors, use category-level expected competitors
-    if (!competitors || competitors.length === 0) {
-      console.log('🔄 [Competitor SEO] All SERP competitors filtered out, using category fallback...');
-      if (expectedCompetitors && expectedCompetitors.length > 0) {
-        competitors = expectedCompetitors.map((c, index) => ({
-          name: c.name,
-          domain: c.domain,
-          competitorType: 'estimated',
-          positioning: 'Estimated competitor',
-          source: 'CategoryFallback',
-          isEstimated: true,
-          isFallback: true,
-          relevanceScore: Math.max(85 - index * 3, 65),
-          evidence: 'Used category fallback because all SERP results were self-links or irrelevant'
-        }));
-        console.log(`✅ [Competitor SEO] Using ${competitors.length} category fallback competitors for ${domain}`);
-      } else {
-        competitors = [];
-      }
-    }
 
     // Step 2: Build competitor SEO profiles
     console.log('📊 [Competitor SEO] Step 2: Building competitor profiles...');
@@ -155,8 +133,25 @@ export async function generateCompetitorSeoIntelligence({
 
   } catch (error) {
     console.error('❌ [Competitor SEO] Error:', error);
-    console.error('❌ [Competitor SEO] Returning fallback with safe identity fields');
-    return generateFallbackCompetitorIntelligence(productName || 'Product', industry || 'Technology');
+    console.error('❌ [Competitor SEO] Returning empty competitor data');
+    return {
+      competitors: [],
+      competitorProfiles: [],
+      keywordGaps: {},
+      contentGaps: [],
+      authorityGaps: {},
+      geoGaps: {},
+      competitorMatrix: [],
+      recommendations: {},
+      metadata: {
+        totalCompetitors: 0,
+        directCompetitors: 0,
+        analyzedAt: new Date().toISOString(),
+        source: 'Unavailable',
+        error: error.message,
+        message: 'Competitor intelligence unavailable due to processing error'
+      }
+    };
   }
 }
 
@@ -221,16 +216,6 @@ async function discoverCompetitors({ productName, industry, websiteUrl, keywordI
       'short form video analytics',
       'content analytics platform'
     ]
-  };
-
-  // Expected competitors for validation (from requirements)
-  const expectedCompetitors = {
-    'canva.com': ['adobe.com', 'figma.com', 'visme.co', 'piktochart.com', 'microsoft.com', 'beautiful.ai', 'vistacreate.com'],
-    'gamma.app': ['canva.com', 'beautiful.ai', 'tome.app', 'pitch.com', 'plus.ai', 'presentations.ai', 'google.com', 'microsoft.com'],
-    'figma.com': ['canva.com', 'adobe.com', 'sketch.com', 'framer.com', 'webflow.com', 'miro.com', 'penpot.app'],
-    'notion.so': ['clickup.com', 'coda.io', 'airtable.com', 'asana.com', 'trello.com', 'monday.com', 'atlassian.com'],
-    'orkyn.ai': ['salesforce.com', 'sap.com', 'oracle.com', 'microsoft.com', 'zoho.com'],
-    'virlo.ai': ['trendpop.com', 'pentos.video', 'exolyt.com', 'hypeauditor.com', 'favikon.com', 'modash.io', 'creatoriq.com', 'sproutsocial.com', 'brandwatch.com']
   };
 
   // Use DataForSEO SERP API if configured and not marked unavailable
@@ -313,28 +298,11 @@ async function discoverCompetitors({ productName, industry, websiteUrl, keywordI
           filtered: separated.irrelevantFilteredSites.length
         });
         
-        // Validate against expected competitors if available
-        const expected = expectedCompetitors[normalizedDomain] || [];
-        if (expected.length > 0) {
-          const verifiedCompetitors = normalizedCompetitors.filter(c => {
-            const domain = extractDomain(c.website);
-            return expected.some(exp => domain.includes(exp) || exp.includes(domain));
-          });
-          
-          if (verifiedCompetitors.length > 0) {
-            console.log(`✅ [Discovery] Verified ${verifiedCompetitors.length} expected competitors`);
-            return verifiedCompetitors;
-          } else {
-            console.log('⚠️ [Discovery] No expected competitors found in results');
-            // Return empty array - do not use fallback competitors
-            return [];
-          }
-        }
-        
-        // If no expected competitors defined, return direct business competitors only
-        if (separated.directBusinessCompetitors.length > 0) {
-          console.log(`✅ [Discovery] Returning ${separated.directBusinessCompetitors.length} direct business competitors`);
-          return separated.directBusinessCompetitors;
+        // Return direct business competitors and SERP competitors
+        if (separated.directBusinessCompetitors.length > 0 || separated.serpCompetitors.length > 0) {
+          const allValid = [...separated.directBusinessCompetitors, ...separated.serpCompetitors];
+          console.log(`✅ [Discovery] Returning ${allValid.length} verified competitors (${separated.directBusinessCompetitors.length} direct, ${separated.serpCompetitors.length} serp)`);
+          return allValid;
         }
         
         // No verified competitors found
@@ -421,25 +389,19 @@ async function discoverCompetitors({ productName, industry, websiteUrl, keywordI
         }
       }
 
-      // AI-estimated competitors as final fallback
-      if (!fallbackResult) {
-        console.log('🔄 [Discovery] Using AI-estimated competitors as final fallback');
-        fallbackResult = generateEstimatedCompetitors(productName, industry, websiteUrl, normalizedDomain);
-        fallbackSource = 'AI-estimated';
-      }
-
       if (fallbackResult && fallbackResult.length > 0) {
         console.log(`✅ [Discovery] Using ${fallbackResult.length} competitors from ${fallbackSource}`);
         return fallbackResult;
       }
 
-      // Return empty array with unavailable reason
+      // No competitors available from any source
+      console.log('⚠️ [Discovery] No competitors available from any verified source');
       return {
         directCompetitors: [],
         serpCompetitors: [],
         directories: [],
-        estimatedCompetitors: fallbackResult || [],
-        unavailableReason: fallbackResult ? 'Using fallback competitors' : 'No competitors available from any source',
+        estimatedCompetitors: [],
+        unavailableReason: 'No competitors available from any source',
         sourcesUsed: fallbackSource ? [fallbackSource] : []
       };
     }
@@ -520,53 +482,6 @@ async function discoverCompetitors({ productName, industry, websiteUrl, keywordI
       }
       return true;
     });
-  }
-
-  // AI-estimated competitors as fallback when no APIs work
-  function generateEstimatedCompetitors(productName, industry, websiteUrl, normalizedDomain) {
-    const domain = extractDomain(websiteUrl);
-    const baseName = domain ? domain.split('.')[0] : productName;
-    
-    // Use expected competitors if available for the domain
-    const expected = expectedCompetitors[normalizedDomain] || [];
-    
-    if (expected.length > 0) {
-      return expected.map(expDomain => ({
-        name: expDomain.split('.')[0].charAt(0).toUpperCase() + expDomain.split('.')[0].slice(1),
-        website: `https://www.${expDomain}`,
-        domain: expDomain,
-        type: 'estimated',
-        positioning: 'Estimated competitor',
-        source: 'CategoryFallback',
-        isEstimated: true,
-        isFallback: true
-      }));
-    }
-    
-    // Generate generic industry competitors based on common patterns
-    const estimated = [];
-    
-    if (industry.toLowerCase().includes('presentation') || productName.toLowerCase().includes('presentation')) {
-      estimated.push(
-        { name: 'Microsoft PowerPoint', website: 'https://www.microsoft.com/powerpoint', domain: 'microsoft.com', type: 'estimated', positioning: 'Market leader', source: 'CategoryFallback', isEstimated: true, isFallback: true },
-        { name: 'Google Slides', website: 'https://slides.google.com', domain: 'google.com', type: 'estimated', positioning: 'Market leader', source: 'CategoryFallback', isEstimated: true, isFallback: true },
-        { name: 'Apple Keynote', website: 'https://www.apple.com/keynote', domain: 'apple.com', type: 'estimated', positioning: 'Market leader', source: 'CategoryFallback', isEstimated: true, isFallback: true }
-      );
-    } else if (industry.toLowerCase().includes('design') || productName.toLowerCase().includes('design')) {
-      estimated.push(
-        { name: 'Adobe Express', website: 'https://www.adobe.com/express', domain: 'adobe.com', type: 'estimated', positioning: 'Market leader', source: 'CategoryFallback', isEstimated: true, isFallback: true },
-        { name: 'Figma', website: 'https://www.figma.com', domain: 'figma.com', type: 'estimated', positioning: 'Market leader', source: 'CategoryFallback', isEstimated: true, isFallback: true },
-        { name: 'Visme', website: 'https://www.visme.co', domain: 'visme.co', type: 'estimated', positioning: 'Direct competitor', source: 'CategoryFallback', isEstimated: true, isFallback: true }
-      );
-    } else {
-      // Generic fallback
-      estimated.push(
-        { name: `Competitor A for ${productName}`, website: '', domain: '', type: 'estimated', positioning: 'Generic competitor', source: 'CategoryFallback', isEstimated: true, isFallback: true },
-        { name: `Competitor B for ${productName}`, website: '', domain: '', type: 'estimated', positioning: 'Generic competitor', source: 'CategoryFallback', isEstimated: true, isFallback: true }
-      );
-    }
-    
-    return filterSelfLinks(estimated, websiteUrl);
   }
 
   // SerpAPI fallback function
@@ -811,35 +726,6 @@ function calculateConfidenceScore(result, query, productName) {
   if (result.title && result.title.length > 10) score += 5;
   
   return Math.min(score, 95);
-}
-
-function generateFallbackCompetitors(productName, industry) {
-  console.log('🔄 [Discovery] No real competitors found, generating category-based fallback');
-
-  const categoryCompetitors = getCategoryCompetitors({
-    brandName: productName || '',
-    productName: productName || '',
-    companyName: '',
-    domain: '',
-    category: industry || ''
-  });
-
-  if (categoryCompetitors.length > 0) {
-    return categoryCompetitors.map((c, index) => ({
-      name: c.name,
-      website: c.domain ? `https://www.${c.domain}` : '',
-      domain: c.domain || '',
-      competitorType: 'direct',
-      positioning: index === 0 ? 'Market leader' : index <= 2 ? 'Strong competitor' : 'Direct competitor',
-      source: 'CategoryFallback',
-      isEstimated: true,
-      isFallback: true,
-      relevanceScore: Math.max(85 - index * 3, 65),
-      evidence: 'Category-based fallback competitor'
-    }));
-  }
-
-  return [];
 }
 
 // ============================================
@@ -1682,157 +1568,6 @@ async function searchWithExa(query) {
   return data.results || [];
 }
 
-// ============================================
-// CATEGORY COMPETITORS
-// ============================================
-
-function getCategoryCompetitors({ brandName = "", productName = "", companyName = "", domain = "", category = "" } = {}) {
-  const b = `${brandName} ${productName} ${companyName} ${domain} ${category}`.toLowerCase();
-
-  if (b.includes("canva")) {
-    return [
-      { name: "Adobe Express", domain: "adobe.com/express" },
-      { name: "Figma", domain: "figma.com" },
-      { name: "Visme", domain: "visme.co" },
-      { name: "Piktochart", domain: "piktochart.com" },
-      { name: "Microsoft Designer", domain: "designer.microsoft.com" },
-      { name: "Beautiful.ai", domain: "beautiful.ai" },
-      { name: "VistaCreate", domain: "create.vista.com" }
-    ];
-  }
-
-  if (b.includes("gamma")) {
-    return [
-      { name: "Canva", domain: "canva.com" },
-      { name: "Beautiful.ai", domain: "beautiful.ai" },
-      { name: "Tome", domain: "tome.app" },
-      { name: "Pitch", domain: "pitch.com" },
-      { name: "Plus AI", domain: "plusdocs.com" },
-      { name: "Presentations.AI", domain: "presentations.ai" },
-      { name: "Google Slides", domain: "google.com/slides/about" },
-      { name: "Microsoft PowerPoint Copilot", domain: "microsoft.com" }
-    ];
-  }
-
-  if (b.includes("figma")) {
-    return [
-      { name: "Canva", domain: "canva.com" },
-      { name: "Adobe XD", domain: "adobe.com/products/xd.html" },
-      { name: "Sketch", domain: "sketch.com" },
-      { name: "Framer", domain: "framer.com" },
-      { name: "Webflow", domain: "webflow.com" },
-      { name: "Miro", domain: "miro.com" },
-      { name: "Penpot", domain: "penpot.app" }
-    ];
-  }
-
-  if (b.includes("notion")) {
-    return [
-      { name: "ClickUp", domain: "clickup.com" },
-      { name: "Coda", domain: "coda.io" },
-      { name: "Airtable", domain: "airtable.com" },
-      { name: "Asana", domain: "asana.com" },
-      { name: "Trello", domain: "trello.com" },
-      { name: "Monday.com", domain: "monday.com" },
-      { name: "Confluence", domain: "atlassian.com/software/confluence" },
-      { name: "Slite", domain: "slite.com" }
-    ];
-  }
-
-  if (b.includes("orkyn") || b.includes("salesforce") || b.includes("erp") || b.includes("custom software")) {
-    return [
-      { name: "Zoho Partners", domain: "zoho.com/partners" },
-      { name: "Odoo Partners", domain: "odoo.com/partners" },
-      { name: "Salesforce Consulting Partners", domain: "salesforce.com/partners" },
-      { name: "Toptal Software Development", domain: "toptal.com" },
-      { name: "ELEKS", domain: "eleks.com" },
-      { name: "ScienceSoft", domain: "scnsoft.com" }
-    ];
-  }
-
-  // Creator economy / social media analytics / influencer marketing
-  if (b.includes("virlo") || b.includes("analytics") || b.includes("social media") || b.includes("influencer") || b.includes("creator") || b.includes("tiktok analytics") || b.includes("social listening")) {
-    return [
-      { name: "Trendpop", domain: "trendpop.com" },
-      { name: "Pentos", domain: "pentos.video" },
-      { name: "Exolyt", domain: "exolyt.com" },
-      { name: "HypeAuditor", domain: "hypeauditor.com" },
-      { name: "Favikon", domain: "favikon.com" },
-      { name: "Modash", domain: "modash.io" },
-      { name: "CreatorIQ", domain: "creatoriq.com" },
-      { name: "Sprout Social", domain: "sproutsocial.com" },
-      { name: "Brandwatch", domain: "brandwatch.com" }
-    ];
-  }
-
-  return [];
-}
-
-// ============================================
-// FALLBACK
-// ============================================
-
-function generateFallbackCompetitorIntelligence(productName, industry) {
-  console.log('🔄 [Fallback] Generating fallback competitor intelligence...');
-
-  return {
-    competitors: generateFallbackCompetitors(productName, industry),
-    competitorProfiles: [],
-    keywordGaps: {
-      missingKeywords: [],
-      sharedKeywords: [],
-      competitorOnlyKeywords: [],
-      highOpportunityKeywords: [],
-      lowCompetitionKeywords: [],
-      summary: { totalMissing: 0, totalShared: 0, highOpportunity: 0 }
-    },
-    contentGaps: [
-      {
-        gapType: 'comparison',
-        title: 'Competitor Comparison Pages',
-        reason: 'Industry standard - create comparison content',
-        competitorExample: '',
-        opportunityScore: 75,
-        priority: 'medium',
-        suggestedAction: 'Research competitors and create comparison pages'
-      }
-    ],
-    authorityGaps: {
-      authorityGapScore: 0,
-      userStrengths: ['Established presence'],
-      competitorAdvantages: [],
-      backlinkOpportunities: [],
-      citationOpportunities: [],
-      trustSignalGaps: []
-    },
-    geoGaps: {
-      entityCoverageGap: 0,
-      citationReadinessGap: 0,
-      answerabilityGap: 0,
-      topicalAuthorityGap: 0,
-      aiVisibilityGap: 0,
-      recommendedFixes: []
-    },
-    competitorMatrix: [],
-    recommendations: {
-      immediate: [
-        { action: 'Research competitors in your industry', impact: 'high', difficulty: 'easy' }
-      ],
-      day30: [
-        { action: 'Analyze competitor strategies', impact: 'medium', difficulty: 'medium' }
-      ],
-      day90: [
-        { action: 'Build competitive advantage', impact: 'high', difficulty: 'hard' }
-      ],
-      competitivePriorities: []
-    },
-    metadata: {
-      totalCompetitors: 2,
-      directCompetitors: 1,
-      analyzedAt: new Date().toISOString()
-    }
-  };
-}
 
 export default {
   generateCompetitorSeoIntelligence
