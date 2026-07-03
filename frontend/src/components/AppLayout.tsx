@@ -26,7 +26,7 @@ export default function AppLayout() {
     isCreatingChatRef.current = true;
     try {
       await createChat('New Analysis');
-      navigate('/app/growth-workspace');
+      navigate('/app/growth-workspace', { state: { newAnalysis: true } });
     } finally {
       isCreatingChatRef.current = false;
     }
@@ -37,7 +37,7 @@ export default function AppLayout() {
       alert('Please select a project first or create a New Analysis.');
       return;
     }
-    navigate('/app/growth-workspace');
+    navigate('/app/growth-workspace', { state: { runFullAnalysis: true } });
   };
 
   return (

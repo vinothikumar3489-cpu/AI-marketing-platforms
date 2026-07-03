@@ -1,4 +1,5 @@
 import { useEffect, useState, Component } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
 import { asArray, asNumber, asText } from '../lib/normalizers';
@@ -78,13 +79,17 @@ class TabErrorBoundary extends Component<{ children: React.ReactNode }, { hasErr
 const tabs = ['Executive Dashboard', 'Executive Story', 'Technical Audit', 'Keyword Intelligence', 'Competitor SEO', 'Content Gaps', 'GEO / AI Visibility', 'Blog Intelligence', 'Action Plan'];
 
 export default function SEOIntelligencePage() {
-  const { selectedChatId, loadFullResults, fullResults, refreshChats } = useProject();
+  const { selectedChatId, createChat, loadFullResults, fullResults, refreshChats } = useProject();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isNewAnalysis = location.state?.newAnalysis === true;
   const [url, setUrl] = useState('');
   const [seo, setSeo] = useState<any>({});
   const [activeTab, setActiveTab] = useState('Executive Dashboard');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [mode, setMode] = useState<'form' | 'running' | 'results' | 'error'>('form');
+  const [mode, setMode] = useState<'form' | 'creating' | 'running' | 'results' | 'error'>(isNewAnalysis ? 'form' : 'form');
+  const [creatingChat, setCreatingChat] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentStage, setCurrentStage] = useState('Starting...');
   const seoProgressStages = [
@@ -115,29 +120,45 @@ export default function SEOIntelligencePage() {
   }, [mode]);
 
   useEffect(() => {
+    if (isNewAnalysis) return;
     let cancelled = false;
     const r = fullResults.seoIntelligence || fullResults.seo || {};
     
     if (Object.keys(r).length && r.scoreBreakdown) {
-      if (!cancelled) { setSeo(r); setMode('results'); if (!url) setUrl(r.websiteUrl || ''); }
+      if (!cancelled && mode !== 'form' && mode !== 'creating') { setSeo(r); setMode('results'); if (!url) setUrl(r.websiteUrl || ''); }
     } else {
-      if (!cancelled) { setSeo({}); setMode('form'); }
+      if (!cancelled && mode !== 'running' && mode !== 'creating') { setSeo({}); setMode('form'); }
     }
     return () => { cancelled = true; };
   }, [fullResults]);
 
   async function run() {
     if (!url) { setError('Website URL is required'); return; }
-    if (!selectedChatId) { setError('Please create or select a project first.'); return; }
     setLoading(true);
     setError('');
     
     // Clear old results before running fresh analysis
     setSeo({});
-    
+
+    let chatId = selectedChatId;
+    if (!chatId) {
+      setMode('creating');
+      setCreatingChat(true);
+      try {
+        chatId = await createChat('New SEO Analysis');
+        navigate('/app/seo', { replace: true });
+      } catch (e: any) {
+        setError('Failed to create project: ' + (e.message || 'Unknown error'));
+        setMode('form');
+        setCreatingChat(false);
+        setLoading(false);
+        return;
+      }
+      setCreatingChat(false);
+    }
+
     setMode('running');
     try {
-      const chatId = selectedChatId;
       console.log('[SEO UI] run started for chat:', chatId, 'url:', url);
 
       const runTag = `seo_fe_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -227,12 +248,21 @@ export default function SEOIntelligencePage() {
         </Card>
       )}
 
+      {mode === 'creating' && (
+        <Card>
+          <div style={{ padding: '40px', textAlign: 'center' }}>
+            <Loader2 className="spin" size={24} />
+            <p style={{ color: '#9aa7bd', marginTop: '15px' }}>Creating project...</p>
+          </div>
+        </Card>
+      )}
+
       {(mode === 'form' || mode === 'running') && (
       <Card>
         <SectionTitle title="Analyze Website" subtitle="Enter your URL to generate thousands of data points." />
         <div style={{ display: 'flex', gap: '15px' }}>
           <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://example.com" style={{ flex: 1, padding: '12px 16px', borderRadius: '8px', border: '1px solid #303849', background: '#0b1220', color: '#fff' }} disabled={loading} />
-          <button onClick={run} className="primary-btn" disabled={loading || !url} style={{ padding: '0 30px' }}>
+          <button onClick={run} className="primary-btn" disabled={loading || !url || mode === 'creating'} style={{ padding: '0 30px' }}>
             {loading ? 'Running 14-Step Audit...' : 'Run SEO Intelligence'}
           </button>
         </div>

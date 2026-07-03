@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
 import { asArray, asNumber, asText, asInsight } from '../lib/normalizers';
@@ -28,15 +29,20 @@ const defaults: any = {
 const tabs = ['Executive Snapshot', 'Executive Story', 'Product DNA', 'Market Intelligence', 'Audience Intelligence', 'Competitor Intelligence', 'Intent Prediction', 'Positioning Strategy', 'Campaign Strategy', 'Channel Strategy', 'Action Plan'];
 
 export default function GrowthWorkspacePage() {
-  const { selectedChatId, loadFullResults, fullResults } = useProject();
+  const { selectedChatId, createChat, loadFullResults, fullResults } = useProject();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isNewAnalysis = location.state?.newAnalysis === true;
   const [form, setForm] = useState(defaults);
   const [activeTab, setActiveTab] = useState('Executive Snapshot');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [results, setResults] = useState<any>({});
-  const [mode, setMode] = useState<'form' | 'running' | 'results' | 'error'>('form');
+  const [mode, setMode] = useState<'form' | 'creating' | 'running' | 'results' | 'error'>(isNewAnalysis ? 'form' : 'form');
+  const [creatingChat, setCreatingChat] = useState(false);
 
   useEffect(() => {
+    if (isNewAnalysis) return;
     let cancelled = false;
     const r = fullResults.growth || {};
     
@@ -44,10 +50,10 @@ export default function GrowthWorkspacePage() {
       r.product || r.market || r.audience || r.competitor || r.intent || r.positioning || r.campaign || r.channel || r.executiveStory || r.actionPlan;
     
     if (!cancelled) {
-      if (hasGrowthData) {
+      if (hasGrowthData && mode !== 'form' && mode !== 'creating') {
         setResults(r);
         setMode('results');
-      } else {
+      } else if (!hasGrowthData && mode !== 'running' && mode !== 'creating') {
         setResults({});
         setMode('form');
         setStep(1);
@@ -61,15 +67,28 @@ export default function GrowthWorkspacePage() {
       setError('Website URL is required.');
       return;
     }
-    if (!selectedChatId) {
-      setError('Please create or select a project first.');
-      return;
-    }
     setError(''); 
     setLoading(true);
+
+    let chatId = selectedChatId;
+    if (!chatId) {
+      setMode('creating');
+      setCreatingChat(true);
+      try {
+        chatId = await createChat('New Analysis');
+        navigate('/app/growth-workspace', { replace: true });
+      } catch (e: any) {
+        setError('Failed to create project: ' + (e.message || 'Unknown error'));
+        setMode('form');
+        setCreatingChat(false);
+        setLoading(false);
+        return;
+      }
+      setCreatingChat(false);
+    }
+
     setMode('running');
     try {
-      const chatId = selectedChatId;
       console.log('[Growth UI] run started for chat:', chatId);
       
       const res: any = await api.post(`/chats/${chatId}/growth-workspace/run-full-analysis`, form);
@@ -185,6 +204,15 @@ export default function GrowthWorkspacePage() {
               <button onClick={run} className="secondary-btn" disabled={loading}>Retry</button>
               <button onClick={handleNewAnalysis} className="ghost-btn">New Analysis</button>
             </div>
+          </div>
+        </Card>
+      )}
+      
+      {mode === 'creating' && (
+        <Card>
+          <div style={{ padding: '40px', textAlign: 'center' }}>
+            <Loader2 className="spin" size={24} />
+            <p style={{ color: '#9aa7bd', marginTop: '15px' }}>Creating project...</p>
           </div>
         </Card>
       )}
