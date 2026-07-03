@@ -28,6 +28,11 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
   console.log('[SEO API] runId:', runId);
   console.log('[SEO API] chatId:', chatId);
   console.log('[SEO API] websiteUrl:', websiteUrl);
+  console.log('[SEO API] DataForSEO configured:', !!(process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD));
+  console.log('[SEO API] Tavily configured:', !!process.env.TAVILY_API_KEY);
+  console.log('[SEO API] Exa configured:', !!process.env.EXA_API_KEY);
+  console.log('[SEO API] Firecrawl configured:', !!process.env.FIRECRAWL_API_KEY);
+  console.log('[SEO API] PageSpeed configured:', !!process.env.PAGESPEED_API_KEY);
   console.log('');
 
   // Add overall timeout to prevent hanging forever (5 minutes)
@@ -76,6 +81,8 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
         keywordsCount: researchData.keywords.length
       });
     }
+    console.log('[SEO API] Firecrawl:', researchData.websiteContent ? 'success' : 'fail');
+    console.log('[SEO API] Tavily:', researchData.competitors.length > 0 ? 'success' : 'fail/empty');
 
     // Step 2: Scrape website if not already done by orchestrator
     if (researchData.websiteContent) {
@@ -125,6 +132,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
         console.log('✅ [SEO Intelligence] Technical audit complete. Score:', technicalAudit.scores.overall);
       }
     }
+    console.log('[SEO API] PageSpeed:', technicalAudit?.scores?.overall ? 'success' : 'fail/timeout');
 
     // Step 5: Calculate multi-dimensional SEO scores
     if (process.env.NODE_ENV !== 'production') {
@@ -164,6 +172,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
       console.error('❌ [SEO Intelligence] Keyword intelligence failed:', kwError);
       keywordIntelligence = { primaryKeywords: [], secondaryKeywords: [], longTailKeywords: [], questionKeywords: [], clusters: [], competitorKeywords: [], contentOpportunities: [], geoKeywords: [], metadata: { totalKeywords: 0, clustersCount: 0, opportunitiesCount: 0 } };
     }
+    console.log('[SEO API] DataForSEO:', (keywordIntelligence?.metadata?.isFromDataForSEO || keywordIntelligence?.isFromDataForSEO) ? 'success' : 'fail/fallback');
     if (process.env.NODE_ENV !== 'production') {
       // ==== DEBUG: Keyword Intel output ====
       console.log('===== KEYWORD INTELLIGENCE OUTPUT =====');
@@ -245,6 +254,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
         }
       };
     }
+    console.log('[SEO API] Competitor SEO generated count:', competitorIntelligence?.metadata?.totalCompetitors || (competitorIntelligence?.competitorProfiles || []).length || (competitorIntelligence?.competitors || []).length || 0);
     if (process.env.NODE_ENV !== 'production') {
       // ==== DEBUG: Competitor Intel output ====
       console.log('===== COMPETITOR INTELLIGENCE OUTPUT =====');
@@ -281,6 +291,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
       console.error('❌ [SEO Intelligence] Blog intelligence failed:', blogError);
       blogIntelligence = { blogIdeas: [], blogClusters: [], blogBriefs: [], publishingCalendar: {}, summary: { totalIdeas: 0, totalClusters: 0, highPriorityIdeas: 0 }, metadata: { analyzedAt: new Date().toISOString(), message: 'Blog intelligence unavailable' } };
     }
+    console.log('[SEO API] Blog ideas generated count:', blogIntelligence?.summary?.totalIdeas || asArray(blogIntelligence?.blogIdeas).length || 0);
     if (process.env.NODE_ENV !== 'production') {
       // ==== DEBUG: Blog Intel output ====
       console.log('===== BLOG INTELLIGENCE OUTPUT =====');
@@ -310,6 +321,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
       console.error('❌ [SEO Intelligence] Content gap intelligence failed:', cgError);
       contentGapIntelligence = { contentGaps: [], landingPageIdeas: [], comparisonPageIdeas: [], faqOpportunities: [], geoContentIdeas: [], resourcePageIdeas: [], contentCalendar: {}, summary: { totalGaps: 0, totalOpportunities: 0, criticalPriority: 0, highPriority: 0 }, metadata: { analyzedAt: new Date().toISOString(), hasKeywordData: false, hasCompetitorData: false } };
     }
+    console.log('[SEO API] Content gaps generated count:', contentGapIntelligence?.summary?.totalGaps || asArray(contentGapIntelligence?.contentGaps).length || 0);
     if (process.env.NODE_ENV !== 'production') {
       // ==== DEBUG: Content Gap output ====
       console.log('===== CONTENT GAP OUTPUT =====');
@@ -736,11 +748,9 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
         updatedAt: new Date()
       }
     });
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('✅ [SEO Intelligence] Blog intelligence saved:', parsedBlogIntelligence.blogIdeas?.length || 0, 'ideas');
-
-      console.log('✅ [SEO Intelligence] All data saved to database');
-    }
+    console.log('✅ [SEO Intelligence] Blog intelligence saved:', parsedBlogIntelligence.blogIdeas?.length || 0, 'ideas');
+    console.log('✅ [SEO Intelligence] All data saved to database');
+    console.log('[SEO API] Final SEO save completed');
 
     return seoRecord;
   });
@@ -884,6 +894,18 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     console.log('');
   }
 
+  console.log('[SEO API] Return data summary:', {
+    hasTechnicalAudit: !!executiveDashboard,
+    hasKeywords: !!parsedKeywordIntelligence,
+    hasCompetitors: !!parsedCompetitorIntelligence,
+    hasContentGaps: !!parsedContentGapIntelligence,
+    hasBlogIdeas: !!parsedBlogIntelligence,
+    hasGeo: !!parsedGeoIntelligence,
+    competitorsCount: parsedCompetitorIntelligence?.metadata?.totalCompetitors || (parsedCompetitorIntelligence?.competitorProfiles || []).length || 0,
+    contentGapCount: parsedContentGapIntelligence?.summary?.totalGaps || 0,
+    blogIdeaCount: parsedBlogIntelligence?.summary?.totalIdeas || 0
+  });
+
   // Return successful analysis data with canonical structure
   return {
     success: true,
@@ -902,13 +924,13 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
       },
       technicalAudit: {
         ...technicalAudit,
-        overallScore: safeTechnicalScores.overall ?? 0,
-        performanceScore: safeTechnicalScores.performance ?? technicalAudit?.auditData?.performanceScore ?? 0,
-        seoScore: safeTechnicalScores.seo ?? technicalAudit?.auditData?.seoScore ?? 0,
-        accessibilityScore: safeTechnicalScores.accessibility ?? technicalAudit?.auditData?.accessibilityScore ?? 0,
-        bestPracticesScore: safeTechnicalScores.bestPractices ?? technicalAudit?.auditData?.bestPracticesScore ?? 0,
-        mobileScore: safeTechnicalScores.mobile ?? technicalAudit?.auditData?.mobileScore ?? 0,
-        desktopScore: safeTechnicalScores.desktop ?? technicalAudit?.auditData?.desktopScore ?? 0,
+        overallScore: safeTechnicalScores.overall ?? technicalAudit?.auditData?.overallScore ?? null,
+        performanceScore: safeTechnicalScores.performance ?? technicalAudit?.auditData?.performanceScore ?? null,
+        seoScore: safeTechnicalScores.seo ?? technicalAudit?.auditData?.seoScore ?? null,
+        accessibilityScore: safeTechnicalScores.accessibility ?? technicalAudit?.auditData?.accessibilityScore ?? null,
+        bestPracticesScore: safeTechnicalScores.bestPractices ?? technicalAudit?.auditData?.bestPracticesScore ?? null,
+        mobileScore: safeTechnicalScores.mobile ?? technicalAudit?.auditData?.mobileScore ?? null,
+        desktopScore: safeTechnicalScores.desktop ?? technicalAudit?.auditData?.desktopScore ?? null,
         source: 'orchestrator'
       },
       keywordIntelligence: parsedKeywordIntelligence || {},

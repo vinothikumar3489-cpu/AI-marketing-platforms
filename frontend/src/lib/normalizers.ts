@@ -408,23 +408,87 @@ export function normalizeSeo(data: any) {
     totalGaps: asArray(contentGapData.contentGaps || contentGapData.gaps || contentGapData.missingPages).length
   };
 
-  // Normalize blog intelligence with filtering
-  const blogData = seo.blogIntelligenceRecord || seo.blogIntelligence || seo.blogIdeas || {};
-  const weakKeywords = ['general', 'account', 'semrush', 'competitors', 'alternatives'];
-  const filteredBlogs = asArray(blogData.blogIdeas || blogData.ideas || blogData).filter((idea: any) => {
-    const keyword = (idea.targetKeyword || idea.keyword || '').toLowerCase();
-    return !weakKeywords.some(weak => keyword === weak || keyword.startsWith(weak + ' '));
-  });
+  // Build API-compatible key aliases for tab components
+  // IMPORTANT: Prefer JSON columns (full service output format) over structured relations (subset fields).
+  // JSON columns store the EXACT format that tabs expect (competitors[], competitorProfiles[], etc.).
+  // Relations store structured subsets — only use as fallback.
+  
+  const tabTechnical = safeParse(seo.technicalAuditDetail || seo.technicalAudit || seo.technicalSeoAudit || {});
+
+  // Keywords: JSON column = keywordOpportunities (exact service format), relation = keywordIntelligenceRecord
+  const tabKeywords = safeParse(
+    seo.keywordOpportunities ||
+    seo.keywordIntelligenceRecord ||
+    seo.keywordIntelligence ||
+    seo.keywords ||
+    {}
+  );
+
+  // Competitors: JSON column = competitorKeywords (exact raw format), relation = competitorSeoRecord (partial subset)
+  const rawCompetitorJson = seo.competitorKeywords;
+  const rawCompetitorRelation = seo.competitorSeoRecord;
+  const tabCompetitors = safeParse(
+    rawCompetitorJson ||
+    rawCompetitorRelation ||
+    seo.competitors ||
+    seo.competitorIntelligence ||
+    {}
+  );
+
+  // Content gaps: JSON column = contentGaps (exact format), relation = contentGapRecord
+  const rawContentGapJson = seo.contentGaps;
+  const rawContentGapRelation = seo.contentGapRecord;
+  const tabContentGaps = safeParse(
+    rawContentGapJson ||
+    rawContentGapRelation ||
+    seo.contentGapAnalysis ||
+    normalizedContentGaps ||
+    {}
+  );
+
+  // GEO: JSON column = geoIntelligence (exact format), relation = geoIntelligenceRecord
+  const tabGeo = safeParse(
+    seo.geoIntelligence ||
+    seo.geoIntelligenceRecord ||
+    seo.aiVisibility ||
+    {}
+  );
+
+  // Blogs: JSON column = blogIdeas (exact format), relation = blogIntelligenceRecord
+  const rawBlogJson = seo.blogIdeas;
+  const rawBlogRelation = seo.blogIntelligenceRecord;
+  const blogWeakKeywords = ['general', 'account', 'semrush', 'competitors', 'alternatives'];
+  const tabBlogs = (() => {
+    const blogData = safeParse(
+      rawBlogJson ||
+      rawBlogRelation ||
+      seo.blogIntelligence ||
+      {}
+    );
+    const filteredBlogs = asArray(blogData.blogIdeas || blogData.ideas || blogData).filter((idea: any) => {
+      const keyword = (idea.targetKeyword || idea.keyword || '').toLowerCase();
+      return !blogWeakKeywords.some(weak => keyword === weak || keyword.startsWith(weak + ' '));
+    });
+    return { ...blogData, blogIdeas: filteredBlogs, ideas: filteredBlogs };
+  })();
 
   const normalizedSeo = {
     ...seo,
+    // API-compatible key aliases (tabs expect these exact names)
+    technicalAudit: tabTechnical,
+    keywordIntelligence: tabKeywords,
+    competitorIntelligence: tabCompetitors,
+    contentGapAnalysis: tabContentGaps,
+    geoIntelligence: tabGeo,
+    blogIntelligence: tabBlogs,
+    // Normalized keys
     scoreBreakdown: safeParse(seo.scoreBreakdown || seo.seoScoreBreakdown || seo.score_breakdown || {}),
-    technical: safeParse(seo.technicalAuditDetail || seo.technicalAudit || seo.technicalSeoAudit || {}),
-    keywords: safeParse(seo.keywordIntelligence || seo.keywordIntelligenceRecord || seo.keywords || {}),
-    geo: safeParse(seo.geoIntelligence || seo.geoIntelligenceRecord || seo.aiVisibility || {}),
-    competitors: safeParse(seo.competitorIntelligence || seo.competitorSeoRecord || seo.competitorSeo || seo.competitors || {}),
-    contentGaps: normalizedContentGaps,
-    blogs: { ...blogData, blogIdeas: filteredBlogs, ideas: filteredBlogs },
+    technical: tabTechnical,
+    keywords: tabKeywords,
+    geo: tabGeo,
+    competitors: tabCompetitors,
+    contentGaps: tabContentGaps,
+    blogs: tabBlogs,
     executiveDashboard: safeParse(seo.executiveDashboard || seo.executiveSeoDashboard || seo.dashboard || {}),
     executive: safeParse(seo.executiveDashboard || seo.executiveSeoDashboard || seo.dashboard || {}),
     // Canonical paths

@@ -272,7 +272,9 @@ function filterJunkKeywords(keywords, source = 'unknown') {
       'send', 'receive', 'share', 'join', 'browse', 'search',
       'view', 'read', 'write', 'edit', 'delete', 'save', 'update',
       'change', 'add', 'remove', 'show', 'hide', 'open', 'close',
-      'back', 'next', 'done', 'cancel', 'ok', 'yes', 'no'
+      'back', 'next', 'done', 'cancel', 'ok', 'yes', 'no',
+      'started', 'daily', 'alerts', 'outlier', 'research',
+      'credits', 'what', 'manage', 'content'
     ]);
 
     const wordCount = keyword.split(' ').length;

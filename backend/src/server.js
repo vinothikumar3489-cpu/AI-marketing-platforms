@@ -28,6 +28,22 @@ import { automationRouter } from "./routes/automation.routes.js";
 
 dotenv.config();
 
+// ============================================
+// API HEALTH CHECK — startup logging
+// ============================================
+console.log('');
+console.log('[API Health] ========================================');
+console.log('[API Health] GROQ_API_KEY loaded:', !!process.env.GROQ_API_KEY);
+console.log('[API Health] GEMINI_API_KEY loaded:', !!process.env.GEMINI_API_KEY);
+console.log('[API Health] TAVILY_API_KEY loaded:', !!process.env.TAVILY_API_KEY);
+console.log('[API Health] FIRECRAWL_API_KEY loaded:', !!process.env.FIRECRAWL_API_KEY);
+console.log('[API Health] PAGESPEED_API_KEY loaded:', !!process.env.PAGESPEED_API_KEY);
+console.log('[API Health] EXA_API_KEY loaded:', !!process.env.EXA_API_KEY);
+console.log('[API Health] DATAFORSEO_LOGIN loaded:', !!process.env.DATAFORSEO_LOGIN);
+console.log('[API Health] DATAFORSEO_PASSWORD loaded:', !!process.env.DATAFORSEO_PASSWORD);
+console.log('[API Health] ========================================');
+console.log('');
+
 const execAsync = promisify(exec);
 const app = express();
 const REQUIRED_PORT = parseInt(process.env.PORT || '5000', 10);

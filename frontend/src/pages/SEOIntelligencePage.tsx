@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, Component } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
-import { asArray, asNumber, asText } from '../lib/normalizers';
+import { asArray, asNumber, asText, normalizeSeo } from '../lib/normalizers';
 import { Badge, Card, EmptyState, Loading, PageHeader, ScoreCard, SectionTitle } from '../components/UI';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { Shield, Target, TrendingUp, Zap, Search, Globe, Code, FileText, Cpu, LayoutList, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
@@ -201,7 +201,7 @@ export default function SEOIntelligencePage() {
       // Store API response data directly in local state (like Growth Workspace does)
       const rawSeo = res.seoIntelligence || res.data || res;
       if (rawSeo && typeof rawSeo === 'object' && Object.keys(rawSeo).length > 0) {
-        setSeo(rawSeo);
+        setSeo(normalizeSeo(rawSeo));
       }
 
       console.log('[SEO UI] refreshing full results');
@@ -1603,7 +1603,7 @@ function BlogIntelligence({ data }: { data: any }) {
   if (!data || Object.keys(data).length === 0) return <EmptyState title="No Blog Intelligence" text="Run analysis first." />;
 
   // Filter out weak/generic keywords that pollute results
-  const weakKeywords = ['general', 'account', 'semrush', 'competitors', 'alternatives', 'sign up', 'login', 'pricing', 'demo', 'free trial', 'contact us', 'about us', 'template', 'download', 'gallery', 'canva', 'wix', 'wordpress', 'shopify', 'squarespace', 'godaddy', 'weebly'];
+  const weakKeywords = ['general', 'account', 'semrush', 'competitors', 'alternatives', 'sign up', 'login', 'pricing', 'demo', 'free trial', 'contact us', 'about us', 'template', 'download', 'gallery', 'canva', 'wix', 'wordpress', 'shopify', 'squarespace', 'godaddy', 'weebly', 'started', 'daily', 'alerts', 'outlier', 'research', 'content', 'data', 'credits', 'what', 'manage'];
   const blogIdeasRaw = asArray(data.blogIdeas || []);
   const blogIdeas = blogIdeasRaw.filter((b: any) => {
     const keyword = (b.targetKeyword || b.keyword || '').toLowerCase().trim();
@@ -1739,6 +1739,15 @@ function BlogIntelligence({ data }: { data: any }) {
 }
 
 function ActionPlan({ data }: { data: any }) {
+  // Filter out weak/generic single-word keywords from action items
+  const weakKeywords = new Set(['started', 'daily', 'alerts', 'outlier', 'research', 'content', 'data', 'credits', 'what', 'manage', 'tool', 'seo', 'competitor', 'keyword', 'general', 'account']);
+  const isStrongKeyword = (kw: string) => {
+    if (!kw) return false;
+    const lower = kw.toLowerCase().trim();
+    if (weakKeywords.has(lower)) return false;
+    if (lower.split(' ').length <= 1) return false;
+    return true;
+  };
   // Build plan from multiple fallback sources when executiveDashboard is missing
   const plan = data.actionPlan || 
                data.executiveDashboard?.executiveActionPlan || 
@@ -1756,7 +1765,7 @@ function ActionPlan({ data }: { data: any }) {
                    priority: g.severity || g.priority || 'Medium', 
                    reason: g.reason || g.description || g.opportunity || 'Content gap to address' 
                  })),
-                 day30: (data.keywordIntelligence?.contentOpportunities || []).slice(0, 3).map((o: any) => ({ 
+                 day30: (data.keywordIntelligence?.contentOpportunities || []).filter((o: any) => isStrongKeyword(o.title || o.keyword || '')).slice(0, 3).map((o: any) => ({ 
                    title: o.title || o.keyword || String(o), 
                    priority: 'Medium', 
                    reason: o.reason || 'Keyword opportunity' 

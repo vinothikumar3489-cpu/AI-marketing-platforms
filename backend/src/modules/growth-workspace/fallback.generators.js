@@ -173,6 +173,36 @@ export function generateAudienceFallback(input, productData) {
         objection: 'Will this require significant engineering effort?'
       }
     ];
+  } else if (industry.toLowerCase().includes('analytics') || industry.toLowerCase().includes('social media') || industry.toLowerCase().includes('influencer') || industry.toLowerCase().includes('marketing') || industry.toLowerCase().includes('creator')) {
+    personas = [
+      {
+        name: 'Social Media Manager',
+        demographics: 'Social media professionals managing brand presence across platforms',
+        intentScore: 85,
+        goals: ['Track content performance across platforms', 'Identify trending content opportunities', 'Report ROI to stakeholders'],
+        painPoints: ['Manual data collection across platforms', 'Difficulty measuring content ROI', 'Missing competitor benchmarking data'],
+        buyingTrigger: 'Need for unified cross-platform analytics',
+        objection: 'Does this integrate with our existing social tools?'
+      },
+      {
+        name: 'Influencer Marketing Manager',
+        demographics: 'Marketing professionals managing creator partnerships and campaigns',
+        intentScore: 80,
+        goals: ['Discover relevant creators', 'Measure campaign performance', 'Optimize influencer ROI'],
+        painPoints: ['Finding authentic creators is time-consuming', 'Difficult to track campaign performance', 'No standardized ROI measurement'],
+        buyingTrigger: 'Need to scale influencer program with data',
+        objection: 'How large is the creator database?'
+      },
+      {
+        name: 'DTC Growth Marketer',
+        demographics: 'Growth marketers focused on customer acquisition and retention',
+        intentScore: 75,
+        goals: ['Acquire customers through social channels', 'Optimize ad creative performance', 'Reduce customer acquisition costs'],
+        painPoints: ['Rising ad costs on social platforms', 'Creative fatigue and performance decline', 'Attribution across channels is complex'],
+        buyingTrigger: 'Need to improve social ad ROI with better data',
+        objection: 'How does this compare to native platform analytics?'
+      }
+    ];
   } else {
     // Generic fallback personas
     personas = [
@@ -184,6 +214,24 @@ export function generateAudienceFallback(input, productData) {
         painPoints: [`Current ${industry} tools don't fit ${targetAudience} workflows`, `${productName} competitors lack ${targetCountry} focus`],
         buyingTrigger: `${targetAudience} struggling with existing ${industry} tools`,
         objection: `How does ${productName} handle ${targetAudience} specific use cases`
+      },
+      {
+        name: `${industry} Manager`,
+        demographics: `Managers responsible for ${industry} strategy and execution in ${targetCountry}`,
+        intentScore: 60,
+        goals: [`Optimize ${industry} operations`, `Drive ${campaignGoal} through better tools`],
+        painPoints: [`Inefficient ${industry} workflows`, `Lack of data-driven insights for ${campaignGoal}`],
+        buyingTrigger: `Need to modernize ${industry} approach`,
+        objection: `Can ${productName} scale with our growth?`
+      },
+      {
+        name: `${targetCountry} Operations Lead`,
+        demographics: `Operations leaders evaluating ${industry} solutions for ${targetCountry} market`,
+        intentScore: 55,
+        goals: [`Reduce operational costs`, `Improve team productivity with ${industry} tools`],
+        painPoints: [`Fragmented ${industry} tool stack`, `Limited ${targetCountry}-specific features`],
+        buyingTrigger: `Need end-to-end ${industry} platform`,
+        objection: `What is the total cost of ownership?`
       }
     ];
   }
@@ -236,8 +284,8 @@ export function generateCompetitorFallback(input, productData, orchestratorCompe
       }))
     : [
       { 
-        name: competitorsArray[0] || 'Competitor A', 
-        domain: `${competitorsArray[0] || 'competitorA'}.com`.toLowerCase().replace(/\s+/g, ''),
+        name: competitorsArray[0] || (industry.toLowerCase().includes('analytics') || industry.toLowerCase().includes('social') ? 'Brandwatch' : 'Market Leader Inc'), 
+        domain: competitorsArray[0] ? `${competitorsArray[0]}.com`.toLowerCase().replace(/\s+/g, '') : 'brandwatch.com',
         opportunityScore: 75,
         trafficEstimate: "50k/mo",
         seoAuthority: 45,
@@ -245,8 +293,8 @@ export function generateCompetitorFallback(input, productData, orchestratorCompe
         weaknesses: [`Legacy technology`, `Slow feature releases`, `High pricing`] 
       },
       { 
-        name: competitorsArray[1] || 'Competitor B', 
-        domain: `${competitorsArray[1] || 'competitorB'}.com`.toLowerCase().replace(/\s+/g, ''),
+        name: competitorsArray[1] || (industry.toLowerCase().includes('analytics') || industry.toLowerCase().includes('social') ? 'Sprout Social' : 'Niche Platform Co'), 
+        domain: competitorsArray[1] ? `${competitorsArray[1]}.com`.toLowerCase().replace(/\s+/g, '') : 'sproutsocial.com',
         opportunityScore: 60,
         trafficEstimate: "20k/mo",
         seoAuthority: 35,
@@ -413,7 +461,12 @@ export function generateCampaignFallback(input, websiteData, allResults) {
  * Product-specific channel strategy with proper structure
  */
 export function generateChannelFallback(input, audienceData, campaignData) {
-  const preferredChannels = input.preferredChannels || input.preferredChannel || ['LinkedIn'];
+  const isSocialAnalytics = (input.industry || '').toLowerCase().includes('analytics') ||
+    (input.industry || '').toLowerCase().includes('social media') ||
+    (input.industry || '').toLowerCase().includes('influencer') ||
+    (input.industry || '').toLowerCase().includes('creator') ||
+    (input.industry || '').toLowerCase().includes('marketing');
+  const preferredChannels = input.preferredChannels || input.preferredChannel || (isSocialAnalytics ? ['TikTok', 'Instagram', 'LinkedIn', 'SEO'] : ['LinkedIn']);
   const targetAudience = input.targetAudience || 'target users';
   const industry = input.industry || 'industry';
   const budget = input.budget || '5000';
@@ -478,6 +531,32 @@ export function generateChannelFallback(input, audienceData, campaignData) {
       impact: 'Medium',
       budgetRecommendation: `10% of ${currency} ${budget}`,
       expectedOutcome: '2.8x ROI with brand awareness',
+      source: 'fallback_analysis'
+    });
+  }
+  
+  if (preferredChannels.includes('TikTok')) {
+    addChannel({
+      channelName: 'TikTok Marketing',
+      reason: `Short-form video reach for ${targetAudience} engagement`,
+      fitScore: 80,
+      confidence: 45,
+      impact: 'High',
+      budgetRecommendation: `25% of ${currency} ${budget}`,
+      expectedOutcome: '3.5x ROI with viral potential and creator partnerships',
+      source: 'fallback_analysis'
+    });
+  }
+  
+  if (preferredChannels.includes('YouTube')) {
+    addChannel({
+      channelName: 'YouTube Content',
+      reason: `Long-form educational content for ${targetAudience}`,
+      fitScore: 75,
+      confidence: 40,
+      impact: 'Medium',
+      budgetRecommendation: `20% of ${currency} ${budget}`,
+      expectedOutcome: '4.0x ROI with evergreen search traffic',
       source: 'fallback_analysis'
     });
   }

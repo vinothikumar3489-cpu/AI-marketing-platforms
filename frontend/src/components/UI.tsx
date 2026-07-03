@@ -6,13 +6,15 @@ export function PageHeader({ eyebrow, title, subtitle }: any) {
 export function Card({ children, className = '' }: any) { return <div className={`card ${className}`}>{children}</div>; }
 export function Badge({ children, tone = 'blue' }: any) { return <span className={`badge ${tone}`}>{children}</span>; }
 export function ScoreCard({ label, value, tone = 'purple', source, evidence }: any) { 
+  const hasValue = value !== null && value !== undefined;
+  const barWidth = hasValue ? `${Math.min(Math.max(Number(value)||0,0),100)}%` : '0%';
   return (
     <Card className={`score-card ${tone}`}>
-      <div className="score-value">{value !== null && value !== undefined ? value : 'N/A'}</div>
+      <div className="score-value">{hasValue ? value : 'Unavailable'}</div>
       <div>{label}</div>
       {source && <div className="score-source" style={{ fontSize: '11px', color: '#9aa7bd', marginTop: '4px' }}>Source: {source}</div>}
       {evidence && <div className="score-evidence" style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}>{evidence}</div>}
-      <div className="bar"><span style={{ width: `${Math.min(Number(value)||0,100)}%` }} /></div>
+      {hasValue && <div className="bar"><span style={{ width: barWidth }} /></div>}
     </Card>
   );
 }

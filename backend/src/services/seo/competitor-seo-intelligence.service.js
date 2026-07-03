@@ -211,6 +211,15 @@ async function discoverCompetitors({ productName, industry, websiteUrl, keywordI
       'CRM integration services',
       'software development company UAE',
       'software development company India'
+    ],
+    'virlo.ai': [
+      'tiktok analytics tool',
+      'social media analytics platform',
+      'influencer marketing platform',
+      'creator analytics tool',
+      'social listening tools',
+      'short form video analytics',
+      'content analytics platform'
     ]
   };
 
@@ -220,7 +229,8 @@ async function discoverCompetitors({ productName, industry, websiteUrl, keywordI
     'gamma.app': ['canva.com', 'beautiful.ai', 'tome.app', 'pitch.com', 'plus.ai', 'presentations.ai', 'google.com', 'microsoft.com'],
     'figma.com': ['canva.com', 'adobe.com', 'sketch.com', 'framer.com', 'webflow.com', 'miro.com', 'penpot.app'],
     'notion.so': ['clickup.com', 'coda.io', 'airtable.com', 'asana.com', 'trello.com', 'monday.com', 'atlassian.com'],
-    'orkyn.ai': ['salesforce.com', 'sap.com', 'oracle.com', 'microsoft.com', 'zoho.com']
+    'orkyn.ai': ['salesforce.com', 'sap.com', 'oracle.com', 'microsoft.com', 'zoho.com'],
+    'virlo.ai': ['trendpop.com', 'pentos.video', 'exolyt.com', 'hypeauditor.com', 'favikon.com', 'modash.io', 'creatoriq.com', 'sproutsocial.com', 'brandwatch.com']
   };
 
   // Use DataForSEO SERP API if configured and not marked unavailable
@@ -611,7 +621,11 @@ function filterAllCompetitors(competitors, identity) {
   const socialDomains = new Set([
     'instagram.com', 'facebook.com', 'twitter.com', 'x.com',
     'linkedin.com', 'youtube.com', 'tiktok.com', 'pinterest.com',
-    'snapchat.com', 'reddit.com', 'threads.net', 'mastodon.social'
+    'snapchat.com', 'reddit.com', 'threads.net', 'mastodon.social',
+    'crunchbase.com', 'trustpilot.com', 'g2.com', 'capterra.com',
+    'getapp.com', 'softwareadvice.com', 'sitejabber.com',
+    'glassdoor.com', 'indeed.com', 'producthunt.com', 'alternativeto.net',
+    'saasworthy.com', 'growjo.com', 'owler.com', 'zoominfo.com'
   ]);
   
   const appStoreDomains = new Set([
@@ -1695,6 +1709,21 @@ function getCategoryCompetitors({ brandName = "", productName = "", companyName 
       { name: "Toptal Software Development", domain: "toptal.com" },
       { name: "ELEKS", domain: "eleks.com" },
       { name: "ScienceSoft", domain: "scnsoft.com" }
+    ];
+  }
+
+  // Creator economy / social media analytics / influencer marketing
+  if (b.includes("virlo") || b.includes("analytics") || b.includes("social media") || b.includes("influencer") || b.includes("creator") || b.includes("tiktok analytics") || b.includes("social listening")) {
+    return [
+      { name: "Trendpop", domain: "trendpop.com" },
+      { name: "Pentos", domain: "pentos.video" },
+      { name: "Exolyt", domain: "exolyt.com" },
+      { name: "HypeAuditor", domain: "hypeauditor.com" },
+      { name: "Favikon", domain: "favikon.com" },
+      { name: "Modash", domain: "modash.io" },
+      { name: "CreatorIQ", domain: "creatoriq.com" },
+      { name: "Sprout Social", domain: "sproutsocial.com" },
+      { name: "Brandwatch", domain: "brandwatch.com" }
     ];
   }
 
