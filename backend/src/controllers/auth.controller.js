@@ -3,16 +3,17 @@ import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 
+// --- Schemas (accept raw, we sanitise in handler) ---
 const registerSchema = z.object({
   name: z.string().min(1).optional(),
   fullName: z.string().min(1).optional(),
-  email: z.string().email(),
-  password: z.string().min(8),
+  email: z.string().min(1, "Email is required"),
+  password: z.string().min(1, "Password is required"),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
+  email: z.string().min(1, "Email is required"),
+  password: z.string().min(1, "Password is required"),
 });
 
 const signToken = (user) => {
@@ -22,17 +23,26 @@ const signToken = (user) => {
   return jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 };
 
+// ---------------------------------------------------------------------------
+// REGISTER
+// ---------------------------------------------------------------------------
 export const register = async (req, res) => {
+  console.log("auth/register body keys", Object.keys(req.body || {}));
+
   const parseResult = registerSchema.safeParse(req.body);
+  console.log("auth/register validation passed", parseResult.success);
+
   if (!parseResult.success) {
     return res.status(400).json({ success: false, error: parseResult.error.errors[0].message });
   }
 
-  const { name: rawName, fullName, email, password } = parseResult.data;
+  let { name: rawName, fullName, email, password } = parseResult.data;
   const name = rawName || fullName;
   if (!name) {
     return res.status(400).json({ success: false, error: "Name is required" });
   }
+
+  email = email.trim().toLowerCase();
   console.log("auth/register received email=", email);
 
   const existing = await prisma.user.findUnique({ where: { email } });
@@ -49,14 +59,23 @@ export const register = async (req, res) => {
   return res.status(201).json({ success: true, user: { id: user.id, name: user.name, email: user.email }, token });
 };
 
+// ---------------------------------------------------------------------------
+// LOGIN
+// ---------------------------------------------------------------------------
 export const login = async (req, res) => {
+  console.log("auth/login body keys", Object.keys(req.body || {}));
+
   const parseResult = loginSchema.safeParse(req.body);
+  console.log("auth/login validation passed", parseResult.success);
+
   if (!parseResult.success) {
     return res.status(400).json({ success: false, error: parseResult.error.errors[0].message });
   }
 
-  const { email, password } = parseResult.data;
-  console.log("auth/login received email=", email);
+  let { email, password } = parseResult.data;
+  email = email.trim().toLowerCase();
+  console.log("auth/login email received=", email);
+
   const user = await prisma.user.findUnique({ where: { email } });
   console.log("auth/login user found=", Boolean(user));
 
@@ -69,11 +88,17 @@ export const login = async (req, res) => {
   return res.json({ success: true, user: { id: user.id, name: user.name, email: user.email }, token });
 };
 
+// ---------------------------------------------------------------------------
+// ME
+// ---------------------------------------------------------------------------
 export const me = async (req, res) => {
   const user = req.user;
   return res.json({ success: true, user: { id: user.id, name: user.name, email: user.email } });
 };
 
+// ---------------------------------------------------------------------------
+// LOGOUT
+// ---------------------------------------------------------------------------
 export const logout = async (req, res) => {
   return res.json({ success: true });
 };
