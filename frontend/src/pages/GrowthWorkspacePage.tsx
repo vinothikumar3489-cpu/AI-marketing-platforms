@@ -33,6 +33,7 @@ export default function GrowthWorkspacePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const isNewAnalysis = location.state?.newAnalysis === true;
+  const storedChatRef = useRef<string>('');
   const [form, setForm] = useState(defaults);
   const [activeTab, setActiveTab] = useState('Executive Snapshot');
   const [loading, setLoading] = useState(false);
@@ -41,25 +42,32 @@ export default function GrowthWorkspacePage() {
   const [mode, setMode] = useState<'form' | 'creating' | 'running' | 'results' | 'error'>(isNewAnalysis ? 'form' : 'form');
   const [creatingChat, setCreatingChat] = useState(false);
 
+  // On mount, hydrate from fullResults if data exists for this chat
   useEffect(() => {
     if (isNewAnalysis) return;
-    let cancelled = false;
+    if (!selectedChatId) return;
     const r = fullResults.growth || {};
-    
     const hasGrowthData = 
       r.product || r.market || r.audience || r.competitor || r.intent || r.positioning || r.campaign || r.channel || r.executiveStory || r.actionPlan;
-    
-    if (!cancelled) {
-      if (hasGrowthData && mode !== 'form' && mode !== 'creating') {
-        setResults(r);
-        setMode('results');
-      } else if (!hasGrowthData && mode !== 'running' && mode !== 'creating') {
-        setResults({});
-        setMode('form');
-        setStep(1);
-      }
+    if (hasGrowthData) {
+      storedChatRef.current = selectedChatId;
+      setResults(r);
+      setMode('results');
     }
-    return () => { cancelled = true; };
+  }, []);
+
+  // On fullResults change: update if data exists, never clear existing results
+  useEffect(() => {
+    if (isNewAnalysis) return;
+    if (!selectedChatId) return;
+    const r = fullResults.growth || {};
+    const hasGrowthData = 
+      r.product || r.market || r.audience || r.competitor || r.intent || r.positioning || r.campaign || r.channel || r.executiveStory || r.actionPlan;
+    if (hasGrowthData) {
+      storedChatRef.current = selectedChatId;
+      setResults(r);
+      setMode('results');
+    }
   }, [fullResults]);
 
   async function run() {
@@ -129,19 +137,21 @@ export default function GrowthWorkspacePage() {
 
   const [step, setStep] = useState(1);
   const [progress, setProgress] = useState(0);
-  const [currentStage, setCurrentStage] = useState('Starting...');
+  const [currentStage, setCurrentStage] = useState('Preparing analysis...');
   const progressStages = [
-    'Starting...',
-    'Scraping website',
-    'Research data collected',
-    'Product analysis',
+    'Preparing analysis...',
+    'Researching website content',
+    'Scraping website structure',
+    'Running growth analysis',
     'Market intelligence',
     'Audience + competitor intelligence',
-    'Campaign/channel strategy',
-    'Saving results'
+    'Campaign & channel strategy',
+    'Saving results to project'
   ];
   useEffect(() => {
     if (mode === 'running') {
+      setProgress(0);
+      setCurrentStage(progressStages[0]);
       const interval = setInterval(() => {
         setProgress(p => {
           if (p >= 7) { clearInterval(interval); return 7; }
@@ -149,11 +159,11 @@ export default function GrowthWorkspacePage() {
           setCurrentStage(progressStages[next] || 'Processing...');
           return next;
         });
-      }, 8000);
+      }, 10000);
       return () => clearInterval(interval);
-    } else {
+    } else if (mode !== 'creating') {
       setProgress(0);
-      setCurrentStage('Starting...');
+      setCurrentStage('Preparing analysis...');
     }
   }, [mode]);
 

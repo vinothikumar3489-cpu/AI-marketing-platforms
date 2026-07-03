@@ -35,12 +35,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       if (!mountedRef.current) return;
       const list = res.chats || res.data || res || [];
       setChats(Array.isArray(list) ? list : []);
-      const exists = list.some((c: any) => c.id === selectedChatId);
-      if (selectedChatId && !exists) {
-        localStorage.removeItem('selectedChatId');
-        setSelectedChatId('');
-        setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null });
-      }
+      // Only clear selection if the selected chat was explicitly deleted (not a race condition)
+      // Don't auto-clear on every refresh - rely on deleteChat to call clearSelection
     } finally { if (mountedRef.current) setLoading(false); }
   }
 
@@ -106,20 +102,15 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     } catch (error: any) {
       console.error('Failed to load full results:', error.message || error);
       
-      // On error, keep existing results if any - don't clear them
-      // This prevents data loss during transient errors
+      // On error, ALWAYS keep existing results - never clear them
+      // Transient network errors should not wipe out analyzed data
       if (mountedRef.current) {
         const currentResults = fullResults;
-        if (currentResults && (currentResults.growth || currentResults.seoIntelligence)) {
-          console.log('[ProjectContext] Keeping existing results after load error');
-          return currentResults;
-        }
-        const emptyResults = { growth: null, seo: null, executive: null, profile: null, chat: null };
-        setFullResults(emptyResults);
-        return emptyResults;
+        console.log('[ProjectContext] Keeping existing results after load error');
+        return currentResults;
       }
       
-      return { growth: null, seo: null, executive: null, profile: null, chat: null };
+      return fullResults;
     } finally {
       if (mountedRef.current) setLoading(false);
     }

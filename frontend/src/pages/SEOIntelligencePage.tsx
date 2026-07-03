@@ -83,6 +83,7 @@ export default function SEOIntelligencePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const isNewAnalysis = location.state?.newAnalysis === true;
+  const storedChatRef = useRef<string>('');
   const [url, setUrl] = useState('');
   const [seo, setSeo] = useState<any>({});
   const [activeTab, setActiveTab] = useState('Executive Dashboard');
@@ -119,17 +120,30 @@ export default function SEOIntelligencePage() {
     }
   }, [mode]);
 
+  // On mount, hydrate from fullResults if data exists for this chat
   useEffect(() => {
     if (isNewAnalysis) return;
-    let cancelled = false;
+    if (!selectedChatId) return;
     const r = fullResults.seoIntelligence || fullResults.seo || {};
-    
     if (Object.keys(r).length && r.scoreBreakdown) {
-      if (!cancelled && mode !== 'form' && mode !== 'creating') { setSeo(r); setMode('results'); if (!url) setUrl(r.websiteUrl || ''); }
-    } else {
-      if (!cancelled && mode !== 'running' && mode !== 'creating') { setSeo({}); setMode('form'); }
+      storedChatRef.current = selectedChatId;
+      setSeo(r);
+      setMode('results');
+      if (!url) setUrl(r.websiteUrl || '');
     }
-    return () => { cancelled = true; };
+  }, []);
+
+  // On fullResults change: update if data exists, never clear existing results
+  useEffect(() => {
+    if (isNewAnalysis) return;
+    if (!selectedChatId) return;
+    const r = fullResults.seoIntelligence || fullResults.seo || {};
+    if (Object.keys(r).length && r.scoreBreakdown) {
+      storedChatRef.current = selectedChatId;
+      setSeo(r);
+      setMode('results');
+      if (!url) setUrl(r.websiteUrl || '');
+    }
   }, [fullResults]);
 
   async function run() {
