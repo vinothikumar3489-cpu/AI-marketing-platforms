@@ -192,28 +192,26 @@ const automationLimiter = rateLimit({
 
 // CORS Configuration
 const allowedOrigins = [
-  process.env.CLIENT_URL || "http://localhost:5173",
+  process.env.CLIENT_URL,
+  "http://localhost:5173",
   "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "http://127.0.0.1:5173",
-  "http://localhost:5174",
-  "http://127.0.0.1:5174",
-  "http://localhost:8080",
-  "http://127.0.0.1:8080",
-  "http://192.168.56.1:8080"
-];
+].filter(Boolean);
+
+const isAllowedVercelPreview = (origin) => {
+  return /^https:\/\/ai-marketing-platforms-[a-z0-9-]+-vinoth4\.vercel\.app$/.test(origin);
+};
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || !isProduction || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin) || isAllowedVercelPreview(origin)) {
+      return callback(null, true);
     }
+
+    return callback(new Error(`CORS blocked origin: ${origin}`));
   },
   credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
 app.options("*", cors());
