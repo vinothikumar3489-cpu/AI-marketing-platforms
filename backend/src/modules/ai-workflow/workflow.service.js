@@ -64,13 +64,12 @@ export async function generateCompleteSolution({ chatId, userId }) {
     const prompt = buildSolutionPrompt(contextData, availableModules, chat.productName);
 
     const aiResult = await callAI(prompt);
+    const parsedSolution = aiResult.success ? (aiResult.data || {}) : {};
+    const fallbackUsed = !aiResult.success;
 
-    if (!aiResult.success) {
-      return { success: false, error: "AI generation failed" };
+    if (fallbackUsed) {
+      console.warn('⚠️ [Workflow] AI generation failed; using fallback solution content');
     }
-
-    // 5. Structure the solution (callAI returns already-parsed JSON)
-    const parsedSolution = aiResult.data || {};
 
     const solution = {
       contentStrategy: parsedSolution.contentStrategy || generateFallbackContentStrategy(contextData),
@@ -83,10 +82,10 @@ export async function generateCompleteSolution({ chatId, userId }) {
         productName: chat.productName || 'Unknown Product',
         modulesUsed: availableModules,
         providers: {
-          ai: aiResult.provider || 'ai',
-          fallbackUsed: false
-        }
-      }
+          ai: aiResult.provider || 'none',
+          fallbackUsed,
+        },
+      },
     };
 
     // 6. Save solution in AgentRun
