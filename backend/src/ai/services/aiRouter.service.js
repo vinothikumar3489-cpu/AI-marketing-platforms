@@ -61,19 +61,13 @@ Ensure all arrays have at least 3 items. Return ONLY valid JSON.`;
 }
 
 function getRuleBasedFallback(productData) {
-  const { productName, description, targetMarket } = productData;
-  const targetAudience = (targetMarket || "Job seekers, Professionals, Students").split(/[,;]/).map((s) => s.trim()).filter(Boolean);
-  
   return {
-    productSummary: `${productName || "This product"} is a solution designed for ${targetAudience.join(", ") || "target users"}. ${description || "It offers key features to help users achieve their goals efficiently."}`,
-    targetAudience: targetAudience.length >=3 ? targetAudience : ["Students", "Professionals", "Job Seekers"],
-    painPoints: ["Time-consuming manual processes", "Lack of professional tools", "High costs of alternatives", "Difficulty standing out"],
-    uniqueValueProposition: `${productName || "This product"} provides an easy-to-use, affordable solution that helps users save time and achieve better results.`,
-    marketOpportunities: ["Growing demand for productivity tools", "Rising remote work trend", "Increasing focus on personal branding"],
-    competitorIdeas: ["Established industry tools", "Free open-source alternatives", "Niche specialized solutions"],
-    seoSuggestions: [`${productName || "product"} tool`, `best ${productName || "product"}`, `${productName || "product"} for ${targetAudience[0] || "users"}`, `free ${productName || "product"} alternative`],
-    campaignIdeas: ["Social media content series", "Free trial offer", "User testimonials campaign", "Educational blog posts"],
-    finalRecommendation: "Start with a free trial to attract initial users, then collect feedback to improve the product further. Focus on content marketing to build SEO authority."
+    hasVerifiedData: false,
+    confidenceScore: 0,
+    provider: 'fallback_evidence',
+    warnings: ['Module: Insufficient verified data - AI providers unavailable'],
+    dataSources: [],
+    note: 'No verified market data available'
   };
 }
 
@@ -235,13 +229,13 @@ export async function generateProductAnalysis(productData, scrapedData) {
     return { ...result, fallbackUsed: false };
   }
 
-  // Use rule-based fallback
-  console.log("⚠️ Using rule-based fallback analysis...");
+  // No verified data available
+  console.log("⚠️ AI providers unavailable, returning no-verified-data response...");
   const fallbackData = getRuleBasedFallback(productData);
   return {
     success: true,
     data: fallbackData,
-    provider: "rule-based",
+    provider: "fallback_evidence",
     fallbackUsed: true
   };
 }

@@ -36,17 +36,13 @@ Ensure all arrays have at least 3 items. Return ONLY valid JSON.`;
 }
 
 function getRuleBasedFallback(inputData) {
-  const { productName, industry, targetCountry } = inputData;
   return {
-    marketOverview: `${productName} operates in the ${industry} industry in ${targetCountry}. The market is growing with increasing demand for digital solutions.`,
-    marketDemand: "High demand from small businesses and startups looking for affordable tools.",
-    currentTrends: ["AI integration", "Mobile-first design", "Subscription models"],
-    targetCustomerSegments: ["Students", "Freelancers", "Small businesses"],
-    growthOpportunities: ["Partnerships with educational institutions", "Content marketing", "Freemium model"],
-    risks: ["Intense competition", "Rapid tech changes", "Economic uncertainty"],
-    recommendedMarketEntryStrategy: "Start with a freemium model targeting early adopters, then expand to paid tiers.",
-    pricingSuggestions: ["Freemium tier", "$9.99/month basic", "$29.99/month pro"],
-    finalRecommendation: "Focus on content marketing and user referrals to drive initial growth."
+    hasVerifiedData: false,
+    confidenceScore: 0,
+    provider: 'fallback_evidence',
+    warnings: ['Module: Insufficient verified data - AI providers unavailable'],
+    dataSources: [],
+    note: 'No verified market discovery data available'
   };
 }
 
@@ -79,8 +75,8 @@ export async function generateMarketDiscovery(inputData) {
   // Step 3: Call AI providers via canonical router
   let result = await callAI(prompt);
   if (!result.success) {
-    console.log("⚠️ Using rule-based fallback for Market Discovery...");
-    result = { success: true, data: getRuleBasedFallback(inputData), provider: "rule-based", fallbackUsed: true };
+    console.log("⚠️ AI providers unavailable for Market Discovery...");
+    result = { success: true, data: getRuleBasedFallback(inputData), provider: "fallback_evidence", fallbackUsed: true };
   } else {
     result.fallbackUsed = false;
   }

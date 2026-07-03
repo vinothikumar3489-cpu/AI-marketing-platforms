@@ -743,8 +743,13 @@ async function buildCompetitorProfiles(competitors, productName) {
       profiles.push(profile);
     } catch (error) {
       console.log(`⚠️ [Profiles] Failed to build profile for ${competitor.name}`);
-      // Add basic profile
       profiles.push({
+        hasVerifiedData: false,
+        confidenceScore: 0,
+        provider: 'fallback_evidence',
+        warnings: ['Module: Insufficient verified data'],
+        dataSources: [],
+        note: 'No verified data available',
         name: competitor.name,
         domain: extractDomain(competitor.website),
         website: competitor.website,
@@ -754,9 +759,9 @@ async function buildCompetitorProfiles(competitors, productName) {
         mainKeywords: [],
         contentThemes: [],
         strongestPages: [],
-        positioning: 'Unknown',
-        strengths: ['Market presence'],
-        weaknesses: ['Limited data available'],
+        positioning: null,
+        strengths: [],
+        weaknesses: [],
         estimatedAuthority: null,
         estimatedTraffic: null,
         backlinks: null,
@@ -890,44 +895,11 @@ function determinePositioning(text, competitorType) {
 }
 
 function identifyStrengths(text) {
-  const strengths = [];
-  
-  if (text.includes('easy') || text.includes('simple') || text.includes('user-friendly')) {
-    strengths.push('User-friendly interface');
-  }
-  if (text.includes('feature') || text.includes('powerful') || text.includes('comprehensive')) {
-    strengths.push('Feature-rich platform');
-  }
-  if (text.includes('support') || text.includes('customer service')) {
-    strengths.push('Strong customer support');
-  }
-  if (text.includes('integration') || text.includes('api')) {
-    strengths.push('Good integrations');
-  }
-  if (text.includes('affordable') || text.includes('pricing')) {
-    strengths.push('Competitive pricing');
-  }
-
-  return strengths.length > 0 ? strengths.slice(0, 4) : ['Market presence', 'Established brand'];
+  return [];
 }
 
 function identifyWeaknesses(text, competitorType) {
-  const weaknesses = [];
-  
-  if (text.includes('expensive') || text.includes('costly')) {
-    weaknesses.push('Higher pricing');
-  }
-  if (text.includes('complex') || text.includes('learning curve')) {
-    weaknesses.push('Complexity');
-  }
-  if (text.includes('limited') || text.includes('lacks')) {
-    weaknesses.push('Limited features in some areas');
-  }
-  if (competitorType === 'emerging') {
-    weaknesses.push('Newer player - less established');
-  }
-
-  return weaknesses.length > 0 ? weaknesses : ['Some feature gaps'];
+  return [];
 }
 
 function estimateAuthority(competitor, text) {

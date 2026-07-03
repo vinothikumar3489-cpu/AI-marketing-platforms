@@ -444,105 +444,15 @@ function isDuplicateKeyword(keyword, existingIdeas) {
 }
 
 function generateBlogTitle(keyword, productName, type) {
-  const keywordLower = keyword.toLowerCase();
-  
-  if (type === 'question') {
-    if (keywordLower.startsWith('how to')) {
-      return `How to ${keyword.replace(/^(how to)\s*/i, '')} with ${productName}`;
-    }
-    if (keywordLower.startsWith('what is')) {
-      return `What is ${keyword.replace(/^(what is)\s*/i, '')}? A Complete Guide`;
-    }
-    if (keywordLower.startsWith('why')) {
-      return `Why ${keyword.replace(/^why\s*/i, '')} Matters for Your Business`;
-    }
-    return `${keyword.charAt(0).toUpperCase() + keyword.slice(1)}: Everything You Need to Know`;
-  }
-  
-  if (type === 'geo') {
-    return `${keyword.charAt(0).toUpperCase() + keyword.slice(1)} - AI-Optimized Answer`;
-  }
-  
-  if (type === 'competitor') {
-    return `${keyword.charAt(0).toUpperCase() + keyword.slice(1)} vs ${productName}: Comparison`;
-  }
-  
-  if (type === 'gap') {
-    return `${keyword.charAt(0).toUpperCase() + keyword.slice(1)}: Strategies and Best Practices`;
-  }
-  
-  // Default informational - generate more specific titles
-  if (keywordLower.includes('guide') || keywordLower.includes('tutorial')) {
-    return `${keyword.charAt(0).toUpperCase() + keyword.slice(1)}`;
-  }
-  if (keywordLower.includes('tips')) {
-    return `${keyword.charAt(0).toUpperCase() + keyword.slice(1)}`;
-  }
-  if (keywordLower.includes('benefits')) {
-    return `Benefits of ${keyword.charAt(0).toUpperCase() + keyword.slice(1)}`;
-  }
-  
-  return `${keyword.charAt(0).toUpperCase() + keyword.slice(1)}: A Comprehensive Guide`;
+  return '';
 }
 
 function generateOutline(type, keyword) {
-  const outlines = {
-    'informational': [
-      'Introduction',
-      'Key Concepts',
-      'Why It Matters',
-      'How to Implement',
-      'Best Practices',
-      'Common Mistakes',
-      'Conclusion'
-    ],
-    'how-to': [
-      'Introduction',
-      'What You Need',
-      'Step-by-Step Guide',
-      'Tips and Tricks',
-      'Troubleshooting',
-      'Conclusion'
-    ],
-    'guide': [
-      'Overview',
-      'Detailed Explanation',
-      'Examples',
-      'Use Cases',
-      'Recommendations',
-      'Conclusion'
-    ],
-    'faq-style': [
-      'Direct Answer',
-      'Context',
-      'Examples',
-      'Related Questions',
-      'Resources'
-    ]
-  };
-  
-  return outlines[type] || outlines['informational'];
+  return [];
 }
 
 function generateInternalLinks(keyword, productName) {
-  const suggestions = [];
-  const keywordLower = keyword.toLowerCase();
-  
-  if (keywordLower.includes('software') || keywordLower.includes('development')) {
-    suggestions.push('Services page', 'Case studies');
-  }
-  if (keywordLower.includes('salesforce') || keywordLower.includes('erp')) {
-    suggestions.push('Integrations page', 'Service pages');
-  }
-  if (keywordLower.includes('automation') || keywordLower.includes('custom')) {
-    suggestions.push('Features page', 'Pricing page');
-  }
-  
-  if (suggestions.length === 0) {
-    suggestions.push('Homepage', 'Services overview');
-  }
-  
-  return suggestions;
+  return [];
 }
 
 function calculateConfidence(volume, difficulty) {
@@ -642,40 +552,13 @@ function createPublishingCalendar(blogIdeas, blogClusters) {
   try {
   const safeIdeas = asArray(blogIdeas);
   if (safeIdeas.length === 0) {
-    return { week1: [], week2: [], week3: [], week4: [] };
+    return {};
   }
 
-  const sortedIdeas = [...safeIdeas].sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
-  
-  return {
-    week1: sortedIdeas.slice(0, 2).map(idea => ({
-      title: idea.title,
-      targetKeyword: idea.targetKeyword,
-      publishDate: 'Week 1',
-      priority: idea.confidence > 80 ? 'high' : 'medium'
-    })),
-    week2: sortedIdeas.slice(2, 4).map(idea => ({
-      title: idea.title,
-      targetKeyword: idea.targetKeyword,
-      publishDate: 'Week 2',
-      priority: 'medium'
-    })),
-    week3: sortedIdeas.slice(4, 6).map(idea => ({
-      title: idea.title,
-      targetKeyword: idea.targetKeyword,
-      publishDate: 'Week 3',
-      priority: 'medium'
-    })),
-    week4: sortedIdeas.slice(6, 8).map(idea => ({
-      title: idea.title,
-      targetKeyword: idea.targetKeyword,
-      publishDate: 'Week 4',
-      priority: 'low'
-    }))
-  };
+  return {};
   } catch (calError) {
     console.error('❌ [Calendar] Error:', calError);
-    return { week1: [], week2: [], week3: [], week4: [] };
+    return {};
   }
 }
 

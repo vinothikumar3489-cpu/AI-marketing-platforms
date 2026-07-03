@@ -1373,7 +1373,7 @@ function CompetitorSEO({ data }: { data: any }) {
                   <tr key={i} style={{ borderBottom: '1px solid #1d2738', fontSize: '13px' }}>
                     <td style={{ padding: '10px', fontWeight: 'bold', color: '#fff' }}>{asText(k.keyword || k)}</td>
                     <td style={{ padding: '10px', color: '#10e18b' }}>{formatNumber(k.searchVolume)}</td>
-                    <td style={{ padding: '10px', color: '#ffa502' }}>{asNumber(k.difficulty || Math.floor(Math.random()*40)+20)}</td>
+                    <td style={{ padding: '10px', color: '#ffa502' }}>{asNumber(k.difficulty) ?? "N/A"}</td>
                   </tr>
                 ))}
               </tbody>

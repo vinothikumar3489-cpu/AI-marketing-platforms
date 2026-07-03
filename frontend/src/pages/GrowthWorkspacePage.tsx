@@ -424,16 +424,9 @@ function ExecutiveSnapshot({ results }: { results: any }) {
     { subject: 'Campaign Readiness', A: asNumber(sum?.campaignReadinessScore || results.campaign?.confidenceScore, null), fullMark: 100 },
   ].filter(d => d.A !== null) : [];
 
-  // Filter out placeholder/redundant labels
-  const isPlaceholder = (val: any) => {
-    if (!val) return true;
-    const s = typeof val === 'string' ? val : (val.value || val.title || '');
-    const placeholders = ['Top Recommendation', 'Primary Risk', 'Immediate Action', 'Recommendation', 'Risk', 'Action'];
-    return placeholders.some(p => s.trim() === p);
-  };
-  const topRec = isPlaceholder(sum?.topRecommendation) ? null : sum?.topRecommendation;
-  const primaryRisk = isPlaceholder(sum?.primaryRisk) ? null : sum?.primaryRisk;
-  const immediateAction = isPlaceholder(sum?.immediateAction) ? null : sum?.immediateAction;
+  const topRec = sum?.topRecommendation || null;
+  const primaryRisk = sum?.primaryRisk || null;
+  const immediateAction = sum?.immediateAction || null;
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
@@ -463,17 +456,17 @@ function ExecutiveSnapshot({ results }: { results: any }) {
         
         <div style={{ display: 'grid', gap: '20px' }}>
           <InsightCard insight={{
-            value: topRec ? (typeof topRec === 'string' ? topRec : topRec.value || topRec.title || topRec) : 'Verified recommendation unavailable',
+            value: topRec ? (typeof topRec === 'string' ? topRec : topRec.value || topRec.title || topRec) : 'No verified data available',
             confidence: topRec?.confidence || null,
             impact: topRec?.impact || 'Medium' as const
           }} icon={Zap} />
           <InsightCard insight={{
-            value: primaryRisk ? (typeof primaryRisk === 'string' ? primaryRisk : primaryRisk.value || primaryRisk.title || primaryRisk) : 'Verified recommendation unavailable',
+            value: primaryRisk ? (typeof primaryRisk === 'string' ? primaryRisk : primaryRisk.value || primaryRisk.title || primaryRisk) : 'No verified data available',
             confidence: primaryRisk?.confidence || null,
             impact: primaryRisk?.impact || 'Medium' as const
           }} icon={Shield} />
           <InsightCard insight={{
-            value: immediateAction ? (typeof immediateAction === 'string' ? immediateAction : immediateAction.value || immediateAction.title || immediateAction) : 'Verified recommendation unavailable',
+            value: immediateAction ? (typeof immediateAction === 'string' ? immediateAction : immediateAction.value || immediateAction.title || immediateAction) : 'No verified data available',
             confidence: immediateAction?.confidence || null,
             impact: immediateAction?.impact || 'Medium' as const
           }} icon={Target} />
@@ -869,26 +862,7 @@ function ActionPlan({ data }: { data: any }) {
   const actionPlan = data || {};
   if (!actionPlan || Object.keys(actionPlan).length === 0) return <EmptyState title="No Action Plan" />;
   
-  // Replace "app downloads" with SaaS-appropriate terms
-  const replaceAppDownloads = (text: string) => {
-    if (!text) return text;
-    return text
-      .replace(/app downloads/gi, 'demo requests')
-      .replace(/app installs/gi, 'trial signups')
-      .replace(/download our app/gi, 'request a demo')
-      .replace(/app store/gi, 'product demo');
-  };
-  
-  const saasifyItem = (item: any) => {
-    if (!item || typeof item === 'string') return item;
-    return {
-      ...item,
-      title: replaceAppDownloads(item.title),
-      problem: replaceAppDownloads(item.problem),
-      businessImpact: replaceAppDownloads(item.businessImpact),
-      expectedGain: replaceAppDownloads(item.expectedGain),
-    };
-  };
+
   
   return (
     <div style={{ display: 'grid', gap: '20px' }}>

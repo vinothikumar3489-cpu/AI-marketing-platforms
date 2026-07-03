@@ -276,7 +276,7 @@ export const PriorityCard = ({ data }: { data: any }) => {
   const whyItMatters = data.whyItMatters || data.reason || data.description || 'Improve search visibility and traffic potential.';
   const sections = data.contentSections || data.sections || ['Introduction', 'Core Benefits', 'Next Steps'];
   const cta = data.CTASuggestion || data.cta || 'Explore Features';
-  const score = data.opportunityScore || data.confidenceScore || data.score || Math.floor(Math.random() * 30) + 70;
+  const score = data.opportunityScore || data.confidenceScore || data.score || 0;
   
   // Extract expected impacts
   const estimatedTraffic = data.estimatedTraffic || '+18% Organic Traffic';

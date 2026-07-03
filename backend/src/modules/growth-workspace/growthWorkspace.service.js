@@ -131,6 +131,9 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     { key: 'channel', label: 'Channel Recommendation', status: 'pending' }
   ];
 
+  const NO_DATA = 'No verified market data available';
+  const INSUFFICIENT_DATA = 'Insufficient verified data';
+
   const results = {};
   const warnings = [];
   let overallStatus = 'in_progress';
@@ -427,7 +430,6 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
       if (!modules.length) return null;
 
-      // Use actual module outputs instead of generic confidence scores
       const scores = {
         productFit: calculateProductFitScore(results?.product),
         marketOpportunity: calculateMarketOpportunityScore(results?.market),
@@ -442,84 +444,80 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
         return Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length);
       }
 
-      return Math.round((modules.length / 8) * 100);
+      return null;
     }
 
     function calculateProductFitScore(product) {
-      if (!product) return null;
-      // Score based on product maturity, value propositions, and differentiators
+      if (!product || product.hasVerifiedData === false) return null;
       const maturityScore = product.productMaturity === 'Growth' ? 80 : product.productMaturity === 'Mature' ? 90 : 60;
       const valuePropScore = (product.valuePropositions?.length || 0) * 10;
       const differentiatorScore = (product.keyDifferentiators?.length || 0) * 8;
-      return Math.min(100, Math.round((maturityScore + valuePropScore + differentiatorScore) / 3));
+      const total = (maturityScore + valuePropScore + differentiatorScore) / 3;
+      return total > 0 ? Math.min(100, Math.round(total)) : null;
     }
 
     function calculateMarketOpportunityScore(market) {
-      if (!market) return null;
-      // Score based on market size, growth rate, and demand
+      if (!market || market.hasVerifiedData === false) return null;
       const demandScore = market.demandScore || 0;
-      const growthRateScore = (market.marketGrowthRate || 0) * 10;
       const opportunityScore = (market.growthOpportunities?.length || 0) * 12;
-      return Math.min(100, Math.round((demandScore + growthRateScore + opportunityScore) / 3));
+      const total = (demandScore + opportunityScore) / 2;
+      return total > 0 ? Math.min(100, Math.round(total)) : null;
     }
 
     function calculateAudienceClarityScore(audience) {
-      if (!audience) return null;
-      // Score based on buyer personas, segments, and clarity
+      if (!audience || audience.hasVerifiedData === false) return null;
       const personaScore = (audience.buyerPersonas?.length || 0) * 15;
-      const segmentScore = (audience.audienceSegments?.length || 0) * 12;
-      const clarityScore = audience.audienceClarity === 'High' ? 90 : audience.audienceClarity === 'Medium' ? 70 : 50;
-      return Math.min(100, Math.round((personaScore + segmentScore + clarityScore) / 3));
+      const total = (personaScore) / 1;
+      return total > 0 ? Math.min(100, Math.round(total)) : null;
     }
 
     function calculateCompetitiveDefensibilityScore(competitor) {
-      if (!competitor) return null;
-      // Score based on differentiation opportunities and market gaps
+      if (!competitor || competitor.hasVerifiedData === false) return null;
       const differentiationScore = (competitor.differentiationOpportunities?.length || 0) * 15;
       const gapScore = (competitor.marketGaps?.length || 0) * 12;
-      const weaknessScore = (competitor.competitorWeaknesses?.length || 0) * 10;
-      return Math.min(100, Math.round((differentiationScore + gapScore + weaknessScore) / 3));
+      const total = (differentiationScore + gapScore) / 2;
+      return total > 0 ? Math.min(100, Math.round(total)) : null;
     }
 
     function calculateCampaignReadinessScore(campaign, channel) {
-      if (!campaign && !channel) return null;
-      // Score based on campaign angles, hooks, and channel fit
+      if ((!campaign || campaign.hasVerifiedData === false) && (!channel || channel.hasVerifiedData === false)) return null;
       const angleScore = (campaign?.creativeAngles?.length || 0) * 12;
-      const hookScore = (campaign?.copyHooks?.length || 0) * 10;
       const channelScore = (channel?.recommendedChannels?.length || 0) * 15;
-      return Math.min(100, Math.round((angleScore + hookScore + channelScore) / 3));
+      const total = (angleScore + channelScore) / 2;
+      return total > 0 ? Math.min(100, Math.round(total)) : null;
     }
 
-    // Generate product-specific top recommendation
     function generateTopRecommendation(results, input) {
+      const hasVerified = results.channel?.hasVerifiedData || results.audience?.hasVerifiedData || results.market?.hasVerifiedData;
+      if (!hasVerified) return INSUFFICIENT_DATA;
+
+      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0] || null;
+      const topPersona = results.audience?.buyerPersonas?.[0]?.name || null;
+      const topAngle = results.campaign?.creativeAngles?.[0]?.value || results.campaign?.copyHooks?.[0]?.value || null;
+      const topOpportunity = results.market?.opportunities?.[0]?.value || null;
       const productName = input.companyName || input.productName || 'the product';
-      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0] || 'content marketing';
-      const topPersona = results.audience?.buyerPersonas?.[0]?.name || 'target audience';
-      const topAngle = results.campaign?.creativeAngles?.[0]?.value || results.campaign?.copyHooks?.[0]?.value || 'compelling messaging';
-      const topOpportunity = results.market?.growthOpportunities?.[0]?.value || results.market?.opportunities?.[0]?.value || 'market growth';
       
-      return `Focus on ${primaryChannel} to reach ${topPersona} with ${topAngle}, leveraging ${topOpportunity} for ${productName}.`;
+      if (!primaryChannel && !topPersona && !topOpportunity) return INSUFFICIENT_DATA;
+      return `Focus on ${primaryChannel || 'verified channels'} to reach ${topPersona || 'target audience'}${topAngle ? ` with ${topAngle}` : ''}${topOpportunity ? `, leveraging ${topOpportunity}` : ''} for ${productName}.`;
     }
 
-    // Generate product-specific primary risk
     function generatePrimaryRisk(results, input) {
-      const topRisk = results.market?.risks?.[0]?.value || results.competitor?.competitorWeaknesses?.[0]?.value;
-      const topCompetitor = results.competitor?.directCompetitors?.[0]?.name || 'competitors';
+      const topRisk = results.market?.risks?.[0]?.value || null;
+      const topCompetitor = results.competitor?.directCompetitors?.[0]?.name || null;
       const productName = input.companyName || input.productName || 'the product';
       
-      if (topRisk) {
-        return `${topRisk} affecting ${productName}.`;
-      }
-      return `Competitive pressure from ${topCompetitor} in the market.`;
+      if (topRisk) return `${topRisk} affecting ${productName}.`;
+      if (topCompetitor) return `Competitive pressure from ${topCompetitor} in the market.`;
+      return INSUFFICIENT_DATA;
     }
 
-    // Generate product-specific immediate action
     function generateImmediateAction(results, input) {
-      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0] || 'marketing';
-      const topPersona = results.audience?.buyerPersonas?.[0]?.name || 'target audience';
+      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0] || null;
+      const topPersona = results.audience?.buyerPersonas?.[0]?.name || null;
       const productName = input.companyName || input.productName || 'the product';
       
-      return `Launch ${primaryChannel} campaign targeting ${topPersona} to validate ${productName} positioning.`;
+      if (!primaryChannel && !topPersona) return INSUFFICIENT_DATA;
+      return `Launch ${primaryChannel || 'targeted'} campaign targeting ${topPersona || 'verified audience'} to validate ${productName} positioning.`;
     }
 
     const overallGrowthScore = calculateGrowthScore(normalizedResults);
@@ -561,9 +559,8 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     });
     console.log('[Growth Snapshot Source]', growthSummary.sourceModules || ['All 8 modules']);
 
-    // Generate executive story from all modules
+    // Generate executive story from all modules (ONLY from verified data)
     const companyName = input.companyName || input.productName || 'Unknown';
-    // Fix brand casing - capitalize first letter of each word
     const formattedCompanyName = companyName.split(' ').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
     ).join(' ');
@@ -572,42 +569,49 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       companyOverview: {
         name: formattedCompanyName,
         website: input.websiteUrl || '',
-        industry: input.industry || 'Not specified',
+        industry: input.industry || null,
       },
       productSummary: {
-        usp: normalizedResults.product?.usp || 'Not available',
+        usp: normalizedResults.product?.usp || null,
         features: asArray(normalizedResults.product?.keyFeatures || normalizedResults.product?.features).slice(0, 5),
         targetUsers: asArray(normalizedResults.product?.targetUsers).slice(0, 3),
+        hasVerifiedData: normalizedResults.product?.hasVerifiedData !== false
       },
       marketSummary: {
-        demandScore: normalizedResults.market?.demandScore || 70,
-        tam: normalizedResults.market?.tam?.value || normalizedResults.market?.tam || 'Not available',
+        demandScore: normalizedResults.market?.demandScore || null,
+        tam: normalizedResults.market?.tam?.value || normalizedResults.market?.tam || null,
         trends: asArray(normalizedResults.market?.marketTrends).slice(0, 3),
-        opportunities: asArray(normalizedResults.market?. growthOpportunities || normalizedResults.market?.opportunities).slice(0, 3),
+        opportunities: asArray(normalizedResults.market?.opportunities || normalizedResults.market?.growthOpportunities).slice(0, 3),
+        hasVerifiedData: normalizedResults.market?.hasVerifiedData !== false
       },
       audienceSummary: {
         personas: asArray(normalizedResults.audience?.buyerPersonas).slice(0, 3),
         bestChannels: asArray(normalizedResults.audience?.bestChannels).slice(0, 3),
+        hasVerifiedData: normalizedResults.audience?.hasVerifiedData !== false
       },
       competitorSummary: {
         competitors: asArray(normalizedResults.competitor?.directCompetitors).slice(0, 3),
         marketGaps: asArray(normalizedResults.competitor?.marketGaps).slice(0, 3),
+        hasVerifiedData: normalizedResults.competitor?.hasVerifiedData !== false
       },
       positioningSummary: {
-        statement: normalizedResults.positioning?.positioningStatement || 'Not available',
+        statement: normalizedResults.positioning?.positioningStatement || null,
         messagingPillars: asArray(normalizedResults.positioning?.messagingPillars).slice(0, 3),
+        hasVerifiedData: normalizedResults.positioning?.hasVerifiedData !== false
       },
       campaignSummary: {
         creativeAngles: asArray(normalizedResults.campaign?.creativeAngles).slice(0, 3),
         copyHooks: asArray(normalizedResults.campaign?.copyHooks).slice(0, 3),
+        hasVerifiedData: normalizedResults.campaign?.hasVerifiedData !== false
       },
       channelSummary: {
-        primaryChannel: normalizedResults.channel?.primaryChannel || 'Not specified',
+        primaryChannel: normalizedResults.channel?.primaryChannel || null,
         recommendedChannels: asArray(normalizedResults.channel?.recommendedChannels).slice(0, 3),
+        hasVerifiedData: normalizedResults.channel?.hasVerifiedData !== false
       },
       keyRisks: asArray(normalizedResults.market?.risks || normalizedResults.competitor?.competitorWeaknesses).slice(0, 3),
       keyOpportunities: asArray(normalizedResults.market?.opportunities || normalizedResults.competitor?.differentiationOpportunities).slice(0, 3),
-      finalRecommendation: `For ${formattedCompanyName}, prioritize ${normalizedResults.channel?.primaryChannel || 'content marketing'} to engage ${normalizedResults.audience?.buyerPersonas?.[0]?.name || 'target audience'}. Leverage ${normalizedResults.campaign?.creativeAngles?.[0]?.value || 'compelling messaging'} to capitalize on ${normalizedResults.market?.growthOpportunities?.[0]?.value || 'market opportunities'} while addressing ${normalizedResults.competitor?.directCompetitors?.[0]?.name || 'competitive dynamics'}.`,
+      finalRecommendation: overallGrowthScore ? `For ${formattedCompanyName}, prioritize ${normalizedResults.channel?.primaryChannel || 'verified channels'} to engage ${normalizedResults.audience?.buyerPersonas?.[0]?.name || 'target audience'} based on ${overallGrowthScore}/100 confidence score.` : INSUFFICIENT_DATA,
       sourceModules: ['Product Analysis', 'Market Discovery', 'Audience Intelligence', 'Competitor Analysis', 'Intent Prediction', 'Positioning Engine', 'Campaign Generator', 'Channel Recommendation'],
       confidence: overallGrowthScore
     };
@@ -634,98 +638,110 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       }
     }
 
-    // Add generated actions from other modules based on real data
+    // Add generated actions from other modules ONLY if verified data exists
     const productName = input.companyName || input.productName || 'the product';
-    const primaryChannel = normalizedResults.channel?.primaryChannel || normalizedResults.channel?.recommendedChannels?.[0]?.channelName || 'marketing';
-    const topPersona = normalizedResults.audience?.buyerPersonas?.[0]?.name || 'target audience';
-    const topCompetitor = normalizedResults.competitor?.directCompetitors?.[0]?.name || 'competitors';
-    const topOpportunity = normalizedResults.market?.growthOpportunities?.[0]?.value || normalizedResults.market?.opportunities?.[0]?.value || 'market growth';
-    const topAngle = normalizedResults.campaign?.creativeAngles?.[0]?.value || normalizedResults.campaign?.copyHooks?.[0]?.value || 'compelling messaging';
+    const primaryChannel = normalizedResults.channel?.primaryChannel || normalizedResults.channel?.recommendedChannels?.[0]?.channelName || null;
+    const topPersona = normalizedResults.audience?.buyerPersonas?.[0]?.name || null;
+    const topCompetitor = normalizedResults.competitor?.directCompetitors?.[0]?.name || null;
+    const topOpportunity = normalizedResults.market?.opportunities?.[0]?.value || null;
+    const topAngle = normalizedResults.campaign?.creativeAngles?.[0]?.value || normalizedResults.campaign?.copyHooks?.[0]?.value || null;
     const industry = input.industry || 'industry';
 
     if (growthActionPlan.day7.length === 0) {
-      growthActionPlan.day7.push({
-        title: `Validate ${productName} positioning for ${topPersona}`,
-        problem: `Ensure ${productName} messaging aligns with ${topPersona} needs in ${industry}`,
-        evidence: `Based on product analysis: ${normalizedResults.product?.productSummary?.substring(0, 100) || 'product analysis'}`,
-        researchSource: 'Product Analysis',
-        businessImpact: 'Higher conversion rates from target audience',
-        expectedGain: '15-20% improvement in messaging resonance',
-        difficulty: 'Medium',
-        priority: 'High',
-        estimatedTimeline: '1 week',
-        owner: 'Marketing Team'
-      });
+      if (topPersona) {
+        growthActionPlan.day7.push({
+          title: `Validate ${productName} positioning for ${topPersona}`,
+          problem: `Ensure ${productName} messaging aligns with ${topPersona} needs in ${industry}`,
+          evidence: `Based on product analysis: ${normalizedResults.product?.productSummary?.substring(0, 100) || 'product analysis'}`,
+          researchSource: 'Product Analysis',
+          businessImpact: 'Higher conversion rates from target audience',
+          expectedGain: 'Pending verified data',
+          difficulty: 'Medium',
+          priority: 'High',
+          estimatedTimeline: '1 week',
+          owner: 'Marketing Team'
+        });
+      }
       
-      growthActionPlan.day7.push({
-        title: `Research ${topCompetitor} positioning and messaging`,
-        problem: 'Understand competitive landscape to differentiate effectively',
-        evidence: `Competitor analysis identified ${normalizedResults.competitor?.directCompetitors?.length || 0} direct competitors`,
-        researchSource: 'Competitor Analysis',
-        businessImpact: 'Clear differentiation strategy',
-        expectedGain: 'Improved competitive positioning',
-        difficulty: 'Low',
-        priority: 'High',
-        estimatedTimeline: '1 week',
-        owner: 'Product Marketing'
-      });
+      if (topCompetitor) {
+        growthActionPlan.day7.push({
+          title: `Research ${topCompetitor} positioning and messaging`,
+          problem: 'Understand competitive landscape to differentiate effectively',
+          evidence: `Competitor analysis identified ${normalizedResults.competitor?.directCompetitors?.length || 0} direct competitors`,
+          researchSource: 'Competitor Analysis',
+          businessImpact: 'Clear differentiation strategy',
+          expectedGain: 'Pending verified data',
+          difficulty: 'Low',
+          priority: 'High',
+          estimatedTimeline: '1 week',
+          owner: 'Product Marketing'
+        });
+      }
     }
 
     if (growthActionPlan.day30.length === 0) {
-      growthActionPlan.day30.push({
-        title: `Launch ${primaryChannel} campaign targeting ${topPersona}`,
-        problem: `Generate awareness and leads among ${topPersona} using ${topAngle}`,
-        evidence: `Channel recommendation shows ${primaryChannel} with fit score of ${normalizedResults.channel?.recommendedChannels?.[0]?.fitScore || 80}`,
-        researchSource: 'Channel Recommendation',
-        businessImpact: `Increased brand awareness and lead generation`,
-        expectedGain: '50-100 qualified leads per month',
-        difficulty: 'Medium',
-        priority: 'High',
-        estimatedTimeline: '2-4 weeks',
-        owner: 'Growth Team'
-      });
+      if (primaryChannel && topPersona) {
+        growthActionPlan.day30.push({
+          title: `Launch ${primaryChannel} campaign targeting ${topPersona}`,
+          problem: `Generate awareness and leads among ${topPersona}`,
+          evidence: `Channel recommendation shows ${primaryChannel}`,
+          researchSource: 'Channel Recommendation',
+          businessImpact: 'Increased brand awareness and lead generation',
+          expectedGain: 'Pending verified performance data',
+          difficulty: 'Medium',
+          priority: 'High',
+          estimatedTimeline: '2-4 weeks',
+          owner: 'Growth Team'
+        });
+      }
       
-      growthActionPlan.day30.push({
-        title: `Capitalize on ${topOpportunity}`,
-        problem: 'Leverage identified market opportunity for growth',
-        evidence: `Market discovery identified: ${topOpportunity}`,
-        researchSource: 'Market Discovery',
-        businessImpact: 'Accelerated market penetration',
-        expectedGain: '20-30% increase in market share',
-        difficulty: 'High',
-        priority: 'High',
-        estimatedTimeline: '2-4 weeks',
-        owner: 'Strategy Team'
-      });
+      if (topOpportunity) {
+        growthActionPlan.day30.push({
+          title: `Capitalize on ${topOpportunity}`,
+          problem: 'Leverage identified market opportunity for growth',
+          evidence: `Market discovery identified: ${topOpportunity}`,
+          researchSource: 'Market Discovery',
+          businessImpact: 'Accelerated market penetration',
+          expectedGain: 'Pending verified data',
+          difficulty: 'High',
+          priority: 'High',
+          estimatedTimeline: '2-4 weeks',
+          owner: 'Strategy Team'
+        });
+      }
     }
 
     if (growthActionPlan.day60.length === 0) {
-      const topGap = normalizedResults.competitor?.marketGaps?.[0]?.value || 'market gaps';
-      growthActionPlan.day60.push({
-        title: `Address ${topGap} in ${industry}`,
-        problem: 'Fill identified market gaps to gain competitive advantage',
-        evidence: `Competitor analysis found ${normalizedResults.competitor?.marketGaps?.length || 0} market gaps`,
-        researchSource: 'Competitor Analysis',
-        businessImpact: 'Differentiated market position',
-        expectedGain: '15-25% competitive advantage',
-        difficulty: 'High',
-        priority: 'Medium',
-        estimatedTimeline: '1-2 months',
-        owner: 'Product Team'
-      });
+      const topGap = normalizedResults.competitor?.marketGaps?.[0]?.value || null;
+      if (topGap) {
+        growthActionPlan.day60.push({
+          title: `Address ${topGap} in ${industry}`,
+          problem: 'Fill identified market gaps to gain competitive advantage',
+          evidence: `Competitor analysis found ${normalizedResults.competitor?.marketGaps?.length || 0} market gaps`,
+          researchSource: 'Competitor Analysis',
+          businessImpact: 'Differentiated market position',
+          expectedGain: 'Pending verified data',
+          difficulty: 'High',
+          priority: 'Medium',
+          estimatedTimeline: '1-2 months',
+          owner: 'Product Team'
+        });
+      }
       
-      growthActionPlan.day60.push({
-        title: `Expand ${primaryChannel} reach based on initial performance`,
-        problem: 'Scale successful channel strategies',
-        evidence: `Initial ${primaryChannel} campaign performance data`,
-        researchSource: 'Campaign Generator',
-        businessImpact: 'Scaled lead generation',
-        expectedGain: '2-3x increase in qualified leads',
-        difficulty: 'Medium',
-        priority: 'Medium',
-        estimatedTimeline: '1-2 months',
-        owner: 'Growth Team'
-      });
+      if (primaryChannel) {
+        growthActionPlan.day60.push({
+          title: `Expand ${primaryChannel} reach based on initial performance`,
+          problem: 'Scale successful channel strategies',
+          evidence: `Initial ${primaryChannel} campaign performance data`,
+          researchSource: 'Campaign Generator',
+          businessImpact: 'Scaled lead generation',
+          expectedGain: 'Pending verified performance data',
+          difficulty: 'Medium',
+          priority: 'Medium',
+          estimatedTimeline: '1-2 months',
+          owner: 'Growth Team'
+        });
+      }
     }
 
     console.log('[Growth Save] executiveStory exists', !!growthExecutiveStory);
@@ -828,22 +844,22 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     return {
       success: true,
-      chatId: validChatId, // Return the actual chat ID
+      chatId: validChatId,
       results: normalizedResults,
       steps,
       overallStatus,
       warnings,
       summary: {
         overallGrowthScore,
-        growthPotential: Math.min(100, Math.round((normalizedResults.market?.demandScore || 70 + overallGrowthScore) / 2)),
-        marketReadiness: Math.min(100, Math.round((normalizedResults.market?.demandScore || 70) * 0.95)),
-        competitiveStrength: Math.min(100, Math.round(65 + (normalizedResults.competitor?.differentiationOpportunities?.length || 2) * 5)),
-        customerDemand: normalizedResults.market?.demandScore || 70,
-        brandPosition: Math.min(100, Math.round(overallGrowthScore * 0.9)),
-        bestChannel: normalizedResults.channel.primaryChannel || normalizedResults.channel.recommendedChannels?.[0]?.channel || normalizedResults.channel.recommendedChannels?.[0]?.name || 'LinkedIn',
-        topOpportunity: normalizedResults.market.growthOpportunities?.[0] || 'Market expansion',
-        topRisk: normalizedResults.market.marketRisks?.[0] || 'Competition',
-        nextAction: normalizedResults.campaign.nextActions?.[0] || normalizedResults.campaign.campaignIdeas?.[0] || 'Launch campaign',
+        growthPotential: overallGrowthScore ? Math.min(100, Math.round(((normalizedResults.market?.demandScore || 0) + overallGrowthScore) / 2)) : null,
+        marketReadiness: normalizedResults.market?.demandScore ? Math.min(100, Math.round(normalizedResults.market?.demandScore * 0.95)) : null,
+        competitiveStrength: normalizedResults.competitor?.differentiationOpportunities?.length ? Math.min(100, Math.round(65 + normalizedResults.competitor.differentiationOpportunities.length * 5)) : null,
+        customerDemand: normalizedResults.market?.demandScore || null,
+        brandPosition: overallGrowthScore ? Math.min(100, Math.round(overallGrowthScore * 0.9)) : null,
+        bestChannel: normalizedResults.channel?.primaryChannel || normalizedResults.channel?.recommendedChannels?.[0]?.channel || normalizedResults.channel?.recommendedChannels?.[0]?.name || null,
+        topOpportunity: normalizedResults.market?.opportunities?.[0]?.value || normalizedResults.market?.growthOpportunities?.[0]?.value || null,
+        topRisk: normalizedResults.market?.risks?.[0]?.value || normalizedResults.market?.marketRisks?.[0]?.value || null,
+        nextAction: normalizedResults.campaign?.nextActions?.[0] || normalizedResults.campaign?.campaignIdeas?.[0] || null,
         completedSteps: steps.filter(s => s.status === 'completed').length,
         progress: Math.round((steps.filter(s => s.status === 'completed').length / steps.length) * 100)
       }
@@ -931,19 +947,19 @@ Context: ${productData.productSummary}
 
 Provide JSON response:
 {
-  "demandScore": 75,
-  "confidence": 80,
-  "tam": {"value": "$X Billion", "source": "API/Industry Report", "confidence": 60, "method": "Top-down market sizing"},
-  "sam": {"value": "$Y Billion", "source": "API/Industry Report", "confidence": 55, "method": "Serviceable market subset"},
-  "som": {"value": "$Z Million", "source": "API/Industry Report", "confidence": 45, "method": "Achievable market estimation"},
-  "cagr": "XX%",
-  "marketTrends": [{"value": "Trend description", "confidence": 80, "impact": "High"}],
-  "opportunities": [{"value": "Opportunity description", "confidence": 75, "impact": "High"}],
-  "risks": [{"value": "Risk description", "confidence": 85, "impact": "High"}],
-  "entryStrategy": "Detailed description of entry strategy"
+  "demandScore": null,
+  "confidence": null,
+  "tam": null,
+  "sam": null,
+  "som": null,
+  "cagr": null,
+  "marketTrends": [],
+  "opportunities": [],
+  "risks": [],
+  "entryStrategy": null
 }
 
-CRITICAL INSTRUCTION: NEVER use generic placeholders like "$X Billion". Use realistic market size estimates for the ${input.industry || 'this'} industry. TAM/SAM/SOM must include value, source, confidence, and method fields. Return only valid JSON.`;
+CRITICAL INSTRUCTION: Set tam/sam/som to null with a source field if you don't have verified data. NEVER fabricate market size numbers. Only provide TAM/SAM/SOM if you have actual verified data from a reliable source. Return only valid JSON.`;
 
   const fallbackData = generateMarketFallback(input, productData);
   const aiResult = await callBestAI(prompt, 1200, 'Market Discovery', fallbackData);
@@ -1009,23 +1025,15 @@ Industry: ${input.industry}
 
 Provide JSON response:
 {
-  "directCompetitors": [
-    {
-      "name": "Competitor 1",
-      "domain": "competitor1.com",
-      "opportunityScore": 75,
-      "strengths": ["s1"],
-      "weaknesses": ["w1"]
-    }
-  ],
-  "competitorMatrix": "Matrix description",
-  "differentiationOpportunities": [{"value": "Opp", "confidence": 85, "impact": "High"}],
-  "marketGaps": [{"value": "Gap", "confidence": 80, "impact": "High"}],
-  "competitorWeaknesses": [{"value": "Weakness", "confidence": 80, "impact": "High"}],
-  "confidenceScore": 70
+  "directCompetitors": [],
+  "competitorMatrix": null,
+  "differentiationOpportunities": [],
+  "marketGaps": [],
+  "competitorWeaknesses": [],
+  "confidenceScore": null
 }
 
-CRITICAL INSTRUCTION: NEVER use generic placeholders like "Competitor 1". Use real competitor names if known, or infer real players in the ${input.industry} space. Return only valid JSON.`;
+CRITICAL INSTRUCTION: Do NOT invent competitor names. If you don't have verified data about specific competitors, return empty arrays and null values. Only populate competitor data if you have actual knowledge of real companies competing in this space. Return only valid JSON.`;
 
   const fallbackData = generateCompetitorFallback(input, productData, orchestratorCompetitors);
   const aiResult = await callBestAI(prompt, 1200, 'Competitor Analysis', fallbackData);
@@ -1510,16 +1518,16 @@ export async function getGrowthWorkspaceResults({ chatId, userId }) {
       steps,
       input: productIntel.inputJson,
       summary: {
-        overallGrowthScore: avgConfidence,
-        growthPotential: Math.min(100, Math.round((results.market?.demandScore || 70 + avgConfidence) / 2)),
-        marketReadiness: Math.min(100, Math.round((results.market?.demandScore || 70) * 0.95)),
-        competitiveStrength: Math.min(100, Math.round(65 + (results.competitor?.differentiationOpportunities?.length || 2) * 5)),
-        customerDemand: results.market?.demandScore || 70,
-        brandPosition: Math.min(100, Math.round(avgConfidence * 0.9)),
-        bestChannel: results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel || results.channel?.recommendedChannels?.[0]?.name || 'LinkedIn',
-        topOpportunity: results.market?.growthOpportunities?.[0] || 'Market expansion',
-        topRisk: results.market?.marketRisks?.[0] || 'Competition',
-        nextAction: results.campaign?.nextActions?.[0] || results.campaign?.campaignIdeas?.[0] || 'Run full analysis',
+        overallGrowthScore: avgConfidence || null,
+        growthPotential: results.market?.demandScore ? Math.min(100, Math.round((results.market.demandScore + avgConfidence) / 2)) : null,
+        marketReadiness: results.market?.demandScore ? Math.min(100, Math.round(results.market.demandScore * 0.95)) : null,
+        competitiveStrength: results.competitor?.differentiationOpportunities?.length ? Math.min(100, Math.round(65 + results.competitor.differentiationOpportunities.length * 5)) : null,
+        customerDemand: results.market?.demandScore || null,
+        brandPosition: avgConfidence ? Math.min(100, Math.round(avgConfidence * 0.9)) : null,
+        bestChannel: results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel || results.channel?.recommendedChannels?.[0]?.name || null,
+        topOpportunity: results.market?.opportunities?.[0]?.value || results.market?.growthOpportunities?.[0]?.value || null,
+        topRisk: results.market?.risks?.[0]?.value || results.market?.marketRisks?.[0]?.value || null,
+        nextAction: results.campaign?.nextActions?.[0] || results.campaign?.campaignIdeas?.[0] || null,
         completedSteps,
         progress: Math.round((completedSteps / 8) * 100)
       }

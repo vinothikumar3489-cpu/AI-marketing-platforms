@@ -645,27 +645,11 @@ function isPageCovered(page, existingPages) {
 }
 
 function generateTitleFromKeyword(keyword, productName) {
-  const keywordLower = keyword.toLowerCase();
-  if (keywordLower.includes('vs') || keywordLower.includes('versus')) {
-    return keyword.charAt(0).toUpperCase() + keyword.slice(1);
-  }
-  if (keywordLower.startsWith('how to') || keywordLower.startsWith('how')) {
-    return `How to ${keyword.replace(/^(how to|how)\s*/i, '')} with ${productName}`;
-  }
-  if (keywordLower.startsWith('what is') || keywordLower.startsWith('what')) {
-    return `What is ${keyword.replace(/^(what is|what)\s*/i, '')}?`;
-  }
-  return keyword.charAt(0).toUpperCase() + keyword.slice(1);
+  return '';
 }
 
 function generateSectionsFromIntent(intent) {
-  const sections = {
-    transactional: ['Overview', 'Features', 'Pricing', 'CTA'],
-    informational: ['Introduction', 'Details', 'Examples', 'Conclusion'],
-    commercial: ['Comparison', 'Benefits', 'Pricing', 'CTA'],
-    navigational: ['Direct link', 'Overview', 'Related content']
-  };
-  return sections[intent] || ['Overview', 'Details', 'Conclusion'];
+  return [];
 }
 
 function calculateConfidence(volume, difficulty) {
@@ -709,33 +693,7 @@ function deduplicateContentGaps(gaps) {
 }
 
 function generateContentCalendar(gaps) {
-  const critical = gaps.filter(g => g.priority === 'critical');
-  const high = gaps.filter(g => g.priority === 'high');
-  const medium = gaps.filter(g => g.priority === 'medium');
-
-  return {
-    day30: critical.slice(0, 3).map(g => ({
-      title: g.title,
-      reason: g.evidence,
-      priority: g.priority,
-      effort: 'medium',
-      impact: g.businessImpact
-    })),
-    day60: high.slice(0, 3).map(g => ({
-      title: g.title,
-      reason: g.evidence,
-      priority: g.priority,
-      effort: 'high',
-      impact: g.businessImpact
-    })),
-    day90: medium.slice(0, 3).map(g => ({
-      title: g.title,
-      reason: g.evidence,
-      priority: g.priority,
-      effort: 'low',
-      impact: g.businessImpact
-    }))
-  };
+  return {};
 }
 
 

@@ -1351,54 +1351,9 @@ function generateRuleBasedAnalysis(websiteData, technicalAudit, researchData, pr
         'Build authority pages'
       ]
     },
-    landingPageOptimization: {
-      headlineSuggestions: [
-        `Transform Your [Problem] with ${productName}`,
-        `The Smart Way to [Benefit]`,
-        `${productName}: [Unique Value Proposition]`
-      ],
-      ctaSuggestions: [
-        'Start Free Trial',
-        'See How It Works',
-        'Get Started in 60 Seconds'
-      ],
-      trustSignals: [
-        'Add customer testimonials',
-        'Display security badges',
-        'Show client logos',
-        'Include social proof numbers'
-      ],
-      conversionTips: [
-        'Place CTA above the fold',
-        'Reduce form fields to 3 or less',
-        'Add urgency indicators',
-        'Include money-back guarantee'
-      ]
-    },
-    blogOpportunities: generateBlogOpportunities(productName),
-    actionPlan: {
-      day30: [
-        'Fix critical technical SEO issues (title, meta, headings)',
-        'Create 3-5 core product pages with optimized content',
-        'Set up Google Search Console and Analytics',
-        'Research and document target keywords',
-        'Write first 2 blog posts targeting long-tail keywords'
-      ],
-      day60: [
-        'Publish 4-6 more SEO-optimized blog posts',
-        'Create 2-3 comparison pages',
-        'Build internal linking structure',
-        'Start link building campaign',
-        'Optimize images and page speed'
-      ],
-      day90: [
-        'Publish 6-8 additional blog posts',
-        'Create comprehensive guides and resources',
-        'Launch content promotion campaign',
-        'Monitor rankings and adjust strategy',
-        'Analyze competitors and fill content gaps'
-      ]
-    },
+    landingPageOptimization: { hasVerifiedData: false },
+    blogOpportunities: [],
+    actionPlan: { hasVerifiedData: false },
     metadata: {
       analyzedAt: new Date().toISOString(),
       websiteDataCollected: !!websiteData.title,
@@ -1416,42 +1371,12 @@ function generateRuleBasedAnalysis(websiteData, technicalAudit, researchData, pr
   };
 }
 
-function generateKeywordOpportunities(productName, researchData) {
-  return [
-    { keyword: `${productName} tutorial`, intent: 'informational', difficulty: 'easy', opportunity: 'high', reason: 'Low competition, high search volume' },
-    { keyword: `best ${productName} alternative`, intent: 'commercial', difficulty: 'medium', opportunity: 'high', reason: 'Captures competitor traffic' },
-    { keyword: `${productName} pricing`, intent: 'commercial', difficulty: 'easy', opportunity: 'high', reason: 'High purchase intent' },
-    { keyword: `how to use ${productName}`, intent: 'informational', difficulty: 'easy', opportunity: 'medium', reason: 'Existing user searches' },
-    { keyword: `${productName} vs [competitor]`, intent: 'commercial', difficulty: 'medium', opportunity: 'high', reason: 'Comparison searches' },
-    { keyword: `${productName} review`, intent: 'commercial', difficulty: 'medium', opportunity: 'medium', reason: 'Research phase traffic' },
-    { keyword: `${productName} features`, intent: 'informational', difficulty: 'easy', opportunity: 'medium', reason: 'Product research' },
-    { keyword: `${productName} for small business`, intent: 'commercial', difficulty: 'medium', opportunity: 'high', reason: 'Niche targeting' }
-  ];
+function generateKeywordOpportunities() {
+  return [];
 }
 
-function generateBlogOpportunities(productName) {
-  return [
-    { title: `The Complete ${productName} Guide for Beginners`, keyword: `${productName} guide`, intent: 'informational', difficulty: 'easy' },
-    { title: `10 Ways to Get More Value from ${productName}`, keyword: `${productName} tips`, intent: 'informational', difficulty: 'easy' },
-    { title: `${productName} vs Top 5 Alternatives: Detailed Comparison`, keyword: `${productName} alternatives`, intent: 'commercial', difficulty: 'medium' },
-    { title: `How [Company] Achieved [Result] Using ${productName}`, keyword: `${productName} case study`, intent: 'commercial', difficulty: 'easy' },
-    { title: `${productName} Pricing Guide: Which Plan is Right for You?`, keyword: `${productName} pricing`, intent: 'commercial', difficulty: 'easy' },
-    { title: `Common ${productName} Mistakes and How to Avoid Them`, keyword: `${productName} mistakes`, intent: 'informational', difficulty: 'easy' },
-    { title: `${productName} Integration Guide: Connect Your Favorite Tools`, keyword: `${productName} integrations`, intent: 'informational', difficulty: 'easy' },
-    { title: `Advanced ${productName} Techniques for Power Users`, keyword: `${productName} advanced`, intent: 'informational', difficulty: 'medium' },
-    { title: `${productName} ROI Calculator: Measure Your Returns`, keyword: `${productName} roi`, intent: 'commercial', difficulty: 'medium' },
-    { title: `Why Teams are Switching from [Competitor] to ${productName}`, keyword: `switch to ${productName}`, intent: 'commercial', difficulty: 'medium' },
-    { title: `${productName} Security and Compliance: Everything You Need to Know`, keyword: `${productName} security`, intent: 'informational', difficulty: 'easy' },
-    { title: `${productName} Mobile App: Features and Benefits`, keyword: `${productName} mobile`, intent: 'informational', difficulty: 'easy' },
-    { title: `How to Migrate from [Competitor] to ${productName} in 5 Steps`, keyword: `migrate to ${productName}`, intent: 'commercial', difficulty: 'medium' },
-    { title: `${productName} Keyboard Shortcuts to Boost Your Productivity`, keyword: `${productName} shortcuts`, intent: 'informational', difficulty: 'easy' },
-    { title: `${productName} Updates: What's New in the Latest Release`, keyword: `${productName} updates`, intent: 'informational', difficulty: 'easy' },
-    { title: `Building a Workflow with ${productName}: Step-by-Step Tutorial`, keyword: `${productName} workflow`, intent: 'informational', difficulty: 'easy' },
-    { title: `${productName} for Remote Teams: Best Practices`, keyword: `${productName} remote work`, intent: 'informational', difficulty: 'easy' },
-    { title: `${productName} API Documentation and Examples`, keyword: `${productName} api`, intent: 'informational', difficulty: 'medium' },
-    { title: `${productName} Customer Success Stories and Results`, keyword: `${productName} success stories`, intent: 'commercial', difficulty: 'easy' },
-    { title: `The Ultimate ${productName} Checklist for Getting Started`, keyword: `${productName} checklist`, intent: 'informational', difficulty: 'easy' }
-  ];
+function generateBlogOpportunities() {
+  return [];
 }
 
 function generateFallbackAnalysis(websiteUrl, productName) {

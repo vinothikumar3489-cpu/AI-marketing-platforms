@@ -975,61 +975,46 @@ async function callGroqAI(prompt) {
 // ============================================
 
 function generateFallbackGeoIntelligence(productName, industry) {
-  console.log('🔄 [Fallback] Generating fallback GEO intelligence...');
+  console.log('🔄 [Fallback] Fallback GEO intelligence - no verified data');
 
   return {
-    aiVisibilityScore: 0,
-    chatGptScore: 0,
-    geminiScore: 0,
-    claudeScore: 0,
-    perplexityScore: 0,
-    googleAiOverviewScore: 0,
-    entityCoverageScore: 0,
-    knowledgeGraphReadinessScore: 0,
-    citationReadinessScore: 0,
-    answerabilityScore: 0,
-    topicalAuthorityScore: 0,
-    entities: [
-      { entity: productName, type: 'product', confidenceScore: 100, context: 'Primary product' }
-    ],
+    hasVerifiedData: false,
+    confidenceScore: 0,
+    provider: 'fallback_evidence',
+    warnings: ['Module: Insufficient verified data'],
+    dataSources: [],
+    note: 'No verified data available',
+    aiVisibilityScore: null,
+    chatGptScore: null,
+    geminiScore: null,
+    claudeScore: null,
+    perplexityScore: null,
+    googleAiOverviewScore: null,
+    entityCoverageScore: null,
+    knowledgeGraphReadinessScore: null,
+    citationReadinessScore: null,
+    answerabilityScore: null,
+    topicalAuthorityScore: null,
+    entities: [],
     knowledgeGraphEntities: [],
-    citationOpportunities: [
-      { type: 'faq_page', opportunity: 'Add FAQ section', impact: 'high' },
-      { type: 'definition_page', opportunity: 'Create definition pages', impact: 'high' }
-    ],
-    faqOpportunities: [
-      { question: `What is ${productName}?`, reason: 'No clear definition found', impact: 'high' },
-      { question: `How does ${productName} work?`, reason: 'Limited explanation', impact: 'high' }
-    ],
-    aiContentOpportunities: [
-      { type: 'faq', opportunity: 'Create comprehensive FAQ', impact: 'high', priority: 10 },
-      { type: 'definition', opportunity: 'Add definition pages', impact: 'high', priority: 9 },
-      { type: 'comparison', opportunity: 'Build comparison pages', impact: 'high', priority: 8 }
-    ],
+    citationOpportunities: [],
+    faqOpportunities: [],
+    aiContentOpportunities: [],
     trustSignals: {
-      score: 40,
-      recommendations: ['Add testimonials', 'Create case studies', 'Display certifications']
+      score: null,
+      recommendations: []
     },
     recommendations: {
-      immediate: [
-        { action: 'Add FAQ page', impact: 'high', difficulty: 'easy' },
-        { action: 'Create definition content', impact: 'high', difficulty: 'easy' }
-      ],
-      day30: [
-        { action: 'Build comparison pages', impact: 'high', difficulty: 'medium' },
-        { action: 'Add structured data', impact: 'high', difficulty: 'medium' }
-      ],
-      day90: [
-        { action: 'Create knowledge base', impact: 'high', difficulty: 'hard' },
-        { action: 'Build authority content', impact: 'high', difficulty: 'hard' }
-      ]
+      immediate: [],
+      day30: [],
+      day90: []
     },
     metadata: {
       analyzedAt: new Date().toISOString(),
-      totalEntities: 1,
-      totalOpportunities: 3,
+      totalEntities: 0,
+      totalOpportunities: 0,
       isFallback: true,
-      source: 'heuristic_fallback',
+      source: 'fallback_evidence',
       confidence: 'low'
     }
   };

@@ -1320,164 +1320,30 @@ async function callGroqAI(prompt) {
 // ============================================
 
 function generateFallbackKeywordIntelligence(productName, industry) {
-  console.log('🔄 [Fallback] Generating fallback keyword intelligence...');
-
-  const baseName = productName.toLowerCase();
+  console.log('🔄 [Fallback] Fallback keyword intelligence - no verified data');
 
   return {
-    primaryKeywords: [
-      {
-        keyword: productName,
-        intent: 'navigational',
-        difficulty: 'easy',
-        opportunity: 'high',
-        confidenceScore: 95,
-        reason: 'Brand name - primary keyword'
-      },
-      {
-        keyword: `${baseName} software`,
-        intent: 'commercial',
-        difficulty: 'medium',
-        opportunity: 'high',
-        confidenceScore: 85,
-        reason: 'Commercial intent keyword for product category'
-      },
-      {
-        keyword: `${baseName} platform`,
-        intent: 'informational',
-        difficulty: 'medium',
-        opportunity: 'high',
-        confidenceScore: 80,
-        reason: 'Platform-focused keyword'
-      }
-    ],
-    secondaryKeywords: [
-      {
-        keyword: `${baseName} features`,
-        intent: 'informational',
-        difficulty: 'easy',
-        opportunity: 'medium',
-        confidenceScore: 75,
-        reason: 'Feature discovery keyword'
-      },
-      {
-        keyword: `${baseName} pricing`,
-        intent: 'commercial',
-        difficulty: 'easy',
-        opportunity: 'high',
-        confidenceScore: 85,
-        reason: 'High commercial intent'
-      },
-      {
-        keyword: `${baseName} review`,
-        intent: 'commercial',
-        difficulty: 'medium',
-        opportunity: 'medium',
-        confidenceScore: 70,
-        reason: 'Research phase keyword'
-      }
-    ],
-    longTailKeywords: [
-      {
-        keyword: `how to use ${baseName}`,
-        intent: 'informational',
-        difficulty: 'easy',
-        opportunity: 'high',
-        confidenceScore: 80,
-        reason: 'Tutorial/guide keyword with low competition'
-      },
-      {
-        keyword: `${baseName} for small business`,
-        intent: 'commercial',
-        difficulty: 'easy',
-        opportunity: 'high',
-        confidenceScore: 75,
-        reason: 'Niche targeting with specific audience'
-      }
-    ],
-    questionKeywords: [
-      {
-        keyword: `what is ${productName}?`,
-        intent: 'informational',
-        difficulty: 'easy',
-        opportunity: 'high',
-        confidenceScore: 85,
-        reason: 'FAQ keyword perfect for featured snippets'
-      },
-      {
-        keyword: `how does ${baseName} work?`,
-        intent: 'informational',
-        difficulty: 'easy',
-        opportunity: 'medium',
-        confidenceScore: 75,
-        reason: 'Explanation-seeking query'
-      }
-    ],
-    clusters: [
-      {
-        name: `${productName} Core`,
-        keywords: [productName, `${baseName} software`, `${baseName} platform`],
-        priority: 10,
-        contentSuggestions: [
-          'Optimize homepage and product pages',
-          'Create comprehensive product documentation',
-          'Build feature showcase pages'
-        ]
-      },
-      {
-        name: 'Commercial Intent',
-        keywords: [`${baseName} pricing`, `${baseName} review`, `${baseName} vs competitors`],
-        priority: 9,
-        contentSuggestions: [
-          'Transparent pricing page',
-          'Customer testimonials and case studies',
-          'Competitive comparison pages'
-        ]
-      }
-    ],
-    competitorKeywords: [
-      {
-        keyword: `${baseName} alternative`,
-        competitorUsing: 'Various competitors',
-        reason: 'Competitors rank for alternative searches',
-        opportunity: 'high',
-        intent: 'commercial',
-        difficulty: 'medium'
-      }
-    ],
-    contentOpportunities: [
-      {
-        keyword: `${baseName} guide`,
-        pageSuggestion: `Complete ${productName} Guide`,
-        reason: 'Educational content gap',
-        impact: 'high',
-        type: 'blog_post',
-        priority: 8
-      }
-    ],
-    geoKeywords: [
-      {
-        question: `What is ${productName}?`,
-        platform: 'chatgpt',
-        answerOpportunity: 'high',
-        contentSuggestion: 'Clear, concise product definition with use cases',
-        intent: 'informational'
-      },
-      {
-        question: `How to use ${productName}`,
-        platform: 'gemini',
-        answerOpportunity: 'high',
-        contentSuggestion: 'Step-by-step tutorial with visuals',
-        intent: 'informational'
-      }
-    ],
+    hasVerifiedData: false,
+    confidenceScore: 0,
+    provider: 'fallback_evidence',
+    warnings: ['Module: Insufficient verified data'],
+    dataSources: [],
+    note: 'No verified data available',
+    primaryKeywords: [],
+    secondaryKeywords: [],
+    longTailKeywords: [],
+    questionKeywords: [],
+    clusters: [],
+    competitorKeywords: [],
+    contentOpportunities: [],
+    geoKeywords: [],
     metadata: {
-      totalKeywords: 15,
-      clustersCount: 2,
-      opportunitiesCount: 1,
+      totalKeywords: 0,
+      clustersCount: 0,
+      opportunitiesCount: 0,
       analyzedAt: new Date().toISOString(),
       isFallback: true,
-      source: 'heuristic_fallback',
+      source: 'fallback_evidence',
       confidence: 'low'
     }
   };
@@ -1527,23 +1393,7 @@ function normalizeKeywordBuckets(result, identity) {
     console.log(`✅ [Keyword Normalizer] Filtered Orkyn/software keywords for Canva (primary: ${result.primaryKeywords.length}, secondary: ${result.secondaryKeywords.length}, longTail: ${result.longTailKeywords.length})`);
   }
 
-  // Step 4: Force Canva seed keywords if still empty
-  if ((result.primaryKeywords || []).length === 0 && isCanva) {
-    result.primaryKeywords = [
-      { keyword: 'graphic design tool', intent: 'commercial', confidence: 80, source: 'Seed', searchVolume: null, keywordDifficulty: null, cpc: null, contentType: 'Landing Page', opportunity: 85 },
-      { keyword: 'online design platform', intent: 'commercial', confidence: 75, source: 'Seed', searchVolume: null, keywordDifficulty: null, cpc: null, contentType: 'Landing Page', opportunity: 80 },
-      { keyword: 'presentation maker', intent: 'commercial', confidence: 80, source: 'Seed', searchVolume: null, keywordDifficulty: null, cpc: null, contentType: 'Landing Page', opportunity: 85 },
-      { keyword: 'social media design tool', intent: 'commercial', confidence: 75, source: 'Seed', searchVolume: null, keywordDifficulty: null, cpc: null, contentType: 'Landing Page', opportunity: 80 },
-      { keyword: 'Canva pricing plans', intent: 'commercial', confidence: 85, source: 'Seed', searchVolume: null, keywordDifficulty: null, cpc: null, contentType: 'Landing Page', opportunity: 90 },
-    ];
-    result.secondaryKeywords = result.secondaryKeywords.length > 0 ? result.secondaryKeywords : [
-      { keyword: 'Canva vs Adobe Express', intent: 'commercial', confidence: 70, source: 'Seed', searchVolume: null, keywordDifficulty: null, cpc: null, contentType: 'Comparison', opportunity: 75 },
-      { keyword: 'logo maker', intent: 'commercial', confidence: 70, source: 'Seed', searchVolume: null, keywordDifficulty: null, cpc: null, contentType: 'Landing Page', opportunity: 75 },
-      { keyword: 'brand kit software', intent: 'commercial', confidence: 65, source: 'Seed', searchVolume: null, keywordDifficulty: null, cpc: null, contentType: 'Landing Page', opportunity: 70 },
-      { keyword: 'Canva alternatives', intent: 'commercial', confidence: 75, source: 'Seed', searchVolume: null, keywordDifficulty: null, cpc: null, contentType: 'Comparison', opportunity: 80 },
-    ];
-    console.log(`✅ [Keyword Normalizer] Injected ${result.primaryKeywords.length} Canva-specific seed keywords`);
-  }
+  // Step 4: Removed - no longer injects hardcoded seed keywords
   
   // Update metadata totals
   result.metadata = result.metadata || {};

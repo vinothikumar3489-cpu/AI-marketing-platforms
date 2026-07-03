@@ -29,75 +29,23 @@ function calculateSeoScore(data) {
 }
 
 function predictSeoGrowth(metrics) {
-  // Basic heuristic prediction
-  const expectedTrafficGrowth = Math.round((metrics.keywordTrend ?? 0.05) * (metrics.organicTraffic ?? 1000));
-  const rankingImprovementChance = clamp(50 + (metrics.keywordTrend ?? 0) * 100);
-  const highOpportunityKeywords = (metrics.topKeywords || []).slice(0, 5);
-  const riskLevel = rankingImprovementChance > 60 ? "low" : "medium";
-  const nextBestActions = [
-    "Optimize top opportunity keywords in titles and headings",
-    "Improve page speed and mobile UX",
-    "Build high-quality backlinks from relevant sites",
-  ];
-
   return {
-    expectedTrafficGrowth,
-    rankingImprovementChance,
-    highOpportunityKeywords,
-    riskLevel,
-    nextBestActions,
+    expectedTrafficGrowth: null,
+    rankingImprovementChance: null,
+    highOpportunityKeywords: [],
+    riskLevel: 'unknown',
+    nextBestActions: [],
   };
 }
 
 function generateFallbackSeo(productName, websiteUrl) {
-  const name = productName || websiteUrl || "Business";
-  
-  let keywords = [
-    { keyword: `${name} features`, position: 10, prev: 15, volume: 1500, difficulty: 35 },
-    { keyword: `best ${name} alternative`, position: 18, prev: 25, volume: 800, difficulty: 45 },
-    { keyword: `${name} pricing`, position: 12, prev: 14, volume: 2000, difficulty: 40 },
-  ];
-
-  const topKeywords = keywords.map((k) => ({ ...k }));
-  const competitorKeywords = [
-    { domain: "example-competitor.com", keywords: keywords.slice(0, 2) },
-  ];
-
-  const backlinks = { total: 120, referringDomains: 35, authority: 45 };
-  const trafficEstimate = { monthlyOrganic: 1200, trend: [900, 1000, 1100, 1200] };
-  const technicalIssues = { titleTag: true, metaDescription: true, headings: true, pageSpeed: "moderate" };
-  const contentSuggestions = [
-    { title: `How ${productName} helps users`, type: "blog" },
-    { title: `${productName} vs competitors`, type: "comparison" },
-  ];
-
-  const scores = {
-    keywordScore: 55,
-    trafficScore: 50,
-    backlinkScore: 40,
-    technicalScore: 60,
-    contentScore: 50,
-  };
-
-  const seoScore = calculateSeoScore(scores);
-
   return {
-    websiteUrl,
-    seoScore,
-    visibilityScore: 50,
-    organicTraffic: trafficEstimate.monthlyOrganic,
-    keywordCount: topKeywords.length,
-    backlinkCount: backlinks.total,
-    avgPosition: topKeywords.reduce((s, k) => s + k.position, 0) / topKeywords.length,
-    ctr: 2.5,
-    topKeywords,
-    competitorKeywords,
-    backlinks,
-    trafficEstimate,
-    technicalIssues,
-    contentSuggestions,
-    prediction: predictSeoGrowth({ keywordTrend: 0.05, organicTraffic: trafficEstimate.monthlyOrganic, topKeywords }),
-    source: "fallback",
+    hasVerifiedData: false,
+    confidenceScore: 0,
+    provider: 'fallback_evidence',
+    warnings: ['Module: Insufficient verified data - no integration data available'],
+    dataSources: [],
+    note: 'No verified SEO data available'
   };
 }
 
@@ -117,7 +65,6 @@ export async function runSeoAnalysis({ chatId, userId, websiteUrl, productName }
 
   let result;
   if (gscData || semrushData || ahrefsData) {
-    // Merge available data into result (simplified)
     const topKeywords = (semrushData?.topKeywords || ahrefsData?.topKeywords || gscData?.topQueries || []).slice(0, 10);
     const backlinks = ahrefsData?.backlinks || { total: 0, referringDomains: 0 };
     const trafficEstimate = semrushData?.trafficEstimate || { monthlyOrganic: 0 };
@@ -151,7 +98,14 @@ export async function runSeoAnalysis({ chatId, userId, websiteUrl, productName }
       source: "integrations",
     };
   } else {
-    result = generateFallbackSeo(productName || domain || "product", websiteUrl || "");
+    return {
+      hasVerifiedData: false,
+      confidenceScore: 0,
+      provider: 'fallback_evidence',
+      warnings: ['Module: Insufficient verified data - no integration data available'],
+      dataSources: [],
+      note: 'No verified SEO data available'
+    };
   }
 
   // Upsert into DB
