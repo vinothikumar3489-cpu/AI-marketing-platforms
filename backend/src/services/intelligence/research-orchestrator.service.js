@@ -61,6 +61,7 @@ export async function collectResearchData({ websiteUrl, productName, companyName
       warnings.push('PageSpeed audit failed - API key may be missing');
       sources.push({ type: 'pagespeed', success: false });
     }
+    console.log('[Research Orchestrator] Continuing after PageSpeed');
 
     // Phase 3: SERP / Competitor Discovery
     console.log('[Research Orchestrator] Running SERP search for:', websiteUrl);
