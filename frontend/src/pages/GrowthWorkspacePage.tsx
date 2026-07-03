@@ -28,7 +28,7 @@ const defaults: any = {
 const tabs = ['Executive Snapshot', 'Executive Story', 'Product DNA', 'Market Intelligence', 'Audience Intelligence', 'Competitor Intelligence', 'Intent Prediction', 'Positioning Strategy', 'Campaign Strategy', 'Channel Strategy', 'Action Plan'];
 
 export default function GrowthWorkspacePage() {
-  const { selectedChatId, createChat, loadFullResults, fullResults } = useProject();
+  const { selectedChatId, loadFullResults, fullResults } = useProject();
   const [form, setForm] = useState(defaults);
   const [activeTab, setActiveTab] = useState('Executive Snapshot');
   const [loading, setLoading] = useState(false);

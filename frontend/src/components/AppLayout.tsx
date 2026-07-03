@@ -1,9 +1,8 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { Bot, Home, Rocket, Search, Settings, User, WandSparkles, Menu, X, Plus } from 'lucide-react';
+import { Bot, Home, Rocket, Search, Settings, User, WandSparkles, Menu, X, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useProject } from '../context/ProjectContext';
-import { api } from '../lib/api';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import ChatHistoryPage from '../pages/ChatHistoryPage';
 
 const links = [
@@ -17,14 +16,20 @@ const links = [
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
-  const { createChat, selectedChatId, loadFullResults, fullResults } = useProject();
+  const { createChat, selectedChatId } = useProject();
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [runningFullAnalysis, setRunningFullAnalysis] = useState(false);
+  const isCreatingChatRef = useRef(false);
 
   const handleNewAnalysis = async () => {
-    const newChatId = await createChat('New Analysis');
-    navigate('/app/growth-workspace');
+    if (isCreatingChatRef.current) return;
+    isCreatingChatRef.current = true;
+    try {
+      await createChat('New Analysis');
+      navigate('/app/growth-workspace');
+    } finally {
+      isCreatingChatRef.current = false;
+    }
   };
 
   const handleRunFullAnalysis = async () => {
@@ -32,30 +37,7 @@ export default function AppLayout() {
       alert('Please select a project first or create a New Analysis.');
       return;
     }
-    setRunningFullAnalysis(true);
-    try {
-      // Navigate to Growth Workspace first
-      navigate('/app/growth-workspace');
-      // Small delay for navigation
-      await new Promise(r => setTimeout(r, 500));
-      
-      console.log('[Run Full] Starting Growth Workspace analysis');
-      const form = { websiteUrl: fullResults?.profile?.websiteUrl || '' };
-      await api.post(`/chats/${selectedChatId}/growth-workspace/run-full-analysis`, form);
-      console.log('[Run Full] Growth Workspace completed');
-      await loadFullResults(selectedChatId);
-      
-      console.log('[Run Full] Starting SEO Intelligence analysis');
-      await api.post(`/chats/${selectedChatId}/seo-intelligence/run`, { websiteUrl: fullResults?.profile?.websiteUrl || '' });
-      console.log('[Run Full] SEO Intelligence completed');
-      await loadFullResults(selectedChatId);
-      
-      console.log('[Run Full] All analyses completed');
-    } catch (e: any) {
-      console.error('[Run Full] Analysis failed:', e.message);
-    } finally {
-      setRunningFullAnalysis(false);
-    }
+    navigate('/app/growth-workspace');
   };
 
   return (
@@ -79,8 +61,8 @@ export default function AppLayout() {
             <button onClick={handleNewAnalysis} className="primary-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', fontSize: '13px' }}>
               <Plus size={16} /> New Analysis
             </button>
-            <button onClick={handleRunFullAnalysis} disabled={runningFullAnalysis || !selectedChatId} className="secondary-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', fontSize: '13px' }}>
-              <Bot size={16} /> {runningFullAnalysis ? 'Running...' : 'Run Full Analysis'}
+            <button onClick={handleRunFullAnalysis} disabled={!selectedChatId} className="secondary-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', fontSize: '13px' }}>
+              <Bot size={16} /> Run Full Analysis
             </button>
             <button className="avatar" onClick={logout}>{(user?.name || user?.email || 'U')[0]?.toUpperCase()}</button>
           </div>
@@ -107,9 +89,10 @@ export default function AppLayout() {
 }
 
 function ProjectDropdown() {
-  const { chats, selectedChatId, selectChat, createChat, refreshChats, fullResults } = useProject();
+  const { chats, selectedChatId, selectChat, createChat, deleteChat, fullResults } = useProject();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const isCreatingRef = useRef(false);
 
   const currentChat = chats.find(c => c.id === selectedChatId);
   const hasGrowth = fullResults?.growth && Object.keys(fullResults.growth).length > 0;
@@ -127,8 +110,20 @@ function ProjectDropdown() {
   const filtered = chats.filter(c => (c.productName || c.title || '').toLowerCase().includes(search.toLowerCase()) || (c.companyName || '').toLowerCase().includes(search.toLowerCase()));
 
   const handleCreate = async () => {
+    if (isCreatingRef.current) return;
+    isCreatingRef.current = true;
     setOpen(false);
-    await createChat('New Project');
+    try {
+      await createChat('New Project');
+    } finally {
+      isCreatingRef.current = false;
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!confirm('Delete this project forever?')) return;
+    await deleteChat(id);
   };
 
   return (
@@ -158,17 +153,21 @@ function ProjectDropdown() {
           <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {filtered.map(c => (
               <div 
-                key={c.id} 
-                onClick={() => { selectChat(c.id); setOpen(false); }}
-                style={{ padding: '12px', borderRadius: '12px', background: c.id === selectedChatId ? '#1a2335' : 'transparent', cursor: 'pointer', border: '1px solid transparent', borderColor: c.id === selectedChatId ? '#3a4355' : 'transparent' }}
+                key={c.id}
+                style={{ padding: '8px 12px', borderRadius: '12px', background: c.id === selectedChatId ? '#1a2335' : 'transparent', border: '1px solid transparent', borderColor: c.id === selectedChatId ? '#3a4355' : 'transparent' }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontWeight: 'bold' }}>{c.productName || c.title}</span>
-                  <span style={{ fontSize: '12px', color: '#9aa7bd' }}>{new Date(c.updatedAt).toLocaleDateString()}</span>
-                </div>
-                <div style={{ fontSize: '12px', color: '#9aa7bd', display: 'flex', gap: '10px', marginTop: '6px' }}>
-                  <span>Growth: <strong style={{ color: '#fff' }}>{c.growthScore || '-'}</strong></span>
-                  <span>SEO: <strong style={{ color: '#fff' }}>{c.seoScore || '-'}</strong></span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div onClick={() => { selectChat(c.id); setOpen(false); }} style={{ flex: 1, cursor: 'pointer' }}>
+                    <span style={{ fontWeight: 'bold' }}>{c.productName || c.title}</span>
+                    <div style={{ fontSize: '12px', color: '#9aa7bd', display: 'flex', gap: '10px', marginTop: '4px' }}>
+                      <span>Growth: <strong style={{ color: '#fff' }}>{c.growthScore || '-'}</strong></span>
+                      <span>SEO: <strong style={{ color: '#fff' }}>{c.seoScore || '-'}</strong></span>
+                      <span style={{ marginLeft: 'auto' }}>{new Date(c.updatedAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  <button onClick={(e) => handleDelete(e, c.id)} className="ghost-btn" style={{ padding: '6px', color: '#ff6b6b', marginLeft: '8px', flexShrink: 0 }} title="Delete project">
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
             ))}

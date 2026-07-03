@@ -78,7 +78,7 @@ class TabErrorBoundary extends Component<{ children: React.ReactNode }, { hasErr
 const tabs = ['Executive Dashboard', 'Executive Story', 'Technical Audit', 'Keyword Intelligence', 'Competitor SEO', 'Content Gaps', 'GEO / AI Visibility', 'Blog Intelligence', 'Action Plan'];
 
 export default function SEOIntelligencePage() {
-  const { selectedChatId, createChat, loadFullResults, fullResults, refreshChats } = useProject();
+  const { selectedChatId, loadFullResults, fullResults, refreshChats } = useProject();
   const [url, setUrl] = useState('');
   const [seo, setSeo] = useState<any>({});
   const [activeTab, setActiveTab] = useState('Executive Dashboard');
