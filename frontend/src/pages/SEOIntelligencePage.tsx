@@ -4,7 +4,7 @@ import { useProject } from '../context/ProjectContext';
 import { asArray, asNumber, asText } from '../lib/normalizers';
 import { Badge, Card, EmptyState, Loading, PageHeader, ScoreCard, SectionTitle } from '../components/UI';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
-import { Shield, Target, TrendingUp, Zap, Search, Globe, Code, FileText, Cpu, LayoutList, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Shield, Target, TrendingUp, Zap, Search, Globe, Code, FileText, Cpu, LayoutList, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
 
 // Safe format helpers to handle non-number values from backend
 function toNumberOrNull(value: unknown): number | null {
@@ -78,13 +78,41 @@ class TabErrorBoundary extends Component<{ children: React.ReactNode }, { hasErr
 const tabs = ['Executive Dashboard', 'Executive Story', 'Technical Audit', 'Keyword Intelligence', 'Competitor SEO', 'Content Gaps', 'GEO / AI Visibility', 'Blog Intelligence', 'Action Plan'];
 
 export default function SEOIntelligencePage() {
-  const { selectedChatId, createChat, loadFullResults, fullResults, clearSelection, refreshChats } = useProject();
+  const { selectedChatId, createChat, loadFullResults, fullResults, refreshChats } = useProject();
   const [url, setUrl] = useState('');
   const [seo, setSeo] = useState<any>({});
   const [activeTab, setActiveTab] = useState('Executive Dashboard');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [mode, setMode] = useState<'form' | 'running' | 'results' | 'error'>('form');
+  const [progress, setProgress] = useState(0);
+  const [currentStage, setCurrentStage] = useState('Starting...');
+  const seoProgressStages = [
+    'Starting...',
+    'Scraping website',
+    'Technical audit',
+    'Keyword intelligence',
+    'Competitor SEO',
+    'GEO / AI visibility',
+    'Content gaps + blog intelligence',
+    'Saving results'
+  ];
+  useEffect(() => {
+    if (mode === 'running') {
+      const interval = setInterval(() => {
+        setProgress(p => {
+          if (p >= 7) { clearInterval(interval); return 7; }
+          const next = p + 1;
+          setCurrentStage(seoProgressStages[next] || 'Processing...');
+          return next;
+        });
+      }, 10000);
+      return () => clearInterval(interval);
+    } else {
+      setProgress(0);
+      setCurrentStage('Starting...');
+    }
+  }, [mode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,6 +128,7 @@ export default function SEOIntelligencePage() {
 
   async function run() {
     if (!url) { setError('Website URL is required'); return; }
+    if (!selectedChatId) { setError('Please create or select a project first.'); return; }
     setLoading(true);
     setError('');
     
@@ -108,37 +137,26 @@ export default function SEOIntelligencePage() {
     
     setMode('running');
     try {
-      let chatId = selectedChatId;
-      if (!chatId) {
-        chatId = await createChat(url.replace(/^https?:\/\//, ''));
-        if (import.meta.env.DEV) console.log('✅ [SEO Page] Chat created:', chatId);
-      }
+      const chatId = selectedChatId;
+      console.log('[SEO UI] run started for chat:', chatId, 'url:', url);
 
       const runTag = `seo_fe_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-      if (import.meta.env.DEV) {
-        console.log(''); console.log('[SEO Page Run]'); console.log('runTag:', runTag); console.log('chatId:', chatId); console.log('websiteUrl:', url); console.log('');
-      }
+      console.log('[SEO UI] runTag:', runTag);
       
-      if (import.meta.env.DEV) console.log('🔍 [SEO Page] Running SEO analysis for chat:', chatId);
+      console.log('[SEO UI] Sending POST /chats/' + chatId + '/seo-intelligence/run');
       const res: any = await api.post(`/chats/${chatId}/seo-intelligence/run`, { websiteUrl: url, url });
+      console.log('[SEO UI] run completed');
       
-      if (import.meta.env.DEV) {
-        if (res.chatId && res.chatId !== chatId) {
-          console.error('[SEO Page] ChatId MISMATCH: request', chatId, 'response', res.chatId);
-        } else { console.log('[SEO Page] ChatId MATCH:', chatId); }
+      if (res.chatId && res.chatId !== chatId) {
+        console.warn('[SEO UI] ChatId mismatch: request', chatId, 'response', res.chatId);
       }
 
-      if (import.meta.env.DEV) console.log('✅ [SEO Page] SEO analysis complete, refreshing full results...');
+      console.log('[SEO UI] refreshing full results');
       const loaded = await loadFullResults(chatId);
       
-      if (import.meta.env.DEV && loaded?.seoIntelligence?.websiteUrl) {
-        const loadedUrl = loaded.seoIntelligence.websiteUrl;
-        const inputUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-        const match = loadedUrl.includes(inputUrl) || inputUrl.includes(loadedUrl);
-        console.log('[SEO Page] Loaded URL:', loadedUrl, 'Input URL:', inputUrl, 'Match:', match);
+      if (loaded?.seoIntelligence) {
+        console.log('[SEO UI] seo keys received:', Object.keys(loaded.seoIntelligence).length > 0 ? Object.keys(loaded.seoIntelligence).slice(0, 10) : 'empty');
       }
-
-      if (import.meta.env.DEV) { console.log('[SEO Page Run Complete]'); console.log('runTag:', runTag); console.log('chatId:', chatId); console.log(''); }
 
       // Refresh chat history so the analyzed chat shows latest
       await refreshChats();
@@ -146,7 +164,7 @@ export default function SEOIntelligencePage() {
       // Only set mode to results after full results are loaded
       setMode('results');
     } catch (e: any) {
-      if (import.meta.env.DEV) console.error('❌ [SEO Page] SEO analysis failed:', e);
+      console.error('[SEO UI] run failed:', e.message || e);
       setError(e.message || 'SEO analysis failed');
       setMode('error');
     } finally {
@@ -155,7 +173,6 @@ export default function SEOIntelligencePage() {
   }
 
   function handleNewAnalysis() {
-    clearSelection();
     setUrl('');
     setSeo({});
     setError('');
@@ -179,11 +196,6 @@ export default function SEOIntelligencePage() {
           title={hasData && analyzedCompany ? `${analyzedCompany} SEO Intelligence` : "SEO & GEO Intelligence"} 
           subtitle={hasData && analyzedDomain ? `Displaying 14-step technical, content, and competitor SEO audit for ${analyzedDomain}` : "Run a complete 14-step technical, content, and competitor SEO audit."} 
         />
-        {mode === 'results' && (
-          <button onClick={handleNewAnalysis} className="primary-btn" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Search size={16} /> New SEO Analysis
-          </button>
-        )}
       </div>
       
       {error && (
@@ -227,7 +239,22 @@ export default function SEOIntelligencePage() {
       </Card>
       )}
 
-      {mode === 'running' && <Loading text="Crawling website, analyzing competitors, and scoring AI visibility..." />}
+      {mode === 'running' && (
+        <Card>
+          <div style={{ padding: '20px' }}>
+            <h3 style={{ margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Loader2 className="spin" size={20} /> Running SEO Intelligence
+            </h3>
+            <div style={{ height: '8px', background: '#1d2738', borderRadius: '4px', overflow: 'hidden', marginBottom: '15px' }}>
+              <div style={{ height: '100%', width: `${Math.min((progress / 8) * 100, 90)}%`, background: 'linear-gradient(90deg, #10e18b, #2aa3ff)', borderRadius: '4px', transition: 'width 0.5s ease' }} />
+            </div>
+            <div style={{ color: '#9aa7bd', fontSize: '14px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>{currentStage}</span>
+              <span>{Math.round((progress / 8) * 100)}%</span>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {mode === 'results' && hasData && (
         <Card>

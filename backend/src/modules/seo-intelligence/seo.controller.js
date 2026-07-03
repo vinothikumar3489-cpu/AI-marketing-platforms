@@ -45,21 +45,21 @@ export const runSeoHandler = async (req, res) => {
   }
 
   try {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('🔍 [SEO Run] Starting analysis for URL:', websiteUrl);
-    }
+    console.log('🔍 [SEO API] Starting analysis for URL:', websiteUrl);
     
-    const result = await generateCompleteSeoIntelligence({
-      chatId,
-      userId,
-      websiteUrl,
-      chat
-    });
+    // Add timeout to prevent infinite hanging (5 minutes)
+    const SEO_TIMEOUT = 5 * 60 * 1000;
+    const result = await Promise.race([
+      generateCompleteSeoIntelligence({ chatId, userId, websiteUrl, chat }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error(`SEO analysis timed out after ${SEO_TIMEOUT/1000}s`)), SEO_TIMEOUT)
+      )
+    ]);
+
+    console.log('[SEO API] run completed, success:', result.success);
 
     if (!result.success) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('⚠️ [SEO Run] Analysis failed, using fallback');
-      }
+      console.log('[SEO API] Analysis failed, using fallback:', result.error);
       return res.json({
         success: true,
         seoIntelligence: result.fallback,
@@ -67,17 +67,8 @@ export const runSeoHandler = async (req, res) => {
       });
     }
 
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('✅ [SEO Run] Analysis complete');
+    console.log('[SEO API] Analysis complete, saving...');
       
-      console.log('[SEO Run Response]', {
-        requestChatId: chatId,
-        responseChatId: result.data?.chatId || chatId,
-        hasData: !!result.data,
-        hasTechnical: !!result.data?.technicalAudit
-      });
-    }
-
     // Attach identity to response
     const payload = result.data || {};
     if (payload && typeof payload === 'object') {
@@ -89,6 +80,7 @@ export const runSeoHandler = async (req, res) => {
       };
     }
 
+    console.log('[SEO API] save completed, returning response');
     return res.json({
       success: true,
       chatId,

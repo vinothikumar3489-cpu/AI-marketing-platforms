@@ -23,17 +23,21 @@ const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
 
 export async function generateCompleteSeoIntelligence({ chatId, userId, websiteUrl, chat }) {
   const runId = `seo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('');
-    console.log('========================================');
-    console.log('[SEO RUN START]');
-    console.log('runId:', runId);
-    console.log('chatId:', chatId);
-    console.log('userId:', userId);
-    console.log('websiteUrl:', websiteUrl);
-    console.log('========================================');
-    console.log('');
-  }
+  console.log('');
+  console.log('[SEO API] run started');
+  console.log('[SEO API] runId:', runId);
+  console.log('[SEO API] chatId:', chatId);
+  console.log('[SEO API] websiteUrl:', websiteUrl);
+  console.log('');
+
+  // Add overall timeout to prevent hanging forever (5 minutes)
+  const SEO_TIMEOUT = 5 * 60 * 1000;
+  let timeoutHandle = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(`SEO analysis timed out after ${SEO_TIMEOUT/1000}s`));
+    }, SEO_TIMEOUT);
+  });
 
   // Declare all variables in outer scope for use in catch block
   let parsedKeywordIntelligence = null;

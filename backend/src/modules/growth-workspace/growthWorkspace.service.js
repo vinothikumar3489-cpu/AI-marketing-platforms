@@ -85,40 +85,32 @@ function asArray(value) {
 export async function runFullGrowthAnalysis({ chatId, userId, input }) {
   console.log('🚀 [Growth Workspace] Starting full analysis:', { chatId, userId, productName: input.productName });
 
-  // STEP 1: Validate or create chat if needed
-  let chat = null;
-  
-  // Check if chatId is provided and exists
-  if (chatId && chatId !== 'temp-' && !chatId.startsWith('temp-')) {
-    chat = await prisma.chat.findFirst({
-      where: {
-        id: chatId,
-        userId: userId
-      }
-    });
+  // STEP 1: Validate chat exists - do NOT auto-create
+  if (!chatId || chatId === 'temp-' || chatId.startsWith('temp-')) {
+    console.error('❌ [Growth Workspace] No valid chatId provided');
+    return {
+      success: false,
+      error: 'No valid project selected. Please select or create a project first.',
+      results: {},
+      steps: []
+    };
   }
 
-  // If chat doesn't exist or invalid chatId, create a new one
+  const chat = await prisma.chat.findFirst({
+    where: { id: chatId, userId }
+  });
+
   if (!chat) {
-    console.log('📝 [Growth Workspace] No valid chat found, creating new chat automatically...');
-    
-    const title = input.productName || input.companyName || 'New Project';
-    
-    chat = await prisma.chat.create({
-      data: {
-        userId: userId,
-        title: title,
-        productName: input.productName || title,
-      }
-    });
-
-    console.log('✅ [Growth Workspace] New chat created automatically:', { 
-      chatId: chat.id, 
-      title: chat.title 
-    });
-  } else {
-    console.log('✅ [Growth Workspace] Chat validated:', { chatId: chat.id });
+    console.error('❌ [Growth Workspace] Chat not found or not owned by user');
+    return {
+      success: false,
+      error: 'Project not found. Please select a valid project.',
+      results: {},
+      steps: []
+    };
   }
+
+  console.log('✅ [Growth Workspace] Chat validated:', { chatId: chat.id });
 
   // Use the valid chat ID for all operations
   const validChatId = chat.id;

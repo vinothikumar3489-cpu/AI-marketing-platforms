@@ -56,10 +56,10 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     console.log('previousSelectedChatId:', selectedChatId);
     console.log('isSwitch:', id !== selectedChatId);
     
-    // Only clear results if switching to a different chat
+    // Only clear results if switching to a DIFFERENT chat
+    // Preserve existing results when same chat is re-selected
     if (id !== selectedChatId) {
-      console.log('[ProjectContext] Clearing results for chat switch');
-      setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null });
+      console.log('[ProjectContext] Switching to different chat, will load fresh data');
     }
     
     setSelectedChatId(id);
@@ -86,17 +86,40 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       
       const normalized = normalizeFullResults(res);
 
+      // Preserve existing growth data if backend returns empty but we have cached data
+      // This prevents data loss when switching between tabs
+      if (normalized?.growth && Object.keys(normalized.growth).length === 0 && fullResults?.growth && Object.keys(fullResults.growth).length > 0) {
+        if (selectedChatId === id) {
+          normalized.growth = fullResults.growth;
+        }
+      }
+      
+      // Same for seoIntelligence
+      if (normalized?.seoIntelligence && Object.keys(normalized.seoIntelligence).length === 0 && fullResults?.seoIntelligence && Object.keys(fullResults.seoIntelligence).length > 0) {
+        if (selectedChatId === id) {
+          normalized.seoIntelligence = fullResults.seoIntelligence;
+        }
+      }
+
       setFullResults(normalized);
       return normalized;
     } catch (error: any) {
       console.error('Failed to load full results:', error.message || error);
       
-      const emptyResults = { growth: null, seo: null, executive: null, profile: null, chat: null };
+      // On error, keep existing results if any - don't clear them
+      // This prevents data loss during transient errors
+      if (mountedRef.current) {
+        const currentResults = fullResults;
+        if (currentResults && (currentResults.growth || currentResults.seoIntelligence)) {
+          console.log('[ProjectContext] Keeping existing results after load error');
+          return currentResults;
+        }
+        const emptyResults = { growth: null, seo: null, executive: null, profile: null, chat: null };
+        setFullResults(emptyResults);
+        return emptyResults;
+      }
       
-      // Always set empty state on any error (404, 500, network)
-      if (mountedRef.current) setFullResults(emptyResults);
-      
-      return emptyResults;
+      return { growth: null, seo: null, executive: null, profile: null, chat: null };
     } finally {
       if (mountedRef.current) setLoading(false);
     }

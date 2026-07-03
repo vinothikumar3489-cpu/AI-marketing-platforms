@@ -150,16 +150,17 @@ export const getFullResults = async (req, res) => {
       include: { assets: { orderBy: { createdAt: 'asc' } } },
     }).catch(() => null);
 
-    console.log('[FullResults] empty chat response returned');
+    console.log('[FullResults] response built');
 
-    // Build canonical empty-safe response
+    // Build canonical response with actual data
+    const hasGrowth = !!(productIntelligence || competitorIntelligence || campaignIntelligence);
     const canonicalResult = {
       success: true,
       chat,
-      growth: {},
-      seoIntelligence: {},
-      hasGrowthWorkspace: false,
-      hasSeoIntelligence: false,
+      growth: hasGrowth ? {} : {},
+      seoIntelligence: seoIntelligence || null,
+      hasGrowthWorkspace: hasGrowth,
+      hasSeoIntelligence: !!seoIntelligence,
       productIntelligence: productIntelligence || null,
       competitorIntelligence: competitorIntelligence || null,
       campaignIntelligence: campaignIntelligence || null,

@@ -1,7 +1,8 @@
-import { Outlet, NavLink } from 'react-router-dom';
-import { Bot, Home, Rocket, Search, Settings, User, WandSparkles, Menu, X, Briefcase } from 'lucide-react';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Bot, Home, Rocket, Search, Settings, User, WandSparkles, Menu, X, Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useProject } from '../context/ProjectContext';
+import { api } from '../lib/api';
 import { useState } from 'react';
 import ChatHistoryPage from '../pages/ChatHistoryPage';
 
@@ -16,7 +17,47 @@ const links = [
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
+  const { createChat, selectedChatId, loadFullResults, fullResults } = useProject();
+  const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [runningFullAnalysis, setRunningFullAnalysis] = useState(false);
+
+  const handleNewAnalysis = async () => {
+    const newChatId = await createChat('New Analysis');
+    navigate('/app/growth-workspace');
+  };
+
+  const handleRunFullAnalysis = async () => {
+    if (!selectedChatId) {
+      alert('Please select a project first or create a New Analysis.');
+      return;
+    }
+    setRunningFullAnalysis(true);
+    try {
+      // Navigate to Growth Workspace first
+      navigate('/app/growth-workspace');
+      // Small delay for navigation
+      await new Promise(r => setTimeout(r, 500));
+      
+      console.log('[Run Full] Starting Growth Workspace analysis');
+      const form = { websiteUrl: fullResults?.profile?.websiteUrl || '' };
+      await api.post(`/chats/${selectedChatId}/growth-workspace/run-full-analysis`, form);
+      console.log('[Run Full] Growth Workspace completed');
+      await loadFullResults(selectedChatId);
+      
+      console.log('[Run Full] Starting SEO Intelligence analysis');
+      await api.post(`/chats/${selectedChatId}/seo-intelligence/run`, { websiteUrl: fullResults?.profile?.websiteUrl || '' });
+      console.log('[Run Full] SEO Intelligence completed');
+      await loadFullResults(selectedChatId);
+      
+      console.log('[Run Full] All analyses completed');
+    } catch (e: any) {
+      console.error('[Run Full] Analysis failed:', e.message);
+    } finally {
+      setRunningFullAnalysis(false);
+    }
+  };
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -35,7 +76,12 @@ export default function AppLayout() {
         <header className="topbar">
           <ProjectDropdown />
           <div className="top-actions">
-            <button className="ghost-btn"><Bot size={18} />AI Copilot</button>
+            <button onClick={handleNewAnalysis} className="primary-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', fontSize: '13px' }}>
+              <Plus size={16} /> New Analysis
+            </button>
+            <button onClick={handleRunFullAnalysis} disabled={runningFullAnalysis || !selectedChatId} className="secondary-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', fontSize: '13px' }}>
+              <Bot size={16} /> {runningFullAnalysis ? 'Running...' : 'Run Full Analysis'}
+            </button>
             <button className="avatar" onClick={logout}>{(user?.name || user?.email || 'U')[0]?.toUpperCase()}</button>
           </div>
         </header>
