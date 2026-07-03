@@ -274,7 +274,10 @@ function filterJunkKeywords(keywords, source = 'unknown') {
       'change', 'add', 'remove', 'show', 'hide', 'open', 'close',
       'back', 'next', 'done', 'cancel', 'ok', 'yes', 'no',
       'started', 'daily', 'alerts', 'outlier', 'research',
-      'credits', 'what', 'manage', 'content'
+      'credits', 'what', 'manage', 'content',
+      'tiktok', 'shorts', 'trends', 'trending', 'seo', 'youtube',
+      'review', 'reviews', 'instagram', 'reels', 'video', 'viral',
+      'watch', 'customer', 'service', 'app', 'store', 'read'
     ]);
 
     const wordCount = keyword.split(' ').length;
@@ -386,6 +389,11 @@ async function extractKeywordsFromWebsite({
       return 'orkyn';
     }
 
+    // Virlo category: social media analytics, short-form video analytics, creator tools
+    if (content.includes('virlo') || content.includes('analytics') || content.includes('social listening') || content.includes('creator analytics') || content.includes('short form video') || content.includes('trend tracking') || content.includes('influencer')) {
+      return 'virlo';
+    }
+
     return 'general';
   };
 
@@ -436,6 +444,18 @@ async function extractKeywordsFromWebsite({
       'Salesforce consulting',
       'business automation',
       'CRM integration services'
+    ],
+    virlo: [
+      'tiktok analytics tool',
+      'short form video analytics',
+      'creator analytics platform',
+      'social media trend tracking',
+      'influencer marketing platform',
+      'viral video analytics',
+      'social listening platform',
+      'instagram reels analytics',
+      'youtube shorts analytics',
+      'competitor video analysis'
     ],
     general: [
       'software solution',
@@ -649,6 +669,20 @@ Provide exactly 8 primary, 10 secondary, 10 longTail, and 8 question keywords to
       'software development company UAE',
       'software development company India',
       'Salesforce implementation partner'
+    ],
+    'virlo.ai': [
+      'tiktok analytics tool',
+      'short form video analytics',
+      'social media trend tracking',
+      'creator analytics platform',
+      'influencer marketing platform',
+      'viral video analytics',
+      'social listening tool',
+      'instagram reels analytics',
+      'youtube shorts analytics',
+      'competitor video analysis',
+      'trend forecasting tool',
+      'content analytics platform'
     ]
   };
   

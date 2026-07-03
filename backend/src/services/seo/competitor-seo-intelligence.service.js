@@ -471,7 +471,37 @@ async function discoverCompetitors({ productName, industry, websiteUrl, keywordI
       'help.canva.com',
       'support.canva.com',
       'status.canva.com',
-      'community.canva.com'
+      'community.canva.com',
+      'trustpilot.com',
+      'g2.com',
+      'capterra.com',
+      'crunchbase.com',
+      'producthunt.com',
+      'alternativeto.net',
+      'medium.com',
+      'forbes.com',
+      'techcrunch.com',
+      'theverge.com',
+      'wired.com',
+      'businessinsider.com',
+      'entrepreneur.com',
+      'inc.com',
+      'venturebeat.com',
+      'techradar.com',
+      'zdnet.com',
+      'cnet.com',
+      'pcmag.com',
+      'gartner.com',
+      'forrester.com',
+      'similarweb.com',
+      'semrush.com',
+      'ahrefs.com',
+      'moz.com',
+      'getapp.com',
+      'softwareadvice.com',
+      'sitejabber.com',
+      'saasworthy.com',
+      'zoominfo.com'
     ]);
 
     return competitors.filter(comp => {
@@ -625,12 +655,20 @@ function filterAllCompetitors(competitors, identity) {
     'crunchbase.com', 'trustpilot.com', 'g2.com', 'capterra.com',
     'getapp.com', 'softwareadvice.com', 'sitejabber.com',
     'glassdoor.com', 'indeed.com', 'producthunt.com', 'alternativeto.net',
-    'saasworthy.com', 'growjo.com', 'owler.com', 'zoominfo.com'
+    'saasworthy.com', 'growjo.com', 'owler.com', 'zoominfo.com',
+    'medium.com', 'news.ycombinator.com', 'techcrunch.com',
+    'theverge.com', 'wired.com', 'forbes.com', 'businessinsider.com',
+    'entrepreneur.com', 'inc.com', 'venturebeat.com',
+    'techradar.com', 'zdnet.com', 'cnet.com', 'pcmag.com',
+    'g2.com', 'capterra.com', 'trustradius.com',
+    'gartner.com', 'forrester.com', 'idc.com',
+    'similarweb.com', 'semrush.com', 'ahrefs.com', 'moz.com'
   ]);
   
   const appStoreDomains = new Set([
     'play.google.com', 'apps.apple.com', 'appstore.com',
-    'chrome.google.com', 'chromewebstore.google.com'
+    'chrome.google.com', 'chromewebstore.google.com',
+    'developer.apple.com', 'developer.android.com'
   ]);
   
   const selfShortlinks = ['canva.me', 'figma.com', 'gamma.app', 'notion.so', 'orkyn.ai'];

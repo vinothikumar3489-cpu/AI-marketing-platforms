@@ -1741,11 +1741,19 @@ function BlogIntelligence({ data }: { data: any }) {
 function ActionPlan({ data }: { data: any }) {
   // Filter out weak/generic single-word keywords from action items
   const weakKeywords = new Set(['started', 'daily', 'alerts', 'outlier', 'research', 'content', 'data', 'credits', 'what', 'manage', 'tool', 'seo', 'competitor', 'keyword', 'general', 'account']);
+  const weakActionPhrases = [
+    'review technical seo audit',
+    'review ai search visibility baseline',
+    'target competitor keyword:',
+    'target keyword missing',
+    'review ai search visibility',
+  ];
   const isStrongKeyword = (kw: string) => {
     if (!kw) return false;
     const lower = kw.toLowerCase().trim();
     if (weakKeywords.has(lower)) return false;
     if (lower.split(' ').length <= 1) return false;
+    if (weakActionPhrases.some(phrase => lower.includes(phrase))) return false;
     return true;
   };
   // Build plan from multiple fallback sources when executiveDashboard is missing
@@ -1774,6 +1782,18 @@ function ActionPlan({ data }: { data: any }) {
                  day90: []
                } : {}) ||
                {};
+
+  // Filter weak action items from all buckets
+  const filterWeakActions = (items: any[]) => (items || []).filter((item: any) => {
+    const title = (item.title || item.action || item.task || item.step || item.name || '').toLowerCase().trim();
+    if (!title || title.split(' ').length <= 1) return false;
+    if (weakKeywords.has(title)) return false;
+    if (weakActionPhrases.some(phrase => title.includes(phrase))) return false;
+    return true;
+  });
+  ['immediate', 'day7', 'day30', 'day60', 'day90'].forEach(bucket => {
+    if (plan[bucket]) plan[bucket] = filterWeakActions(plan[bucket]);
+  });
 
   if (import.meta.env.DEV) { console.log('[SEO Page] actionPlan buckets', Object.keys(plan || {})); }
   const totalActionPlanItems =

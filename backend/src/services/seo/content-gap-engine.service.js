@@ -983,6 +983,99 @@ function generateFallbackContentGaps(productName, industry) {
         competitorEvidence: []
       }
     );
+  } else if (productLower.includes('virlo') || productLower.includes('analytics') || productLower.includes('tiktok') || productLower.includes('trend')) {
+    gaps.push(
+      {
+        title: 'Virlo vs Exolyt: TikTok Analytics Compared',
+        pageType: 'comparison',
+        targetKeyword: 'virlo vs exolyt',
+        searchVolume: null,
+        keywordDifficulty: null,
+        intent: 'commercial',
+        evidence: 'Category seed comparison page for TikTok analytics tools',
+        source: 'Category Seed Generation',
+        confidence: 60,
+        businessImpact: 'high',
+        priority: 'high',
+        recommendedSections: ['Feature comparison', 'Pricing', 'Analytics capabilities', 'Verdict'],
+        competitorEvidence: []
+      },
+      {
+        title: 'Virlo vs Trendpop: Short-Form Video Analytics',
+        pageType: 'comparison',
+        targetKeyword: 'virlo vs trendpop',
+        searchVolume: null,
+        keywordDifficulty: null,
+        intent: 'commercial',
+        evidence: 'Category seed comparison page for short-form video analytics',
+        source: 'Category Seed Generation',
+        confidence: 60,
+        businessImpact: 'high',
+        priority: 'high',
+        recommendedSections: ['Feature comparison', 'Pricing', 'Trend detection', 'Verdict'],
+        competitorEvidence: []
+      },
+      {
+        title: 'Best TikTok Analytics Tools for Marketers',
+        pageType: 'landing_page',
+        targetKeyword: 'best tiktok analytics tools',
+        searchVolume: null,
+        keywordDifficulty: null,
+        intent: 'commercial',
+        evidence: 'Category seed landing page for TikTok analytics tools comparison',
+        source: 'Category Seed Generation',
+        confidence: 60,
+        businessImpact: 'high',
+        priority: 'high',
+        recommendedSections: ['Overview', 'Top tools', 'Features comparison', 'Pricing', 'Selection guide'],
+        competitorEvidence: []
+      },
+      {
+        title: 'Best Short-Form Video Analytics Platforms',
+        pageType: 'landing_page',
+        targetKeyword: 'short form video analytics platform',
+        searchVolume: null,
+        keywordDifficulty: null,
+        intent: 'commercial',
+        evidence: 'Category seed landing page for short-form video analytics',
+        source: 'Category Seed Generation',
+        confidence: 60,
+        businessImpact: 'high',
+        priority: 'high',
+        recommendedSections: ['Overview', 'Top platforms', 'Features comparison', 'Pricing', 'Selection guide'],
+        competitorEvidence: []
+      },
+      {
+        title: 'How to Track Viral TikTok Trends',
+        pageType: 'resource',
+        targetKeyword: 'track viral tiktok trends',
+        searchVolume: null,
+        keywordDifficulty: null,
+        intent: 'informational',
+        evidence: 'Category seed resource page for trend tracking',
+        source: 'Category Seed Generation',
+        confidence: 60,
+        businessImpact: 'medium',
+        priority: 'medium',
+        recommendedSections: ['Introduction', 'Step-by-step guide', 'Tools to use', 'Examples', 'FAQ'],
+        competitorEvidence: []
+      },
+      {
+        title: 'Social Listening for Short-Form Video: Complete Guide',
+        pageType: 'resource',
+        targetKeyword: 'social listening short form video',
+        searchVolume: null,
+        keywordDifficulty: null,
+        intent: 'informational',
+        evidence: 'Category seed resource page for social listening',
+        source: 'Category Seed Generation',
+        confidence: 60,
+        businessImpact: 'medium',
+        priority: 'medium',
+        recommendedSections: ['What is social listening', 'Why short-form video', 'Tools and platforms', 'Best practices', 'FAQ'],
+        competitorEvidence: []
+      }
+    );
   } else {
     // Generic fallback for other products
     gaps.push(
