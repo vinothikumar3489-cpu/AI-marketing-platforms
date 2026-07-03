@@ -93,9 +93,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       
       const emptyResults = { growth: null, seo: null, executive: null, profile: null, chat: null };
       
-      if (error.response?.status === 404) {
-        if (mountedRef.current) setFullResults(emptyResults);
-      }
+      // Always set empty state on any error (404, 500, network)
+      if (mountedRef.current) setFullResults(emptyResults);
       
       return emptyResults;
     } finally {
