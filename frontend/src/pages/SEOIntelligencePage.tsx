@@ -120,12 +120,31 @@ export default function SEOIntelligencePage() {
     }
   }, [mode]);
 
+  // Helper: check if seo object has meaningful data (not just normalized empty keys)
+  function hasRealSeoData(d: any): boolean {
+    if (!d || typeof d !== 'object') return false;
+    const keys = Object.keys(d);
+    if (keys.length === 0) return false;
+    // Must have at least one meaningful content field
+    return !!(
+      (d.scoreBreakdown && typeof d.scoreBreakdown === 'object' && Object.keys(d.scoreBreakdown).length > 0) ||
+      d.performanceScore ||
+      d.seoScore ||
+      (d.technical && typeof d.technical === 'object' && Object.keys(d.technical).length > 0) ||
+      (d.keywords && typeof d.keywords === 'object' && Object.keys(d.keywords).length > 0) ||
+      (d.executiveDashboard && typeof d.executiveDashboard === 'object' && Object.keys(d.executiveDashboard).length > 0) ||
+      d.executiveStory ||
+      (d.actionPlan && (d.actionPlan.day7?.length || d.actionPlan.day30?.length || d.actionPlan.day60?.length || d.actionPlan.day90?.length)) ||
+      d.websiteUrl
+    );
+  }
+
   // On mount, hydrate from fullResults if data exists for this chat
   useEffect(() => {
     if (isNewAnalysis) return;
     if (!selectedChatId) return;
     const r = fullResults.seoIntelligence || fullResults.seo || {};
-    if (Object.keys(r).length && r.scoreBreakdown) {
+    if (hasRealSeoData(r)) {
       storedChatRef.current = selectedChatId;
       setSeo(r);
       setMode('results');
@@ -138,7 +157,7 @@ export default function SEOIntelligencePage() {
     if (isNewAnalysis) return;
     if (!selectedChatId) return;
     const r = fullResults.seoIntelligence || fullResults.seo || {};
-    if (Object.keys(r).length && r.scoreBreakdown) {
+    if (hasRealSeoData(r)) {
       storedChatRef.current = selectedChatId;
       setSeo(r);
       setMode('results');
@@ -174,24 +193,19 @@ export default function SEOIntelligencePage() {
     setMode('running');
     try {
       console.log('[SEO UI] run started for chat:', chatId, 'url:', url);
-
-      const runTag = `seo_fe_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-      console.log('[SEO UI] runTag:', runTag);
       
       console.log('[SEO UI] Sending POST /chats/' + chatId + '/seo-intelligence/run');
       const res: any = await api.post(`/chats/${chatId}/seo-intelligence/run`, { websiteUrl: url, url });
       console.log('[SEO UI] run completed');
-      
-      if (res.chatId && res.chatId !== chatId) {
-        console.warn('[SEO UI] ChatId mismatch: request', chatId, 'response', res.chatId);
+
+      // Store API response data directly in local state (like Growth Workspace does)
+      const rawSeo = res.seoIntelligence || res.data || res;
+      if (rawSeo && typeof rawSeo === 'object' && Object.keys(rawSeo).length > 0) {
+        setSeo(rawSeo);
       }
 
       console.log('[SEO UI] refreshing full results');
-      const loaded = await loadFullResults(chatId);
-      
-      if (loaded?.seoIntelligence) {
-        console.log('[SEO UI] seo keys received:', Object.keys(loaded.seoIntelligence).length > 0 ? Object.keys(loaded.seoIntelligence).slice(0, 10) : 'empty');
-      }
+      await loadFullResults(chatId);
 
       // Refresh chat history so the analyzed chat shows latest
       await refreshChats();
@@ -214,7 +228,7 @@ export default function SEOIntelligencePage() {
     setMode('form');
   }
 
-  const hasData = Object.keys(seo).length > 0 && !!seo.scoreBreakdown;
+  const hasData = hasRealSeoData(seo);
   const analyzedUrl = seo.websiteUrl || '';
   const analyzedDomain = seo.domain || '';
   const analyzedCompany = seo.companyName || seo.productName || '';

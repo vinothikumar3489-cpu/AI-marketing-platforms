@@ -190,6 +190,9 @@ export function normalizeFullResults(data: any) {
 export function normalizeSeo(data: any) {
   const seo = data?.seo || data?.seoIntelligence || data?.data || data || {};
   
+  // Return empty when no real data — prevents false hasData in pages
+  if (!seo || Object.keys(seo).length === 0) return {};
+
   // Normalize executive story from canonical and legacy paths
   const execStory = seo.executiveStory || 
                    seo.executiveDashboard?.metadata?.executiveStory || 
