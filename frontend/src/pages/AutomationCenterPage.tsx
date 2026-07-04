@@ -26,11 +26,15 @@ function formatArray(arr: any[]): string {
 
 function renderObjectCard(obj: any, fields: string[], labelMap?: Record<string, string>) {
   if (!obj || typeof obj !== 'object') return null;
-  const entries = fields.filter(f => obj[f] !== undefined && obj[f] !== null);
-  if (entries.length === 0) return null;
+  const preferredFields = ['title', 'problem', 'owner', 'priority', 'difficulty', 'expectedGain', 'businessImpact', 'evidence', 'estimatedTimeline'];
+  const orderedFields = [
+    ...preferredFields.filter(f => fields.includes(f) && obj[f] !== undefined && obj[f] !== null),
+    ...fields.filter(f => !preferredFields.includes(f) && obj[f] !== undefined && obj[f] !== null)
+  ];
+  if (orderedFields.length === 0) return null;
   return (
     <div style={{ display: 'grid', gap: '6px' }}>
-      {entries.map(f => (
+      {orderedFields.map(f => (
         <div key={f}>
           <strong>{(labelMap?.[f] || f).replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}:</strong>{' '}
           {renderValue(obj[f])}
@@ -54,9 +58,11 @@ function renderValue(v: any): React.ReactNode {
     );
   }
   if (typeof v === 'object') {
-    const keys = Object.keys(v);
+    const keys = Object.keys(v || {});
     if (keys.length === 0) return <span style={{ color: '#9aa7bd' }}>Unavailable</span>;
-    return renderObjectCard(v, keys);
+    const preferredFields = ['title', 'problem', 'owner', 'priority', 'difficulty', 'expectedGain', 'businessImpact', 'evidence', 'estimatedTimeline'];
+    const structuredFields = preferredFields.filter(f => keys.includes(f) && v[f] !== undefined && v[f] !== null);
+    return renderObjectCard(v, structuredFields.length > 0 ? structuredFields : keys);
   }
   return <span style={{ color: '#9aa7bd' }}>Unavailable</span>;
 }
@@ -106,12 +112,15 @@ function renderPlanTab(data: any) {
   if (data.weeklyPlan && typeof data.weeklyPlan === 'object' && Object.keys(data.weeklyPlan).length > 0) {
     sections.push({ title: 'Weekly Plan', content: (
       <div style={{ display: 'grid', gap: '8px' }}>
-        {Object.entries(data.weeklyPlan).map(([day, task]: any) => (
-          <div key={day} style={{ display: 'flex', gap: '8px', padding: '8px', background: '#151d2b', borderRadius: '6px' }}>
-            <strong style={{ minWidth: '80px', color: '#53a7ff' }}>{day}:</strong>
-            <span style={{ color: '#9aa7bd' }}>{renderValue(task)}</span>
-          </div>
-        ))}
+        {Object.entries(data.weeklyPlan).map(([day, task]: any) => {
+          const taskText = task && typeof task === 'object' ? (task.title || task.problem || task.owner || task.priority || task.difficulty || task.expectedGain || task.businessImpact || task.evidence || task.estimatedTimeline || JSON.stringify(task)) : task;
+          return (
+            <div key={day} style={{ display: 'flex', gap: '8px', padding: '8px', background: '#151d2b', borderRadius: '6px' }}>
+              <strong style={{ minWidth: '80px', color: '#53a7ff' }}>{day}:</strong>
+              <span style={{ color: '#9aa7bd' }}>{renderValue(task)}</span>
+            </div>
+          );
+        })}
       </div>
     )});
   }
@@ -149,13 +158,13 @@ function renderEmailTab(data: any) {
         <Card key={i}>
           <h4 style={{ margin: '0 0 12px 0' }}>{email.subject || email.title || `Email Draft ${i + 1}`}</h4>
           <div style={{ display: 'grid', gap: '8px' }}>
-            {email.previewText && <div><strong>Preview:</strong> {email.previewText}</div>}
-            {email.body && <div><strong>Body:</strong><p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0' }}>{email.body}</p></div>}
-            {email.cta && <div><strong>CTA:</strong> {email.cta}</div>}
-            {email.targetPersona && <div><strong>Target Persona:</strong> {email.targetPersona}</div>}
-            {email.personalizationNotes && <div><strong>Personalization Notes:</strong> {email.personalizationNotes}</div>}
-            {email.complianceNote && <div style={{ color: '#ffb347', fontSize: '12px' }}>{email.complianceNote}</div>}
-            {email.unsubscribeReminder && <div style={{ color: '#9aa7bd', fontSize: '12px' }}>{email.unsubscribeReminder}</div>}
+            {email.previewText && <div><strong>Preview:</strong> {asText(email.previewText)}</div>}
+            {email.body && <div><strong>Body:</strong><p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0' }}>{asText(email.body)}</p></div>}
+            {email.cta && <div><strong>CTA:</strong> {asText(email.cta)}</div>}
+            {email.targetPersona && <div><strong>Target Persona:</strong> {asText(email.targetPersona)}</div>}
+            {email.personalizationNotes && <div><strong>Personalization Notes:</strong> {asText(email.personalizationNotes)}</div>}
+            {email.complianceNote && <div style={{ color: '#ffb347', fontSize: '12px' }}>{asText(email.complianceNote)}</div>}
+            {email.unsubscribeReminder && <div style={{ color: '#9aa7bd', fontSize: '12px' }}>{asText(email.unsubscribeReminder)}</div>}
             {!email.complianceNote && <div style={{ color: '#ffb347', fontSize: '12px' }}>Include unsubscribe link and physical mailing address per CAN-SPAM.</div>}
             {renderObjectCard(email, ['day', 'trigger', 'condition', 'action', 'tool', 'owner', 'evidence', 'confidence', 'dataSource'])}
           </div>
@@ -184,9 +193,9 @@ function renderLinkedInTab(data: any) {
               <div key={i} style={{ padding: '12px', background: '#151d2b', borderRadius: '8px' }}>
                 <h4 style={{ margin: '0 0 8px 0' }}>{post.title || `Post ${i + 1}`}</h4>
                 <div style={{ display: 'grid', gap: '6px' }}>
-                  {post.format && <div><strong>Format:</strong> {post.format}</div>}
-                  {post.content && <div><strong>Content:</strong><p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0' }}>{post.content}</p></div>}
-                  {post.bestTime && <div><strong>Best Time:</strong> {post.bestTime}</div>}
+                  {post.format && <div><strong>Format:</strong> {asText(post.format)}</div>}
+                  {post.content && <div><strong>Content:</strong><p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0' }}>{asText(post.content)}</p></div>}
+                  {post.bestTime && <div><strong>Best Time:</strong> {asText(post.bestTime)}</div>}
                   {renderObjectCard(post, ['trigger', 'condition', 'action', 'tool', 'owner', 'evidence', 'confidence', 'dataSource'])}
                 </div>
               </div>
@@ -201,8 +210,8 @@ function renderLinkedInTab(data: any) {
             {templates.map((tmpl: any, i: number) => (
               <div key={i} style={{ padding: '12px', background: '#151d2b', borderRadius: '8px' }}>
                 <h4 style={{ margin: '0 0 8px 0' }}>{tmpl.title || `Template ${i + 1}`}</h4>
-                {tmpl.body && <p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap' }}>{tmpl.body}</p>}
-                {tmpl.cta && <div><strong>CTA:</strong> {tmpl.cta}</div>}
+                {tmpl.body && <p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap' }}>{asText(tmpl.body)}</p>}
+                {tmpl.cta && <div><strong>CTA:</strong> {asText(tmpl.cta)}</div>}
                 {renderObjectCard(tmpl, ['trigger', 'condition', 'action', 'tool', 'owner', 'evidence', 'confidence', 'dataSource'])}
               </div>
             ))}
@@ -227,8 +236,8 @@ function renderInstagramTab(data: any) {
             {captions.map((cap: any, i: number) => (
               <div key={i} style={{ padding: '12px', background: '#151d2b', borderRadius: '8px' }}>
                 <h4 style={{ margin: '0 0 8px 0' }}>{cap.title || `Post ${i + 1}`}</h4>
-                {cap.postType && <div><strong>Type:</strong> {cap.postType}</div>}
-                {cap.caption && <div><strong>Caption:</strong><p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0' }}>{cap.caption}</p></div>}
+                {cap.postType && <div><strong>Type:</strong> {asText(cap.postType)}</div>}
+                {cap.caption && <div><strong>Caption:</strong><p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0' }}>{asText(cap.caption)}</p></div>}
                 {cap.hashtags && Array.isArray(cap.hashtags) && <div><strong>Hashtags:</strong> {cap.hashtags.join(', ')}</div>}
                 {renderObjectCard(cap, ['trigger', 'condition', 'action', 'tool', 'owner', 'evidence', 'confidence', 'dataSource'])}
               </div>
@@ -243,9 +252,9 @@ function renderInstagramTab(data: any) {
             {reelIdeas.map((reel: any, i: number) => (
               <div key={i} style={{ padding: '12px', background: '#151d2b', borderRadius: '8px' }}>
                 <h4 style={{ margin: '0 0 8px 0' }}>{reel.title || `Reel ${i + 1}`}</h4>
-                {reel.description && <p style={{ color: '#9aa7bd' }}>{reel.description}</p>}
-                {reel.music && <div><strong>Music:</strong> {reel.music}</div>}
-                {reel.duration && <div><strong>Duration:</strong> {reel.duration}</div>}
+                {reel.description && <p style={{ color: '#9aa7bd' }}>{asText(reel.description)}</p>}
+                {reel.music && <div><strong>Music:</strong> {asText(reel.music)}</div>}
+                {reel.duration && <div><strong>Duration:</strong> {asText(reel.duration)}</div>}
               </div>
             ))}
           </div>
@@ -335,15 +344,15 @@ function renderVideoTab(data: any) {
           <Card key={i}>
             <h4 style={{ margin: '0 0 12px 0' }}>{vs.title || `Video Ad ${i + 1}`}</h4>
             <div style={{ display: 'grid', gap: '8px' }}>
-              {vs.hook && <div><strong>Hook:</strong> {vs.hook}</div>}
-              {vs.problem && <div><strong>Problem:</strong> {vs.problem}</div>}
-              {vs.productSolution && <div><strong>Product Solution:</strong> {vs.productSolution}</div>}
-              {vs.proofEvidence && <div><strong>Proof/Evidence:</strong> {vs.proofEvidence}</div>}
-              {vs.cta && <div><strong>CTA:</strong> {vs.cta}</div>}
-              {vs.duration && <div><strong>Duration:</strong> {vs.duration}</div>}
-              {vs.voiceover && <div><strong>Voiceover:</strong> {vs.voiceover}</div>}
-              {vs.visualDirection && <div><strong>Visual Direction:</strong> {vs.visualDirection}</div>}
-              {vs.script && <div><strong>Script:</strong><p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0' }}>{vs.script}</p></div>}
+                  {vs.hook && <div><strong>Hook:</strong> {asText(vs.hook)}</div>}
+                  {vs.problem && <div><strong>Problem:</strong> {asText(vs.problem)}</div>}
+                  {vs.productSolution && <div><strong>Product Solution:</strong> {asText(vs.productSolution)}</div>}
+                  {vs.proofEvidence && <div><strong>Proof/Evidence:</strong> {asText(vs.proofEvidence)}</div>}
+                  {vs.cta && <div><strong>CTA:</strong> {asText(vs.cta)}</div>}
+                  {vs.duration && <div><strong>Duration:</strong> {asText(vs.duration)}</div>}
+                  {vs.voiceover && <div><strong>Voiceover:</strong> {asText(vs.voiceover)}</div>}
+                  {vs.visualDirection && <div><strong>Visual Direction:</strong> {asText(vs.visualDirection)}</div>}
+                  {vs.script && <div><strong>Script:</strong><p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0' }}>{asText(vs.script)}</p></div>}
 
               {scenes.length > 0 && (
                 <div style={{ marginTop: '12px' }}>
@@ -352,10 +361,10 @@ function renderVideoTab(data: any) {
                     {scenes.map((scene: any, si: number) => (
                       <div key={si} style={{ padding: '8px', background: '#101622', borderRadius: '6px', borderLeft: '3px solid #53a7ff' }}>
                         <strong>Scene {si + 1}:</strong>
-                        {scene.description && <p style={{ color: '#9aa7bd', margin: '4px 0' }}>{scene.description}</p>}
-                        {scene.visual && <div><em>Visual:</em> {scene.visual}</div>}
-                        {scene.audio && <div><em>Audio:</em> {scene.audio}</div>}
-                        {scene.duration && <div><em>Duration:</em> {scene.duration}</div>}
+                        {scene.description && <p style={{ color: '#9aa7bd', margin: '4px 0' }}>{asText(scene.description)}</p>}
+                        {scene.visual && <div><em>Visual:</em> {asText(scene.visual)}</div>}
+                        {scene.audio && <div><em>Audio:</em> {asText(scene.audio)}</div>}
+                        {scene.duration && <div><em>Duration:</em> {asText(scene.duration)}</div>}
                         {renderValue(scene)}
                       </div>
                     ))}
@@ -378,7 +387,8 @@ function renderContentCalendarTab(data: any) {
 
   if (data.weeklyPlan && typeof data.weeklyPlan === 'object') {
     Object.entries(data.weeklyPlan).forEach(([day, task]: any) => {
-      calendarEntries.push({ date: day, channel: 'multi', content: formatValue(task) });
+      const taskText = task && typeof task === 'object' ? (task.title || task.problem || task.owner || task.priority || task.difficulty || task.expectedGain || task.businessImpact || task.evidence || task.estimatedTimeline || JSON.stringify(task)) : task;
+      calendarEntries.push({ date: day, channel: 'multi', content: formatValue(taskText) });
     });
   }
 
@@ -448,17 +458,17 @@ function renderCrmTab(data: any) {
               <div key={i} style={{ padding: '12px', background: '#151d2b', borderRadius: '8px', borderLeft: '4px solid #a855f7' }}>
                 <h4 style={{ margin: '0 0 8px 0' }}>{wf.name || wf.title || wf.step || `Step ${i + 1}`}</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '13px' }}>
-                  {wf.trigger && <div><strong>Trigger:</strong> {wf.trigger}</div>}
-                  {wf.condition && <div><strong>Condition:</strong> {wf.condition}</div>}
-                  {wf.action && <div><strong>Action:</strong> {wf.action}</div>}
-                  {wf.tool && <div><strong>Tool:</strong> {wf.tool}</div>}
-                  {wf.owner && <div><strong>Owner:</strong> {wf.owner}</div>}
-                  {wf.priority && <div><strong>Priority:</strong> {wf.priority}</div>}
-                  {wf.difficulty && <div><strong>Difficulty:</strong> {wf.difficulty}</div>}
-                  {wf.expectedKpi && <div><strong>Expected KPI:</strong> {wf.expectedKpi}</div>}
-                  {wf.timeline && <div><strong>Timeline:</strong> {wf.timeline}</div>}
-                  {wf.evidence && <div><strong>Evidence:</strong> {wf.evidence}</div>}
-                  {wf.confidence && <div><strong>Confidence:</strong> {wf.confidence}</div>}
+                  {wf.trigger && <div><strong>Trigger:</strong> {asText(wf.trigger)}</div>}
+                  {wf.condition && <div><strong>Condition:</strong> {asText(wf.condition)}</div>}
+                  {wf.action && <div><strong>Action:</strong> {asText(wf.action)}</div>}
+                  {wf.tool && <div><strong>Tool:</strong> {asText(wf.tool)}</div>}
+                  {wf.owner && <div><strong>Owner:</strong> {asText(wf.owner)}</div>}
+                  {wf.priority && <div><strong>Priority:</strong> {asText(wf.priority)}</div>}
+                  {wf.difficulty && <div><strong>Difficulty:</strong> {asText(wf.difficulty)}</div>}
+                  {wf.expectedKpi && <div><strong>Expected KPI:</strong> {asText(wf.expectedKpi)}</div>}
+                  {wf.timeline && <div><strong>Timeline:</strong> {asText(wf.timeline)}</div>}
+                  {wf.evidence && <div><strong>Evidence:</strong> {asText(wf.evidence)}</div>}
+                  {wf.confidence && <div><strong>Confidence:</strong> {asText(wf.confidence)}</div>}
                 </div>
               </div>
             ))}
