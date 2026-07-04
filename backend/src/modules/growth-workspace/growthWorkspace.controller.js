@@ -5,7 +5,9 @@ export const runFullAnalysisHandler = async (req, res) => {
   const userId = req.user?.id;
   const input = req.body;
 
-  console.log('🚀 [Growth Workspace Controller] Run Full Analysis:', { chatId, userId });
+  console.log('[Growth API] run started');
+  console.log('[Growth API] chatId:', chatId);
+  console.log('[Growth API] websiteUrl:', input?.websiteUrl);
 
   if (!userId) {
     return res.status(400).json({ success: false, error: 'User not authenticated' });
@@ -54,11 +56,13 @@ export const runFullAnalysisHandler = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [Growth Workspace Controller] Error:', error);
+    console.error('[Growth API] step failed:', error.message);
+    console.error('[Growth API] error stack:', error.stack);
     
     return res.status(500).json({
       success: false,
-      error: error.message || 'Failed to run full analysis'
+      error: 'Growth analysis failed',
+      details: error.message || 'Unknown error'
     });
   }
 };

@@ -9,7 +9,8 @@ export const AUTOMATION_PLAN_ALLOWED_FIELDS = new Set([
   'posterPrompts', 'imageAdIdeas', 'designStyles',
   'videoScripts', 'videoScenes', 'videoSchedule',
   'idealLeadProfile', 'leadSources', 'outreachAngles', 'sampleLeads',
-  'readinessScore', 'status', 'provider', 'fallbackUsed'
+  'readinessScore', 'status', 'provider', 'fallbackUsed',
+  'automationType', 'priority', 'startDate', 'endDate',
 ]);
 
 export function sanitizeAutomationPlanData(data) {
@@ -33,6 +34,9 @@ export async function generateAutomationPlanWithAI(context) {
     seoIntelligence,
     chatTitle,
     productName,
+    growthWorkspace,
+    executiveStory,
+    actionPlan,
   } = context;
 
   // Check for sufficient verified data
@@ -82,34 +86,30 @@ export async function generateAutomationPlanWithAI(context) {
 
   // Try AI generation first
   try {
-    const prompt = `Generate a comprehensive marketing automation plan for:
+    const prompt = `Generate a marketing automation plan using ONLY the verified data below.
+
+VERIFIED DATA:
 Product: ${product}
 ${industry ? `Industry: ${industry}` : ""}
 ${targetAudience ? `Target Audience: ${targetAudience}` : ""}
-Channels: ${channels.map(c => c.channel).join(", ")}
+${channels.length > 0 ? `Channels: ${channels.map(c => c.channel).join(", ")}` : ""}
 ${seoScore !== null ? `SEO Score: ${seoScore}/100` : ""}
-${seoKeywords ? `Keyword Opportunities: ${JSON.stringify(seoKeywords)}` : ""}
-${seoContentGaps ? `Content Gaps: ${JSON.stringify(seoContentGaps)}` : ""}
-${seoBlogIdeas ? `Blog Ideas: ${JSON.stringify(seoBlogIdeas)}` : ""}
-${seoCompetitorKeywords ? `Competitor Keywords: ${JSON.stringify(seoCompetitorKeywords)}` : ""}
-${seoTechnicalAudit ? `Technical Audit: ${JSON.stringify(seoTechnicalAudit)}` : ""}
-${seoActionPlan ? `SEO Action Plan: ${JSON.stringify(seoActionPlan)}` : ""}
-${seoScoreBreakdown ? `Score Breakdown: ${JSON.stringify(seoScoreBreakdown)}` : ""}
+${seoKeywords ? `SEO Keywords: ${JSON.stringify(seoKeywords.slice(0, 10))}` : ""}
+${seoContentGaps ? `Content Gaps: ${JSON.stringify(seoContentGaps.slice(0, 5))}` : ""}
+${seoBlogIdeas ? `Blog Ideas: ${JSON.stringify(seoBlogIdeas.slice(0, 5))}` : ""}
+${growthWorkspace ? `Growth Score: ${JSON.stringify(growthWorkspace.overallGrowthScore)}` : ""}
+${executiveStory?.companyOverview?.name ? `Company Name: ${executiveStory.companyOverview.name}` : ""}
 
-Generate:
-1. Campaign objective and weekly plan
-2. Email sequence (3 emails with subject, preview, body, CTA)
-3. LinkedIn posts (5 posts with different formats)
-4. Instagram content (5 captions with hashtags and reel ideas)
-5. Video ad scripts (3 videos with scenes and voiceover)
-6. Image ad prompts (5 poster ideas with design direction)
-7. Lead generation strategy with ideal profile
-8. DM templates for outreach
+RULES:
+1. Use ONLY the verified data shown above. Do NOT invent any data.
+2. For any section with no verified data, set it to an empty array [] or null.
+3. Do NOT generate sample leads, fake discounts, fake case studies, placeholder hashtags, or fabricated campaign names.
+4. Every item in any array MUST include evidence fields: trigger, condition, action, tool, owner, evidence, confidence, dataSource.
 
-Return as JSON with these exact keys:
+Return valid JSON with these keys (set to [] or null if no data):
 {
-  "campaignName": "string",
-  "campaignObjective": "string",
+  "campaignName": "string or null",
+  "campaignObjective": "string or null",
   "targetAudience": {},
   "channels": [],
   "weeklyPlan": {},
@@ -139,17 +139,7 @@ Return as JSON with these exact keys:
   "sampleLeads": []
 }
 
-Every item in any array MUST include these evidence fields:
-- "trigger": "what triggers this action"
-- "condition": "condition to execute"
-- "action": "the actual content or action"
-- "tool": "tool to execute (e.g. LinkedIn, Email, Instagram)"
-- "owner": "role responsible"
-- "evidence": "source data from analysis"
-- "confidence": "high/medium/low"
-- "dataSource": "where data came from"
-
-CRITICAL: Use ONLY verified data. Set any field to null or empty array if no verified data exists. Do NOT invent or fabricate data.`;
+CRITICAL: Return valid JSON. Empty arrays for sections with no data. No fabricated content.`;
 
     const aiResult = await callAI(prompt);
     
@@ -162,7 +152,7 @@ CRITICAL: Use ONLY verified data. Set any field to null or empty array if no ver
   }
 
   // If AI fails, generate evidence-based plan from verified data
-  console.log('📝 [Automation] Generating evidence-based automation plan from verified data');
+  console.log('[Automation] Generating evidence-based automation plan from verified data');
   
   return generateEvidenceBasedPlan({
     product,
@@ -181,6 +171,9 @@ CRITICAL: Use ONLY verified data. Set any field to null or empty array if no ver
     competitorIntelligence,
     campaignIntelligence,
     seoIntelligence,
+    growthWorkspace,
+    executiveStory,
+    actionPlan,
   });
 }
 
@@ -193,22 +186,33 @@ function generateEvidenceBasedPlan(context) {
     hasProductData, hasMarketData, hasAudienceData, hasCompetitorData,
     hasCampaignData, hasChannelData, hasSeoData,
     productIntelligence, competitorIntelligence, campaignIntelligence, seoIntelligence,
+    growthWorkspace, executiveStory, actionPlan,
   } = context;
 
   const productAnalysis = productIntelligence?.productAnalysis || {};
   const audienceData = productIntelligence?.audienceIntelligence || {};
   const campaignData = campaignIntelligence?.campaignGenerator || {};
 
-  const plan = {
-    campaignName: `${product} Campaign`,
-    provider: "evidence_based",
-    fallbackUsed: true,
-  };
+  const plan = {};
+
+  if (executiveStory?.companyOverview?.name) {
+    plan.campaignName = `${executiveStory.companyOverview.name} Automation Plan`;
+  } else if (product) {
+    plan.campaignName = `${product} Automation Plan`;
+  }
+
+  if (growthWorkspace?.overallGrowthScore !== undefined) {
+    plan.campaignObjective = `Growth Score: ${growthWorkspace.overallGrowthScore}/100. Prioritize channels and campaigns based on growth analysis.`;
+  } else if (hasProductData && productAnalysis.usp) {
+    plan.campaignObjective = `Promote ${product}: ${productAnalysis.usp}`;
+  } else if (hasCampaignData && campaignData.campaignObjectives) {
+    plan.campaignObjective = campaignData.campaignObjectives;
+  }
 
   if (targetAudience) {
     plan.targetAudience = {
       primary: targetAudience,
-      evidence: "target_audience_input",
+      evidence: "verified_data",
       confidence: "medium",
       dataSource: "project_input",
     };
@@ -218,19 +222,21 @@ function generateEvidenceBasedPlan(context) {
     plan.channels = channels;
   }
 
-  if (hasProductData && productAnalysis.usp) {
-    plan.campaignObjective = `Promote ${product}: ${productAnalysis.usp}`;
-  } else if (hasCampaignData && campaignData.campaignObjectives) {
-    plan.campaignObjective = campaignData.campaignObjectives;
+  if (hasCampaignData) {
+    const campaignActionPlan = campaignData.actionPlan || {};
+    if (campaignActionPlan.kpis) {
+      plan.kpis = Array.isArray(campaignActionPlan.kpis)
+        ? campaignActionPlan.kpis.map(k => ({ kpi: k, tool: "campaign_tracker", owner: "marketing_team", evidence: "campaign_generator", confidence: "medium", dataSource: "campaign_intelligence" }))
+        : campaignActionPlan.kpis;
+    }
   }
 
-  if (hasCampaignData) {
-    const actionPlan = campaignData.actionPlan || {};
-    if (actionPlan.kpis) {
-      plan.kpis = Array.isArray(actionPlan.kpis)
-        ? actionPlan.kpis.map(k => ({ kpi: k, tool: "campaign_tracker", owner: "marketing_team", evidence: "campaign_generator", confidence: "medium", dataSource: "campaign_intelligence" }))
-        : actionPlan.kpis;
-    }
+  if (actionPlan?.day7?.length > 0) {
+    plan.weeklyPlan = {
+      day7: actionPlan.day7.slice(0, 7),
+      day30: actionPlan.day30?.slice(0, 5) || [],
+      source: "growth_workspace_action_plan",
+    };
   }
 
   if (hasSeoData) {

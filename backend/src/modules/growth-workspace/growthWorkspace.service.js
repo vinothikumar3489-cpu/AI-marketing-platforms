@@ -147,7 +147,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     { key: 'channel', label: 'Channel Recommendation', status: 'pending' }
   ];
 
-  const results = {};
+  let results = {};
   const warnings = [];
   let overallStatus = 'in_progress';
   let websiteData = null;

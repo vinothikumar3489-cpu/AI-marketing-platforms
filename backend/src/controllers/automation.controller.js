@@ -113,9 +113,9 @@ export const generateAutomationDemo = async (req, res) => {
     const completedModules = Object.values(readinessModules).filter(Boolean).length;
     const readinessScore = Math.round((completedModules / 8) * 100);
 
-    console.log('📊 [Automation] Readiness:', { completedModules, readinessScore });
+    console.log('[Automation] Readiness:', { completedModules, readinessScore });
 
-    // Generate automation plan using AI or fallback
+    // Generate automation plan using AI or evidence-based fallback
     const automationData = await generateAutomationPlanWithAI({
       productIntelligence,
       competitorIntelligence,
@@ -123,6 +123,9 @@ export const generateAutomationDemo = async (req, res) => {
       seoIntelligence,
       chatTitle: chat.title,
       productName: chat.productName,
+      growthWorkspace: campaignIntelligence?.campaignGenerator?.growthSummary || null,
+      executiveStory: campaignIntelligence?.executiveStory || campaignIntelligence?.campaignGenerator?.executiveStory || null,
+      actionPlan: campaignIntelligence?.actionPlan || campaignIntelligence?.campaignGenerator?.actionPlan || null,
     });
 
     // Check for insufficient data

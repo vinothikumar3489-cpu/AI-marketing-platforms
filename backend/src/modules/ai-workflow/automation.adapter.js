@@ -35,6 +35,9 @@ export async function generateAutomationPlanStep({ chatId, userId }) {
     seoIntelligence,
     chatTitle: chat.title,
     productName: chat.productName,
+    growthWorkspace: campaignIntelligence?.campaignGenerator?.growthSummary || null,
+    executiveStory: campaignIntelligence?.executiveStory || campaignIntelligence?.campaignGenerator?.executiveStory || null,
+    actionPlan: campaignIntelligence?.actionPlan || campaignIntelligence?.campaignGenerator?.actionPlan || null,
   });
 
   if (automationData._noData) {
