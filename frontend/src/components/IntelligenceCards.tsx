@@ -38,13 +38,10 @@ export function InsightCard({ insight, icon: Icon = Info }: { insight: Insight |
           {!insight.title && <span style={{ fontWeight: 'bold' }}>Insight</span>}
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          {insight.confidence && insight.confidence > 0 && (
+          {insight.confidence && (
             <Badge tone={insight.confidence > 80 ? 'green' : insight.confidence > 50 ? 'blue' : 'yellow'}>
               {insight.confidence}% Confidence
             </Badge>
-          )}
-          {insight.confidence === 0 && (
-            <Badge tone="yellow">Confidence unavailable</Badge>
           )}
           {insight.impact && (
             <Badge tone={insight.impact === 'High' ? 'pink' : 'dark'}>{insight.impact} Impact</Badge>

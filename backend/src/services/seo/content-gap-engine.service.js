@@ -645,11 +645,31 @@ function isPageCovered(page, existingPages) {
 }
 
 function generateTitleFromKeyword(keyword, productName) {
-  return '';
+  if (!keyword) return `${productName} - Content Opportunity`;
+  const lower = keyword.trim();
+  // Convert keyword to readable title
+  const words = lower.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1));
+  const title = words.join(' ');
+  // If it looks like a question, keep as-is
+  if (lower.startsWith('how') || lower.startsWith('what') || lower.startsWith('why') || lower.startsWith('when') || lower.startsWith('where') || lower.startsWith('which') || lower.startsWith('who') || lower.startsWith('is') || lower.startsWith('can') || lower.startsWith('does') || lower.includes('?')) {
+    return title.endsWith('?') ? title : title + '?';
+  }
+  // Short keywords get product context
+  if (words.length <= 2) {
+    return `${title} - Complete Guide for ${productName}`;
+  }
+  return title;
 }
 
 function generateSectionsFromIntent(intent) {
-  return [];
+  const base = ['Introduction', 'Key benefits', 'How it works', 'Use cases', 'Next steps'];
+  if (intent === 'commercial' || intent === 'transactional') {
+    return ['Overview', 'Pricing & Plans', 'Feature comparison', 'ROI analysis', 'Testimonials', 'FAQ', 'Get started'];
+  }
+  if (intent === 'informational') {
+    return ['What is this', 'How it works', 'Step-by-step guide', 'Best practices', 'Common mistakes', 'FAQ', 'Related resources'];
+  }
+  return base;
 }
 
 function calculateConfidence(volume, difficulty) {

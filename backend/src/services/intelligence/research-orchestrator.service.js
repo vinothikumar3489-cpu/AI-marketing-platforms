@@ -61,7 +61,6 @@ export async function collectResearchData({ websiteUrl, productName, companyName
       warnings.push('PageSpeed audit failed - API key may be missing');
       sources.push({ type: 'pagespeed', success: false });
     }
-    console.log('[Research Orchestrator] Continuing after PageSpeed');
 
     // Phase 3: SERP / Competitor Discovery
     console.log('[Research Orchestrator] Running SERP search for:', websiteUrl);
@@ -158,13 +157,10 @@ async function scrapeWebsiteOrchestrator(url) {
     console.warn(`[Research Orchestrator] Unified scraper failed:`, error.message);
   }
 
-  // Fallback: Basic fetch with timeout
+  // Fallback: Basic fetch
   try {
     console.log('[Research Orchestrator] Trying basic fetch fallback');
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30000);
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
+    const response = await fetch(url);
     if (response.ok) {
       const html = await response.text();
       return {

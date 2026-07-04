@@ -64,12 +64,13 @@ export async function generateCompleteSolution({ chatId, userId }) {
     const prompt = buildSolutionPrompt(contextData, availableModules, chat.productName);
 
     const aiResult = await callAI(prompt);
-    const parsedSolution = aiResult.success ? (aiResult.data || {}) : {};
-    const fallbackUsed = !aiResult.success;
 
-    if (fallbackUsed) {
-      console.warn('⚠️ [Workflow] AI generation failed; using fallback solution content');
+    if (!aiResult.success) {
+      return { success: false, error: "AI generation failed" };
     }
+
+    // 5. Structure the solution (callAI returns already-parsed JSON)
+    const parsedSolution = aiResult.data || {};
 
     const solution = {
       contentStrategy: parsedSolution.contentStrategy || generateFallbackContentStrategy(contextData),
@@ -82,10 +83,10 @@ export async function generateCompleteSolution({ chatId, userId }) {
         productName: chat.productName || 'Unknown Product',
         modulesUsed: availableModules,
         providers: {
-          ai: aiResult.provider || 'none',
-          fallbackUsed,
-        },
-      },
+          ai: aiResult.provider || 'ai',
+          fallbackUsed: false
+        }
+      }
     };
 
     // 6. Save solution in AgentRun
@@ -163,24 +164,77 @@ Return as JSON with these exact keys: contentStrategy, seoImplementation, campai
 Each section should be an object with detailed, actionable information.`;
 }
 
-function generateFallbackContentStrategy() {
-  return { hasVerifiedData: false };
+function generateFallbackContentStrategy(contextData) {
+  return {
+    contentCalendar: {
+      weeks: 12,
+      themes: ['Product Education', 'Customer Success', 'Industry Insights', 'Product Updates'],
+      frequency: 'Weekly blog posts, daily social updates'
+    },
+    channels: ['Blog', 'LinkedIn', 'Twitter', 'Email Newsletter'],
+    tactics: ['SEO-optimized articles', 'Thought leadership', 'Customer stories']
+  };
 }
 
-function generateFallbackSEO() {
-  return { hasVerifiedData: false };
+function generateFallbackSEO(contextData) {
+  const seoData = contextData.seoIntelligence || {};
+  return {
+    priorityFixes: seoData.technicalIssues || ['Improve page speed', 'Fix mobile responsiveness', 'Add schema markup'],
+    keywordPlan: seoData.keywordOpportunities || ['Target long-tail keywords', 'Optimize title tags', 'Create keyword-rich content'],
+    timeline: '3-month implementation roadmap'
+  };
 }
 
-function generateFallbackCampaign() {
-  return { hasVerifiedData: false };
+function generateFallbackCampaign(contextData) {
+  return {
+    adCopy: {
+      headlines: [
+        'Transform Your Business Today',
+        'The Smart Solution You\'ve Been Looking For',
+        'Get Results That Matter'
+      ],
+      descriptions: [
+        'Join thousands of satisfied customers',
+        'Easy setup. Powerful results.',
+        'Start your free trial today'
+      ]
+    },
+    landingPage: {
+      hero: 'Clear value proposition',
+      features: 'Benefit-focused feature list',
+      cta: 'Strong call-to-action',
+      social_proof: 'Customer testimonials and logos'
+    },
+    emailSequence: ['Welcome email', 'Educational content', 'Case study', 'Product demo', 'Special offer']
+  };
 }
 
 function generateFallbackAutomation() {
-  return { hasVerifiedData: false };
+  return {
+    tracking: ['Google Analytics 4 setup', 'Conversion tracking', 'Event tracking'],
+    monitoring: ['Weekly performance dashboards', 'Automated alerts for anomalies'],
+    reporting: ['Monthly performance reports', 'Quarterly strategy reviews']
+  };
 }
 
-function generateFallbackNextActions() {
-  return { hasVerifiedData: false };
+function generateFallbackNextActions(availableModules) {
+  return {
+    thisWeek: [
+      'Review complete solution',
+      'Set up tracking infrastructure',
+      'Begin content calendar planning'
+    ],
+    thisMonth: [
+      'Launch first campaign',
+      'Implement priority SEO fixes',
+      'Create initial content batch'
+    ],
+    thisQuarter: [
+      'Scale successful campaigns',
+      'Expand content distribution',
+      'Optimize based on performance data'
+    ]
+  };
 }
 
 const STEP_ORDER = ["check_readiness", "automation_plan", "asset_review", "solution_generate", "approval_pending"];

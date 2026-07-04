@@ -35,8 +35,12 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       if (!mountedRef.current) return;
       const list = res.chats || res.data || res || [];
       setChats(Array.isArray(list) ? list : []);
-      // Only clear selection if the selected chat was explicitly deleted (not a race condition)
-      // Don't auto-clear on every refresh - rely on deleteChat to call clearSelection
+      const exists = list.some((c: any) => c.id === selectedChatId);
+      if (selectedChatId && !exists) {
+        localStorage.removeItem('selectedChatId');
+        setSelectedChatId('');
+        setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null });
+      }
     } finally { if (mountedRef.current) setLoading(false); }
   }
 
@@ -52,10 +56,10 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     console.log('previousSelectedChatId:', selectedChatId);
     console.log('isSwitch:', id !== selectedChatId);
     
-    // Only clear results if switching to a DIFFERENT chat
-    // Preserve existing results when same chat is re-selected
+    // Only clear results if switching to a different chat
     if (id !== selectedChatId) {
-      console.log('[ProjectContext] Switching to different chat, will load fresh data');
+      console.log('[ProjectContext] Clearing results for chat switch');
+      setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null });
     }
     
     setSelectedChatId(id);
@@ -82,35 +86,18 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       
       const normalized = normalizeFullResults(res);
 
-      // Preserve existing growth data if backend returns empty but we have cached data
-      // This prevents data loss when switching between tabs
-      if (normalized?.growth && Object.keys(normalized.growth).length === 0 && fullResults?.growth && Object.keys(fullResults.growth).length > 0) {
-        if (selectedChatId === id) {
-          normalized.growth = fullResults.growth;
-        }
-      }
-      
-      // Same for seoIntelligence
-      if (normalized?.seoIntelligence && Object.keys(normalized.seoIntelligence).length === 0 && fullResults?.seoIntelligence && Object.keys(fullResults.seoIntelligence).length > 0) {
-        if (selectedChatId === id) {
-          normalized.seoIntelligence = fullResults.seoIntelligence;
-        }
-      }
-
       setFullResults(normalized);
       return normalized;
     } catch (error: any) {
       console.error('Failed to load full results:', error.message || error);
       
-      // On error, ALWAYS keep existing results - never clear them
-      // Transient network errors should not wipe out analyzed data
-      if (mountedRef.current) {
-        const currentResults = fullResults;
-        console.log('[ProjectContext] Keeping existing results after load error');
-        return currentResults;
+      const emptyResults = { growth: null, seo: null, executive: null, profile: null, chat: null };
+      
+      if (error.response?.status === 404) {
+        if (mountedRef.current) setFullResults(emptyResults);
       }
       
-      return fullResults;
+      return emptyResults;
     } finally {
       if (mountedRef.current) setLoading(false);
     }

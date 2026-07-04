@@ -444,15 +444,58 @@ function isDuplicateKeyword(keyword, existingIdeas) {
 }
 
 function generateBlogTitle(keyword, productName, type) {
-  return '';
+  if (!keyword) return `${productName}: Tips and Best Practices`;
+  const lower = keyword.trim();
+  const titleCase = lower.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+  if (type === 'question' || lower.startsWith('how') || lower.startsWith('what') || lower.startsWith('why') || lower.startsWith('when') || lower.startsWith('where') || lower.startsWith('which') || lower.startsWith('who') || lower.startsWith('is') || lower.startsWith('can') || lower.startsWith('does')) {
+    const q = titleCase.endsWith('?') ? titleCase : titleCase + '?';
+    return q;
+  }
+  if (type === 'competitor') {
+    return `${titleCase}: ${productName} vs The Competition`;
+  }
+  if (type === 'geo') {
+    return `Understanding ${titleCase}: A Complete Guide for ${productName}`;
+  }
+  if (type === 'gap') {
+    return `${titleCase}: How ${productName} Can Help`;
+  }
+  // Default: informational blog title
+  const words = lower.split(' ');
+  if (words.length <= 3) {
+    return `The Ultimate Guide to ${titleCase}`;
+  }
+  return titleCase;
 }
 
 function generateOutline(type, keyword) {
-  return [];
+  if (!keyword) return ['Introduction', 'Key points', 'Conclusion'];
+  const lower = keyword.trim();
+  if (type === 'how-to' || lower.startsWith('how')) {
+    return ['What is this about', 'Why it matters', 'Step-by-step process', 'Common challenges', 'Expert tips', 'Frequently asked questions', 'Takeaways'];
+  }
+  if (type === 'question' || lower.startsWith('what') || lower.startsWith('why') || lower.startsWith('when') || lower.startsWith('where') || lower.startsWith('which') || lower.startsWith('who') || lower.startsWith('is') || lower.startsWith('can') || lower.startsWith('does')) {
+    return ['Direct answer', 'Detailed explanation', 'Real-world examples', 'Common misconceptions', 'Related questions', 'Summary'];
+  }
+  if (type === 'guide') {
+    return ['Introduction', 'Core concepts', 'Practical examples', 'Best practices', 'Pitfalls to avoid', 'Resources', 'Conclusion'];
+  }
+  if (type === 'faq-style') {
+    return ['Quick answer', 'In-depth explanation', 'Examples', 'Related questions'];
+  }
+  if (type === 'competitor') {
+    return ['Product overview', 'Feature comparison', 'Pricing comparison', 'Pros and cons', 'Verdict', 'FAQ'];
+  }
+  return ['Introduction', 'Main content', 'Key takeaways', 'Next steps'];
 }
 
 function generateInternalLinks(keyword, productName) {
-  return [];
+  if (!keyword) return [];
+  return [
+    { text: `${productName} Home`, url: '/' },
+    { text: `${productName} Features`, url: '/features' }
+  ];
 }
 
 function calculateConfidence(volume, difficulty) {

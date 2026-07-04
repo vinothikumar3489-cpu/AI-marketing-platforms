@@ -1,5 +1,5 @@
 import { prisma } from "../../config/prisma.js";
-import { generateAutomationPlanWithAI, sanitizeAutomationPlanData } from "../../services/automation.service.js";
+import { generateAutomationPlanWithAI } from "../../services/automation.service.js";
 
 export async function generateAutomationPlanStep({ chatId, userId }) {
   const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
@@ -40,16 +40,14 @@ export async function generateAutomationPlanStep({ chatId, userId }) {
 
   const { source: _s, confidence: _c, isFallback: _i, ...planData } = automationData;
 
-  const automationPlanData = {
-    userId,
-    chatId,
-    ...sanitizeAutomationPlanData(automationData, chat.title),
-    readinessScore,
-    status: "draft",
-  };
-
   const automationPlan = await prisma.automationPlan.create({
-    data: automationPlanData,
+    data: {
+      userId,
+      chatId,
+      ...planData,
+      readinessScore,
+      status: "draft",
+    },
   });
 
   const assets = [];

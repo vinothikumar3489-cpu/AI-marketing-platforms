@@ -1,7 +1,8 @@
 ﻿import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { isAuthenticated } from "@/lib/auth";
-import { ArrowRight, Brain } from "lucide-react";
+import { ArrowRight, Brain, Sparkles, Zap, TrendingUp, Target, Globe } from "lucide-react";
+import { stats } from "@/lib/sample-data";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -50,6 +51,7 @@ function Landing() {
       {/* Hero */}
       <section className="relative z-10 max-w-7xl mx-auto px-8 pt-16 pb-24 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass text-xs mb-6">
+          <Sparkles className="w-3.5 h-3.5 text-brand-cyan" />
           <span className="text-muted-foreground">Powered by 12 specialized AI models</span>
         </div>
         <h1 className="text-5xl md:text-7xl font-display font-bold tracking-tight leading-[1.05] max-w-5xl mx-auto">
@@ -65,6 +67,22 @@ function Landing() {
           <Link to="/app" className="px-6 h-12 rounded-xl glass text-foreground font-medium flex items-center gap-2 hover:border-white/20">
             View Live Demo
           </Link>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-20 max-w-5xl mx-auto">
+          {[
+            { v: `${stats.wastedSpend}%`, l: "Marketing Spend Wasted", c: "text-brand-purple", i: TrendingUp },
+            { v: `${stats.conversionLift}x`, l: "Conversion Lift", c: "text-brand-green", i: Zap },
+            { v: `<${stats.timeToInsight} min`, l: "Time to Insight", c: "text-brand-cyan", i: Target },
+            { v: `${stats.cacReduction}%`, l: "CAC Reduction", c: "text-brand-blue", i: Globe },
+          ].map((s, i) => (
+            <div key={i} className="glass rounded-2xl p-5 text-left">
+              <s.i className={`w-5 h-5 mb-3 ${s.c}`} />
+              <div className="text-3xl font-display font-bold">{s.v}</div>
+              <div className="text-xs text-muted-foreground mt-1">{s.l}</div>
+            </div>
+          ))}
         </div>
       </section>
 

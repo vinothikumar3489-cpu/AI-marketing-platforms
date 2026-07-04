@@ -215,15 +215,34 @@ async function discoverCompetitors({ productName, industry, websiteUrl, keywordI
       'social listening tools',
       'short form video analytics',
       'content analytics platform'
+    ],
+    'upfluence.com': [
+      'influencer marketing platform',
+      'creator management software',
+      'influencer discovery tool',
+      'influencer relationship management',
+      'influencer campaign management',
+      'creator economy platform'
+    ],
+    'resume.io': [
+      'resume builder',
+      'cv maker online',
+      'best resume writing service',
+      'professional resume templates',
+      'online resume creator',
+      'cover letter builder'
+    ],
+    'zety.com': [
+      'zety alternatives',
+      'best resume builders',
+      'online cv maker',
+      'professional resume templates',
+      'resume writing service'
     ]
   };
 
-  // Use DataForSEO SERP API if configured and not marked unavailable
-  const isDataForSEOUnavailable = researchData?.unavailableSources?.includes('dataforseo') ||
-                                  researchData?.fallbackSourcesUsed?.includes('dataforseo') === false ||
-                                  false;
-
-  if (isDataForSEOConfigured() && !isDataForSEOUnavailable) {
+  // Use DataForSEO SERP API if configured
+  if (isDataForSEOConfigured()) {
     console.log('🔍 [Discovery] Using DataForSEO SERP API for competitor discovery...');
     
     // Use domain-specific queries if available
@@ -463,7 +482,47 @@ async function discoverCompetitors({ productName, industry, websiteUrl, keywordI
       'softwareadvice.com',
       'sitejabber.com',
       'saasworthy.com',
-      'zoominfo.com'
+      'zoominfo.com',
+      'trustradius.com',
+      'top10.com',
+      'softwaretestinghelp.com',
+      'digital.com',
+      'financesonline.com',
+      'selecthub.com',
+      'peerinsights.com',
+      'itqlick.com',
+      'crazyegg.com',
+      'hotjar.com',
+      'clearbit.com',
+      'builtwith.com',
+      'wappalyzer.com',
+      'datanyze.com',
+      '6sense.com',
+      'demandbase.com',
+      'techtarget.com',
+      'itcentralstation.com',
+      'peerspot.com',
+      'martech.org',
+      'chiefmartec.com',
+      'marketingtechnews.net',
+      'martechvibe.com',
+      'martechcube.com',
+      'martechseries.com',
+      'searchengineland.com',
+      'searchenginejournal.com',
+      'seroundtable.com',
+      'thesempost.com',
+      'searchenginewatch.com',
+      'neilpatel.com',
+      'backlinko.com',
+      'moz.com',
+      'ahrefs.com',
+      'semrush.com',
+      'searchenginejournal.com',
+      'wordstream.com',
+      'hubspot.com',
+      'marketingprofs.com',
+      'contentmarketinginstitute.com'
     ]);
 
     return competitors.filter(comp => {
@@ -577,7 +636,20 @@ function filterAllCompetitors(competitors, identity) {
     'techradar.com', 'zdnet.com', 'cnet.com', 'pcmag.com',
     'g2.com', 'capterra.com', 'trustradius.com',
     'gartner.com', 'forrester.com', 'idc.com',
-    'similarweb.com', 'semrush.com', 'ahrefs.com', 'moz.com'
+    'similarweb.com', 'semrush.com', 'ahrefs.com', 'moz.com',
+    'trustradius.com', 'top10.com', 'softwaretestinghelp.com',
+    'digital.com', 'financesonline.com', 'selecthub.com',
+    'peerinsights.com', 'itqlick.com', 'crazyegg.com',
+    'hotjar.com', 'clearbit.com', 'builtwith.com',
+    'wappalyzer.com', 'datanyze.com', '6sense.com',
+    'demandbase.com', 'techtarget.com', 'itcentralstation.com',
+    'peerspot.com', 'martech.org', 'chiefmartec.com',
+    'marketingtechnews.net', 'martechvibe.com', 'martechcube.com',
+    'martechseries.com', 'searchengineland.com',
+    'searchenginejournal.com', 'seroundtable.com', 'thesempost.com',
+    'searchenginewatch.com', 'neilpatel.com', 'backlinko.com',
+    'wordstream.com', 'hubspot.com', 'marketingprofs.com',
+    'contentmarketinginstitute.com'
   ]);
   
   const appStoreDomains = new Set([

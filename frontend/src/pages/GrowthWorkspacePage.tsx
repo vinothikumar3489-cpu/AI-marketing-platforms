@@ -1,11 +1,10 @@
-import { useEffect, useState, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { api } from '../lib/api';
+import { useEffect, useState } from 'react';
+import { api, downloadReport } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
 import { asArray, asNumber, asText, asInsight } from '../lib/normalizers';
 import { Badge, Card, EmptyState, Loading, PageHeader, ScoreCard, SectionTitle, InsightCard, PersonaCard, CompetitorCard } from '../components/UI';
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
-import { Shield, Target, Users, TrendingUp, Zap, Map, Info, Box, Briefcase, Activity, CheckCircle, Flame, Droplets, Snowflake, Loader2 } from 'lucide-react';
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, AreaChart, Area } from 'recharts';
+import { Shield, Target, Users, TrendingUp, Zap, Map, Info, Box, Briefcase, Activity, CheckCircle, Flame, Droplets, Snowflake } from 'lucide-react';
 
 const defaults: any = {
   websiteUrl: '',
@@ -29,45 +28,32 @@ const defaults: any = {
 const tabs = ['Executive Snapshot', 'Executive Story', 'Product DNA', 'Market Intelligence', 'Audience Intelligence', 'Competitor Intelligence', 'Intent Prediction', 'Positioning Strategy', 'Campaign Strategy', 'Channel Strategy', 'Action Plan'];
 
 export default function GrowthWorkspacePage() {
-  const { selectedChatId, createChat, loadFullResults, fullResults } = useProject();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const isNewAnalysis = location.state?.newAnalysis === true;
-  const storedChatRef = useRef<string>('');
+  const { selectedChatId, createChat, loadFullResults, fullResults, clearSelection } = useProject();
   const [form, setForm] = useState(defaults);
   const [activeTab, setActiveTab] = useState('Executive Snapshot');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [results, setResults] = useState<any>({});
-  const [mode, setMode] = useState<'form' | 'creating' | 'running' | 'results' | 'error'>(isNewAnalysis ? 'form' : 'form');
-  const [creatingChat, setCreatingChat] = useState(false);
+  const [mode, setMode] = useState<'form' | 'running' | 'results' | 'error'>('form');
 
-  // On mount, hydrate from fullResults if data exists for this chat
   useEffect(() => {
-    if (isNewAnalysis) return;
-    if (!selectedChatId) return;
+    let cancelled = false;
     const r = fullResults.growth || {};
+    
     const hasGrowthData = 
       r.product || r.market || r.audience || r.competitor || r.intent || r.positioning || r.campaign || r.channel || r.executiveStory || r.actionPlan;
-    if (hasGrowthData) {
-      storedChatRef.current = selectedChatId;
-      setResults(r);
-      setMode('results');
+    
+    if (!cancelled) {
+      if (hasGrowthData) {
+        setResults(r);
+        setMode('results');
+      } else {
+        setResults({});
+        setMode('form');
+        setStep(1);
+      }
     }
-  }, []);
-
-  // On fullResults change: update if data exists, never clear existing results
-  useEffect(() => {
-    if (isNewAnalysis) return;
-    if (!selectedChatId) return;
-    const r = fullResults.growth || {};
-    const hasGrowthData = 
-      r.product || r.market || r.audience || r.competitor || r.intent || r.positioning || r.campaign || r.channel || r.executiveStory || r.actionPlan;
-    if (hasGrowthData) {
-      storedChatRef.current = selectedChatId;
-      setResults(r);
-      setMode('results');
-    }
+    return () => { cancelled = true; };
   }, [fullResults]);
 
   async function run() {
@@ -77,35 +63,23 @@ export default function GrowthWorkspacePage() {
     }
     setError(''); 
     setLoading(true);
-
-    let chatId = selectedChatId;
-    if (!chatId) {
-      setMode('creating');
-      setCreatingChat(true);
-      try {
-        chatId = await createChat('New Analysis');
-        navigate('/app/growth-workspace', { replace: true });
-      } catch (e: any) {
-        setError('Failed to create project: ' + (e.message || 'Unknown error'));
-        setMode('form');
-        setCreatingChat(false);
-        setLoading(false);
-        return;
-      }
-      setCreatingChat(false);
-    }
-
     setMode('running');
     try {
-      console.log('[Growth UI] run started for chat:', chatId);
+      let chatId = selectedChatId;
+      // Force create a new chat if URL changes
+      const projectUrl = fullResults?.profile?.websiteUrl || fullResults?.chat?.websiteUrl;
+      if (!chatId || (projectUrl && !form.websiteUrl.includes(projectUrl.replace(/^https?:\/\//, '').split('/')[0]))) {
+        chatId = await createChat(form.websiteUrl.replace(/^https?:\/\//, '').split('/')[0]);
+      }
       
       const res: any = await api.post(`/chats/${chatId}/growth-workspace/run-full-analysis`, form);
       const data = res.results || res.data?.results || res;
       setResults(data);
       
-      console.log('[Growth UI] run completed, refreshing full results');
+      // CRITICAL: Load full results from database after analysis completes
       await loadFullResults(chatId);
       
+      // Only set mode to results after full results are loaded
       setMode('results');
     } catch (e: any) {
       setError(e.message || 'Analysis failed');
@@ -116,6 +90,7 @@ export default function GrowthWorkspacePage() {
   }
 
   function handleNewAnalysis() {
+    clearSelection();
     setForm(defaults);
     setResults({});
     setError('');
@@ -136,36 +111,6 @@ export default function GrowthWorkspacePage() {
     results.actionPlan;
 
   const [step, setStep] = useState(1);
-  const [progress, setProgress] = useState(0);
-  const [currentStage, setCurrentStage] = useState('Preparing analysis...');
-  const progressStages = [
-    'Preparing analysis...',
-    'Researching website content',
-    'Scraping website structure',
-    'Running growth analysis',
-    'Market intelligence',
-    'Audience + competitor intelligence',
-    'Campaign & channel strategy',
-    'Saving results to project'
-  ];
-  useEffect(() => {
-    if (mode === 'running') {
-      setProgress(0);
-      setCurrentStage(progressStages[0]);
-      const interval = setInterval(() => {
-        setProgress(p => {
-          if (p >= 7) { clearInterval(interval); return 7; }
-          const next = p + 1;
-          setCurrentStage(progressStages[next] || 'Processing...');
-          return next;
-        });
-      }, 10000);
-      return () => clearInterval(interval);
-    } else if (mode !== 'creating') {
-      setProgress(0);
-      setCurrentStage('Preparing analysis...');
-    }
-  }, [mode]);
 
   const toggleArray = (field: string, val: string) => {
     setForm((prev: any) => {
@@ -201,6 +146,24 @@ export default function GrowthWorkspacePage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '20px' }}>
         <PageHeader eyebrow="All-in-one Analysis Command Center" title="Growth Workspace" subtitle="Generate a multi-stage, validated business intelligence report." />
+        {mode === 'results' && (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div className="dropdown" style={{ position: 'relative' }}>
+              <button className="secondary-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <TrendingUp size={14} /> Download Report ▾
+              </button>
+              <div className="dropdown-menu" style={{ position: 'absolute', right: 0, top: '100%', background: '#101622', border: '1px solid #293245', borderRadius: '8px', padding: '4px', zIndex: 100, display: 'none', minWidth: '160px' }}>
+                {['pdf', 'docx', 'pptx', 'json', 'csv', 'markdown'].map(f => (
+                  <button key={f} onClick={() => { const id = selectedChatId || fullResults?.chat?.id; if (id) downloadReport(id, 'growth', f); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: '#9aa7bd', cursor: 'pointer', fontSize: '13px', borderRadius: '4px' }} onMouseEnter={e => (e.target as HTMLElement).style.background = '#1a2335'} onMouseLeave={e => (e.target as HTMLElement).style.background = 'none'}>{f.toUpperCase()}</button>
+                ))}
+              </div>
+            </div>
+            <button onClick={handleNewAnalysis} className="primary-btn" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Target size={16} /> New Growth Analysis
+            </button>
+          </div>
+        )}
+        <style>{`.dropdown:hover .dropdown-menu { display: block !important; }`}</style>
       </div>
       
       {error && (
@@ -214,15 +177,6 @@ export default function GrowthWorkspacePage() {
               <button onClick={run} className="secondary-btn" disabled={loading}>Retry</button>
               <button onClick={handleNewAnalysis} className="ghost-btn">New Analysis</button>
             </div>
-          </div>
-        </Card>
-      )}
-      
-      {mode === 'creating' && (
-        <Card>
-          <div style={{ padding: '40px', textAlign: 'center' }}>
-            <Loader2 className="spin" size={24} />
-            <p style={{ color: '#9aa7bd', marginTop: '15px' }}>Creating project...</p>
           </div>
         </Card>
       )}
@@ -336,22 +290,7 @@ export default function GrowthWorkspacePage() {
         </Card>
       )}
       
-      {mode === 'running' && (
-        <Card>
-          <div style={{ padding: '20px' }}>
-            <h3 style={{ margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Loader2 className="spin" size={20} /> Running Growth Analysis
-            </h3>
-            <div style={{ height: '8px', background: '#1d2738', borderRadius: '4px', overflow: 'hidden', marginBottom: '15px' }}>
-              <div style={{ height: '100%', width: `${Math.min((progress / 8) * 100, 90)}%`, background: 'linear-gradient(90deg, #a855f7, #2aa3ff)', borderRadius: '4px', transition: 'width 0.5s ease' }} />
-            </div>
-            <div style={{ color: '#9aa7bd', fontSize: '14px', display: 'flex', justifyContent: 'space-between' }}>
-              <span>{currentStage}</span>
-              <span>{Math.round((progress / 8) * 100)}%</span>
-            </div>
-          </div>
-        </Card>
-      )}
+      {mode === 'running' && <Loading text="Agentic pipeline active: Scraping web -> Normalizing -> Extracting Insights -> Cross-referencing evidence..." />}
       
       {mode === 'results' && hasData && (
         <Card>
@@ -405,71 +344,59 @@ export default function GrowthWorkspacePage() {
 function ExecutiveSnapshot({ results }: { results: any }) {
   const sum = results.summary || results.growthSummary || null;
   
+  // Only show scores if summary exists with actual values
   const hasScores = sum && (
     sum.overallGrowthScore !== null ||
     sum.marketOpportunityScore !== null ||
     sum.campaignViabilityScore !== null ||
-    sum.productFitScore !== null
+    sum.productFitScore !== null ||
+    sum.marketSizeScore !== null ||
+    sum.audienceClarityScore !== null ||
+    sum.competitiveDefensibilityScore !== null ||
+    sum.campaignReadinessScore !== null
   );
-
-  const growthIndex = asNumber(sum?.overallGrowthScore || results.product?.confidenceScore, null);
-  const marketOpportunity = asNumber(sum?.marketOpportunityScore || results.market?.demandScore, null);
-  const campaignViability = asNumber(sum?.campaignViabilityScore || results.campaign?.confidenceScore, null);
   
   const radarData = hasScores ? [
-    { subject: 'Product Fit', A: asNumber(sum?.productFitScore || results.product?.confidenceScore, null), fullMark: 100 },
-    { subject: 'Market Size', A: asNumber(sum?.marketSizeScore || results.market?.confidenceScore, null), fullMark: 100 },
-    { subject: 'Audience Clarity', A: asNumber(sum?.audienceClarityScore || results.audience?.confidenceScore, null), fullMark: 100 },
-    { subject: 'Competitive Defensibility', A: asNumber(sum?.competitiveDefensibilityScore || results.competitor?.confidenceScore, null), fullMark: 100 },
-    { subject: 'Campaign Readiness', A: asNumber(sum?.campaignReadinessScore || results.campaign?.confidenceScore, null), fullMark: 100 },
+    { subject: 'Product Fit', A: asNumber(sum.productFitScore || results.product?.confidenceScore), fullMark: 100 },
+    { subject: 'Market Size', A: asNumber(sum.marketSizeScore || results.market?.confidenceScore), fullMark: 100 },
+    { subject: 'Audience Clarity', A: asNumber(sum.audienceClarityScore || results.audience?.confidenceScore), fullMark: 100 },
+    { subject: 'Competitive Defensibility', A: asNumber(sum.competitiveDefensibilityScore || results.competitor?.confidenceScore), fullMark: 100 },
+    { subject: 'Campaign Readiness', A: asNumber(sum.campaignReadinessScore || results.campaign?.confidenceScore), fullMark: 100 },
   ].filter(d => d.A !== null) : [];
 
-  const topRec = sum?.topRecommendation || null;
-  const primaryRisk = sum?.primaryRisk || null;
-  const immediateAction = sum?.immediateAction || null;
+  if (!hasScores) {
+    return (
+      <EmptyState 
+        title="Executive Snapshot Not Available" 
+        text="Run Growth Workspace analysis to generate executive snapshot scores and recommendations."
+      />
+    );
+  }
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
       <div className="score-grid">
-        <ScoreCard label="Growth Index" value={growthIndex} />
-        <ScoreCard label="Market Opportunity" value={marketOpportunity} tone="blue" />
-        <ScoreCard label="Campaign Viability" value={campaignViability} tone="green" />
+        <ScoreCard label="Growth Index" value={asNumber(sum.overallGrowthScore || results.product?.confidenceScore)} />
+        <ScoreCard label="Market Opportunity" value={asNumber(sum.marketOpportunityScore || results.market?.demandScore)} tone="blue" />
+        <ScoreCard label="Campaign Viability" value={asNumber(sum.campaignViabilityScore || results.campaign?.confidenceScore)} tone="green" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        {radarData.length > 0 ? (
-          <Card style={{ height: '350px' }}>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Map size={18} /> Business Readiness Radar</h3>
-            <ResponsiveContainer width="100%" height="90%">
-              <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
-                <PolarGrid stroke="#293245" />
-                <PolarAngleAxis dataKey="subject" tick={{ fill: '#9aa7bd', fontSize: 12 }} />
-                <Radar name="Confidence Score" dataKey="A" stroke="#10e18b" fill="#10e18b" fillOpacity={0.4} />
-              </RadarChart>
-            </ResponsiveContainer>
-          </Card>
-        ) : (
-          <Card style={{ height: '350px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <p style={{ color: '#9aa7bd' }}>Radar data unavailable</p>
-          </Card>
-        )}
+        <Card style={{ height: '350px' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Map size={18} /> Business Readiness Radar</h3>
+          <ResponsiveContainer width="100%" height="90%">
+            <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+              <PolarGrid stroke="#293245" />
+              <PolarAngleAxis dataKey="subject" tick={{ fill: '#9aa7bd', fontSize: 12 }} />
+              <Radar name="Confidence Score" dataKey="A" stroke="#10e18b" fill="#10e18b" fillOpacity={0.4} />
+            </RadarChart>
+          </ResponsiveContainer>
+        </Card>
         
         <div style={{ display: 'grid', gap: '20px' }}>
-          <InsightCard insight={{
-            value: topRec ? (typeof topRec === 'string' ? topRec : topRec.value || topRec.title || topRec) : 'No verified data available',
-            confidence: topRec?.confidence || null,
-            impact: topRec?.impact || 'Medium' as const
-          }} icon={Zap} />
-          <InsightCard insight={{
-            value: primaryRisk ? (typeof primaryRisk === 'string' ? primaryRisk : primaryRisk.value || primaryRisk.title || primaryRisk) : 'No verified data available',
-            confidence: primaryRisk?.confidence || null,
-            impact: primaryRisk?.impact || 'Medium' as const
-          }} icon={Shield} />
-          <InsightCard insight={{
-            value: immediateAction ? (typeof immediateAction === 'string' ? immediateAction : immediateAction.value || immediateAction.title || immediateAction) : 'No verified data available',
-            confidence: immediateAction?.confidence || null,
-            impact: immediateAction?.impact || 'Medium' as const
-          }} icon={Target} />
+          <InsightCard insight={asInsight(sum.topRecommendation, 'Top Recommendation')} icon={Zap} />
+          <InsightCard insight={asInsight(sum.primaryRisk, 'Primary Risk')} icon={Shield} />
+          <InsightCard insight={asInsight(sum.immediateAction, 'Immediate Action')} icon={Target} />
         </div>
       </div>
     </div>
@@ -553,29 +480,13 @@ function MarketIntelligence({ data }: { data: any }) {
 function AudienceIntelligence({ data }: { data: any }) {
   const audience = data || {};
   if (!audience || Object.keys(audience).length === 0) return <EmptyState title="No Audience Data" />;
-  
-  // Filter out consumer/creator-specific personas that are irrelevant for B2B/SaaS
-  const b2cKeywords = ['parent', 'caregiver', 'creator', 'influencer', 'mom', 'dad', 'student'];
-  const personas = asArray(audience.buyerPersonas || audience.personas || []).filter((p: any) => {
-    const name = (p.name || p.persona || '').toLowerCase();
-    const desc = (p.description || p.demographics || '').toLowerCase();
-    // Keep the persona if it's B2B-relevant or if we can't determine
-    const isB2cOnly = b2cKeywords.some(k => name.includes(k) || desc.includes(k));
-    // But keep if it has clear B2B signals
-    const hasB2BSignal = /b2b|enterprise|business|decision.?maker|procurement|executive|manager|director|vp|cto|cio/.test(desc);
-    return !isB2cOnly || hasB2BSignal;
-  });
-  
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
       <SectionTitle title="Buyer Personas" subtitle="Detailed psychological profiles of your Ideal Customer Profiles (ICPs)." />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '20px' }}>
-        {personas.map((p: any, i) => (
+        {asArray(audience.buyerPersonas || audience.personas || []).map((p: any, i) => (
           <PersonaCard key={i} persona={p} />
         ))}
-        {personas.length === 0 && (
-          <p style={{ color: '#9aa7bd' }}>B2B-relevant personas not available in current analysis data.</p>
-        )}
       </div>
     </div>
   );
@@ -584,24 +495,13 @@ function AudienceIntelligence({ data }: { data: any }) {
 function CompetitorIntelligence({ data }: { data: any }) {
   const competitor = data || {};
   if (!competitor || Object.keys(competitor).length === 0) return <EmptyState title="No Competitor Data" />;
-  
-  // Filter out generic/unrelated competitors
-  const genericCompetitors = ['ahrefs', 'semrush', 'moz', 'hunter', 'similarweb', 'builtwith', 'wappalyzer', 'crunchbase'];
-  const relevantCompetitors = asArray(competitor.directCompetitors).filter((c: any) => {
-    const name = (c.name || c.domain || '').toLowerCase();
-    return !genericCompetitors.some(g => name.includes(g));
-  });
-  
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
       <SectionTitle title="Competitor War Room" subtitle="Direct threats and their market positioning." />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '20px' }}>
-        {relevantCompetitors.map((c: any, i) => (
+        {asArray(competitor.directCompetitors).map((c: any, i) => (
           <CompetitorCard key={i} competitor={c} />
         ))}
-        {relevantCompetitors.length === 0 && (
-          <p style={{ color: '#9aa7bd' }}>No relevant competitors identified for this analysis.</p>
-        )}
       </div>
 
       <Card>
@@ -709,82 +609,47 @@ function ChannelStrategy({ data }: { data: any }) {
   const channel = data || {};
   if (!channel || Object.keys(channel).length === 0) return <EmptyState title="No Channel Data" />;
   
-  // Filter out generic placeholder channel names
-  const isGenericChannel = (name: string) => {
-    const lower = (name || '').toLowerCase().trim();
-    const generics = ['channel', 'channel 1', 'channel 2', 'channel 160', 'channel 160 channel', 'ch160', 'marketing channel', 'digital channel'];
-    return generics.includes(lower) || /^channel\s*\d*/i.test(lower) || lower === '';
-  };
-  
+  // Deduplicate channels by channelName
   const channels = asArray(channel.recommendedChannels || channel.channels || []);
   const uniqueChannels = channels.filter((c: any, index: number, self: any[]) => {
-    const channelName = (c.channelName || c.channel || c.name || '').toLowerCase().trim();
-    if (!channelName || isGenericChannel(channelName)) return false;
+    const channelName = (c.channelName || c.channel || c.name || '').toLowerCase();
     return self.findIndex((item: any) => 
-      (item.channelName || item.channel || item.name || '').toLowerCase().trim() === channelName
+      (item.channelName || item.channel || item.name || '').toLowerCase() === channelName
     ) === index;
   });
   
-  const primaryChannel = channel.primaryChannel || channel.primary || '';
-  const channelStrategy = channel.channelStrategy || channel.strategy || '';
-  
-  // Show primary channel prominently if available
-  const hasRealChannel = primaryChannel && !isGenericChannel(primaryChannel);
-  
   const chartData = uniqueChannels.map((c:any) => {
-    const nameVal = asText(c.channelName || c.channel || c.name || '');
     const budgetStr = (c.budgetAllocation || c.budget || '20%').toString();
     const budgetNum = asNumber(budgetStr.replace('%', ''));
     const roiStr = (c.expectedRoi || c.roi || '150%').toString();
     const roiNum = asNumber(roiStr.replace('%', '').replace('x', ''));
     return {
-      name: nameVal,
+      name: asText(c.channelName || c.channel || c.name || c),
       budget: budgetNum,
       roi: roiNum
     };
-  }).filter(d => d.name && !isGenericChannel(d.name));
-
-  if (!hasRealChannel && uniqueChannels.length === 0 && !channelStrategy) {
-    return <EmptyState title="Channel data unavailable" text="Run Growth Workspace analysis to generate channel recommendations." />;
-  }
+  });
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
-      {hasRealChannel && (
-        <div className="score-grid">
-          <ScoreCard label="Primary Channel" value={primaryChannel} tone="blue" />
-        </div>
-      )}
-      
-      {channelStrategy && (
-        <Card>
-          <h3>Channel Strategy</h3>
-          <p style={{ color: '#9aa7bd', lineHeight: '1.6' }}>{channelStrategy}</p>
-        </Card>
-      )}
+      <Card style={{ height: '350px' }}>
+        <h3>Budget Allocation & Expected ROI</h3>
+        <ResponsiveContainer width="100%" height="90%">
+          <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <XAxis dataKey="name" tick={{ fill: '#9aa7bd', fontSize: 12 }} />
+            <YAxis tick={{ fill: '#9aa7bd', fontSize: 12 }} />
+            <Tooltip cursor={{ fill: '#1a2335' }} contentStyle={{ background: '#101622', border: '1px solid #293245' }} />
+            <Bar dataKey="budget" fill="#53a7ff" name="Budget %" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="roi" fill="#10e18b" name="Expected ROI %" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </Card>
 
-      {chartData.length > 0 && (
-        <Card style={{ height: '350px' }}>
-          <h3>Budget Allocation & Expected ROI</h3>
-          <ResponsiveContainer width="100%" height="90%">
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <XAxis dataKey="name" tick={{ fill: '#9aa7bd', fontSize: 12 }} />
-              <YAxis tick={{ fill: '#9aa7bd', fontSize: 12 }} />
-              <Tooltip cursor={{ fill: '#1a2335' }} contentStyle={{ background: '#101622', border: '1px solid #293245' }} />
-              <Bar dataKey="budget" fill="#53a7ff" name="Budget %" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="roi" fill="#10e18b" name="Expected ROI %" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-      )}
-
-      {uniqueChannels.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px' }}>
-          {uniqueChannels.map((c: any, i) => (
-            <InsightCard key={i} insight={asInsight(c, asText(c.channelName || c.channel || c.name || ''))} icon={Activity} />
-          ))}
-        </div>
-      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px' }}>
+        {uniqueChannels.map((c: any, i) => (
+          <InsightCard key={i} insight={asInsight(c, asText(c.channelName || c.channel || c.name || `Channel ${i+1}`))} icon={Activity} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -862,8 +727,6 @@ function ActionPlan({ data }: { data: any }) {
   const actionPlan = data || {};
   if (!actionPlan || Object.keys(actionPlan).length === 0) return <EmptyState title="No Action Plan" />;
   
-
-  
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
       <Card>
@@ -883,37 +746,34 @@ function ActionPlan({ data }: { data: any }) {
                 <div style={{ position: 'absolute', left: '-12px', top: '0', width: '20px', height: '20px', background: '#a855f7', borderRadius: '50%' }}></div>
                 <h4 style={{ color: '#a855f7', margin: '0 0 10px 0' }}>{phase.label}</h4>
                 <div style={{ display: 'grid', gap: '10px' }}>
-                  {phase.items.map((item: any, i) => {
-                    const cleanItem = saasifyItem(item);
-                    return (
+                  {phase.items.map((item: any, i) => (
                     <div key={i} style={{ padding: '15px', background: '#151d2b', borderRadius: '8px', border: '1px solid #293245' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                        <strong style={{ fontSize: '15px', color: '#fff' }}>{asText(cleanItem.title || cleanItem)}</strong>
-                        <Badge className="blue">{asText(cleanItem.priority || 'High')}</Badge>
+                        <strong style={{ fontSize: '15px', color: '#fff' }}>{asText(item.title || item)}</strong>
+                        <Badge className="blue">{asText(item.priority || 'High')}</Badge>
                       </div>
-                      {cleanItem.problem && (
+                      {item.problem && (
                         <div style={{ fontSize: '13px', color: '#9aa7bd', marginBottom: '8px' }}>
-                          <span style={{ color: '#ff4757', fontWeight: 'bold' }}>Problem:</span> {asText(cleanItem.problem)}
+                          <span style={{ color: '#ff4757', fontWeight: 'bold' }}>Problem:</span> {asText(item.problem)}
                         </div>
                       )}
-                      {cleanItem.businessImpact && (
+                      {item.businessImpact && (
                         <div style={{ fontSize: '13px', color: '#9aa7bd', marginBottom: '8px' }}>
-                          <span style={{ color: '#10e18b', fontWeight: 'bold' }}>Impact:</span> {asText(cleanItem.businessImpact)}
+                          <span style={{ color: '#10e18b', fontWeight: 'bold' }}>Impact:</span> {asText(item.businessImpact)}
                         </div>
                       )}
-                      {cleanItem.expectedGain && (
+                      {item.expectedGain && (
                         <div style={{ fontSize: '13px', color: '#9aa7bd', marginBottom: '8px' }}>
-                          <span style={{ color: '#53a7ff', fontWeight: 'bold' }}>Expected Gain:</span> {asText(cleanItem.expectedGain)}
+                          <span style={{ color: '#53a7ff', fontWeight: 'bold' }}>Expected Gain:</span> {asText(item.expectedGain)}
                         </div>
                       )}
                       <div style={{ display: 'flex', gap: '15px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #1d2738', fontSize: '12px', color: '#9aa7bd' }}>
-                        {cleanItem.difficulty && <span><b>Difficulty:</b> {asText(cleanItem.difficulty)}</span>}
-                        {cleanItem.estimatedTimeline && <span><b>Timeline:</b> {asText(cleanItem.estimatedTimeline)}</span>}
-                        {cleanItem.owner && <span><b>Owner:</b> {asText(cleanItem.owner)}</span>}
+                        {item.difficulty && <span><b>Difficulty:</b> {asText(item.difficulty)}</span>}
+                        {item.estimatedTimeline && <span><b>Timeline:</b> {asText(item.estimatedTimeline)}</span>}
+                        {item.owner && <span><b>Owner:</b> {asText(item.owner)}</span>}
                       </div>
                     </div>
-                    );
-                  })}
+                  ))}
                 </div>
               </div>
             );

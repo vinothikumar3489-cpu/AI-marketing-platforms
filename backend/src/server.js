@@ -25,24 +25,9 @@ import { workflowRouter } from "./modules/ai-workflow/workflow.routes.js";
 import { growthWorkspaceRouter } from "./modules/growth-workspace/growthWorkspace.routes.js";
 import productAnalysisRouter from "./routes/productAnalysis.routes.js";
 import { automationRouter } from "./routes/automation.routes.js";
+import { reportRouter } from "./services/reporting/report.routes.js";
 
 dotenv.config();
-
-// ============================================
-// API HEALTH CHECK — startup logging
-// ============================================
-console.log('');
-console.log('[API Health] ========================================');
-console.log('[API Health] GROQ_API_KEY loaded:', !!process.env.GROQ_API_KEY);
-console.log('[API Health] GEMINI_API_KEY loaded:', !!process.env.GEMINI_API_KEY);
-console.log('[API Health] TAVILY_API_KEY loaded:', !!process.env.TAVILY_API_KEY);
-console.log('[API Health] FIRECRAWL_API_KEY loaded:', !!process.env.FIRECRAWL_API_KEY);
-console.log('[API Health] PAGESPEED_API_KEY loaded:', !!process.env.PAGESPEED_API_KEY);
-console.log('[API Health] EXA_API_KEY loaded:', !!process.env.EXA_API_KEY);
-console.log('[API Health] DATAFORSEO_LOGIN loaded:', !!process.env.DATAFORSEO_LOGIN);
-console.log('[API Health] DATAFORSEO_PASSWORD loaded:', !!process.env.DATAFORSEO_PASSWORD);
-console.log('[API Health] ========================================');
-console.log('');
 
 const execAsync = promisify(exec);
 const app = express();
@@ -208,26 +193,28 @@ const automationLimiter = rateLimit({
 
 // CORS Configuration
 const allowedOrigins = [
-  process.env.CLIENT_URL,
-  "http://localhost:5173",
+  process.env.CLIENT_URL || "http://localhost:5173",
   "http://localhost:3000",
-].filter(Boolean);
-
-const isAllowedVercelPreview = (origin) => {
-  return /^https:\/\/ai-marketing-platforms-[a-z0-9-]+-vinoth4\.vercel\.app$/.test(origin);
-};
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5174",
+  "http://localhost:8080",
+  "http://127.0.0.1:8080",
+  "http://192.168.56.1:8080"
+];
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin) || isAllowedVercelPreview(origin)) {
-      return callback(null, true);
+    if (!origin || !isProduction || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
     }
-
-    return callback(new Error(`CORS blocked origin: ${origin}`));
   },
   credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
 app.options("*", cors());
@@ -257,6 +244,7 @@ app.use("/api/chats", automationLimiter, workflowRouter);
 app.use("/api/chats", growthWorkspaceRouter);
 app.use("/api/product-analysis", productAnalysisRouter);
 app.use("/api/automation", automationLimiter, automationRouter);
+app.use("/api/chats", reportRouter);
 
 // 404 handler
 app.use((req, res) => {

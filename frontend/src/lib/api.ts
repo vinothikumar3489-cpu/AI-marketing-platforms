@@ -79,3 +79,35 @@ export async function tryGet(paths: string[]) {
   }
   throw last;
 }
+
+export function downloadReport(chatId: string, type: 'executive' | 'growth' | 'seo', format: string) {
+  const token = getToken();
+  const url = `${API_BASE}/chats/${chatId}/report/${type}/${format}`;
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('Authorization', `Bearer ${token}`);
+  link.style.display = 'none';
+
+  // Use fetch to get the blob and trigger download (preserves auth header)
+  fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+    .then(res => {
+      if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+      return res.blob();
+    })
+    .then(blob => {
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `Report_${type}_${chatId}.${format === 'markdown' ? 'md' : format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(blobUrl);
+      a.remove();
+    })
+    .catch(err => {
+      console.error('[Download Report]', err);
+      alert('Failed to download report. Check server connection.');
+    });
+}

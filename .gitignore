@@ -1,4 +1,4 @@
-node_modules/
+﻿node_modules/
 .env
 backend/.env
 frontend/.env
@@ -37,4 +37,3 @@ Thumbs.db
 error.txt
 output.txt
 debug.log
-*.tsbuildinfo

@@ -1,202 +1,177 @@
 // ============================================
-// EVIDENCE-BASED FALLBACK GENERATORS
-// These NEVER generate fake data. When AI/APIs fail,
-// they return structured responses indicating
-// insufficient verified data.
+// FALLBACK GENERATORS - VERIFIED DATA ONLY
+// Returns 'Unknown' when data cannot be verified
+// NO GENERIC OR INVENTED DATA ALLOWED
 // ============================================
 
-const NO_DATA = 'No verified market data available';
-const INSUFFICIENT_DATA = 'Insufficient verified data';
-
-function noDataResponse(module, confidence = 0) {
-  return {
-    hasVerifiedData: false,
-    confidenceScore: confidence,
-    provider: 'fallback',
-    warnings: [`${module}: ${INSUFFICIENT_DATA}`],
-    dataSources: []
-  };
-}
-
 /**
- * Generate evidence-based Product Analysis fallback
- * NEVER generates fake features, benefits, or USPs
+ * Generate fallback Product Analysis
+ * Returns Unknown values when AI fails
  */
 export function generateProductFallback(input, websiteData) {
-  const sources = [];
-  if (websiteData?.metadata?.title) sources.push('Website Metadata');
-  if (websiteData?.text) sources.push('Website Content');
-  if (websiteData?.extract) sources.push('AI Website Extraction');
-
-  const hasRealData = websiteData?.metadata?.title || websiteData?.metadata?.description || websiteData?.text;
-
-  const result = {
-    hasVerifiedData: !!hasRealData,
-    productSummary: hasRealData ? (websiteData.metadata?.description || websiteData.text?.substring(0, 200) || NO_DATA) : NO_DATA,
-    productCategory: input.industry || null,
-    productMaturity: null,
-    businessModel: null,
-    revenueModel: null,
+  const description = websiteData?.metadata?.description || input?.description || '';
+  
+  return {
+    productSummary: description || 'Insufficient Data - Analysis unavailable from verified sources',
+    productCategory: 'Unknown',
+    productMaturity: 'Unknown',
+    businessModel: 'Unknown',
+    revenueModel: 'Unknown',
     jobsToBeDone: [],
     valuePropositions: [],
     keyDifferentiators: [],
     painPoints: [],
     buyerPersonas: [],
     targetUsers: [],
-    pricingPosition: null,
-    confidenceScore: hasRealData ? 25 : 0,
-    provider: 'fallback_evidence',
-    websiteDataUsed: hasRealData,
-    dataSources: sources,
-    warnings: hasRealData ? ['Limited data - only website metadata available'] : ['No verified product data available']
+    pricingPosition: 'Unknown',
+    confidenceScore: 0,
+    provider: 'fallback_unavailable'
   };
-
-  if (websiteData?.metadata?.title) {
-    result.productSummary = websiteData.metadata.description || `Website: ${websiteData.metadata.title}`;
-    result.confidenceScore = 30;
-  }
-
-  return result;
 }
 
 /**
- * Generate evidence-based Market Discovery fallback
- * NEVER generates fake TAM/SAM/SOM
+ * Generate fallback Market Discovery
+ * Returns Unknown values when AI fails
  */
 export function generateMarketFallback(input, productData) {
   return {
-    ...noDataResponse('Market Discovery'),
-    tam: { value: null, source: null, confidence: 0, method: null },
-    sam: { value: null, source: null, confidence: 0, method: null },
-    som: { value: null, source: null, confidence: 0, method: null },
-    cagr: null,
+    tam: 'Unknown',
+    sam: 'Unknown',
+    som: 'Unknown',
+    cagr: 'Unknown',
     marketTrends: [],
-    demandScore: null,
+    demandScore: 0,
     growthOpportunities: [],
     marketRisks: [],
-    entryStrategy: null,
-    competitiveLandscape: null,
-    note: NO_DATA
+    entryStrategy: 'Insufficient Data - Market discovery unavailable from verified sources',
+    competitiveLandscape: 'Insufficient Data - Competitive landscape unavailable from verified sources',
+    confidenceScore: 0,
+    provider: 'fallback_unavailable'
   };
 }
 
 /**
- * Generate evidence-based Audience Intelligence fallback
- * NEVER generates fake personas
+ * Generate fallback Audience Intelligence
+ * Returns Unknown values when AI fails
  */
 export function generateAudienceFallback(input, productData) {
   return {
-    ...noDataResponse('Audience Intelligence'),
     buyerPersonas: [],
     personas: [],
     decisionMakers: [],
     bestChannels: [],
-    messagingStyle: null,
-    note: NO_DATA
+    messagingStyle: 'Insufficient Data - Audience intelligence unavailable from verified sources',
+    confidenceScore: 0,
+    provider: 'fallback_unavailable'
   };
 }
 
 /**
- * Generate evidence-based Competitor Analysis fallback
- * NEVER generates fake competitors
+ * Generate fallback Competitor Analysis
+ * Uses orchestrator competitors if available, otherwise returns Unknown
  */
 export function generateCompetitorFallback(input, productData, orchestratorCompetitors = []) {
-  const hasVerifiedCompetitors = orchestratorCompetitors.length > 0;
-
-  const result = {
-    hasVerifiedData: hasVerifiedCompetitors,
-    competitors: hasVerifiedCompetitors ? orchestratorCompetitors.map(c => ({
-      name: c.name,
-      domain: c.domain,
-      source: c.source || 'orchestrator',
-      confidenceScore: c.confidence || 50,
-      note: 'Basic competitor info - requires deeper analysis'
-    })) : [],
+  const verifiedCompetitors = orchestratorCompetitors.length > 0 
+    ? orchestratorCompetitors.slice(0, 5).map(c => ({
+        name: c.name,
+        domain: c.domain,
+        opportunityScore: null,
+        trafficEstimate: 'Unknown',
+        seoAuthority: null,
+        strengths: [],
+        weaknesses: [],
+        evidence: `Identified via ${c.source || 'SERP analysis'}`,
+        source: c.source || 'orchestrator'
+      }))
+    : [];
+  
+  return {
+    competitors: verifiedCompetitors,
     marketGaps: [],
-    directCompetitors: hasVerifiedCompetitors ? orchestratorCompetitors.map(c => ({
+    directCompetitors: verifiedCompetitors.map(c => ({
       name: c.name,
       domain: c.domain,
-      note: 'Competitor identified but no detailed analysis available'
-    })) : [],
+      opportunityScore: null,
+      strengths: [],
+      weaknesses: [],
+      evidence: c.evidence,
+      source: c.source
+    })),
     indirectCompetitors: [],
-    competitorMatrix: null,
+    competitorMatrix: verifiedCompetitors.length > 0 
+      ? `${verifiedCompetitors.length} competitors identified from verified sources`
+      : 'Insufficient Data - Competitor analysis unavailable from verified sources',
     differentiationOpportunities: [],
     strengths: [],
     weaknesses: [],
-    confidenceScore: hasVerifiedCompetitors ? 30 : 0,
-    provider: hasVerifiedCompetitors ? 'orchestrator_fallback' : 'fallback_evidence',
-    warnings: hasVerifiedCompetitors
-      ? ['Competitors identified but limited analysis available']
-      : ['No verified competitor data available'],
-    dataSources: hasVerifiedCompetitors ? ['Research Orchestrator'] : []
+    confidenceScore: orchestratorCompetitors.length > 0 ? 65 : 0,
+    provider: orchestratorCompetitors.length > 0 ? 'orchestrator_fallback' : 'fallback_unavailable'
   };
-
-  return result;
 }
 
 /**
- * Generate evidence-based Intent Prediction fallback
- * NEVER generates fake intent signals
+ * Generate fallback Intent Prediction
+ * Returns Unknown when AI fails
  */
 export function generateIntentFallback(input, audienceData) {
   return {
-    ...noDataResponse('Intent Prediction'),
     highIntentSegments: [],
     mediumIntentSegments: [],
     lowIntentSegments: [],
     buyingSignals: [],
-    triggerEvents: [],
-    leadScoringRules: [],
-    note: NO_DATA
+    confidenceScore: 0,
+    provider: 'fallback_unavailable'
   };
 }
 
 /**
- * Generate evidence-based Positioning Engine fallback
- * NEVER generates fake positioning statements
+ * Generate fallback Positioning Engine
+ * Returns Unknown when AI fails
  */
 export function generatePositioningFallback(input, productData, competitorData) {
   return {
-    ...noDataResponse('Positioning Engine'),
-    positioningStatement: null,
-    valueProposition: null,
-    differentiationAngle: null,
+    positioningStatement: 'Insufficient Data - Positioning unavailable from verified sources',
+    valueProposition: 'Insufficient Data - Value proposition unavailable from verified sources',
+    differentiationAngle: 'Insufficient Data - Differentiation unavailable from verified sources',
     messagingPillars: [],
-    brandPromise: null,
+    brandPromise: 'Insufficient Data - Brand promise unavailable from verified sources',
     competitorWeaknessToAttack: [],
-    targetPerception: null,
-    note: NO_DATA
+    targetPerception: 'Insufficient Data - Target perception unavailable from verified sources',
+    confidenceScore: 0,
+    provider: 'fallback_unavailable'
   };
 }
 
 /**
- * Generate evidence-based Campaign Generator fallback
- * NEVER generates fake campaign ideas or fake KPIs
+ * Generate fallback Campaign Generator
+ * Returns Unknown when AI fails
  */
 export function generateCampaignFallback(input, websiteData, allResults) {
   return {
-    ...noDataResponse('Campaign Generator'),
-    campaignObjective: null,
+    campaignObjective: 'Insufficient Data - Campaign objective unavailable from verified sources',
     campaignIdeas: [],
     adHooks: [],
-    actionPlan: { sevenDay: [], thirtyDay: [], sixtyDay: [], ninetyDay: [] },
+    actionPlan: {
+      day7: [],
+      day30: [],
+      day60: [],
+      day90: []
+    },
     ctaSuggestions: [],
-    creativeAngles: [],
-    copyHooks: [],
-    note: NO_DATA
+    confidenceScore: 0,
+    provider: 'fallback_unavailable'
   };
 }
 
 /**
- * Generate evidence-based Channel Recommendation fallback
- * NEVER generates fake ROI numbers or fake budget allocations
+ * Generate fallback Channel Recommendation
+ * Returns Unknown when AI fails
  */
 export function generateChannelFallback(input, audienceData, campaignData) {
   return {
-    ...noDataResponse('Channel Recommendation'),
-    primaryChannel: null,
+    primaryChannel: 'Unknown',
     recommendedChannels: [],
-    budgetSplit: null,
-    note: NO_DATA
+    confidenceScore: 0,
+    provider: 'fallback_unavailable'
   };
 }

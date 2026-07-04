@@ -61,13 +61,17 @@ Ensure all arrays have at least 3 items. Return ONLY valid JSON.`;
 
 function getRuleBasedFallback(inputData, pageSpeedScore = 0) {
   return {
-    hasVerifiedData: false,
-    confidenceScore: 0,
-    provider: 'fallback_evidence',
-    pageSpeedScore: pageSpeedScore || 0,
-    warnings: ['Module: Insufficient verified data - AI providers unavailable'],
-    dataSources: [],
-    note: 'No verified SEO intelligence data available'
+    seoScore: 0,
+    pageSpeedScore: pageSpeedScore,
+    metaTitleAnalysis: "Check if title is 50-60 characters, includes main keyword, and is unique.",
+    metaDescriptionAnalysis: "Check if description is 150-160 characters, includes main keyword, and is compelling.",
+    headingStructure: ["Ensure one H1 per page", "Use H2-H3 for content hierarchy", "Include keywords in headings"],
+    keywordSuggestions: [],
+    technicalSeoIssues: ["Check mobile-friendliness", "Ensure fast page speed", "Fix broken links"],
+    contentImprovementIdeas: ["Add keyword-rich content", "Create blog posts", "Update content regularly"],
+    backlinkAuthorityNotes: "Backlink data not available - focus on content quality and outreach.",
+    priorityFixes: ["Improve page speed", "Optimize meta tags", "Fix mobile issues"],
+    finalRecommendation: "Start with technical SEO fixes, then create keyword-rich content."
   };
 }
 
@@ -216,8 +220,8 @@ export async function generateSeoIntelligence(inputData) {
     result = await callGroq(prompt);
   }
   if (!result.success) {
-    console.log("⚠️ AI providers unavailable for SEO Intelligence...");
-    result = { success: true, data: getRuleBasedFallback(inputData, pageSpeedScore), provider: "fallback_evidence", fallbackUsed: true };
+    console.log("⚠️ Using rule-based fallback for SEO Intelligence...");
+    result = { success: true, data: getRuleBasedFallback(inputData, pageSpeedScore), provider: "rule-based", fallbackUsed: true };
   } else {
     result.fallbackUsed = false;
     // Ensure pageSpeedScore matches

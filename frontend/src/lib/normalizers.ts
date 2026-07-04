@@ -18,8 +18,18 @@ export const asText = (value: any, fallback = 'Not available') => {
   if (value === null || value === undefined) return fallback;
   if (typeof value === 'string') return value.trim() || fallback;
   if (typeof value === 'number') return String(value);
-  if (Array.isArray(value)) return value.filter(Boolean).join(', ') || fallback;
-  if (typeof value === 'object') return value.value || value.title || value.name || value.summary || value.keyword || value.opportunity || JSON.stringify(value);
+  if (Array.isArray(value)) {
+    const filtered = value.filter(Boolean);
+    if (filtered.length === 0) return fallback;
+    const joined = filtered.map(v => asText(v, '')).filter(Boolean).join(', ');
+    return joined || fallback;
+  }
+  if (typeof value === 'object') {
+    const candidate = value.value || value.title || value.name || value.summary || value.keyword || value.opportunity || value.description || value.label;
+    if (candidate && typeof candidate === 'string') return candidate.trim();
+    if (candidate && typeof candidate === 'number') return String(candidate);
+    return fallback;
+  }
   return fallback;
 };
 

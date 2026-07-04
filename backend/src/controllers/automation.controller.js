@@ -1,5 +1,5 @@
 import { prisma } from "../config/prisma.js";
-import { generateAutomationPlanWithAI, sanitizeAutomationPlanData } from "../services/automation.service.js";
+import { generateAutomationPlanWithAI } from "../services/automation.service.js";
 import { callAI } from "../ai/services/aiRouter.service.js";
 
 /**
@@ -125,25 +125,20 @@ export const generateAutomationDemo = async (req, res) => {
       productName: chat.productName,
     });
 
-    console.log('📦 [Automation] Generated data keys:', Object.keys(automationData));
-
     // Delete existing plan if any
     await prisma.automationPlan.deleteMany({
       where: { chatId }
     });
 
-    // Create new automation plan using only supported fields
-    const automationPlanData = {
-      userId,
-      chatId,
-      ...sanitizeAutomationPlanData(automationData, chat.title),
-      readinessScore,
-      status: 'draft',
-    };
-
-    // Create plan record
+    // Create new automation plan
     const automationPlan = await prisma.automationPlan.create({
-      data: automationPlanData
+      data: {
+        userId,
+        chatId,
+        ...automationData,
+        readinessScore,
+        status: 'draft',
+      }
     });
 
     // Create automation assets
