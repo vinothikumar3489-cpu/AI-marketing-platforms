@@ -204,7 +204,7 @@ const automationLimiter = rateLimit({
 
 // CORS Configuration
 const allowedOrigins = [
-  process.env.CLIENT_URL || "http://localhost:5173",
+  ...(process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',').map(s => s.trim()) : ["http://localhost:5173"]),
   "http://localhost:3000",
   "http://127.0.0.1:3000",
   "http://127.0.0.1:5173",
@@ -217,11 +217,23 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || !isProduction || allowedOrigins.indexOf(origin) !== -1) {
+    if (!origin || !isProduction) {
       callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
+      return;
     }
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+      return;
+    }
+    // Allow Vercel preview deployments
+    try {
+      const url = new URL(origin);
+      if (url.hostname.endsWith('.vercel.app')) {
+        callback(null, true);
+        return;
+      }
+    } catch {}
+    callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
