@@ -12,7 +12,6 @@ export async function generatePptx(data) {
   pptx.company = name;
   pptx.title = `${name} Strategic Report`;
   pptx.subject = 'Enterprise Market Intelligence Report';
-  pptx.version = 3.0;
 
   const COLORS = { dark: '1E1B4B', primary: '6366F1', secondary: '10B981', accent: 'F59E0B', danger: 'EF4444', muted: '6B7280', light: 'F3F4F6' };
 
