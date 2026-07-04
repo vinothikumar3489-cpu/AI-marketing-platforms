@@ -1,5 +1,5 @@
 import { prisma } from "../../config/prisma.js";
-import { generateAutomationPlanWithAI } from "../../services/automation.service.js";
+import { generateAutomationPlanWithAI, sanitizeAutomationPlanData } from "../../services/automation.service.js";
 
 export async function generateAutomationPlanStep({ chatId, userId }) {
   const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
@@ -36,15 +36,19 @@ export async function generateAutomationPlanStep({ chatId, userId }) {
     productName: chat.productName,
   });
 
+  if (automationData._noData) {
+    return { success: false, error: "No verified automation data available. Run Growth Workspace and SEO Intelligence first." };
+  }
+
   await prisma.automationPlan.deleteMany({ where: { chatId } });
 
-  const { source: _s, confidence: _c, isFallback: _i, ...planData } = automationData;
+  const sanitizedData = sanitizeAutomationPlanData(automationData);
 
   const automationPlan = await prisma.automationPlan.create({
     data: {
       userId,
       chatId,
-      ...planData,
+      ...sanitizedData,
       readinessScore,
       status: "draft",
     },

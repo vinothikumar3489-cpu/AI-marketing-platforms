@@ -473,6 +473,9 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     overallStatus = 'completed';
 
+    // Apply quality filters to ensure evidence-based data
+    results = enforceGrowthQualityFilters(results);
+
     // Normalize all results
     const normalizedResults = normalizeGrowthResults(results, input);
     console.log('🔄 [Growth Workspace] Results normalized');
@@ -1566,6 +1569,57 @@ function safeParseAIJson(text) {
     console.log('⚠️ [Parse] JSON parsing failed:', error.message);
     return null;
   }
+}
+
+// ============================================
+// QUALITY FILTERS
+// ============================================
+
+function enforceGrowthQualityFilters(results) {
+  if (!results || typeof results !== 'object') return results;
+
+  const market = results.market;
+  if (market) {
+    ['tam', 'sam', 'som'].forEach(field => {
+      const val = market[field];
+      if (val && typeof val === 'object') {
+        if (!val.source && !val.method && !val.evidence) {
+          market[field] = 'Unknown';
+        }
+      } else if (val && typeof val === 'string') {
+        if (val.includes('$') || val.match(/\d+/)) {
+          market[field] = 'Unknown';
+        }
+      }
+    });
+  }
+
+  const audience = results.audience;
+  if (audience && audience.buyerPersonas && Array.isArray(audience.buyerPersonas)) {
+    audience.buyerPersonas = audience.buyerPersonas.filter(p => {
+      if (!p || !p.name) return false;
+      const name = p.name.toLowerCase();
+      if (name === 'target persona' || name === 'target user' || name === 'persona name') return false;
+      return (p.goals && p.goals.length > 0) || (p.painPoints && p.painPoints.length > 0) || (p.demographics && p.demographics.length > 10);
+    });
+  }
+
+  ['channel', 'campaign'].forEach(area => {
+    const data = results[area];
+    if (!data) return;
+    if (data.recommendedChannels && Array.isArray(data.recommendedChannels)) {
+      data.recommendedChannels = data.recommendedChannels.filter(ch => {
+        const name = (ch.channel || ch.name || '').toLowerCase();
+        if (name === 'google ads') return false;
+        return true;
+      });
+    }
+    if (data.primaryChannel && data.primaryChannel.toLowerCase() === 'google ads') {
+      data.primaryChannel = data.recommendedChannels?.[0]?.channel || data.recommendedChannels?.[0]?.name || null;
+    }
+  });
+
+  return results;
 }
 
 // ============================================

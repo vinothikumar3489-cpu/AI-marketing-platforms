@@ -1,5 +1,5 @@
 import { prisma } from "../config/prisma.js";
-import { generateAutomationPlanWithAI } from "../services/automation.service.js";
+import { generateAutomationPlanWithAI, sanitizeAutomationPlanData } from "../services/automation.service.js";
 import { callAI } from "../ai/services/aiRouter.service.js";
 
 /**
@@ -125,17 +125,26 @@ export const generateAutomationDemo = async (req, res) => {
       productName: chat.productName,
     });
 
+    // Check for insufficient data
+    if (automationData._noData) {
+      return res.status(400).json({
+        success: false,
+        error: "No verified automation data available. Run Growth Workspace and SEO Intelligence first."
+      });
+    }
+
     // Delete existing plan if any
     await prisma.automationPlan.deleteMany({
       where: { chatId }
     });
 
-    // Create new automation plan
+    // Create new automation plan (with strict field sanitization)
+    const sanitizedData = sanitizeAutomationPlanData(automationData);
     const automationPlan = await prisma.automationPlan.create({
       data: {
         userId,
         chatId,
-        ...automationData,
+        ...sanitizedData,
         readinessScore,
         status: 'draft',
       }

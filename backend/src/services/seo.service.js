@@ -6,6 +6,62 @@ import { generateContentGapIntelligence } from "./seo/content-gap-engine.service
 import { generateBlogIntelligence } from "./seo/blog-intelligence.service.js";
 import { generateExecutiveDashboard } from "./seo/executive-dashboard-generator.service.js";
 
+const WEAK_KEYWORDS = new Set([
+  'founder', 'generate', 'carousel', 'english', 'hero',
+  'login', 'signup', 'home', 'page', 'click here',
+  'read more', 'learn more', 'contact us', 'about us',
+  'get started', 'free trial', 'download', 'submit',
+  'example', 'test', 'sample', 'demo', 'coming soon'
+]);
+
+const GENERIC_BLOG_PATTERNS = [
+  /^Competitor:/i,
+  /^How to (use|get|start|make|do)/i,
+  / vs /i,
+  /: (What|Why|How|When|Where)/i,
+  /^5 (ways|tips|reasons|steps|things)/i,
+  /^Top \d+/i,
+  /^The (Ultimate|Complete|Definitive)/i,
+  /^Your (Guide|Manual|Handbook)/i,
+  /^Everything You/i,
+];
+
+function isWeakKeyword(kw) {
+  const text = (typeof kw === 'string' ? kw : (kw.keyword || kw.value || '')).toLowerCase().trim();
+  if (!text || text.length < 4) return true;
+  return WEAK_KEYWORDS.has(text);
+}
+
+function isGenericBlogTopic(title) {
+  if (!title) return true;
+  return GENERIC_BLOG_PATTERNS.some(pattern => pattern.test(title));
+}
+
+function filterSeoResults(result, domain) {
+  if (!result) return result;
+
+  // Filter self-domain competitors
+  if (result.competitorKeywords && domain) {
+    result.competitorKeywords = result.competitorKeywords.filter(c => {
+      const cDomain = c.domain || c.name || '';
+      return !cDomain.includes(domain) && !domain.includes(cDomain);
+    });
+  }
+
+  // Filter weak keywords
+  if (result.topKeywords) {
+    result.topKeywords = result.topKeywords.filter(k => !isWeakKeyword(k));
+    result.keywordCount = result.topKeywords.length;
+  }
+
+  // Filter generic blog topics
+  if (result.contentSuggestions) {
+    result.contentSuggestions = result.contentSuggestions.filter(s => !isGenericBlogTopic(s.title || s.value));
+  }
+
+  return result;
+}
+
 function clamp(n, min = 0, max = 100) {
   return Math.max(min, Math.min(max, n));
 }
@@ -50,54 +106,30 @@ function predictSeoGrowth(metrics) {
 }
 
 function generateFallbackSeo(productName, websiteUrl) {
-  const name = productName || websiteUrl || "Business";
-  
-  let keywords = [
-    { keyword: `${name} features`, position: 10, prev: 15, volume: 1500, difficulty: 35 },
-    { keyword: `best ${name} alternative`, position: 18, prev: 25, volume: 800, difficulty: 45 },
-    { keyword: `${name} pricing`, position: 12, prev: 14, volume: 2000, difficulty: 40 },
-  ];
-
-  const topKeywords = keywords.map((k) => ({ ...k }));
-  const competitorKeywords = [
-    { domain: "example-competitor.com", keywords: keywords.slice(0, 2) },
-  ];
-
-  const backlinks = { total: 120, referringDomains: 35, authority: 45 };
-  const trafficEstimate = { monthlyOrganic: 1200, trend: [900, 1000, 1100, 1200] };
-  const technicalIssues = { titleTag: true, metaDescription: true, headings: true, pageSpeed: "moderate" };
-  const contentSuggestions = [
-    { title: `How ${productName} helps users`, type: "blog" },
-    { title: `${productName} vs competitors`, type: "comparison" },
-  ];
-
-  const scores = {
-    keywordScore: 55,
-    trafficScore: 50,
-    backlinkScore: 40,
-    technicalScore: 60,
-    contentScore: 50,
-  };
-
-  const seoScore = calculateSeoScore(scores);
-
   return {
-    websiteUrl,
-    seoScore,
-    visibilityScore: 50,
-    organicTraffic: trafficEstimate.monthlyOrganic,
-    keywordCount: topKeywords.length,
-    backlinkCount: backlinks.total,
-    avgPosition: topKeywords.reduce((s, k) => s + k.position, 0) / topKeywords.length,
-    ctr: 2.5,
-    topKeywords,
-    competitorKeywords,
-    backlinks,
-    trafficEstimate,
-    technicalIssues,
-    contentSuggestions,
-    prediction: predictSeoGrowth({ keywordTrend: 0.05, organicTraffic: trafficEstimate.monthlyOrganic, topKeywords }),
-    source: "fallback",
+    websiteUrl: websiteUrl || "",
+    seoScore: 0,
+    visibilityScore: 0,
+    organicTraffic: 0,
+    keywordCount: 0,
+    backlinkCount: 0,
+    avgPosition: 0,
+    ctr: 0,
+    topKeywords: [],
+    competitorKeywords: [],
+    backlinks: { total: 0, referringDomains: 0, authority: 0 },
+    trafficEstimate: { monthlyOrganic: 0, trend: [] },
+    technicalIssues: { pageSpeed: "unknown" },
+    contentSuggestions: [],
+    prediction: {
+      expectedTrafficGrowth: 0,
+      rankingImprovementChance: 0,
+      highOpportunityKeywords: [],
+      riskLevel: "unknown",
+      nextBestActions: ["No verified data available. Connect Google Search Console or a SEO tool to generate insights."],
+    },
+    source: "unavailable",
+    note: "No verified SEO data available. Run a URL analysis with an active SEO provider connection."
   };
 }
 
@@ -153,6 +185,9 @@ export async function runSeoAnalysis({ chatId, userId, websiteUrl, productName }
   } else {
     result = generateFallbackSeo(productName || domain || "product", websiteUrl || "");
   }
+
+  // Apply SEO quality filters
+  result = filterSeoResults(result, domain);
 
   // Upsert into DB
   const saved = await prisma.seoAnalysis.upsert({

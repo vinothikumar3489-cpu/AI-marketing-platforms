@@ -346,6 +346,8 @@ export default function AutomationCenterPage() {
   const { selectedChatId } = useProject();
   const [active, setActive] = useState('Plan');
   const [data, setData] = useState<any>({});
+  const [genError, setGenError] = useState<string | null>(null);
+  const [genLoading, setGenLoading] = useState(false);
   useEffect(() => {
     if (!selectedChatId) return;
     let cancelled = false;
@@ -354,12 +356,20 @@ export default function AutomationCenterPage() {
   }, [selectedChatId]);
   async function generate() {
     if (!selectedChatId) return;
+    setGenLoading(true);
+    setGenError(null);
     try {
       const res: any = await api.post(`/automation/${selectedChatId}/generate`, {});
-      setData(res.automationPlan || res.data || res);
-    } catch (e) {
-      console.warn('Failed to generate automation plan:', e);
+      if (res.success === false && res.error) {
+        setGenError(res.error);
+      } else {
+        setData(res.automationPlan || res.data || res);
+      }
+    } catch (e: any) {
+      const msg = e?.response?.data?.error || e.message || 'Failed to generate automation plan';
+      setGenError(msg);
     }
+    setGenLoading(false);
   }
   const renderer = tabRenderers[active] || renderPlanTab;
   return (
@@ -370,7 +380,8 @@ export default function AutomationCenterPage() {
           <Status ok={!!selectedChatId} label="Project selected" />
           <Status ok={!!data} label="Automation plan ready" />
         </div>
-        <button className="primary-btn" onClick={generate}>Generate Automation Plan</button>
+        <button className="primary-btn" onClick={generate} disabled={genLoading}>{genLoading ? 'Generating...' : 'Generate Automation Plan'}</button>
+        {genError && <p style={{ color: 'red', marginTop: '8px' }}>{genError}</p>}
       </Card>
       <Card>
         <div className="tab-row">
