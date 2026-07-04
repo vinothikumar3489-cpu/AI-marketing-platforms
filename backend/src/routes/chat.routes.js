@@ -12,7 +12,7 @@ chatRouter.get("/:chatId", getChat);
 chatRouter.get("/:chatId/full", getFullChat);
 chatRouter.get("/:chatId/full-results", getFullResults);
 chatRouter.put("/:chatId", updateChat);
-chatRouter.delete("/:chatId", deleteChat);
 chatRouter.delete("/clear-history", clearHistory);
+chatRouter.delete("/:chatId", deleteChat);
 chatRouter.post("/:chatId/messages", addMessage);
 chatRouter.get("/:chatId/messages", getMessages);

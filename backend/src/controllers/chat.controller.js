@@ -660,6 +660,10 @@ export const deleteChat = async (req, res) => {
   await prisma.campaignIntelligence.deleteMany({ where: { chatId } });
   await prisma.agentRun.deleteMany({ where: { chatId } });
   
+  // Automation models (cascade deletes automationAsset via AutomationPlan relation)
+  await prisma.automationLog.deleteMany({ where: { chatId } });
+  await prisma.automationPlan.deleteMany({ where: { chatId } });
+
   // SEO Intelligence has many related models - let Prisma cascade handle them
   await prisma.seoIntelligence.deleteMany({ where: { chatId } });
 
@@ -706,6 +710,8 @@ export const clearHistory = async (req, res) => {
       await tx.competitorIntelligence.deleteMany({ where: { chatId: { in: chatIds } } });
       await tx.campaignIntelligence.deleteMany({ where: { chatId: { in: chatIds } } });
       await tx.agentRun.deleteMany({ where: { chatId: { in: chatIds } } });
+      await tx.automationLog.deleteMany({ where: { chatId: { in: chatIds } } });
+      await tx.automationPlan.deleteMany({ where: { chatId: { in: chatIds } } });
       await tx.seoIntelligence.deleteMany({ where: { chatId: { in: chatIds } } });
 
       // Finally delete all chats

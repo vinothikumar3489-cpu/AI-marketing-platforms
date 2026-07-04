@@ -1,7 +1,7 @@
 ﻿import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader, Section } from "@/components/ui-kit";
-import { getActiveProject } from "@/lib/project-store";
+import { getActiveProject, setActiveProjectId } from "@/lib/project-store";
 import { api } from "@/lib/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -33,8 +33,8 @@ function SeoIntelligencePage() {
   async function fetchSavedAnalysis(chatId: string) {
     try {
       const res = await api.get(`/api/chats/${chatId}/seo-intelligence`);
-      if (res.data.success && res.data.seoIntelligence) {
-        setSeoData(res.data.seoIntelligence);
+      if (res && (res.seoIntelligence || res.data?.seoIntelligence)) {
+        setSeoData(res.seoIntelligence || res.data?.seoIntelligence);
       } else {
         setSeoData(null);
       }
@@ -45,7 +45,25 @@ function SeoIntelligencePage() {
   }
 
   async function runAnalysis() {
-    if (!project?.id) {
+    let activeProject = project;
+
+    if (!activeProject?.id || activeProject.id.startsWith('temp-')) {
+      try {
+        const chatTitle = website ? website.replace(/^https?:\/\//, '').split('/')[0] : 'SEO Analysis';
+        const res = await api.post('/api/chats', { title: chatTitle });
+        const chat = res.data || res.chat || res;
+        if (!chat?.id) throw new Error('No chat ID returned');
+        setActiveProjectId(chat.id);
+        activeProject = { id: chat.id, productName: chatTitle, websiteUrl: website, description: '', industry: '', targetAudience: '', pricing: '', competitors: '', createdAt: '', updatedAt: '' } as any;
+        setProject(activeProject);
+        window.dispatchEvent(new Event('marketform-project-change'));
+      } catch (err: any) {
+        alert('Failed to create project: ' + (err.message || 'Unknown error'));
+        return;
+      }
+    }
+
+    if (!activeProject?.id) {
       alert("Select or create a project first.");
       return;
     }
@@ -63,11 +81,11 @@ function SeoIntelligencePage() {
         industry: project.industry || 'General'
       });
       
-      if (res.data.success) {
-        setSeoData(res.data.seoIntelligence);
+      if (res.success || res.data?.success) {
+        setSeoData(res.seoIntelligence || res.data?.seoIntelligence);
         setActiveTab("overview");
       } else {
-        alert(res.data.error || "Failed to run SEO analysis");
+        alert((res.error || res.data?.error) || "Failed to run SEO analysis");
       }
     } catch (err: any) {
       console.error("SEO analysis error:", err);

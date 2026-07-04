@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import { PageHeader, Section } from '@/components/ui-kit';
-import { getActiveProject } from '@/lib/project-store';
+import { getActiveProject, setActiveProjectId } from '@/lib/project-store';
 import { api } from '@/lib/api';
 import { UnifiedAnalysisForm } from './UnifiedAnalysisForm';
 import { WorkflowStepper } from './WorkflowStepper';
@@ -67,14 +67,27 @@ export function GrowthWorkspacePage() {
   }
 
   async function handleRunAnalysis(formData: any) {
-    if (!project?.id) {
-      toast.error('Please select or create a project first.');
-      return;
+    let activeProject = project;
+
+    // Auto-create a real chat if project is null or has a temp ID
+    if (!activeProject?.id || activeProject.id.startsWith('temp-')) {
+      try {
+        const chatTitle = formData.websiteUrl ? formData.websiteUrl.replace(/^https?:\/\//, '').split('/')[0] : (formData.productName || 'New Analysis');
+        const res = await api.post('/api/chats', { title: chatTitle });
+        const chat = res.data || res.chat || res;
+        if (!chat?.id) throw new Error('No chat ID returned');
+        setActiveProjectId(chat.id);
+        activeProject = { id: chat.id, productName: chat.productName || chatTitle, websiteUrl: formData.websiteUrl || '', description: '', industry: '', targetAudience: '', pricing: '', competitors: '', createdAt: '', updatedAt: '' };
+        setProject(activeProject);
+        window.dispatchEvent(new Event('marketform-project-change'));
+      } catch (err: any) {
+        toast.error('Failed to create project: ' + (err.message || 'Unknown error'));
+        return;
+      }
     }
 
-    // Validate that project ID is not a temp ID
-    if (project.id.startsWith('temp-')) {
-      toast.error('Please create or select a valid project first. Temporary projects cannot run analysis.');
+    if (!activeProject?.id) {
+      toast.error('Please select or create a project first.');
       return;
     }
 
