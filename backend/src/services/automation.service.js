@@ -1,4 +1,5 @@
 import { callAI } from "../ai/services/aiRouter.service.js";
+import { validateRecommendations, EvidenceFilter } from "../services/intelligence/evidence-validator.service.js";
 
 export const AUTOMATION_PLAN_ALLOWED_FIELDS = new Set([
   'campaignName', 'campaignObjective', 'targetAudience',
@@ -830,6 +831,39 @@ function generateEvidenceBasedPlan(context) {
   if (leadSources.length > 0) {
     plan.leadSources = leadSources;
   }
+
+  // === EVIDENCE VALIDATION ===
+  // Validate all generated array fields through EvidenceFilter to reject placeholders, fakes, and duplicates
+  const filter = new EvidenceFilter();
+  const arrayFields = ['emailSequence', 'linkedInPosts', 'linkedInDmTemplates', 'instagramCaptions', 'instagramReelIdeas', 'googleAds', 'posterPrompts', 'videoScripts', 'contentCalendar', 'crmWorkflows', 'leadSources'];
+  for (const field of arrayFields) {
+    if (Array.isArray(plan[field]) && plan[field].length > 0) {
+      const result = filter.filter(plan[field], `automation_${field}`);
+      if (result.valid && result.items.length > 0) {
+        plan[field] = result.items;
+      } else if (result.items.length === 0) {
+        delete plan[field];
+      }
+    }
+  }
+
+  // Add evidence metadata wrapper at plan level
+  plan._metadata = {
+    evidenceVersion: '2.0.0',
+    generatedAt: new Date().toISOString(),
+    sourcesUsed: {
+      productAnalysis: !!productAnalysis,
+      seoIntelligence: hasSeoData,
+      audienceIntelligence: !!audienceIntelligence,
+      competitorIntelligence: !!competitorIntelligence,
+      campaignIntelligence: !!campaignIntelligence,
+      actionPlan: !!actionPlan,
+      businessIntelligence: !!businessIntelligence,
+      growthWorkspace: !!growthWorkspace,
+    },
+    totalItemsGenerated: Object.values(plan).reduce((sum, v) => sum + (Array.isArray(v) ? v.length : 0), 0),
+    validationStats: filter.getStats(),
+  };
 
   return plan;
 }
