@@ -83,12 +83,7 @@ export async function tryGet(paths: string[]) {
 export function downloadReport(chatId: string, type: 'executive' | 'growth' | 'seo', format: string) {
   const token = getToken();
   const url = `${API_BASE}/chats/${chatId}/report/${type}/${format}`;
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('Authorization', `Bearer ${token}`);
-  link.style.display = 'none';
 
-  // Use fetch to get the blob and trigger download (preserves auth header)
   fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   })

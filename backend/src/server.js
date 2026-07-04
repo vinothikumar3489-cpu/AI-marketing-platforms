@@ -29,6 +29,17 @@ import { reportRouter } from "./services/reporting/report.routes.js";
 
 dotenv.config();
 
+// Startup env validation
+const REQUIRED_ENV_VARS = ['JWT_SECRET', 'DATABASE_URL'];
+const MISSING_VARS = REQUIRED_ENV_VARS.filter(v => !process.env[v]);
+if (MISSING_VARS.length > 0) {
+  console.error(`❌ Missing required environment variables: ${MISSING_VARS.join(', ')}`);
+  process.exit(1);
+}
+if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
+  console.warn('⚠️ JWT_SECRET is too short (< 32 chars). Use a random 64-character string.');
+}
+
 const execAsync = promisify(exec);
 const app = express();
 const REQUIRED_PORT = parseInt(process.env.PORT || '5000', 10);
@@ -277,12 +288,20 @@ app.use((err, req, res, _next) => {
 // Graceful shutdown handlers
 process.on('SIGTERM', () => {
   console.log('\n⚠️ SIGTERM received, shutting down gracefully...');
-  process.exit(0);
+  server.close(() => {
+    prisma.$disconnect();
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10000);
 });
 
 process.on('SIGINT', () => {
   console.log('\n⚠️ SIGINT received, shutting down gracefully...');
-  process.exit(0);
+  server.close(() => {
+    prisma.$disconnect();
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10000);
 });
 
 // Start server - always on port 5000

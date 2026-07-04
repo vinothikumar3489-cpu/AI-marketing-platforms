@@ -1,6 +1,9 @@
 import express from "express";
+import { requireAuth } from "../middleware/auth.middleware.js";
 
 export const integrationsRouter = express.Router();
+
+integrationsRouter.use(requireAuth);
 
 integrationsRouter.post("/seo/connect", (req, res) => {
   // Placeholder: in real app we'd persist credentials securely

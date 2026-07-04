@@ -2,25 +2,31 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../config/prisma.js";
 
 export const getCurrentUser = async (req, res) => {
-  const user = req.user;
-  const projectCount = await prisma.chat.count({ where: { userId: user.id } });
-  const analysesCount = await prisma.analysis.count({ where: { userId: user.id } });
-  const seoCount = await prisma.seoAnalysis.count({ where: { userId: user.id } });
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const projectCount = await prisma.chat.count({ where: { userId: user.id } });
+    const analysesCount = await prisma.analysis.count({ where: { userId: user.id } });
+    const seoCount = await prisma.seoAnalysis.count({ where: { userId: user.id } });
 
-  return res.json({
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      profileImage: user.profileImage || null,
-      role: user.role || "member",
-      lastActiveAt: user.lastActiveAt,
-      createdAt: user.createdAt,
-      projectCount,
-      analysesCount,
-      seoCount,
-    },
-  });
+    return res.json({
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        profileImage: user.profileImage || null,
+        role: user.role || "member",
+        lastActiveAt: user.lastActiveAt,
+        createdAt: user.createdAt,
+        projectCount,
+        analysesCount,
+        seoCount,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, error: "Failed to get current user" });
+  }
 };
 
 export const updateProfile = async (req, res) => {

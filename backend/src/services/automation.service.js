@@ -530,8 +530,8 @@ function generateEvidenceBasedPlan(context) {
       objective: 'Lead generation and brand awareness',
       audience: targetAudience || personaName,
       adGroups: [{ name: 'Primary Keywords', keywords: adGroup1, bidStrategy: 'maximize_clicks' }],
-      headlines: [googleAds[0]?.headline || `${product || 'Brand'} Solutions`].filter(Boolean),
-      descriptions: [googleAds[0]?.description || `Learn more about ${companyName || product}`].filter(Boolean),
+      headlines: [`${product || 'Brand'} Solutions`],
+      descriptions: [`Learn more about ${companyName || product}`],
       landingPageRecommendation: website || 'Homepage',
       negativeKeywords: ['free', 'cheap', 'jobs', 'career'].filter(k => !keywordsTexts.some((kt) => kt.includes(k))),
       budgetSuggestion: 'Start with $500-1000/month test budget',
@@ -835,7 +835,7 @@ function generateEvidenceBasedPlan(context) {
   // === EVIDENCE VALIDATION ===
   // Validate all generated array fields through EvidenceFilter to reject placeholders, fakes, and duplicates
   const filter = new EvidenceFilter();
-  const arrayFields = ['emailSequence', 'linkedInPosts', 'linkedInDmTemplates', 'instagramCaptions', 'instagramReelIdeas', 'googleAds', 'posterPrompts', 'videoScripts', 'contentCalendar', 'crmWorkflows', 'leadSources'];
+  const arrayFields = ['emailSequence', 'linkedInPosts', 'linkedInDmTemplates', 'instagramCaptions', 'instagramReelIdeas', 'googleAds', 'posterPrompts', 'videoScripts', 'contentCalendar', 'crmWorkflows', 'workflows', 'leadSources'];
   for (const field of arrayFields) {
     if (Array.isArray(plan[field]) && plan[field].length > 0) {
       const result = filter.filter(plan[field], `automation_${field}`);

@@ -48,10 +48,15 @@ export const upsertProductProfile = async (req, res) => {
 };
 
 export const getProductProfile = async (req, res) => {
-  const { chatId } = req.params;
-  const profile = await prisma.productProfile.findUnique({ where: { chatId } });
-  if (!profile || profile.userId !== req.user.id) return res.status(404).json({ success: false, error: "Product profile not found" });
-  return res.json(profile);
+  try {
+    const { chatId } = req.params;
+    const profile = await prisma.productProfile.findUnique({ where: { chatId } });
+    if (!profile || profile.userId !== req.user.id) return res.status(404).json({ success: false, error: "Product profile not found" });
+    return res.json(profile);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, error: "Failed to get product profile" });
+  }
 };
 
 export const runProductAnalysis = async (req, res) => {
@@ -247,8 +252,13 @@ export const runProductAnalysis = async (req, res) => {
 };
 
 export const getProductAnalysis = async (req, res) => {
-  const { chatId } = req.params;
-  const a = await prisma.productAnalysis.findUnique({ where: { chatId } });
-  if (!a || a.userId !== req.user.id) return res.status(404).json({ success: false, error: "Product analysis not found" });
-  return res.json(a);
+  try {
+    const { chatId } = req.params;
+    const a = await prisma.productAnalysis.findUnique({ where: { chatId } });
+    if (!a || a.userId !== req.user.id) return res.status(404).json({ success: false, error: "Product analysis not found" });
+    return res.json(a);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, error: "Failed to get product analysis" });
+  }
 };
