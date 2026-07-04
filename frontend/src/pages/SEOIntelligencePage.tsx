@@ -290,7 +290,7 @@ export default function SEOIntelligencePage() {
         <SectionTitle title="Analyze Website" subtitle="Enter your URL to generate thousands of data points." />
         <div style={{ display: 'flex', gap: '15px' }}>
           <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://example.com" style={{ flex: 1, padding: '12px 16px', borderRadius: '8px', border: '1px solid #303849', background: '#0b1220', color: '#fff' }} disabled={loading} />
-          <button onClick={run} className="primary-btn" disabled={loading || !url || mode === 'creating'} style={{ padding: '0 30px' }}>
+          <button onClick={run} className="primary-btn" disabled={loading || !url} style={{ padding: '0 30px' }}>
             {loading ? 'Running 14-Step Audit...' : 'Run SEO Intelligence'}
           </button>
         </div>

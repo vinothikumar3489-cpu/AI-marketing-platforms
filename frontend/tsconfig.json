@@ -12,11 +12,38 @@
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src"],
+  "include": [
+    "src/main.tsx",
+    "src/App.tsx",
+    "src/context/**/*",
+    "src/hooks/**/*",
+    "src/lib/**/*",
+    "src/pages/**/*",
+    "src/components/AppLayout.tsx",
+    "src/components/UI.tsx",
+    "src/components/SEO/**/*"
+  ],
+  "exclude": [
+    "src/routes",
+    "src/modules",
+    "src/components/ui",
+    "src/components/ui-kit.tsx",
+    "src/components/app-sidebar.tsx",
+    "src/components/chat-sidebar.tsx",
+    "src/lib/auth.ts",
+    "src/lib/chat-context.tsx",
+    "src/lib/chat-store.ts",
+    "src/lib/config.server.ts",
+    "src/lib/api/example.functions.ts"
+  ],
   "references": []
 }

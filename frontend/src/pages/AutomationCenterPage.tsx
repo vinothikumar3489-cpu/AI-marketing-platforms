@@ -521,7 +521,7 @@ function renderKpiTab(data: any) {
                   acc[a.status] = (acc[a.status] || 0) + 1;
                   return acc;
                 }, {} as Record<string, number>)).map(([status, count]) => (
-                  <span key={status} style={{ marginRight: '12px' }}><Badge>{status}</Badge>: {count}</span>
+                  <span key={String(status)} style={{ marginRight: '12px' }}><Badge>{String(status)}</Badge>: {String(count)}</span>
                 ))}
               </div>
             )}
