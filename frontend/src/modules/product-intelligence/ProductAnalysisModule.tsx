@@ -1,5 +1,6 @@
 ﻿
 import { useEffect, useState } from "react";
+import { toast } from 'sonner';
 import { CheckCircle2, FileText, Sparkles, Target, Layers, Brain, AlertCircle } from "lucide-react";
 import { Section, ScoreBar } from "@/components/ui-kit";
 import { getActiveProject } from "@/lib/project-store";
@@ -43,7 +44,7 @@ export function ProductAnalysisModule() {
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const runAnalysis = async () => {
-    if (!chatId) return alert("Select or create a project first.");
+    if (!chatId) return toast.error("Select or create a project first.");
     setLoading(true);
     setError(null);
     try {

@@ -12,21 +12,21 @@ interface UnifiedAnalysisFormProps {
 
 export function UnifiedAnalysisForm({ onSubmit, loading, savedInput }: UnifiedAnalysisFormProps) {
   const [formData, setFormData] = useState({
-    productName: 'Resume Builder',
-    companyName: 'Resume.io',
-    websiteUrl: 'https://resume.io',
-    description: 'AI-powered resume builder that helps students and freshers create professional resumes in minutes',
-    industry: 'HR Technology',
-    targetAudience: 'Students and freshers',
-    targetCountry: 'India',
-    businessStage: 'Early-stage SaaS',
-    businessGoal: 'Acquire 10,000 student users in 3 months',
-    campaignGoal: 'Get more student users',
-    preferredChannels: 'Instagram',
-    budgetRange: '$1000-$5000',
-    duration: '7 days',
-    tone: 'Friendly and professional',
-    competitors: 'Canva Resume Builder, Novoresume, Zety',
+    productName: '',
+    companyName: '',
+    websiteUrl: '',
+    description: '',
+    industry: '',
+    targetAudience: '',
+    targetCountry: '',
+    businessStage: '',
+    businessGoal: '',
+    campaignGoal: '',
+    preferredChannels: '',
+    budgetRange: '',
+    duration: '',
+    tone: '',
+    competitors: '',
     competitorUrls: ''
   });
 

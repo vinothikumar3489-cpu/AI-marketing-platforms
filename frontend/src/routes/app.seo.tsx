@@ -1,4 +1,4 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader, Section } from "@/components/ui-kit";
 import { getActiveProject, setActiveProjectId } from "@/lib/project-store";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { CheckCircle2, XCircle, AlertTriangle, TrendingUp, Target, FileText, Lightbulb } from "lucide-react";
+import { toast, Toaster } from 'sonner';
 
 export const Route = createFileRoute("/app/seo")({ component: SeoIntelligencePage });
 
@@ -26,8 +27,8 @@ function SeoIntelligencePage() {
       if (p?.id) fetchSavedAnalysis(p.id);
     };
     load();
-    window.addEventListener("marketform-project-change", load);
-    return () => window.removeEventListener("marketform-project-change", load);
+    window.addEventListener("marketform-chat-change", load);
+    return () => window.removeEventListener("marketform-chat-change", load);
   }, []);
 
   async function fetchSavedAnalysis(chatId: string) {
@@ -56,40 +57,40 @@ function SeoIntelligencePage() {
         setActiveProjectId(chat.id);
         activeProject = { id: chat.id, productName: chatTitle, websiteUrl: website, description: '', industry: '', targetAudience: '', pricing: '', competitors: '', createdAt: '', updatedAt: '' } as any;
         setProject(activeProject);
-        window.dispatchEvent(new Event('marketform-project-change'));
+        window.dispatchEvent(new Event('marketform-chat-change'));
       } catch (err: any) {
-        alert('Failed to create project: ' + (err.message || 'Unknown error'));
+        toast.error('Failed to create project: ' + (err.message || 'Unknown error'));
         return;
       }
     }
 
     if (!activeProject?.id) {
-      alert("Select or create a project first.");
+      toast.error('Select or create a project first.');
       return;
     }
 
     if (!website) {
-      alert("Please enter a website URL.");
+      toast.error('Please enter a website URL.');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await api.post(`/api/chats/${project.id}/seo-intelligence/run`, {
+      const res = await api.post(`/api/chats/${activeProject.id}/seo-intelligence/run`, {
         websiteUrl: website,
-        productName: project.productName || 'Product',
-        industry: project.industry || 'General'
+        productName: activeProject.productName || 'Product',
+        industry: activeProject.industry || 'General'
       });
       
       if (res.success || res.data?.success) {
         setSeoData(res.seoIntelligence || res.data?.seoIntelligence);
         setActiveTab("overview");
       } else {
-        alert((res.error || res.data?.error) || "Failed to run SEO analysis");
+        toast.error((res.error || res.data?.error) || "Failed to run SEO analysis");
       }
     } catch (err: any) {
       console.error("SEO analysis error:", err);
-      alert(err.response?.data?.message || "Failed to run SEO analysis. Check console for details.");
+      toast.error(err.response?.data?.message || "Failed to run SEO analysis. Check console for details.");
     } finally {
       setLoading(false);
     }
@@ -202,6 +203,7 @@ function SeoIntelligencePage() {
           <div className="text-sm text-muted-foreground">Run an analysis above to see comprehensive SEO intelligence</div>
         </div>
       )}
+      <Toaster theme="dark" position="bottom-right" />
     </>
   );
 }
@@ -558,7 +560,7 @@ function TechnicalAuditTab({ data, detailedAudit }: { data: any; detailedAudit?:
             <ul className="space-y-2">
               {data.criticalIssues.map((issue: string, i: number) => (
                 <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-red-400">ΓÇó</span>
+                  <span className="text-red-400">G��</span>
                   <span>{issue}</span>
                 </li>
               ))}
@@ -581,7 +583,7 @@ function TechnicalAuditTab({ data, detailedAudit }: { data: any; detailedAudit?:
             <ul className="space-y-2">
               {data.warnings.map((warning: string, i: number) => (
                 <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-yellow-400">ΓÇó</span>
+                  <span className="text-yellow-400">G��</span>
                   <span>{warning}</span>
                 </li>
               ))}
@@ -601,7 +603,7 @@ function TechnicalAuditTab({ data, detailedAudit }: { data: any; detailedAudit?:
           <ul className="space-y-2">
             {(data.passedChecks || []).map((check: string, i: number) => (
               <li key={i} className="text-sm flex items-start gap-2">
-                <span className="text-green-400">Γ£ô</span>
+                <span className="text-green-400">G��</span>
                 <span>{check}</span>
               </li>
             ))}
@@ -620,7 +622,7 @@ function TechnicalAuditTab({ data, detailedAudit }: { data: any; detailedAudit?:
           <ul className="space-y-2">
             {(data.recommendations || []).map((rec: string, i: number) => (
               <li key={i} className="text-sm flex items-start gap-2">
-                <span className="text-blue-400">ΓåÆ</span>
+                <span className="text-blue-400">G��</span>
                 <span>{rec}</span>
               </li>
             ))}
@@ -741,7 +743,7 @@ function CompetitorsTab({ data }: { data: any }) {
             <ul className="space-y-2">
               {(data.contentGaps || []).map((gap: string, i: number) => (
                 <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-blue-400">ΓÇó</span>
+                  <span className="text-blue-400">G��</span>
                   <span>{gap}</span>
                 </li>
               ))}
@@ -861,7 +863,7 @@ function AIVisibilityTab({ data }: { data: any }) {
             <ul className="space-y-2">
               {(data.chatgptOptimization || []).map((tip: string, i: number) => (
                 <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-green-400">Γ£ô</span>
+                  <span className="text-green-400">G��</span>
                   <span>{tip}</span>
                 </li>
               ))}
@@ -877,7 +879,7 @@ function AIVisibilityTab({ data }: { data: any }) {
             <ul className="space-y-2">
               {(data.geminiOptimization || []).map((tip: string, i: number) => (
                 <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-blue-400">Γ£ô</span>
+                  <span className="text-blue-400">G��</span>
                   <span>{tip}</span>
                 </li>
               ))}
@@ -893,7 +895,7 @@ function AIVisibilityTab({ data }: { data: any }) {
             <ul className="space-y-2">
               {(data.perplexityOptimization || []).map((tip: string, i: number) => (
                 <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-purple-400">Γ£ô</span>
+                  <span className="text-purple-400">G��</span>
                   <span>{tip}</span>
                 </li>
               ))}
@@ -953,7 +955,7 @@ function LandingPageTab({ data }: { data: any }) {
             <ul className="space-y-2">
               {(data.trustSignals || []).map((signal: string, i: number) => (
                 <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-blue-400">ΓåÆ</span>
+                  <span className="text-blue-400">G��</span>
                   <span>{signal}</span>
                 </li>
               ))}
@@ -969,7 +971,7 @@ function LandingPageTab({ data }: { data: any }) {
             <ul className="space-y-2">
               {(data.conversionTips || []).map((tip: string, i: number) => (
                 <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-green-400">Γ£ô</span>
+                  <span className="text-green-400">G��</span>
                   <span>{tip}</span>
                 </li>
               ))}
@@ -1141,7 +1143,7 @@ function ProvidersTab({ metadata }: { metadata: any }) {
             <ul className="space-y-2">
               {warnings.map((warning: string, i: number) => (
                 <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-yellow-400">ΓÜá</span>
+                  <span className="text-yellow-400">G��</span>
                   <span>{warning}</span>
                 </li>
               ))}
@@ -1241,7 +1243,7 @@ function ProvidersTab({ metadata }: { metadata: any }) {
             <ul className="space-y-2">
               {warnings.map((warning: string, i: number) => (
                 <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-yellow-400">ΓÜá</span>
+                  <span className="text-yellow-400">G��</span>
                   <span>{warning}</span>
                 </li>
               ))}
@@ -1291,322 +1293,6 @@ function ProvidersTab({ metadata }: { metadata: any }) {
               <CheckCircle2 className="w-5 h-5 text-green-400" />
             </div>
           </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// ============================================
-// CONTENT GAPS TAB COMPONENT
-// ============================================
-
-function ContentGapsTab({ data }: { data: any }) {
-  if (!data) return <div className="text-muted-foreground">No content gap data available</div>;
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card className="bg-white/5 border-white/10">
-        <CardHeader>
-          <CardTitle>Missing Topics</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2">
-            {(data.missingTopics || []).map((topic: string, i: number) => (
-              <li key={i} className="text-sm">{topic}</li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-white/5 border-white/10">
-        <CardHeader>
-          <CardTitle>Comparison Pages</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2">
-            {(data.comparisonPages || []).map((page: string, i: number) => (
-              <li key={i} className="text-sm">{page}</li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-white/5 border-white/10">
-        <CardHeader>
-          <CardTitle>Use Case Pages</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2">
-            {(data.useCasePages || []).map((page: string, i: number) => (
-              <li key={i} className="text-sm">{page}</li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-white/5 border-white/10">
-        <CardHeader>
-          <CardTitle>Educational Content</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2">
-            {(data.educationalContent || []).map((content: string, i: number) => (
-              <li key={i} className="text-sm">{content}</li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// ============================================
-// AI VISIBILITY TAB COMPONENT
-// ============================================
-
-function AIVisibilityTab({ data }: { data: any }) {
-  if (!data) return <div className="text-muted-foreground">No AI visibility data available</div>;
-
-  return (
-    <div className="space-y-6">
-      <Card className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 border-purple-500/20">
-        <CardHeader>
-          <CardTitle>AI Visibility Score</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-4xl font-bold">{data.aiVisibilityScore || 0}<span className="text-xl text-muted-foreground">/100</span></div>
-          <Progress value={data.aiVisibilityScore || 0} className="mt-4" />
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="bg-white/5 border-white/10">
-          <CardHeader>
-            <CardTitle className="text-sm">ChatGPT Optimization</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {(data.chatgptOptimization || []).map((tip: string, i: number) => (
-                <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-green-400">Γ£ô</span>
-                  <span>{tip}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white/5 border-white/10">
-          <CardHeader>
-            <CardTitle className="text-sm">Gemini Optimization</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {(data.geminiOptimization || []).map((tip: string, i: number) => (
-                <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-blue-400">Γ£ô</span>
-                  <span>{tip}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white/5 border-white/10">
-          <CardHeader>
-            <CardTitle className="text-sm">Perplexity Optimization</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {(data.perplexityOptimization || []).map((tip: string, i: number) => (
-                <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-purple-400">Γ£ô</span>
-                  <span>{tip}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-// ============================================
-// LANDING PAGE TAB COMPONENT
-// ============================================
-
-function LandingPageTab({ data }: { data: any }) {
-  if (!data) return <div className="text-muted-foreground">No landing page data available</div>;
-
-  return (
-    <div className="grid grid-cols-1 gap-6">
-      <Card className="bg-white/5 border-white/10">
-        <CardHeader>
-          <CardTitle>Headline Suggestions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {(data.headlineSuggestions || []).map((headline: string, i: number) => (
-              <div key={i} className="text-lg font-semibold bg-gradient-to-r from-purple-500/10 to-blue-500/10 px-4 py-3 rounded-lg border border-purple-500/20">
-                {headline}
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-white/5 border-white/10">
-        <CardHeader>
-          <CardTitle>CTA Suggestions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {(data.ctaSuggestions || []).map((cta: string, i: number) => (
-              <div key={i} className="bg-green-500/10 text-green-400 px-4 py-3 rounded-lg border border-green-500/30 text-center font-medium">
-                {cta}
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-white/5 border-white/10">
-          <CardHeader>
-            <CardTitle>Trust Signals</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {(data.trustSignals || []).map((signal: string, i: number) => (
-                <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-blue-400">ΓåÆ</span>
-                  <span>{signal}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white/5 border-white/10">
-          <CardHeader>
-            <CardTitle>Conversion Tips</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {(data.conversionTips || []).map((tip: string, i: number) => (
-                <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-green-400">Γ£ô</span>
-                  <span>{tip}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-// ============================================
-// BLOG IDEAS TAB COMPONENT
-// ============================================
-
-function BlogIdeasTab({ data }: { data: any[] }) {
-  if (!data || data.length === 0) return <div className="text-muted-foreground">No blog ideas available</div>;
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {data.map((blog: any, i: number) => (
-        <Card key={i} className="bg-white/5 border-white/10 hover:border-purple-500/30 transition-colors">
-          <CardHeader>
-            <CardTitle className="text-sm">{blog.title}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 mb-2">
-              <Badge variant="outline" className="text-xs">{blog.keyword}</Badge>
-              <Badge variant={blog.intent === 'commercial' ? 'default' : 'secondary'} className="text-xs">
-                {blog.intent}
-              </Badge>
-              <Badge variant={
-                blog.difficulty === 'easy' ? 'default' : 
-                blog.difficulty === 'medium' ? 'secondary' : 
-                'destructive'
-              } className="text-xs">
-                {blog.difficulty}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
-// ============================================
-// ACTION PLAN TAB COMPONENT
-// ============================================
-
-function ActionPlanTab({ data }: { data: any }) {
-  if (!data) return <div className="text-muted-foreground">No action plan available</div>;
-
-  return (
-    <div className="grid grid-cols-1 gap-6">
-      <Card className="bg-gradient-to-r from-green-500/10 to-blue-500/10 border-green-500/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" />
-            30-Day Action Plan
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2">
-            {(data.day30 || []).map((action: string, i: number) => (
-              <li key={i} className="text-sm flex items-start gap-2">
-                <span className="text-green-400 font-bold">{i + 1}.</span>
-                <span>{action}</span>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" />
-            60-Day Action Plan
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2">
-            {(data.day60 || []).map((action: string, i: number) => (
-              <li key={i} className="text-sm flex items-start gap-2">
-                <span className="text-blue-400 font-bold">{i + 1}.</span>
-                <span>{action}</span>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" />
-            90-Day Action Plan
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2">
-            {(data.day90 || []).map((action: string, i: number) => (
-              <li key={i} className="text-sm flex items-start gap-2">
-                <span className="text-purple-400 font-bold">{i + 1}.</span>
-                <span>{action}</span>
-              </li>
-            ))}
-          </ul>
         </CardContent>
       </Card>
     </div>

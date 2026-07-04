@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import { useProject } from '../context/ProjectContext';
 import { Badge, Card, EmptyState, PageHeader, ScoreCard, SectionTitle } from '../components/UI';
@@ -68,7 +69,7 @@ export default function DashboardPage() {
   };
 
   const handleExport = (type: string) => {
-    alert(`Exporting Executive Report as ${type} - Feature coming soon!`);
+    toast.error(`Exporting Executive Report as ${type} - Feature coming soon!`);
   };
 
   return (

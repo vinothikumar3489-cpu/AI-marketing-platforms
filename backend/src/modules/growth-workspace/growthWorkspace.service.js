@@ -286,7 +286,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results.product = validateProductAnalysis(rawResult, input);
       steps[0].status = 'completed';
       steps[0].provider = results.product.provider || 'groq';
-      steps[0].confidenceScore = results.product.confidenceScore || 75;
+      steps[0].confidenceScore = results.product.confidenceScore ?? 75;
       console.log('✅ [Growth Workspace] Product Analysis complete & validated:', {
         hasUSP: !!results.product.usp,
         featuresCount: results.product.features?.length || 0,
@@ -298,7 +298,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results.product = validateProductAnalysis(null, input);
       steps[0].status = 'completed';
       steps[0].provider = 'fallback';
-      steps[0].confidenceScore = results.product.confidenceScore || 55;
+      steps[0].confidenceScore = results.product.confidenceScore ?? 55;
     }
 
     // Step 2: Market Discovery
@@ -310,7 +310,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results.market = validateMarketDiscovery(rawResult, input);
       steps[1].status = 'completed';
       steps[1].provider = results.market.provider || 'groq';
-      steps[1].confidenceScore = results.market.confidenceScore || 70;
+      steps[1].confidenceScore = results.market.confidenceScore ?? 70;
       console.log('✅ [Growth Workspace] Market Discovery complete & validated:', {
         trendsCount: results.market.marketTrends?.length || 0,
         opportunitiesCount: results.market.opportunities?.length || 0,
@@ -322,7 +322,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results.market = validateMarketDiscovery(null, input);
       steps[1].status = 'completed';
       steps[1].provider = 'fallback';
-      steps[1].confidenceScore = results.market.confidenceScore || 55;
+      steps[1].confidenceScore = results.market.confidenceScore ?? 55;
     }
 
     // Step 3: Audience Intelligence
@@ -334,7 +334,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results.audience = validateAudienceIntelligence(rawResult, input);
       steps[2].status = 'completed';
       steps[2].provider = results.audience.provider || 'groq';
-      steps[2].confidenceScore = results.audience.confidenceScore || 75;
+      steps[2].confidenceScore = results.audience.confidenceScore ?? 75;
       console.log('✅ [Growth Workspace] Audience Intelligence complete & validated:', {
         personasCount: results.audience.buyerPersonas?.length || 0,
         channelsCount: results.audience.bestChannels?.length || 0,
@@ -346,7 +346,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results.audience = validateAudienceIntelligence(null, input);
       steps[2].status = 'completed';
       steps[2].provider = 'fallback';
-      steps[2].confidenceScore = results.audience.confidenceScore || 55;
+      steps[2].confidenceScore = results.audience.confidenceScore ?? 55;
     }
 
     // Step 4: Competitor Analysis
@@ -358,7 +358,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results.competitor = validateCompetitorAnalysis(rawResult, input);
       steps[3].status = 'completed';
       steps[3].provider = results.competitor.provider || 'groq';
-      steps[3].confidenceScore = results.competitor.confidenceScore || 70;
+      steps[3].confidenceScore = results.competitor.confidenceScore ?? 70;
       console.log('✅ [Growth Workspace] Competitor Analysis complete & validated:', {
         competitorsCount: results.competitor.directCompetitors?.length || 0,
         gapsCount: results.competitor.marketGaps?.length || 0,
@@ -371,7 +371,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results.competitor = validateCompetitorAnalysis(null, input);
       steps[3].status = 'completed';
       steps[3].provider = 'fallback';
-      steps[3].confidenceScore = results.competitor.confidenceScore || 55;
+      steps[3].confidenceScore = results.competitor.confidenceScore ?? 55;
     }
 
     // Step 5: Intent Prediction
@@ -383,7 +383,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results.intent = validateIntentPrediction(rawResult, input);
       steps[4].status = 'completed';
       steps[4].provider = results.intent.provider || 'groq';
-      steps[4].confidenceScore = results.intent.confidenceScore || 68;
+      steps[4].confidenceScore = results.intent.confidenceScore ?? 68;
       console.log('✅ [Growth Workspace] Intent Prediction complete & validated:', {
         hotSegmentsCount: results.intent.hotSegments?.length || 0,
         signalsCount: results.intent.buyingSignals?.length || 0,
@@ -395,7 +395,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results.intent = validateIntentPrediction(null, input);
       steps[4].status = 'completed';
       steps[4].provider = 'fallback';
-      steps[4].confidenceScore = results.intent.confidenceScore || 55;
+      steps[4].confidenceScore = results.intent.confidenceScore ?? 55;
     }
 
     // Step 6: Positioning Engine
@@ -407,7 +407,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results.positioning = validatePositioningEngine(rawResult, input);
       steps[5].status = 'completed';
       steps[5].provider = results.positioning.provider || 'groq';
-      steps[5].confidenceScore = results.positioning.confidenceScore || 72;
+      steps[5].confidenceScore = results.positioning.confidenceScore ?? 72;
       console.log('✅ [Growth Workspace] Positioning Engine complete & validated:', {
         hasStatement: !!results.positioning.positioningStatement,
         pillarsCount: results.positioning.messagingPillars?.length || 0,
@@ -419,7 +419,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results.positioning = validatePositioningEngine(null, input);
       steps[5].status = 'completed';
       steps[5].provider = 'fallback';
-      steps[5].confidenceScore = results.positioning.confidenceScore || 55;
+      steps[5].confidenceScore = results.positioning.confidenceScore ?? 55;
     }
 
     // Step 7: Campaign Generator
@@ -431,7 +431,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results.campaign = validateCampaignGenerator(rawResult, input);
       steps[6].status = 'completed';
       steps[6].provider = results.campaign.provider || 'groq';
-      steps[6].confidenceScore = results.campaign.confidenceScore || 75;
+      steps[6].confidenceScore = results.campaign.confidenceScore ?? 75;
       console.log('✅ [Growth Workspace] Campaign Generator complete & validated:', {
         anglesCount: results.campaign.creativeAngles?.length || 0,
         hooksCount: results.campaign.copyHooks?.length || 0,
@@ -444,7 +444,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results.campaign = validateCampaignGenerator(null, input);
       steps[6].status = 'completed';
       steps[6].provider = 'fallback';
-      steps[6].confidenceScore = results.campaign.confidenceScore || 55;
+      steps[6].confidenceScore = results.campaign.confidenceScore ?? 55;
     }
 
     // Step 8: Channel Recommendation
@@ -456,7 +456,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results.channel = validateChannelRecommendation(rawResult, input);
       steps[7].status = 'completed';
       steps[7].provider = results.channel.provider || 'groq';
-      steps[7].confidenceScore = results.channel.confidenceScore || 73;
+      steps[7].confidenceScore = results.channel.confidenceScore ?? 73;
       console.log('✅ [Growth Workspace] Channel Recommendation complete & validated:', {
         channelsCount: results.channel.recommendedChannels?.length || 0,
         primaryChannel: results.channel.primaryChannel,
@@ -468,7 +468,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results.channel = validateChannelRecommendation(null, input);
       steps[7].status = 'completed';
       steps[7].provider = 'fallback';
-      steps[7].confidenceScore = results.channel.confidenceScore || 55;
+      steps[7].confidenceScore = results.channel.confidenceScore ?? 55;
     }
 
     overallStatus = 'completed';
@@ -929,7 +929,7 @@ CRITICAL INSTRUCTION: Extract REAL information from the website content. NEVER u
   return {
     ...aiResult,
     provider: aiResult.provider || 'fallback',
-    confidenceScore: aiResult.confidenceScore || (websiteData ? 85 : 70)
+    confidenceScore: aiResult.confidenceScore ?? (websiteData ? 85 : 70)
   };
 }
 
@@ -965,7 +965,7 @@ CRITICAL INSTRUCTION: NEVER use generic placeholders like "$X Billion". Use real
   return {
     ...aiResult,
     provider: aiResult.provider || 'fallback',
-    confidenceScore: aiResult.confidenceScore || 75
+    confidenceScore: aiResult.confidenceScore ?? 75
   };
 }
 
@@ -1003,7 +1003,7 @@ CRITICAL INSTRUCTION: NEVER use generic text. Personas must deeply reflect the r
   return {
     ...aiResult,
     provider: aiResult.provider || 'fallback',
-    confidenceScore: aiResult.confidenceScore || 75
+    confidenceScore: aiResult.confidenceScore ?? 75
   };
 }
 
@@ -1047,7 +1047,7 @@ CRITICAL INSTRUCTION: NEVER use generic placeholders like "Competitor 1". Use re
   return {
     ...aiResult,
     provider: aiResult.provider || 'fallback',
-    confidenceScore: aiResult.confidenceScore || 68,
+    confidenceScore: aiResult.confidenceScore ?? 68,
     orchestratorCompetitorsUsed: orchestratorCompetitors.length
   };
 }
@@ -1080,7 +1080,7 @@ CRITICAL INSTRUCTION: Return ONLY valid JSON in the exact schema specified. Use 
   return {
     ...aiResult,
     provider: aiResult.provider || 'fallback',
-    confidenceScore: aiResult.confidenceScore || 68
+    confidenceScore: aiResult.confidenceScore ?? 68
   };
 }
 
@@ -1109,7 +1109,7 @@ CRITICAL INSTRUCTION: Return ONLY valid JSON using the exact schema above.`;
   return {
     ...aiResult,
     provider: aiResult.provider || 'fallback',
-    confidenceScore: aiResult.confidenceScore || 75
+    confidenceScore: aiResult.confidenceScore ?? 75
   };
 }
 
@@ -1152,7 +1152,7 @@ CRITICAL INSTRUCTION: Return ONLY valid JSON. Provide realistic CTR and CPA. Act
   return {
     ...aiResult,
     provider: aiResult.provider || 'fallback',
-    confidenceScore: aiResult.confidenceScore || 75
+    confidenceScore: aiResult.confidenceScore ?? 75
   };
 }
 
@@ -1187,7 +1187,7 @@ CRITICAL INSTRUCTION: Return ONLY valid JSON. Budget allocations must sum to 100
   return {
     ...aiResult,
     provider: aiResult.provider || 'fallback',
-    confidenceScore: aiResult.confidenceScore || 73
+    confidenceScore: aiResult.confidenceScore ?? 73
   };
 }
 
@@ -1515,7 +1515,7 @@ export async function getGrowthWorkspaceResults({ chatId, userId }) {
     // Calculate summary
     const completedSteps = steps.filter(s => s.status === 'completed').length;
     const avgConfidence = completedSteps > 0 ? 
-      Math.round(Object.values(results).reduce((sum, r) => sum + (r?.confidenceScore || 0), 0) / completedSteps) : 0;
+      Math.round(Object.values(results).reduce((sum, r) => sum + (r?.confidenceScore ?? 0), 0) / completedSteps) : 0;
 
     return {
       success: true,

@@ -1,5 +1,6 @@
 ﻿
 import { useEffect, useState } from "react";
+import { toast } from 'sonner';
 import { AlertCircle, Sparkles } from "lucide-react";
 import { Section } from "@/components/ui-kit";
 import { getActiveProject } from "@/lib/project-store";
@@ -36,7 +37,7 @@ export function SeoIntelligencePage() {
   }, [chatId]);
 
   const run = async () => {
-    if (!chatId) return alert("Select or create a project first.");
+    if (!chatId) return toast.error("Select or create a project first.");
     setLoading(true);
     setError(null);
     try {

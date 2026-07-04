@@ -241,10 +241,11 @@ export async function generateReportCharts(chatId, userId) {
   }
 
   if (data.market.trends.length > 0) {
+    // Use index-based deterministic values since no actual trend numbers exist
     charts.marketTrend = generateTrendChartSvg(
       data.market.trends.slice(0, 10).map((t, i) => ({
         label: typeof t === 'string' ? t.substring(0, 20) : t.keyword?.substring(0, 20) || `Point ${i + 1}`,
-        value: Math.round(50 + Math.random() * 50)
+        value: 30 + (i * 7) % 60
       }))
     );
   }

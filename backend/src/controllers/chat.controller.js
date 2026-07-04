@@ -650,32 +650,43 @@ export const deleteChat = async (req, res) => {
     });
   }
 
-  // Delete all related data (cascading deletes should handle most, but being explicit)
-  await prisma.message.deleteMany({ where: { chatId } });
-  await prisma.analysis.deleteMany({ where: { chatId } });
-  await prisma.productAnalysis.deleteMany({ where: { chatId } });
-  await prisma.productProfile.deleteMany({ where: { chatId } });
-  await prisma.productIntelligence.deleteMany({ where: { chatId } });
-  await prisma.competitorIntelligence.deleteMany({ where: { chatId } });
-  await prisma.campaignIntelligence.deleteMany({ where: { chatId } });
-  await prisma.agentRun.deleteMany({ where: { chatId } });
-  
-  // Automation models (cascade deletes automationAsset via AutomationPlan relation)
-  await prisma.automationLog.deleteMany({ where: { chatId } });
-  await prisma.automationPlan.deleteMany({ where: { chatId } });
+  try {
+    // Use a transaction to ensure all deletions happen atomically
+    await prisma.$transaction(async (tx) => {
+      // Delete all related data (cascading deletes should handle most, but being explicit)
+      await tx.message.deleteMany({ where: { chatId } });
+      await tx.analysis.deleteMany({ where: { chatId } });
+      await tx.productAnalysis.deleteMany({ where: { chatId } });
+      await tx.productProfile.deleteMany({ where: { chatId } });
+      await tx.productIntelligence.deleteMany({ where: { chatId } });
+      await tx.competitorIntelligence.deleteMany({ where: { chatId } });
+      await tx.campaignIntelligence.deleteMany({ where: { chatId } });
+      await tx.agentRun.deleteMany({ where: { chatId } });
+      
+      // Automation models (cascade deletes automationAsset via AutomationPlan relation)
+      await tx.automationLog.deleteMany({ where: { chatId } });
+      await tx.automationPlan.deleteMany({ where: { chatId } });
 
-  // SEO Intelligence has many related models - let Prisma cascade handle them
-  await prisma.seoIntelligence.deleteMany({ where: { chatId } });
+      // SEO Intelligence has many related models - let Prisma cascade handle them
+      await tx.seoIntelligence.deleteMany({ where: { chatId } });
 
-  // Finally delete the chat itself
-  await prisma.chat.delete({ where: { id: chatId } });
+      // Finally delete the chat itself
+      await tx.chat.delete({ where: { id: chatId } });
+    });
 
-  console.log('✅ [Chat] Chat and all related data deleted');
+    console.log('✅ [Chat] Chat and all related data deleted');
 
-  return res.json({ 
-    success: true,
-    message: 'Project and all analysis data deleted successfully'
-  });
+    return res.json({ 
+      success: true,
+      message: 'Project and all analysis data deleted successfully'
+    });
+  } catch (error) {
+    console.error('❌ [Chat] Error deleting chat:', error);
+    return res.status(500).json({ 
+      success: false,
+      error: 'Failed to delete chat. Please try again.' 
+    });
+  }
 };
 
 export const clearHistory = async (req, res) => {

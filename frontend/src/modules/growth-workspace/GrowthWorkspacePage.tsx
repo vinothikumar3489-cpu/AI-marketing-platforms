@@ -30,8 +30,8 @@ export function GrowthWorkspacePage() {
       }
     };
     load();
-    window.addEventListener('marketform-project-change', load);
-    return () => window.removeEventListener('marketform-project-change', load);
+    window.addEventListener('marketform-chat-change', load);
+    return () => window.removeEventListener('marketform-chat-change', load);
   }, []);
 
   async function fetchSavedResults(chatId: string) {
@@ -40,17 +40,12 @@ export function GrowthWorkspacePage() {
       console.log('≡ƒöì Fetching saved growth workspace results for chatId:', chatId);
       const res = await api.get(`/api/chats/${chatId}/growth-workspace/results`);
       
-      console.log('≡ƒôª SAVED RESULTS RESPONSE:', res.data);
-      console.log('≡ƒôè LOADED RESULTS:', res.data.results);
-      
-      if (res.data.success && res.data.exists) {
-        console.log('Γ£à Found saved results');
-        setAnalysisData(res.data.results);
-        setSteps(res.data.steps || []);
-        setSummary(res.data.summary || null);
-        setSavedInput(res.data.input || null);
+      if (res && (res.success || res.exists)) {
+        setAnalysisData(res.results || null);
+        setSteps(res.steps || []);
+        setSummary(res.summary || null);
+        setSavedInput(res.input || null);
       } else {
-        console.log('Γä╣∩╕Å No saved results found');
         setAnalysisData(null);
         setSteps([]);
         setSummary(null);
@@ -79,7 +74,7 @@ export function GrowthWorkspacePage() {
         setActiveProjectId(chat.id);
         activeProject = { id: chat.id, productName: chat.productName || chatTitle, websiteUrl: formData.websiteUrl || '', description: '', industry: '', targetAudience: '', pricing: '', competitors: '', createdAt: '', updatedAt: '' };
         setProject(activeProject);
-        window.dispatchEvent(new Event('marketform-project-change'));
+        window.dispatchEvent(new Event('marketform-chat-change'));
       } catch (err: any) {
         toast.error('Failed to create project: ' + (err.message || 'Unknown error'));
         return;

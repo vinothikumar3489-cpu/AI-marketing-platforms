@@ -21,11 +21,12 @@ export async function generateAutomationPlanStep({ chatId, userId }) {
     competitorAnalysis: !!competitorIntelligence?.competitorAnalysis,
     campaignGenerator: !!campaignIntelligence?.campaignGenerator,
     channelRecommendation: !!campaignIntelligence?.channelRecommendation,
+    contentStudio: !!campaignIntelligence?.contentStudio,
     seoAnalysis: !!seoIntelligence?.seoScore,
   };
 
   const completedModules = Object.values(readinessModules).filter(Boolean).length;
-  const readinessScore = Math.round((completedModules / 7) * 100);
+  const readinessScore = Math.round((completedModules / 8) * 100);
 
   const automationData = await generateAutomationPlanWithAI({
     productIntelligence,
