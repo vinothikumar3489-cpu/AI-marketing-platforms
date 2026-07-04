@@ -36,13 +36,13 @@ export async function buildReportData(chatId, userId) {
   const actionPlan = campaignIntel?.actionPlan || {};
 
   const seo = seoIntel ? {
-    scores: seoIntel.technicalSeoAudit || {},
-    keywords: seoIntel.keywordIntelligenceRecord || [],
-    competitors: seoIntel.seoCompetitorIntelligence || [],
-    gaps: seoIntel.contentGapRecord || [],
-    geo: seoIntel.geoIntelligenceRecord || {},
-    blogs: seoIntel.blogIntelligenceRecord || [],
-    backlinks: seoIntel.backlinkSummary || {},
+    scores: seoIntel.technicalAuditDetail || {},
+    keywords: seoIntel.keywordIntelligence || {},
+    competitors: seoIntel.competitorSeoRecord || {},
+    gaps: seoIntel.contentGapRecord || {},
+    geo: seoIntel.geoIntelligence || {},
+    blogs: seoIntel.blogIntelligenceRecord || {},
+    backlinks: seoIntel.rawCrawlData?.[0]?.metadata?.backlinks || {},
     actionPlan: seoIntel.actionPlan || {}
   } : null;
 

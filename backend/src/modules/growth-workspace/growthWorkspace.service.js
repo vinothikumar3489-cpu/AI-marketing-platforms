@@ -11,6 +11,7 @@ import {
   generateCampaignFallback,
   generateChannelFallback 
 } from './fallback.generators.js';
+import { callAI } from '../../ai/services/aiRouter.service.js';
 import { deriveWebsiteIdentity } from '../../utils/seo-identity.util.js';
 import { collectResearchData } from '../../services/intelligence/research-orchestrator.service.js';
 import {
@@ -32,22 +33,7 @@ import {
   logStrategyGenerated, logReportGenerated
 } from '../../services/intelligence/business-intelligence-logger.js';
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_API_URL = process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta/models';
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-const CEREBRAS_API_KEY = process.env.CEREBRAS_API_KEY;
-const CEREBRAS_API_URL = process.env.CEREBRAS_API_URL || 'https://api.cerebras.net/v1/generate';
-const CEREBRAS_MODEL = process.env.CEREBRAS_MODEL || 'cerebras-c1-mini';
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-const DEEPSEEK_API_URL = process.env.DEEPSEEK_API_URL || 'https://api.deepseek.ai/v1/completions';
-const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-business-intel';
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
-const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
-const MAX_CONTEXT_CHARS = 8000;
+
 
 // ============================================
 // HELPER FUNCTIONS
@@ -1191,283 +1177,24 @@ CRITICAL INSTRUCTION: Return ONLY valid JSON. Budget allocations must sum to 100
   };
 }
 
-async function callGeminiAI(prompt, maxTokens = 2000, moduleName = 'unknown') {
-  if (!GEMINI_API_KEY) {
-    console.log(`⚠️ [AI][${moduleName}] No Gemini API key`);
-    return null;
-  }
 
-  try {
-    const response = await fetch(`${GEMINI_API_URL}/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          maxOutputTokens: maxTokens,
-          temperature: 0.4
-        }
-      })
-    });
 
-    if (!response.ok) {
-      console.log(`⚠️ [AI][${moduleName}] Gemini API error: ${response.status}`);
-      return null;
-    }
 
-    const data = await response.json();
-    const content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!content) return null;
-    
-    const parsed = safeParseAIJson(content);
-    if (!parsed) return null;
-    
-    return {
-      ...parsed,
-      provider: 'gemini'
-    };
-  } catch (error) {
-    console.log(`⚠️ [AI][${moduleName}] Gemini fallback failed:`, error.message);
-    return null;
-  }
-}
-
-async function callCerebrasAI(prompt) {
-  if (!CEREBRAS_API_KEY) {
-    return null;
-  }
-
-  try {
-    const response = await fetch(CEREBRAS_API_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${CEREBRAS_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: CEREBRAS_MODEL,
-        prompt,
-        max_tokens: 2000,
-        temperature: 0.3
-      }),
-      signal: AbortSignal.timeout(30000)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.log('⚠️ [AI] Cerebras API error:', response.status, errorText);
-      return null;
-    }
-
-    const data = await response.json();
-    const content = data?.output || data?.text || data?.result;
-    const parsed = safeParseAIJson(typeof content === 'string' ? content : JSON.stringify(content));
-    if (!parsed) return null;
-    return {
-      ...parsed,
-      provider: 'cerebras'
-    };
-  } catch (error) {
-    console.log('⚠️ [AI] Cerebras fallback failed:', error.message);
-    return null;
-  }
-}
-
-async function callDeepSeekAI(prompt) {
-  if (!DEEPSEEK_API_KEY) {
-    return null;
-  }
-
-  try {
-    const response = await fetch(DEEPSEEK_API_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: DEEPSEEK_MODEL,
-        prompt,
-        max_tokens: 2000,
-        temperature: 0.3
-      }),
-      signal: AbortSignal.timeout(30000)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.log('⚠️ [AI] DeepSeek API error:', response.status, errorText);
-      return null;
-    }
-
-    const data = await response.json();
-    const content = data?.output || data?.text || data?.result;
-    const parsed = safeParseAIJson(typeof content === 'string' ? content : JSON.stringify(content));
-    if (!parsed) return null;
-    return {
-      ...parsed,
-      provider: 'deepseek'
-    };
-  } catch (error) {
-    console.log('⚠️ [AI] DeepSeek fallback failed:', error.message);
-    return null;
-  }
-}
 
 async function callBestAI(prompt, maxTokens = 2000, moduleName = 'unknown', fallbackData = null) {
-  try {
-    return await callGroqAI(prompt, maxTokens, moduleName);
-  } catch (error) {
-    console.log(`⚠️ [AI][${moduleName}] Groq failed, falling back to Gemini...`, error.message);
-    try {
-      const geminiResponse = await callGeminiAI(prompt, maxTokens, moduleName);
-      if (geminiResponse) {
-        console.log(`✅ [AI][${moduleName}] Gemini succeeded as fallback`);
-        return geminiResponse;
-      }
-    } catch (geminiError) {
-      console.log(`⚠️ [AI][${moduleName}] Gemini fallback failed:`, geminiError.message);
-    }
-    
-    // Try OpenAI if configured
-    if (OPENAI_API_KEY) {
-      try {
-        console.log(`🤖 [AI][${moduleName}] Gemini failed, falling back to OpenAI...`);
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: OPENAI_MODEL,
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.5,
-            response_format: { type: "json_object" }
-          }),
-          signal: AbortSignal.timeout(45000)
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const content = data.choices?.[0]?.message?.content;
-          if (content) {
-            console.log(`✅ [AI][${moduleName}] OpenAI succeeded as fallback`);
-            const parsed = JSON.parse(content);
-            parsed.provider = 'openai';
-            return parsed;
-          }
-        }
-      } catch (openAiError) {
-        console.log(`⚠️ [AI][${moduleName}] OpenAI fallback failed:`, openAiError.message);
-      }
-    }
-    
-    // If all fail or return null, use rule-based fallback
-    console.log(`🛡️ [AI][${moduleName}] All AI providers failed, using rule-based fallback.`);
-    if (fallbackData) {
-       return { ...fallbackData, provider: 'fallback' };
-    }
-    return { provider: 'fallback' };
+  console.log(`🚀 [AI][${moduleName}] Calling AI...`);
+  const result = await callAI(prompt);
+  if (result.success && result.data) {
+    return { ...result.data, provider: result.provider };
   }
+  console.log(`🗑️ [AI][${moduleName}] All providers failed, using rule-based fallback.`);
+  if (fallbackData) {
+    return { ...fallbackData, provider: 'fallback' };
+  }
+  return { provider: 'fallback' };
 }
 
-// ============================================
-// AI HELPER
-// ============================================
 
-async function callGroqAI(prompt, maxTokens = 2000, moduleName = 'unknown') {
-  if (!GROQ_API_KEY) {
-    console.log(`⚠️ [AI][${moduleName}] No Groq API key, using fallback`);
-    throw new Error('Groq API key is not configured.');
-  }
-
-  const estimateTokens = Math.ceil(prompt.length / 4);
-  console.log(`🚀 [AI][${moduleName}] Calling Groq... (Prompt: ~${estimateTokens} tokens, MaxOut: ${maxTokens})`);
-
-  let retries = 1;
-  while (retries >= 0) {
-    try {
-      let response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${GROQ_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: GROQ_MODEL,
-          messages: [{ role: 'user', content: prompt }],
-          response_format: { type: "json_object" },
-          temperature: 0.7,
-          max_tokens: maxTokens
-        })
-      });
-
-      if (!response.ok && response.status === 400) {
-        console.log(`⚠️ [AI][${moduleName}] Groq JSON mode failed, retrying without JSON mode...`);
-        response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${GROQ_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: GROQ_MODEL,
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.7,
-            max_tokens: maxTokens
-          })
-        });
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        
-        // Handle 429 Rate Limit
-        if (response.status === 429 && retries > 0) {
-          const retryMsg = errorData.error?.message || '';
-          let waitTime = 5000; // default 5s
-          // Extract time from message like "Please try again in 3.42s"
-          const match = retryMsg.match(/try again in ([\d.]+)s/i);
-          if (match && match[1]) {
-            waitTime = Math.ceil(parseFloat(match[1]) * 1000);
-          }
-          const totalWait = waitTime + 2000;
-          console.log(`⏳ [AI][${moduleName}] Groq Rate Limit (429). Waiting ${totalWait}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, totalWait));
-          retries--;
-          continue;
-        }
-
-        throw new Error(`Groq API error ${response.status}: ${errorData.error?.message || 'Unknown error'}`);
-      }
-
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content;
-      
-      if (!content) throw new Error('No content in response');
-
-      // Parse JSON
-      try {
-        const parsed = safeParseAIJson(content);
-        if (parsed) {
-          console.log(`✅ [AI][${moduleName}] Groq success!`);
-          return { ...parsed, provider: 'groq' };
-        }
-        throw new Error('Unable to parse AI response JSON');
-      } catch (parseError) {
-        throw new Error('AI response could not be parsed as JSON.');
-      }
-
-    } catch (error) {
-      if (retries > 0) {
-        retries--;
-        continue;
-      }
-      console.log(`❌ [AI][${moduleName}] Groq failed completely:`, error.message);
-      throw error;
-    }
-  }
-}
 
 // ============================================
 // GET SAVED RESULTS
@@ -1546,30 +1273,7 @@ export async function getGrowthWorkspaceResults({ chatId, userId }) {
 }
 
 
-// ============================================
-// SAFE JSON PARSING
-// ============================================
 
-function safeParseAIJson(text) {
-  if (!text) return null;
-  
-  try {
-    // Remove markdown code fences
-    let cleanText = text.replace(/```json\s*/g, '').replace(/```\s*/g, '');
-    
-    // Extract first JSON object
-    const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-    
-    // Try direct parse
-    return JSON.parse(cleanText);
-  } catch (error) {
-    console.log('⚠️ [Parse] JSON parsing failed:', error.message);
-    return null;
-  }
-}
 
 // ============================================
 // QUALITY FILTERS

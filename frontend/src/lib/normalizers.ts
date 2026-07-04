@@ -521,45 +521,8 @@ export function normalizeSeo(data: any) {
     desktopScore
   };
 
-  if (import.meta.env.DEV) {
-    console.log('[SEO normalized keys]', Object.keys(normalizedSeo || {}));
-    console.log('[SEO actionPlan]', normalizedSeo.actionPlan);
-    console.log('[SEO technical scores]', {
-      performance: normalizedSeo.performanceScore,
-      seo: normalizedSeo.seoScore,
-      accessibility: normalizedSeo.accessibilityScore,
-      bestPractices: normalizedSeo.bestPracticesScore
-    });
-    console.log('[SEO content gaps]', normalizedSeo.contentGaps);
-    
-    // ==== DEBUG: Normalizer raw vs normalized comparison ====
-    console.log('===== NORMALIZER DEBUG =====');
-    console.log('RAW input has technicalAudit?', !!data.technicalAudit);
-    console.log('RAW input has keywordIntelligence?', !!data.keywordIntelligence);
-    console.log('RAW input has competitorIntelligence?', !!data.competitorIntelligence);
-    console.log('RAW input has contentGapAnalysis?', !!data.contentGapAnalysis);
-    console.log('RAW input has blogIntelligence?', !!data.blogIntelligence);
-    console.log('RAW input has geoIntelligence?', !!data.geoIntelligence);
-    console.log('RAW input has executiveDashboard?', !!data.executiveDashboard);
-    console.log('RAW input has scoreBreakdown?', !!data.scoreBreakdown);
-    console.log('RAW input has executiveStory?', !!data.executiveStory);
-    console.log('RAW input has actionPlan?', !!data.actionPlan);
-    console.log('NORMALIZED has executiveStory?', !!normalizedSeo.executiveStory);
-    console.log('NORMALIZED has actionPlan?', !!normalizedSeo.actionPlan);
-    console.log('NORMALIZED executiveDashboard keys:', Object.keys(normalizedSeo.executiveDashboard || {}));
-    console.log('NORMALIZED has performanceScore?', normalizedSeo.performanceScore);
-    console.log('NORMALIZED has seoScore?', normalizedSeo.seoScore);
-    console.log('RAW technicalAudit keys if exists:', data.technicalAudit ? Object.keys(data.technicalAudit) : 'N/A');
-    console.log('RAW keywordIntelligence primaryKeywords if exists:', data.keywordIntelligence ? (data.keywordIntelligence.primaryKeywords || []).length : 'N/A');
-    console.log('RAW competitorIntelligence competitorProfiles if exists:', data.competitorIntelligence ? (data.competitorIntelligence.competitorProfiles || []).length : 'N/A');
-    console.log('RAW contentGapAnalysis contentGaps if exists:', data.contentGapAnalysis ? (data.contentGapAnalysis.contentGaps || []).length : 'N/A');
-    console.log('RAW blogIntelligence blogIdeas if exists:', data.blogIntelligence ? (data.blogIntelligence.blogIdeas || []).length : 'N/A');
-    console.log('RAW geoIntelligence aiVisibilityScore if exists:', data.geoIntelligence ? data.geoIntelligence.aiVisibilityScore : 'N/A');
-    console.log('RAW executiveDashboard keys:', Object.keys(data.executiveDashboard || {}));
-    console.log('RAW scoreBreakdown keys:', Object.keys(data.scoreBreakdown || {}));
-    console.log('RAW executiveStory type:', typeof data.executiveStory, data.executiveStory ? 'has data' : 'null/undefined');
-    console.log('RAW actionPlan type:', typeof data.actionPlan, data.actionPlan ? JSON.stringify(data.actionPlan).substring(0, 100) : 'null/undefined');
-    console.log('===== END NORMALIZER DEBUG =====');
+  if (import.meta.env.DEV && false) {
+    // Dev debug logs removed for production safety
   }
 
   return normalizedSeo;
