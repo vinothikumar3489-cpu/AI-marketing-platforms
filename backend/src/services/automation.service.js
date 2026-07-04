@@ -10,7 +10,7 @@ export const AUTOMATION_PLAN_ALLOWED_FIELDS = new Set([
   'videoScripts', 'videoScenes', 'videoSchedule',
   'idealLeadProfile', 'leadSources', 'outreachAngles', 'sampleLeads',
   'readinessScore', 'status', 'provider', 'fallbackUsed',
-  'automationType', 'priority', 'startDate', 'endDate',
+  'googleAds', 'contentCalendar', 'crmWorkflows', 'workflows',
 ]);
 
 export function sanitizeAutomationPlanData(data) {
