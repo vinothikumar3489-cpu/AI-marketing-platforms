@@ -28,33 +28,45 @@ const defaults: any = {
 const tabs = ['Executive Snapshot', 'Executive Story', 'Product DNA', 'Market Intelligence', 'Audience Intelligence', 'Competitor Intelligence', 'Intent Prediction', 'Positioning Strategy', 'Campaign Strategy', 'Channel Strategy', 'Action Plan'];
 
 export default function GrowthWorkspacePage() {
-  const { selectedChatId, createChat, loadFullResults, fullResults, clearSelection } = useProject();
+  const { selectedChatId, createChat, loadFullResults, fullResults } = useProject();
   const [form, setForm] = useState(defaults);
   const [activeTab, setActiveTab] = useState('Executive Snapshot');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [results, setResults] = useState<any>({});
-  const [mode, setMode] = useState<'form' | 'running' | 'results' | 'error'>('form');
+  const [creatingChat, setCreatingChat] = useState(false);
+  type Status = 'idle' | 'input_required' | 'running' | 'completed' | 'failed';
+  const [status, setStatus] = useState<Status>('idle');
+
+  function hasRealContent(obj: any): boolean {
+    return obj && typeof obj === 'object' && Object.keys(obj).length > 0;
+  }
 
   useEffect(() => {
     let cancelled = false;
     const r = fullResults.growth || {};
-    
-    const hasGrowthData = 
-      r.product || r.market || r.audience || r.competitor || r.intent || r.positioning || r.campaign || r.channel || r.executiveStory || r.actionPlan;
-    
+    const hasGrowthData = fullResults.hasGrowthWorkspace === true ||
+      hasRealContent(r.product) || hasRealContent(r.market) || hasRealContent(r.audience) ||
+      hasRealContent(r.competitor) || hasRealContent(r.intent) || hasRealContent(r.positioning) ||
+      hasRealContent(r.campaign) || hasRealContent(r.channel) || hasRealContent(r.executiveStory) ||
+      hasRealContent(r.actionPlan);
+
     if (!cancelled) {
       if (hasGrowthData) {
         setResults(r);
-        setMode('results');
+        setStatus('completed');
       } else {
         setResults({});
-        setMode('form');
+        if (selectedChatId) {
+          setStatus('input_required');
+        } else {
+          setStatus('idle');
+        }
         setStep(1);
       }
     }
     return () => { cancelled = true; };
-  }, [fullResults]);
+  }, [fullResults, selectedChatId]);
 
   async function run() {
     if (!form.websiteUrl) {
@@ -63,52 +75,55 @@ export default function GrowthWorkspacePage() {
     }
     setError(''); 
     setLoading(true);
-    setMode('running');
+    setStatus('running');
     try {
       let chatId = selectedChatId;
-      // Force create a new chat if URL changes
-      const projectUrl = fullResults?.profile?.websiteUrl || fullResults?.chat?.websiteUrl;
-      if (!chatId || (projectUrl && !form.websiteUrl.includes(projectUrl.replace(/^https?:\/\//, '').split('/')[0]))) {
-        chatId = await createChat(form.websiteUrl.replace(/^https?:\/\//, '').split('/')[0]);
+      if (!chatId) {
+        setCreatingChat(true);
+        chatId = await createChat('New Growth Analysis');
+        setCreatingChat(false);
       }
       
       const res: any = await api.post(`/chats/${chatId}/growth-workspace/run-full-analysis`, form);
-      const data = res.results || res.data?.results || res;
-      setResults(data);
       
       // CRITICAL: Load full results from database after analysis completes
       await loadFullResults(chatId);
       
-      // Only set mode to results after full results are loaded
-      setMode('results');
+      setStatus('completed');
     } catch (e: any) {
       setError(e.message || 'Analysis failed');
-      setMode('error');
+      setStatus('failed');
     } finally {
       setLoading(false);
     }
   }
 
-  function handleNewAnalysis() {
-    clearSelection();
+  async function handleNewAnalysis() {
+    if (creatingChat) return;
+    setCreatingChat(true);
     setForm(defaults);
     setResults({});
     setError('');
-    setMode('form');
+    setStatus('input_required');
     setStep(1);
+    try {
+      await createChat('New Growth Analysis');
+    } catch {
+      // If chat creation fails, allow user to retry
+    } finally {
+      setCreatingChat(false);
+    }
+  }
+
+  function hasContent(obj: any): boolean {
+    return obj && typeof obj === 'object' && Object.keys(obj).length > 0;
   }
 
   const hasData = 
-    results.product || 
-    results.market || 
-    results.audience || 
-    results.competitor || 
-    results.intent || 
-    results.positioning || 
-    results.campaign || 
-    results.channel || 
-    results.executiveStory || 
-    results.actionPlan;
+    hasContent(results.product) || hasContent(results.market) || hasContent(results.audience) ||
+    hasContent(results.competitor) || hasContent(results.intent) || hasContent(results.positioning) ||
+    hasContent(results.campaign) || hasContent(results.channel) || hasContent(results.executiveStory) ||
+    hasContent(results.actionPlan);
 
   const [step, setStep] = useState(1);
 
@@ -146,7 +161,7 @@ export default function GrowthWorkspacePage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '20px' }}>
         <PageHeader eyebrow="All-in-one Analysis Command Center" title="Growth Workspace" subtitle="Generate a multi-stage, validated business intelligence report." />
-        {mode === 'results' && (
+        {(status === 'completed' || status === 'failed') && (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <div className="dropdown" style={{ position: 'relative' }}>
               <button className="secondary-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -181,7 +196,7 @@ export default function GrowthWorkspacePage() {
         </Card>
       )}
       
-      {mode === 'form' && !loading && (
+      {(status === 'input_required' || status === 'idle') && !loading && !creatingChat && (
         <Card style={{ padding: '30px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #293245', paddingBottom: '15px' }}>
             <h2 style={{ margin: 0, color: '#fff', fontSize: '20px' }}>Project Configuration (Step {step} of 7)</h2>
@@ -290,9 +305,9 @@ export default function GrowthWorkspacePage() {
         </Card>
       )}
       
-      {mode === 'running' && <Loading text="Agentic pipeline active: Scraping web -> Normalizing -> Extracting Insights -> Cross-referencing evidence..." />}
+      {status === 'running' && <Loading text="Agentic pipeline active: Scraping web -> Normalizing -> Extracting Insights -> Cross-referencing evidence..." />}
       
-      {mode === 'results' && hasData && (
+      {status === 'completed' && hasData && (
         <Card>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
             {tabs.map(t => (
@@ -332,6 +347,19 @@ export default function GrowthWorkspacePage() {
         </Card>
       )}
 
+      {status === 'completed' && !hasData && (
+        <Card>
+          <EmptyState 
+            title="No Verified Growth Data Available" 
+            text="The analysis completed but did not produce verified data. This can happen when the AI could not extract sufficient information from the provided inputs. Try again with more detailed information."
+          />
+          <div style={{ display: 'flex', gap: '10px', marginTop: '15px', justifyContent: 'center' }}>
+            <button onClick={handleNewAnalysis} className="primary-btn" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Target size={16} /> New Growth Analysis
+            </button>
+          </div>
+        </Card>
+      )}
 
     </div>
   );

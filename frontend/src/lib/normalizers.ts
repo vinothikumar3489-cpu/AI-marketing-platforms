@@ -130,6 +130,14 @@ export function normalizeFullResults(data: any) {
   if (root.growth && Object.keys(root.growth).length > 0) {
     // Canonical shape: growth object already has nested structure
     const growth = root.growth;
+
+    // Only mark completed if at least one real section has content (non-empty keys)
+    const growthModuleKeys = ['product', 'market', 'audience', 'competitor', 'intent', 'positioning', 'campaign', 'channel', 'executiveStory', 'actionPlan'];
+    const hasRealGrowthContent = growthModuleKeys.some(k => {
+      const v = growth[k];
+      return v && typeof v === 'object' && Object.keys(v).length > 0;
+    });
+
     return {
       chat: root.chat || {},
       growth: {
@@ -150,7 +158,7 @@ export function normalizeFullResults(data: any) {
       seo: normalizeSeo(root.seoIntelligence || root.seo || {}), // Legacy compatibility
       agents: asArray(root.agentRuns || []),
       automation: root.automationPlan || {},
-      hasGrowthWorkspace: root.hasGrowthWorkspace || true,
+      hasGrowthWorkspace: root.hasGrowthWorkspace === false ? false : hasRealGrowthContent,
       hasSeoIntelligence: root.hasSeoIntelligence || !!root.seoIntelligence,
     };
   }
@@ -191,7 +199,7 @@ export function normalizeFullResults(data: any) {
     seo: normalizeSeo(root.seoIntelligence || root.seo || {}), // Legacy compatibility
     agents: asArray(root.agentRuns || []),
     automation: root.automationPlan || root.automationPlans || root.automation || {},
-    hasGrowthWorkspace: !!(productIntel || competitorIntel || campaignIntel),
+    hasGrowthWorkspace: !!(productIntel?.productAnalysis || competitorIntel?.competitorAnalysis || campaignIntel?.campaignGenerator),
     hasSeoIntelligence: !!root.seoIntelligence,
   };
 }
