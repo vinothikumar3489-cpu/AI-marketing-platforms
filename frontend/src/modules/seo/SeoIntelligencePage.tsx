@@ -171,7 +171,7 @@ export function SeoIntelligencePage() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.headingStructure || []).map((item, i) => (
                   <li key={i} className="rounded-2xl bg-white/5 border border-white/10 p-3">
-                    {item}
+                    {typeof item === 'object' ? (item.value || item.title || item.name || '') : item}
                   </li>
                 ))}
               </ul>
@@ -180,7 +180,7 @@ export function SeoIntelligencePage() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.keywordSuggestions || []).map((item, i) => (
                   <li key={i} className="rounded-2xl bg-white/5 border border-white/10 p-3">
-                    {item}
+                    {typeof item === 'object' ? (item.value || item.title || item.name || '') : item}
                   </li>
                 ))}
               </ul>
@@ -189,7 +189,7 @@ export function SeoIntelligencePage() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.technicalSeoIssues || []).map((item, i) => (
                   <li key={i} className="rounded-2xl bg-white/5 border border-white/10 p-3">
-                    {item}
+                    {typeof item === 'object' ? (item.value || item.title || item.name || '') : item}
                   </li>
                 ))}
               </ul>
@@ -202,7 +202,7 @@ export function SeoIntelligencePage() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.contentImprovementIdeas || []).map((item, i) => (
                   <li key={i} className="rounded-2xl bg-white/5 border border-white/10 p-3">
-                    {item}
+                    {typeof item === 'object' ? (item.value || item.title || item.name || '') : item}
                   </li>
                 ))}
               </ul>
@@ -211,7 +211,7 @@ export function SeoIntelligencePage() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.priorityFixes || []).map((item, i) => (
                   <li key={i} className="rounded-2xl bg-white/5 border border-white/10 p-3">
-                    {item}
+                    {typeof item === 'object' ? (item.value || item.title || item.name || '') : item}
                   </li>
                 ))}
               </ul>

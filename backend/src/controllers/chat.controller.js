@@ -7,95 +7,115 @@ const chatSchema = z.object({
 });
 
 export const createChat = async (req, res) => {
-  const result = chatSchema.safeParse(req.body);
-  if (!result.success) {
-    return res.status(400).json({ success: false, error: result.error.errors[0].message });
+  try {
+    const result = chatSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ success: false, error: result.error.errors[0].message });
+    }
+
+    const { title, productName } = result.data;
+    const chat = await prisma.chat.create({
+      data: {
+        title,
+        productName: productName || title,
+        userId: req.user.id,
+      },
+    });
+
+    return res.status(201).json(chat);
+  } catch (error) {
+    console.error(`[Controller] createChat error:`, error);
+    return res.status(500).json({ success: false, error: error.message || 'Internal server error' });
   }
-
-  const { title, productName } = result.data;
-  const chat = await prisma.chat.create({
-    data: {
-      title,
-      productName: productName || title,
-      userId: req.user.id,
-    },
-  });
-
-  return res.status(201).json(chat);
 };
 
 export const listChats = async (req, res) => {
-  const chats = await prisma.chat.findMany({
-    where: { userId: req.user.id },
-    orderBy: { updatedAt: "desc" },
-    include: {
-      messages: { take: 1, orderBy: { createdAt: "desc" } },
-      productIntelligence: { select: { inputJson: true, status: true } },
-      seoIntelligence: { select: { websiteUrl: true, seoScore: true, updatedAt: true, scoreBreakdown: { select: { overallScore: true } } } },
-    },
-  });
+  try {
+    const chats = await prisma.chat.findMany({
+      where: { userId: req.user.id },
+      orderBy: { updatedAt: "desc" },
+      include: {
+        messages: { take: 1, orderBy: { createdAt: "desc" } },
+        productIntelligence: { select: { inputJson: true, status: true } },
+        seoIntelligence: { select: { websiteUrl: true, seoScore: true, updatedAt: true, scoreBreakdown: { select: { overallScore: true } } } },
+      },
+    });
 
-  const enriched = chats.map(chat => {
-    const input = chat.productIntelligence?.inputJson || {};
-    const growthScore = chat.messages?.[0]?.analysisData?.summary?.overallGrowthScore || null;
-    const seoScore = chat.seoIntelligence?.scoreBreakdown?.overallScore || chat.seoIntelligence?.seoScore || null;
-    return {
-      ...chat,
-      companyName: input.companyName || null,
-      websiteUrl: input.websiteUrl || chat.seoIntelligence?.websiteUrl || null,
-      growthScore,
-      seoScore,
-      status: chat.productIntelligence?.status || chat.seoIntelligence ? 'analyzed' : 'draft',
-    };
-  });
+    const enriched = chats.map(chat => {
+      const input = chat.productIntelligence?.inputJson || {};
+      const growthScore = chat.messages?.[0]?.analysisData?.summary?.overallGrowthScore || null;
+      const seoScore = chat.seoIntelligence?.scoreBreakdown?.overallScore || chat.seoIntelligence?.seoScore || null;
+      return {
+        ...chat,
+        companyName: input.companyName || null,
+        websiteUrl: input.websiteUrl || chat.seoIntelligence?.websiteUrl || null,
+        growthScore,
+        seoScore,
+        status: chat.productIntelligence?.status || chat.seoIntelligence ? 'analyzed' : 'draft',
+      };
+    });
 
-  return res.json(enriched);
+    return res.json(enriched);
+  } catch (error) {
+    console.error(`[Controller] listChats error:`, error);
+    return res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+  }
 };
 
 export const getChat = async (req, res) => {
-  const { chatId } = req.params;
-  const chat = await prisma.chat.findFirst({
-    where: { id: chatId, userId: req.user.id },
-    include: { messages: { orderBy: { createdAt: "asc" } }, analysis: true },
-  });
-  if (!chat) {
-    return res.status(404).json({ success: false, error: "Chat not found" });
+  try {
+    const { chatId } = req.params;
+    const chat = await prisma.chat.findFirst({
+      where: { id: chatId, userId: req.user.id },
+      include: { messages: { orderBy: { createdAt: "asc" } }, analysis: true },
+    });
+    if (!chat) {
+      return res.status(404).json({ success: false, error: "Chat not found" });
+    }
+    return res.json(chat);
+  } catch (error) {
+    console.error(`[Controller] getChat error:`, error);
+    return res.status(500).json({ success: false, error: error.message || 'Internal server error' });
   }
-  return res.json(chat);
 };
 
 export const getFullChat = async (req, res) => {
-  const { chatId } = req.params;
-  const userId = req.user.id;
-  
-  // Verify chat ownership first
-  const chat = await prisma.chat.findFirst({
-    where: { id: chatId, userId },
-  });
-  if (!chat) {
-    return res.status(404).json({ success: false, error: "Chat not found" });
+  try {
+    const { chatId } = req.params;
+    const userId = req.user.id;
+    
+    // Verify chat ownership first
+    const chat = await prisma.chat.findFirst({
+      where: { id: chatId, userId },
+    });
+    if (!chat) {
+      return res.status(404).json({ success: false, error: "Chat not found" });
+    }
+
+    const productAnalysisRecord = await prisma.productAnalysis.findUnique({ where: { chatId } });
+    const productIntelligence = await prisma.productIntelligence.findUnique({ where: { chatId } });
+    const competitorIntelligence = await prisma.competitorIntelligence.findUnique({ where: { chatId } });
+    const seoIntelligence = await prisma.seoIntelligence.findUnique({ where: { chatId } });
+    const campaignIntelligence = await prisma.campaignIntelligence.findUnique({ where: { chatId } });
+    const assistantMessages = await prisma.message.findMany({
+      where: { chatId },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return res.json({
+      chat,
+      productAnalysis: productAnalysisRecord?.outputJson || null,
+      marketDiscovery: productIntelligence?.marketDiscovery || null,
+      competitorAnalysis: competitorIntelligence?.competitorAnalysis || null,
+      seoAnalysis: seoIntelligence?.seoAudit || null,
+      campaignGenerator: campaignIntelligence?.campaignGenerator || null,
+      audienceIntelligence: productIntelligence?.audienceIntelligence || null,
+      assistantMessages
+    });
+  } catch (error) {
+    console.error(`[Controller] getFullChat error:`, error);
+    return res.status(500).json({ success: false, error: error.message || 'Internal server error' });
   }
-
-  const productAnalysisRecord = await prisma.productAnalysis.findUnique({ where: { chatId } });
-  const productIntelligence = await prisma.productIntelligence.findUnique({ where: { chatId } });
-  const competitorIntelligence = await prisma.competitorIntelligence.findUnique({ where: { chatId } });
-  const seoIntelligence = await prisma.seoIntelligence.findUnique({ where: { chatId } });
-  const campaignIntelligence = await prisma.campaignIntelligence.findUnique({ where: { chatId } });
-  const assistantMessages = await prisma.message.findMany({
-    where: { chatId },
-    orderBy: { createdAt: "asc" },
-  });
-
-  return res.json({
-    chat,
-    productAnalysis: productAnalysisRecord?.outputJson || null,
-    marketDiscovery: productIntelligence?.marketDiscovery || null,
-    competitorAnalysis: competitorIntelligence?.competitorAnalysis || null,
-    seoAnalysis: seoIntelligence?.seoAudit || null,
-    campaignGenerator: campaignIntelligence?.campaignGenerator || null,
-    audienceIntelligence: productIntelligence?.audienceIntelligence || null,
-    assistantMessages
-  });
 };
 
 /**
@@ -103,33 +123,34 @@ export const getFullChat = async (req, res) => {
  * Returns all saved analysis results for a chat/project
  */
 export const getFullResults = async (req, res) => {
-  const { chatId } = req.params;
-  const userId = req.user.id;
+  try {
+    const { chatId } = req.params;
+    const userId = req.user.id;
 
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('');
-    console.log('[FullResults Request]');
-    console.log('chatId:', chatId);
-    console.log('userId:', userId);
-    console.log('');
-  }
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('');
+      console.log('[FullResults Request]');
+      console.log('chatId:', chatId);
+      console.log('userId:', userId);
+      console.log('');
+    }
 
-  // Verify chat ownership
-  const chat = await prisma.chat.findFirst({
-    where: { id: chatId, userId },
-  });
-
-  if (!chat) {
-    return res.status(404).json({ 
-      success: false,
-      error: "Chat not found" 
+    // Verify chat ownership
+    const chat = await prisma.chat.findFirst({
+      where: { id: chatId, userId },
     });
-  }
 
-  // Fetch all intelligence modules
-  const productIntelligence = await prisma.productIntelligence.findUnique({ where: { chatId } });
-  const competitorIntelligence = await prisma.competitorIntelligence.findUnique({ where: { chatId } });
-  const campaignIntelligence = await prisma.campaignIntelligence.findUnique({ where: { chatId } });
+    if (!chat) {
+      return res.status(404).json({ 
+        success: false,
+        error: "Chat not found" 
+      });
+    }
+
+    // Fetch all intelligence modules
+    const productIntelligence = await prisma.productIntelligence.findUnique({ where: { chatId } });
+    const competitorIntelligence = await prisma.competitorIntelligence.findUnique({ where: { chatId } });
+    const campaignIntelligence = await prisma.campaignIntelligence.findUnique({ where: { chatId } });
   const seoIntelligence = await prisma.seoIntelligence.findUnique({ 
     where: { chatId },
     include: {
@@ -609,27 +630,36 @@ export const getFullResults = async (req, res) => {
   }
 
   return res.json(canonicalResult);
+  } catch (error) {
+    console.error(`[Controller] getFullResults error:`, error);
+    return res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+  }
 };
 
 export const updateChat = async (req, res) => {
-  const { chatId } = req.params;
-  const result = chatSchema.safeParse(req.body);
-  if (!result.success) {
-    return res.status(400).json({ success: false, error: result.error.errors[0].message });
+  try {
+    const { chatId } = req.params;
+    const result = chatSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ success: false, error: result.error.errors[0].message });
+    }
+
+    const { title, productName } = result.data;
+    const chat = await prisma.chat.updateMany({
+      where: { id: chatId, userId: req.user.id },
+      data: { title, productName: productName || title },
+    });
+
+    if (chat.count === 0) {
+      return res.status(404).json({ success: false, error: "Chat not found" });
+    }
+
+    const updatedChat = await prisma.chat.findUnique({ where: { id: chatId } });
+    return res.json(updatedChat);
+  } catch (error) {
+    console.error(`[Controller] updateChat error:`, error);
+    return res.status(500).json({ success: false, error: error.message || 'Internal server error' });
   }
-
-  const { title, productName } = result.data;
-  const chat = await prisma.chat.updateMany({
-    where: { id: chatId, userId: req.user.id },
-    data: { title, productName: productName || title },
-  });
-
-  if (chat.count === 0) {
-    return res.status(404).json({ success: false, error: "Chat not found" });
-  }
-
-  const updatedChat = await prisma.chat.findUnique({ where: { id: chatId } });
-  return res.json(updatedChat);
 };
 
 export const deleteChat = async (req, res) => {

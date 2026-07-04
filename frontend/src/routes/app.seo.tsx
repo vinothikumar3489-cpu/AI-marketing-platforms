@@ -387,7 +387,7 @@ function TechnicalAuditTab({ data, detailedAudit }: { data: any; detailedAudit?:
               <CardTitle className="text-xs text-muted-foreground">Overall</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{audit.scores.overall}</div>
+              <div className="text-2xl font-bold">{audit.scores?.overall}</div>
             </CardContent>
           </Card>
           <Card className="bg-white/5 border-white/10">
@@ -395,7 +395,7 @@ function TechnicalAuditTab({ data, detailedAudit }: { data: any; detailedAudit?:
               <CardTitle className="text-xs text-muted-foreground">Title</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{audit.scores.title}</div>
+              <div className="text-2xl font-bold">{audit.scores?.title}</div>
             </CardContent>
           </Card>
           <Card className="bg-white/5 border-white/10">
@@ -403,7 +403,7 @@ function TechnicalAuditTab({ data, detailedAudit }: { data: any; detailedAudit?:
               <CardTitle className="text-xs text-muted-foreground">Meta</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{audit.scores.meta}</div>
+              <div className="text-2xl font-bold">{audit.scores?.meta}</div>
             </CardContent>
           </Card>
           <Card className="bg-white/5 border-white/10">
@@ -411,7 +411,7 @@ function TechnicalAuditTab({ data, detailedAudit }: { data: any; detailedAudit?:
               <CardTitle className="text-xs text-muted-foreground">Security</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{audit.scores.security}</div>
+              <div className="text-2xl font-bold">{audit.scores?.security}</div>
             </CardContent>
           </Card>
           <Card className="bg-white/5 border-white/10">
@@ -419,7 +419,7 @@ function TechnicalAuditTab({ data, detailedAudit }: { data: any; detailedAudit?:
               <CardTitle className="text-xs text-muted-foreground">Mobile</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{audit.scores.mobile}</div>
+              <div className="text-2xl font-bold">{audit.scores?.mobile}</div>
             </CardContent>
           </Card>
           <Card className="bg-white/5 border-white/10">
@@ -427,7 +427,7 @@ function TechnicalAuditTab({ data, detailedAudit }: { data: any; detailedAudit?:
               <CardTitle className="text-xs text-muted-foreground">Headings</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{audit.scores.headings}</div>
+              <div className="text-2xl font-bold">{audit.scores?.headings}</div>
             </CardContent>
           </Card>
           <Card className="bg-white/5 border-white/10">
@@ -435,7 +435,7 @@ function TechnicalAuditTab({ data, detailedAudit }: { data: any; detailedAudit?:
               <CardTitle className="text-xs text-muted-foreground">Schema</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{audit.scores.schema}</div>
+              <div className="text-2xl font-bold">{audit.scores?.schema}</div>
             </CardContent>
           </Card>
         </div>
@@ -446,7 +446,7 @@ function TechnicalAuditTab({ data, detailedAudit }: { data: any; detailedAudit?:
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-red-400">
                 <XCircle className="w-5 h-5" />
-                Critical Issues ({audit.issues.critical.length})
+                Critical Issues ({audit.issues?.critical?.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -454,7 +454,7 @@ function TechnicalAuditTab({ data, detailedAudit }: { data: any; detailedAudit?:
                 <div className="text-sm text-muted-foreground">No critical issues found!</div>
               ) : (
                 <ul className="space-y-2">
-                  {audit.issues.critical.map((issue: any, i: number) => (
+                  {audit.issues?.critical?.map((issue: any, i: number) => (
                     <li key={i} className="text-sm">
                       <div className="font-medium text-red-400">{issue.issue}</div>
                       <div className="text-xs text-muted-foreground mt-1">{issue.recommendation}</div>
@@ -477,7 +477,7 @@ function TechnicalAuditTab({ data, detailedAudit }: { data: any; detailedAudit?:
                 <div className="text-sm text-muted-foreground">No high priority issues</div>
               ) : (
                 <ul className="space-y-2">
-                  {audit.issues.high.map((issue: any, i: number) => (
+                  {audit.issues?.high?.map((issue: any, i: number) => (
                     <li key={i} className="text-sm">
                       <div className="font-medium text-yellow-400">{issue.issue}</div>
                       <div className="text-xs text-muted-foreground mt-1">{issue.recommendation}</div>
@@ -500,7 +500,7 @@ function TechnicalAuditTab({ data, detailedAudit }: { data: any; detailedAudit?:
                 <div className="text-sm text-muted-foreground">No medium priority issues</div>
               ) : (
                 <ul className="space-y-2">
-                  {audit.issues.medium.slice(0, 5).map((issue: any, i: number) => (
+                  {audit.issues?.medium?.slice(0, 5)?.map((issue: any, i: number) => (
                     <li key={i} className="text-sm">
                       <div className="font-medium text-orange-400">{issue.issue}</div>
                       <div className="text-xs text-muted-foreground mt-1">{issue.recommendation}</div>

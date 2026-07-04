@@ -934,7 +934,7 @@ function TechnicalAudit({ data }: { data: any }) {
     if (!Array.isArray(issueArray)) return [];
     const seen = new Set();
     return issueArray.filter(issue => {
-      const key = `${asText(issue.title || issue.description || issue)}-${asText(issue.source || issue.category || issue.severity)}`.toLowerCase();
+      const key = `${asText(issue?.title || issue?.description || issue)}-${asText(issue?.source || issue?.category || issue?.severity)}`.toLowerCase();
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -1088,7 +1088,7 @@ function TechnicalAudit({ data }: { data: any }) {
             {critical.length ? critical.map((c: any, i: number) => (
               <div key={i} style={{ padding: '15px', background: '#1a1014', border: '1px solid #ff4757', borderRadius: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <strong style={{ color: '#ff8a8a', fontSize: '15px' }}>{asText(c.issue || c.title, c.type || 'Technical issue')}</strong>
+                  <strong style={{ color: '#ff8a8a', fontSize: '15px' }}>{asText(c?.issue || c?.title, c?.type || 'Technical issue')}</strong>
                   <Badge className="pink">Critical</Badge>
                 </div>
                 {c.source && <Badge className="blue" style={{ fontSize: '10px', marginBottom: '8px' }}>{c.source}</Badge>}
@@ -1098,7 +1098,7 @@ function TechnicalAudit({ data }: { data: any }) {
                 {c.recommendation && (
                   <div style={{ padding: '10px', background: '#0b1220', borderRadius: '6px', fontSize: '13px', borderLeft: '3px solid #10e18b' }}>
                     <span style={{ color: '#10e18b', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>Fix Implementation:</span>
-                    {asText(c.recommendation)}
+                    {asText(c?.recommendation)}
                   </div>
                 )}
               </div>
@@ -1116,14 +1116,14 @@ function TechnicalAudit({ data }: { data: any }) {
             {high.length ? high.map((h: any, i: number) => (
               <div key={i} style={{ padding: '15px', background: '#1a1810', border: '1px solid #ffa502', borderRadius: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <strong style={{ color: '#ffb347', fontSize: '15px' }}>{asText(h.issue || h.title, h.type || 'Improvement needed')}</strong>
+                  <strong style={{ color: '#ffb347', fontSize: '15px' }}>{asText(h?.issue || h?.title, h?.type || 'Improvement needed')}</strong>
                   <Badge className="blue">High</Badge>
                 </div>
                 {h.source && <Badge className="blue" style={{ fontSize: '10px', marginBottom: '8px' }}>{h.source}</Badge>}
                 {h.recommendation && (
                   <div style={{ padding: '10px', background: '#0b1220', borderRadius: '6px', fontSize: '13px', borderLeft: '3px solid #53a7ff', marginTop: '10px' }}>
                     <span style={{ color: '#53a7ff', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>Recommended Action:</span>
-                    {asText(h.recommendation)}
+                    {asText(h?.recommendation)}
                   </div>
                 )}
               </div>
@@ -1136,8 +1136,8 @@ function TechnicalAudit({ data }: { data: any }) {
           <div className="result-grid" style={{ marginTop: '15px' }}>
             {recs.map((r: any, i: number) => (
               <div key={i} style={{ padding: '12px', background: '#151d2b', borderRadius: '8px', borderLeft: '3px solid #53a7ff' }}>
-                <strong style={{ display: 'block', marginBottom: '5px' }}>{asText(r.recommendation || r.fix || r.title, r.area || 'Recommendation')}</strong>
-                <span style={{ fontSize: '12px', color: '#9aa7bd' }}>{asText(r.area || r.impact || r.reason, 'General improvement')}</span>
+                <strong style={{ display: 'block', marginBottom: '5px' }}>{asText(r?.recommendation || r?.fix || r?.title, r?.area || 'Recommendation')}</strong>
+                <span style={{ fontSize: '12px', color: '#9aa7bd' }}>{asText(r?.area || r?.impact || r?.reason, 'General improvement')}</span>
               </div>
             ))}
           </div>
@@ -1184,11 +1184,11 @@ function KeywordIntelligence({ data }: { data: any }) {
               <div key={i} style={{ marginBottom: '15px', paddingLeft: '10px', borderLeft: '2px solid #293245' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#53a7ff' }}></div>
-                  <strong style={{ color: '#53a7ff', fontSize: '15px' }}>{asText(c.name || c.clusterName || c.topic)}</strong>
+                  <strong style={{ color: '#53a7ff', fontSize: '15px' }}>{asText(c?.name || c?.clusterName || c?.topic)}</strong>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', paddingLeft: '16px' }}>
                   {asArray(c.keywords).map((k: any, j) => (
-                    <Badge key={j} className="dark" style={{ border: '1px solid #1d2738' }}>{typeof k === 'string' ? k : asText(k.keyword || k.name, 'Keyword')}</Badge>
+                    <Badge key={j} className="dark" style={{ border: '1px solid #1d2738' }}>{typeof k === 'string' ? k : asText(k?.keyword || k?.name, 'Keyword')}</Badge>
                   ))}
                 </div>
               </div>
@@ -1201,11 +1201,11 @@ function KeywordIntelligence({ data }: { data: any }) {
             {asArray(data.geoKeywords).map((g: any, i) => (
               <div key={i} style={{ padding: '12px', background: '#151d2b', borderRadius: '8px', borderLeft: '3px solid #a855f7' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <strong>{asText(g.question || g.keyword, g.question || g.keyword || 'GEO Keyword')}</strong>
-                  <Badge className="pink">{asText(g.platform || 'AI Overview')}</Badge>
+                  <strong>{asText(g?.question || g?.keyword, g?.question || g?.keyword || 'GEO Keyword')}</strong>
+                  <Badge className="pink">{asText(g?.platform || 'AI Overview')}</Badge>
                 </div>
                 <div style={{ fontSize: '12px', color: '#9aa7bd' }}>
-                  Recommended Content: <span style={{ color: '#10e18b' }}>{asText(g.contentRecommendation || 'FAQ / Guide')}</span>
+                  Recommended Content: <span style={{ color: '#10e18b' }}>{asText(g?.contentRecommendation || 'FAQ / Guide')}</span>
                 </div>
               </div>
             ))}
@@ -1239,17 +1239,17 @@ function KeywordIntelligence({ data }: { data: any }) {
                 return (
                   <tr key={i} style={{ borderBottom: '1px solid #1d2738', fontSize: '14px' }}>
                     <td style={{ padding: '12px', fontWeight: 'bold' }}>
-                      {asText(k.keyword, 'Keyword')}
+                      {asText(k?.keyword, 'Keyword')}
                       {hasDataForSEO && (
                         <Badge className="green" style={{ fontSize: '10px', marginLeft: '8px' }}>DataForSEO</Badge>
                       )}
                       <div style={{ fontSize: '11px', color: '#9aa7bd', marginTop: '4px', fontWeight: 'normal' }}>
-                        URL: {asText(k.suggestedUrl || '/')}
+                        URL: {asText(k?.suggestedUrl || '/')}
                       </div>
                     </td>
                     <td style={{ padding: '12px' }}>
-                      <Badge className={(asText(k.intent) || '').toLowerCase().includes('commercial') ? 'blue' : 'dark'}>
-                        {asText(k.intent || k.searchIntent, 'Informational')}
+                      <Badge className={(asText(k?.intent) || '').toLowerCase().includes('commercial') ? 'blue' : 'dark'}>
+                        {asText(k?.intent || k?.searchIntent, 'Informational')}
                       </Badge>
                     </td>
                     <td style={{ padding: '12px', color: volume !== null ? '#fff' : '#9aa7bd' }}>
@@ -1268,7 +1268,7 @@ function KeywordIntelligence({ data }: { data: any }) {
                     <td style={{ padding: '12px', color: cpc !== null ? '#9aa7bd' : '#9aa7bd' }}>
                       {formatMoney(cpc)}
                     </td>
-                    <td style={{ padding: '12px', color: '#53a7ff' }}>{asText(k.contentType || 'Blog Post')}</td>
+                    <td style={{ padding: '12px', color: '#53a7ff' }}>{asText(k?.contentType || 'Blog Post')}</td>
                     <td style={{ padding: '12px' }}>
                       <Badge className="green">{asNumber(k.opportunity, 80)}/100</Badge>
                     </td>
@@ -1311,14 +1311,14 @@ function CompetitorSEO({ data }: { data: any }) {
             {competitorProfiles.map((c: any, i) => (
               <div key={i} style={{ padding: '20px', background: '#151d2b', borderRadius: '12px', borderTop: `4px solid ${i===0?'#a855f7':i===1?'#53a7ff':'#10e18b'}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <h4 style={{ fontSize: '18px', margin: 0 }}>{asText(c.name || c.title || c.domain, 'Competitor')}</h4>
+                  <h4 style={{ fontSize: '18px', margin: 0 }}>{asText(c?.name || c?.title || c?.domain, 'Competitor')}</h4>
                   {c.competitorType === 'estimated' || c.source === 'CategoryFallback' || c.isEstimated === true ? (
                     <Badge className="yellow">Estimated</Badge>
                   ) : (
                     <Badge className="green">Direct Competitor</Badge>
                   )}
                 </div>
-                <p style={{ fontSize: '13px', color: '#9aa7bd', margin: '0 0 15px 0', minHeight: '40px' }}>{asText(c.positioning || c.description || c.snippet || c.overlapReason, 'Direct competitor')}</p>
+                <p style={{ fontSize: '13px', color: '#9aa7bd', margin: '0 0 15px 0', minHeight: '40px' }}>{asText(c?.positioning || c?.description || c?.snippet || c?.overlapReason, 'Direct competitor')}</p>
                 {c.source === 'DataForSEO_SERP' && (
                   <Badge className="blue" style={{ fontSize: '10px', marginBottom: '10px' }}>DataForSEO SERP</Badge>
                 )}
@@ -1356,7 +1356,7 @@ function CompetitorSEO({ data }: { data: any }) {
                 </div>
                 <div className="list-row" style={{ borderTop: '1px solid #1d2738', paddingTop: '10px' }}>
                   <b style={{ fontSize: '12px', color: '#9aa7bd' }}>Overlap Reason:</b> 
-                  <span style={{ fontSize: '12px', color: '#10e18b', marginLeft: '8px' }}>{asText(c.overlapReason || c.reason || c.description, 'SERP competitor')}</span>
+                  <span style={{ fontSize: '12px', color: '#10e18b', marginLeft: '8px' }}>{asText(c?.overlapReason || c?.reason || c?.description, 'SERP competitor')}</span>
                 </div>
               </div>
             ))}
@@ -1383,7 +1383,7 @@ function CompetitorSEO({ data }: { data: any }) {
               <tbody>
                 {keywordGaps.slice(0, 8).map((k: any, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid #1d2738', fontSize: '13px' }}>
-                    <td style={{ padding: '10px', fontWeight: 'bold', color: '#fff' }}>{asText(k.keyword, 'Keyword')}</td>
+                    <td style={{ padding: '10px', fontWeight: 'bold', color: '#fff' }}>{asText(k?.keyword, 'Keyword')}</td>
                     <td style={{ padding: '10px', color: '#10e18b' }}>{formatNumber(k.searchVolume)}</td>
                     <td style={{ padding: '10px', color: '#ffa502' }}>{asNumber(k.difficulty) ?? "N/A"}</td>
                   </tr>
@@ -1396,8 +1396,8 @@ function CompetitorSEO({ data }: { data: any }) {
             <ul style={{ paddingLeft: '20px', marginTop: '15px' }}>
               {asArray(authorityGaps.backlinkOpportunities || authorityGaps).map((a: any, i) => (
                 <li key={i} style={{ color: '#53a7ff', marginBottom: '10px', fontSize: '14px' }}>
-                  <b>{asText(a.opportunity || a.type || a.domain || a.title, 'Opportunity')}</b>
-                  {a.reason && <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#9aa7bd' }}>{asText(a.reason, 'Backlink opportunity')}</p>}
+                   <b>{asText(a?.opportunity || a?.type || a?.domain || a?.title, 'Opportunity')}</b>
+                  {a.reason && <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#9aa7bd' }}>{asText(a?.reason, 'Backlink opportunity')}</p>}
                 </li>
               ))}
             </ul>
@@ -1456,8 +1456,8 @@ function ContentGaps({ data }: { data: any }) {
             {contentGaps.map((g: any, i) => (
               <div key={i} className="list-row" style={{ borderLeft: '4px solid #ff4757', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '10px', background: '#151d2b', padding: '15px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                  <b style={{ fontSize: '15px' }}>{asText(g.title || g.pageTitle, g.targetKeyword || 'Content opportunity')}</b>
-                  <Badge className="pink">{asText(g.priority || g.businessImpact || 'High')}</Badge>
+                  <b style={{ fontSize: '15px' }}>{asText(g?.title || g?.pageTitle, g?.targetKeyword || 'Content opportunity')}</b>
+                  <Badge className="pink">{asText(g?.priority || g?.businessImpact || 'High')}</Badge>
                 </div>
                 {g.source && g.source !== 'Unavailable' && (
                   <Badge className="blue" style={{ fontSize: '10px' }}>{g.source}</Badge>
@@ -1475,7 +1475,7 @@ function ContentGaps({ data }: { data: any }) {
                     <b>Confidence:</b> <span style={{ color: g.confidence > 80 ? '#10e18b' : g.confidence > 60 ? '#ffa502' : '#ff4757' }}>{g.confidence}%</span>
                   </div>
                 )}
-                <div style={{ fontSize: '13px', color: '#9aa7bd', lineHeight: '1.5' }}>{asText(g.evidence || g.whyItMatters || g.reason || g.contentType, g.pageType || 'Content opportunity')}</div>
+                <div style={{ fontSize: '13px', color: '#9aa7bd', lineHeight: '1.5' }}>{asText(g?.evidence || g?.whyItMatters || g?.reason || g?.contentType, g?.pageType || 'Content opportunity')}</div>
                 {g.recommendedSections && (
                   <div style={{ fontSize: '12px', marginTop: '4px', color: '#53a7ff', borderTop: '1px solid #1d2738', paddingTop: '8px', width: '100%' }}>
                     <b>Recommended Sections:</b> {Array.isArray(g.recommendedSections) ? g.recommendedSections.join(' • ') : g.recommendedSections}
@@ -1499,10 +1499,10 @@ function ContentGaps({ data }: { data: any }) {
             {landingPageIdeas.map((l: any, i) => (
               <div key={i} style={{ padding: '12px', background: '#151d2b', borderRadius: '8px', borderLeft: '3px solid #53a7ff' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <b style={{ fontSize: '14px' }}>{asText(l.title || l.pageTitle || l.targetKeyword, 'Landing page')}</b>
+                  <b style={{ fontSize: '14px' }}>{asText(l?.title || l?.pageTitle || l?.targetKeyword, 'Landing page')}</b>
                   {l.source && l.source !== 'Unavailable' && <Badge className="blue" style={{ fontSize: '10px' }}>{l.source}</Badge>}
                 </div>
-                <div style={{ fontSize: '12px', color: '#9aa7bd' }}>Target: <span style={{ color: '#10e18b' }}>{asText(l.targetKeyword, l.keyword || 'Not specified')}</span></div>
+                <div style={{ fontSize: '12px', color: '#9aa7bd' }}>Target: <span style={{ color: '#10e18b' }}>{asText(l?.targetKeyword, l?.keyword || 'Not specified')}</span></div>
                 {l.searchVolume !== null && <div style={{ fontSize: '12px', color: '#9aa7bd' }}>Volume: <span style={{ color: '#10e18b' }}>{formatNumber(l.searchVolume)}</span></div>}
               </div>
             ))}
@@ -1592,8 +1592,8 @@ function GeoIntelligence({ data }: { data: any }) {
                 <Zap size={20} />
               </div>
               <div style={{ flex: 1 }}>
-                <b style={{ display: 'block', fontSize: '14px', marginBottom: '4px' }}>{asText(c.opportunity || c.type || c.title, c.description || c.opportunity || 'Content opportunity')}</b>
-                <span style={{ color: '#9aa7bd', fontSize: '13px' }}>{asText(c.reason || c.impact, 'Improve AI visibility')}</span>
+                <b style={{ display: 'block', fontSize: '14px', marginBottom: '4px' }}>{asText(c?.opportunity || c?.type || c?.title, c?.description || c?.opportunity || 'Content opportunity')}</b>
+                <span style={{ color: '#9aa7bd', fontSize: '13px' }}>{asText(c?.reason || c?.impact, 'Improve AI visibility')}</span>
               </div>
               <button className="primary-btn" style={{ padding: '8px 16px', fontSize: '12px' }}>Add to Sprint</button>
             </div>
@@ -1663,7 +1663,7 @@ function BlogIntelligence({ data }: { data: any }) {
                 <tr key={i} style={{ borderBottom: '1px solid #1d2738' }}>
                   <td style={{ padding: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                      <b style={{ color: '#fff', fontSize: '14px' }}>{asText(b.title || b.targetKeyword || b.keyword, 'Blog post')}</b>
+                      <b style={{ color: '#fff', fontSize: '14px' }}>{asText(b?.title || b?.targetKeyword || b?.keyword, 'Blog post')}</b>
                       {b.source && b.source !== 'Unavailable' && (
                         <Badge className="blue" style={{ fontSize: '10px' }}>{b.source}</Badge>
                       )}
@@ -1675,11 +1675,11 @@ function BlogIntelligence({ data }: { data: any }) {
                     )}
                     {b.evidence && (
                       <div style={{ fontSize: '11px', color: '#ffa502', marginTop: '4px' }}>
-                        {asText(b.evidence, b.source || 'Keyword research')}
+                        {asText(b?.evidence, b?.source || 'Keyword research')}
                       </div>
                     )}
                   </td>
-                  <td style={{ padding: '12px', color: '#53a7ff', fontWeight: 'bold' }}>{asText(b.targetKeyword || b.keyword, 'Not specified')}</td>
+                  <td style={{ padding: '12px', color: '#53a7ff', fontWeight: 'bold' }}>{asText(b?.targetKeyword || b?.keyword, 'Not specified')}</td>
                   <td style={{ padding: '12px', color: b.searchVolume ? '#10e18b' : '#9aa7bd' }}>
                     {formatNumber(b.searchVolume)}
                   </td>
@@ -1687,7 +1687,7 @@ function BlogIntelligence({ data }: { data: any }) {
                     {b.keywordDifficulty !== null && b.keywordDifficulty !== undefined ? b.keywordDifficulty : 'Unavailable'}
                   </td>
                   <td style={{ padding: '12px' }}>
-                    <Badge className="dark">{asText(b.intent || 'Informational')}</Badge>
+                    <Badge className="dark">{asText(b?.intent || 'Informational')}</Badge>
                   </td>
                   <td style={{ padding: '12px' }}>
                     {b.source && b.source !== 'Unavailable' ? (
@@ -1722,7 +1722,7 @@ function BlogIntelligence({ data }: { data: any }) {
             {asArray(data.blogClusters).map((cluster: any, i: number) => (
               <div key={i} style={{ padding: '15px', background: '#151d2b', borderRadius: '8px', borderLeft: '4px solid #a855f7' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <b style={{ fontSize: '15px' }}>{asText(cluster.clusterName || cluster.topic, 'Cluster')}</b>
+                  <b style={{ fontSize: '15px' }}>{asText(cluster?.clusterName || cluster?.topic, 'Cluster')}</b>
                   <span style={{ fontSize: '12px', color: '#9aa7bd' }}>{asArray(cluster.blogIdeas || cluster.items || []).length} ideas</span>
                 </div>
                 {cluster.totalVolume && (
@@ -1852,17 +1852,17 @@ function ActionPlan({ data }: { data: any }) {
                 {items.map((item: any, i: number) => (
                   <div key={i} style={{ background: '#151d2b', padding: '15px', borderRadius: '8px', borderLeft: '3px solid #53a7ff', boxShadow: '0 4px 6px rgba(0,0,0,0.2)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
-                      <b style={{ fontSize: '14px', lineHeight: '1.4' }}>{asText(item.title || item.action || item.task || item.step)}</b>
-                      <Badge className={(asText(item.priority || 'High') || '').toLowerCase().includes('high') ? 'pink' : 'blue'}>
-                        {asText(item.priority || 'High')}
+                      <b style={{ fontSize: '14px', lineHeight: '1.4' }}>{asText(item?.title || item?.action || item?.task || item?.step)}</b>
+                      <Badge className={(asText(item?.priority || 'High') || '').toLowerCase().includes('high') ? 'pink' : 'blue'}>
+                        {asText(item?.priority || 'High')}
                       </Badge>
                     </div>
                     <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#9aa7bd', lineHeight: '1.5' }}>
-                      {asText(item.reason || item.description || item.impact || item.detail)}
+                      {asText(item?.reason || item?.description || item?.impact || item?.detail)}
                     </p>
                     {item.assignedTo && (
                       <div style={{ marginTop: '10px', fontSize: '11px', color: '#53a7ff', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Target size={12} /> Asssigned to: {asText(item.assignedTo)}
+                        <Target size={12} /> Asssigned to: {asText(item?.assignedTo)}
                       </div>
                     )}
                   </div>

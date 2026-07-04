@@ -160,7 +160,7 @@ export function AudienceIntelligenceModule() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.demographics || []).map((item: string, i: number) => (
                   <li key={i} className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                    {item}
+                    {typeof item === 'object' ? (item.value || item.title || item.name || '') : item}
                   </li>
                 ))}
               </ul>
@@ -169,7 +169,7 @@ export function AudienceIntelligenceModule() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.psychographics || []).map((item: string, i: number) => (
                   <li key={i} className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                    {item}
+                    {typeof item === 'object' ? (item.value || item.title || item.name || '') : item}
                   </li>
                 ))}
               </ul>
@@ -181,7 +181,7 @@ export function AudienceIntelligenceModule() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.buyingMotivations || []).map((item: string, i: number) => (
                   <li key={i} className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                    {item}
+                    {typeof item === 'object' ? (item.value || item.title || item.name || '') : item}
                   </li>
                 ))}
               </ul>
@@ -190,7 +190,7 @@ export function AudienceIntelligenceModule() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.painPoints || []).map((item: string, i: number) => (
                   <li key={i} className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                    {item}
+                    {typeof item === 'object' ? (item.value || item.title || item.name || '') : item}
                   </li>
                 ))}
               </ul>

@@ -815,6 +815,12 @@ model AutomationPlan {
   videoScenes   Json?
   videoSchedule Json?
 
+  // Campaign Generation
+  googleAds       Json?
+  contentCalendar Json?
+  crmWorkflows    Json?
+  workflows       Json?
+
   // Lead Generation
   idealLeadProfile Json?
   leadSources      Json?

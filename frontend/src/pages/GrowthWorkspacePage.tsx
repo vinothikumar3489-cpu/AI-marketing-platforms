@@ -614,7 +614,7 @@ function CampaignStrategy({ data }: { data: any }) {
         {asArray(campaign.creativeAngles).map((c: any, i) => (
           <Card key={i}>
              <h3>Angle {i+1}</h3>
-             <p style={{ color: '#9aa7bd', fontSize: '13px' }}>{asText(c.value || c.angle || c)}</p>
+              <p style={{ color: '#9aa7bd', fontSize: '13px' }}>{asText(c?.value || c?.angle || c)}</p>
           </Card>
         ))}
       </div>
@@ -624,7 +624,7 @@ function CampaignStrategy({ data }: { data: any }) {
         <div style={{ display: 'grid', gap: '10px', marginTop: '15px' }}>
           {asArray(campaign.copyHooks).map((h: any, i) => (
             <div key={i} style={{ padding: '10px', background: '#151d2b', borderRadius: '8px', borderLeft: '3px solid #a855f7' }}>
-              {asText(h.value || h.hook || h)}
+              {asText(h?.value || h?.hook || h)}
             </div>
           ))}
         </div>
@@ -718,7 +718,7 @@ function ExecutiveStory({ data }: { data: any }) {
                     <strong style={{ color: '#fff' }}>Key Features:</strong>
                     <ul style={{ margin: '5px 0 0 20px', color: '#9aa7bd' }}>
                       {asArray(story.productSummary.features).map((f: any, i: number) => (
-                        <li key={i}>{asText(f.value || f)}</li>
+                        <li key={i}>{asText(f?.value || f)}</li>
                       ))}
                     </ul>
                   </div>

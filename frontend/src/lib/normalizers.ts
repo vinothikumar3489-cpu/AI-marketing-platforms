@@ -25,7 +25,7 @@ export const asText = (value: any, fallback = 'Not available') => {
     return joined || fallback;
   }
   if (typeof value === 'object') {
-    const candidate = value.value || value.title || value.name || value.summary || value.keyword || value.opportunity || value.description || value.label;
+    const candidate = value?.value || value?.title || value?.name || value?.summary || value?.keyword || value?.opportunity || value?.description || value?.label;
     if (candidate && typeof candidate === 'string') return candidate.trim();
     if (candidate && typeof candidate === 'number') return String(candidate);
     return fallback;

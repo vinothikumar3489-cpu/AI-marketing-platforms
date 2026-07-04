@@ -221,7 +221,7 @@ export function ProductAnalysisModule() {
                   className="rounded-2xl bg-white/5 p-3 flex items-center gap-2"
                 >
                   <CheckCircle2 className="w-4 h-4 text-brand-blue" />
-                  {item}
+                  {typeof item === 'object' ? (item.value || item.title || item.name || '') : item}
                 </div>
               ))}
             </div>
@@ -289,7 +289,7 @@ function List({ items }: { items: string[] }) {
             className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-start gap-2"
           >
             <CheckCircle2 className="w-4 h-4 mt-0.5 text-brand-blue flex-shrink-0" />
-            {item}
+            {typeof item === 'object' ? (item.value || item.title || item.name || '') : item}
           </li>
         ))
       ) : (

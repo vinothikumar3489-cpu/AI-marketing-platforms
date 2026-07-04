@@ -14,7 +14,7 @@ function AudiencePage() {
         description="5 AI-generated ICP personas with goals, pains, triggers, and preferred channels."
       />
       <div className="grid grid-cols-2 gap-5">
-        {personas.map((p) => (
+        {(personas || []).map((p) => (
           <div key={p.name} className="glass-strong rounded-2xl p-6 relative overflow-hidden">
             <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full bg-brand-purple/20 blur-3xl" />
             <div className="relative">
@@ -46,26 +46,26 @@ function AudiencePage() {
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
                   <div className="text-[10px] uppercase tracking-wider text-brand-cyan mb-1">Goals</div>
-                  <ul className="space-y-0.5 text-muted-foreground">{p.goals.map(g => <li key={g}>ΓÇó {g}</li>)}</ul>
+                  <ul className="space-y-0.5 text-muted-foreground">{(p.goals || []).map(g => <li key={g}>ΓÇó {g}</li>)}</ul>
                 </div>
                 <div>
                   <div className="text-[10px] uppercase tracking-wider text-brand-purple mb-1">Pain Points</div>
-                  <ul className="space-y-0.5 text-muted-foreground">{p.pains.map(g => <li key={g}>ΓÇó {g}</li>)}</ul>
+                  <ul className="space-y-0.5 text-muted-foreground">{(p.pains || []).map(g => <li key={g}>ΓÇó {g}</li>)}</ul>
                 </div>
                 <div>
                   <div className="text-[10px] uppercase tracking-wider text-brand-green mb-1">KPIs</div>
-                  <ul className="space-y-0.5 text-muted-foreground">{p.kpis.map(g => <li key={g}>ΓÇó {g}</li>)}</ul>
+                  <ul className="space-y-0.5 text-muted-foreground">{(p.kpis || []).map(g => <li key={g}>ΓÇó {g}</li>)}</ul>
                 </div>
                 <div>
                   <div className="text-[10px] uppercase tracking-wider text-brand-blue mb-1">Buying Triggers</div>
-                  <ul className="space-y-0.5 text-muted-foreground">{p.triggers.map(g => <li key={g}>ΓÇó {g}</li>)}</ul>
+                  <ul className="space-y-0.5 text-muted-foreground">{(p.triggers || []).map(g => <li key={g}>ΓÇó {g}</li>)}</ul>
                 </div>
               </div>
 
               <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs">
                 <div className="text-muted-foreground">Preferred Channels:</div>
                 <div className="flex gap-1.5">
-                  {p.channels.map(c => <span key={c} className="px-2 py-0.5 rounded-md bg-brand-blue/20 text-brand-cyan">{c}</span>)}
+                  {(p.channels || []).map(c => <span key={c} className="px-2 py-0.5 rounded-md bg-brand-blue/20 text-brand-cyan">{c}</span>)}
                 </div>
               </div>
             </div>
