@@ -37,3 +37,9 @@ Thumbs.db
 error.txt
 output.txt
 debug.log
+*.tsbuildinfo
+git_history.txt
+reflog.txt
+backend/error.txt
+backend/output.txt
+backend/package-lock.json
