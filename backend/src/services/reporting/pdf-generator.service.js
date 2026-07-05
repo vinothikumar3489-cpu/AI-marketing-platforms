@@ -1,4 +1,63 @@
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
+
+let chromium;
+try {
+  chromium = (await import('@sparticuz/chromium')).default;
+} catch {
+  chromium = null;
+}
+
+function getExecutablePath() {
+  return process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
+}
+
+async function resolveExecutablePath() {
+  const configured = getExecutablePath();
+  if (configured) return configured;
+
+  if (chromium && typeof chromium.executablePath === 'function') {
+    try {
+      const p = await chromium.executablePath();
+      if (p) return p;
+    } catch {
+      /* fall through */
+    }
+  }
+
+  if (typeof puppeteer.executablePath === 'function') {
+    try {
+      const p = puppeteer.executablePath();
+      if (p) return p;
+    } catch {
+      /* fall through */
+    }
+  }
+
+  return undefined;
+}
+
+async function createLaunchOptions() {
+  const executablePath = await resolveExecutablePath();
+
+  const args = chromium && Array.isArray(chromium.args)
+    ? [...chromium.args]
+    : ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'];
+
+  if (!args.includes('--disable-gpu')) args.push('--disable-gpu');
+  if (!args.includes('--single-process')) args.push('--single-process');
+
+  const options = {
+    headless: chromium && chromium.headless !== undefined ? chromium.headless : true,
+    args,
+    executablePath
+  };
+
+  if (chromium && chromium.defaultViewport) {
+    options.defaultViewport = chromium.defaultViewport;
+  }
+
+  return options;
+}
 
 export async function generatePdf(htmlContent, options = {}) {
   const {
@@ -13,26 +72,7 @@ export async function generatePdf(htmlContent, options = {}) {
 
   let browser;
   try {
-    const launchOptions = {
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--single-process'
-      ],
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
-    };
-
-    // If PUPPETEER_EXECUTABLE_PATH is not set, try puppeteer's bundled Chrome
-    if (!launchOptions.executablePath) {
-      try {
-        const { execPath } = await import('puppeteer');
-        if (execPath) launchOptions.executablePath = execPath;
-      } catch { /* fall through - let puppeteer auto-detect */ }
-    }
-
+    const launchOptions = await createLaunchOptions();
     browser = await puppeteer.launch(launchOptions);
 
     const page = await browser.newPage();
@@ -70,25 +110,30 @@ export async function generatePdf(htmlContent, options = {}) {
 }
 
 export async function generatePdfFromUrl(url, options = {}) {
-  const launchOptions = {
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-  };
+  console.log('[Report][PDF] generator start (from URL)');
 
-  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-    launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-  }
-
-  const browser = await puppeteer.launch(launchOptions);
+  let browser;
   try {
+    const launchOptions = await createLaunchOptions();
+    browser = await puppeteer.launch(launchOptions);
+
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
-    return await page.pdf({
+
+    const pdfBuffer = await page.pdf({
       format: 'A4',
       printBackground: true,
       ...options
     });
+
+    console.log('[Report][PDF] generator finish:', pdfBuffer.length, 'bytes');
+    return pdfBuffer;
+  } catch (error) {
+    console.error('[Report][PDF] generator failure:', error.message);
+    throw new Error(`PDF generation failed: ${error.message}`);
   } finally {
-    await browser.close();
+    if (browser) {
+      try { await browser.close(); } catch (e) { /* ignore */ }
+    }
   }
 }
