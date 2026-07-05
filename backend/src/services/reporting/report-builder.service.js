@@ -132,95 +132,155 @@ export async function buildReportData(chatId, userId) {
 }
 
 export async function generateExecutiveReport(chatId, userId, format = 'pdf') {
-  console.log(`[Report] Building Executive Report (${format}) for chat: ${chatId}`);
+  console.log(`[Report] type=executive format=${format} chatId=${chatId}`);
+  console.log('[Report] data loaded');
   const data = await buildReportData(chatId, userId);
 
-  switch (format) {
-    case 'pdf': {
-      const html = buildExecutiveReportHtml(data);
-      return await generatePdf(html, { format: 'A4', landscape: false });
+  console.log(`[Report] generator started format=${format}`);
+  try {
+    let result;
+    switch (format) {
+      case 'pdf': {
+        const html = buildExecutiveReportHtml(data);
+        result = await generatePdf(html, { format: 'A4', landscape: false });
+        break;
+      }
+      case 'docx': {
+        result = await generateDocx(data);
+        break;
+      }
+      case 'pptx': {
+        result = await generatePptx(data);
+        break;
+      }
+      case 'json': {
+        result = Buffer.from(JSON.stringify(data, null, 2));
+        break;
+      }
+      case 'csv': {
+        result = Buffer.from(generateCsv(data));
+        break;
+      }
+      case 'markdown': {
+        result = Buffer.from(generateMarkdown(data, 'executive'));
+        break;
+      }
+      default:
+        throw new Error(`Unsupported format: ${format}`);
     }
-    case 'docx': {
-      return await generateDocx(data);
-    }
-    case 'pptx': {
-      return await generatePptx(data);
-    }
-    case 'json': {
-      return Buffer.from(JSON.stringify(data, null, 2));
-    }
-    case 'csv': {
-      return Buffer.from(generateCsv(data));
-    }
-    case 'markdown': {
-      return Buffer.from(generateMarkdown(data, 'executive'));
-    }
-    default:
-      throw new Error(`Unsupported format: ${format}`);
+    console.log(`[Report] generator finish format=${format}`);
+    return result;
+  } catch (error) {
+    console.error(`[Report] generator failure format=${format}:`, error.message);
+    throw error;
   }
 }
 
 export async function generateGrowthReport(chatId, userId, format = 'pdf') {
-  console.log(`[Report] Building Growth Strategy Report (${format}) for chat: ${chatId}`);
+  console.log(`[Report] type=growth format=${format} chatId=${chatId}`);
+  console.log('[Report] data loaded');
   const data = await buildReportData(chatId, userId);
 
-  switch (format) {
-    case 'pdf': {
-      const html = buildGrowthReportHtml(data);
-      return await generatePdf(html, { format: 'A4', landscape: false });
+  console.log(`[Report] generator started format=${format}`);
+  try {
+    let result;
+    switch (format) {
+      case 'pdf': {
+        const html = buildGrowthReportHtml(data);
+        result = await generatePdf(html, { format: 'A4', landscape: false });
+        break;
+      }
+      case 'docx':
+        result = await generateDocx(data);
+        break;
+      case 'pptx':
+        result = await generatePptx(data);
+        break;
+      case 'json':
+        result = Buffer.from(JSON.stringify(data, null, 2));
+        break;
+      case 'csv':
+        result = Buffer.from(generateCsv(data));
+        break;
+      case 'markdown':
+        result = Buffer.from(generateMarkdown(data, 'growth'));
+        break;
+      default:
+        throw new Error(`Unsupported format: ${format}`);
     }
-    case 'docx':
-      return await generateDocx(data);
-    case 'pptx':
-      return await generatePptx(data);
-    case 'json':
-      return Buffer.from(JSON.stringify(data, null, 2));
-    case 'csv':
-      return Buffer.from(generateCsv(data));
-    case 'markdown':
-      return Buffer.from(generateMarkdown(data, 'growth'));
-    default:
-      throw new Error(`Unsupported format: ${format}`);
+    console.log(`[Report] generator finish format=${format}`);
+    return result;
+  } catch (error) {
+    console.error(`[Report] generator failure format=${format}:`, error.message);
+    throw error;
   }
 }
 
 export async function generateSeoReport(chatId, userId, format = 'pdf') {
-  console.log(`[Report] Building SEO Intelligence Report (${format}) for chat: ${chatId}`);
+  console.log(`[Report] type=seo format=${format} chatId=${chatId}`);
+  console.log('[Report] data loaded');
   const data = await buildReportData(chatId, userId);
 
-  switch (format) {
-    case 'pdf': {
-      const html = buildSeoReportHtml(data);
-      return await generatePdf(html, { format: 'A4', landscape: false });
+  console.log(`[Report] generator started format=${format}`);
+  try {
+    let result;
+    switch (format) {
+      case 'pdf': {
+        const html = buildSeoReportHtml(data);
+        result = await generatePdf(html, { format: 'A4', landscape: false });
+        break;
+      }
+      case 'docx':
+        result = await generateDocx(data);
+        break;
+      case 'pptx':
+        result = await generatePptx(data);
+        break;
+      case 'json':
+        result = Buffer.from(JSON.stringify(data, null, 2));
+        break;
+      case 'csv':
+        result = Buffer.from(generateCsv(data));
+        break;
+      case 'markdown':
+        result = Buffer.from(generateMarkdown(data, 'seo'));
+        break;
+      default:
+        throw new Error(`Unsupported format: ${format}`);
     }
-    case 'docx':
-      return await generateDocx(data);
-    case 'pptx':
-      return await generatePptx(data);
-    case 'json':
-      return Buffer.from(JSON.stringify(data, null, 2));
-    case 'csv':
-      return Buffer.from(generateCsv(data));
-    case 'markdown':
-      return Buffer.from(generateMarkdown(data, 'seo'));
-    default:
-      throw new Error(`Unsupported format: ${format}`);
+    console.log(`[Report] generator finish format=${format}`);
+    return result;
+  } catch (error) {
+    console.error(`[Report] generator failure format=${format}:`, error.message);
+    throw error;
   }
 }
 
 export async function generateCompleteReport(chatId, userId, format = 'pdf') {
-  console.log(`[Report] Building Complete Marketing Audit (${format}) for chat: ${chatId}`);
+  console.log(`[Report] type=complete format=${format} chatId=${chatId}`);
+  console.log('[Report] data loaded');
   const data = await buildReportData(chatId, userId);
 
-  switch (format) {
-    case 'pdf': {
-      const html = buildGrowthReportHtml(data);
-      return await generatePdf(html, { format: 'A4', landscape: false });
+  console.log(`[Report] generator started format=${format}`);
+  try {
+    let result;
+    switch (format) {
+      case 'pdf': {
+        const html = buildGrowthReportHtml(data);
+        result = await generatePdf(html, { format: 'A4', landscape: false });
+        break;
+      }
+      case 'json':
+        result = Buffer.from(JSON.stringify(data, null, 2));
+        break;
+      default:
+        throw new Error(`Complete report only supports PDF and JSON formats`);
     }
-    case 'json':
-      return Buffer.from(JSON.stringify(data, null, 2));
-    default:
-      throw new Error(`Complete report only supports PDF and JSON formats`);
+    console.log(`[Report] generator finish format=${format}`);
+    return result;
+  } catch (error) {
+    console.error(`[Report] generator failure format=${format}:`, error.message);
+    throw error;
   }
 }
 

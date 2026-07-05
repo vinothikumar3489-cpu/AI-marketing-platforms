@@ -9,7 +9,7 @@ export async function generatePdf(htmlContent, options = {}) {
     preferCSSPageSize = true
   } = options;
 
-  console.log('[Report][PDF] Generating PDF...');
+  console.log('[Report][PDF] generator start');
 
   let browser;
   try {
@@ -21,11 +21,16 @@ export async function generatePdf(htmlContent, options = {}) {
         '--disable-dev-shm-usage',
         '--disable-gpu',
         '--single-process'
-      ]
+      ],
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
     };
 
-    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-      launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    // If PUPPETEER_EXECUTABLE_PATH is not set, try puppeteer's bundled Chrome
+    if (!launchOptions.executablePath) {
+      try {
+        const { execPath } = await import('puppeteer');
+        if (execPath) launchOptions.executablePath = execPath;
+      } catch { /* fall through - let puppeteer auto-detect */ }
     }
 
     browser = await puppeteer.launch(launchOptions);
@@ -52,10 +57,10 @@ export async function generatePdf(htmlContent, options = {}) {
       `
     });
 
-    console.log('[Report][PDF] PDF generated successfully:', pdfBuffer.length, 'bytes');
+    console.log('[Report][PDF] generator finish:', pdfBuffer.length, 'bytes');
     return pdfBuffer;
   } catch (error) {
-    console.error('[Report][PDF] PDF generation failed:', error.message);
+    console.error('[Report][PDF] generator failure:', error.message);
     throw new Error(`PDF generation failed: ${error.message}`);
   } finally {
     if (browser) {

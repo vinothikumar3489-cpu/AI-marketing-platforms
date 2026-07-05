@@ -1,7 +1,7 @@
 import PptxGenJS from 'pptxgenjs';
 
 export async function generatePptx(data) {
-  console.log('[Report][PPTX] Generating PPTX...');
+  console.log('[Report][PPTX] generator start');
 
   try {
     const { company, market, audience, competitor, technology, pricing, scores, actionPlan } = data || {};
@@ -141,16 +141,17 @@ export async function generatePptx(data) {
     end.addText('CONFIDENTIAL', { x: 1, y: 4.5, w: 8, h: 0.5, fontSize: 10, fontFace: 'Calibri', color: '6B7280', align: 'center' });
 
     const buffer = await pptx.write({ outputType: 'nodebuffer' });
-    console.log('[Report][PPTX] PPTX generated successfully:', buffer.length, 'bytes');
+    console.log('[Report][PPTX] generator finish:', buffer.length, 'bytes');
     return buffer;
   } catch (error) {
-    console.error('[Report][PPTX] PPTX generation failed:', error.message);
+    console.error('[Report][PPTX] generator failure:', error.message);
     throw new Error(`PPTX generation failed: ${error.message}`);
   }
 }
 
 function safeStr(val, fallback = 'Data unavailable') {
   if (val === null || val === undefined || val === '' || val === 'Unknown') return fallback;
+  if (typeof val === 'object') return fallback;
   return String(val);
 }
 

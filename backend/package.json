@@ -8,7 +8,7 @@
     "start": "node src/server.js",
     "prisma": "prisma",
     "seed": "node prisma/seed.js",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate && npx puppeteer browsers install chrome"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

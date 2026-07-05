@@ -6,7 +6,7 @@ import {
 } from 'docx';
 
 export async function generateDocx(data) {
-  console.log('[Report][DOCX] Generating DOCX...');
+  console.log('[Report][DOCX] generator start');
 
   try {
     const { company, market, audience, competitor, technology, pricing, scores } = data || {};
@@ -242,17 +242,26 @@ export async function generateDocx(data) {
     });
 
     const buffer = await Packer.toBuffer(doc);
-    console.log('[Report][DOCX] DOCX generated successfully:', buffer.length, 'bytes');
+    console.log('[Report][DOCX] generator finish:', buffer.length, 'bytes');
     return buffer;
   } catch (error) {
-    console.error('[Report][DOCX] DOCX generation failed:', error.message);
+    console.error('[Report][DOCX] generator failure:', error.message);
     throw new Error(`DOCX generation failed: ${error.message}`);
   }
 }
 
 function safeStr(val, fallback = 'Data unavailable') {
   if (val === null || val === undefined || val === '' || val === 'Unknown') return fallback;
+  if (typeof val === 'object') return fallback;
   return String(val);
+}
+
+function safeArray(val) {
+  if (Array.isArray(val)) return val;
+  if (val === null || val === undefined) return [];
+  if (typeof val === 'string') return [val];
+  if (typeof val === 'object') return Object.values(val).filter(v => typeof v === 'string' || typeof v === 'number');
+  return [];
 }
 
 function createDataSourcesSection() {
@@ -348,8 +357,8 @@ function createPersonaBox(persona) {
         children: [
           new Paragraph({ children: [new TextRun({ text: safeStr(persona.role || persona.name, 'Target Persona'), bold: true, size: 22, color: '4338ca' })] }),
           new Paragraph({ children: [new TextRun({ text: `Company Size: ${safeStr(persona.companySize)}`, size: 20 })] }),
-          new Paragraph({ children: [new TextRun({ text: `Pain Points: ${(persona.painPoints || []).join(', ') || 'Data unavailable'}`, size: 20 })] }),
-          new Paragraph({ children: [new TextRun({ text: `Goals: ${(persona.goals || []).join(', ') || 'Data unavailable'}`, size: 20 })] }),
+          new Paragraph({ children: [new TextRun({ text: `Pain Points: ${safeArray(persona.painPoints).join(', ') || 'Data unavailable'}`, size: 20 })] }),
+          new Paragraph({ children: [new TextRun({ text: `Goals: ${safeArray(persona.goals).join(', ') || 'Data unavailable'}`, size: 20 })] }),
           new Paragraph({ children: [new TextRun({ text: `Budget: ${safeStr(persona.budget)}`, size: 20 })] })
         ]
       })]
