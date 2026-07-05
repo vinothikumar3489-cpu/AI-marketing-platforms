@@ -28,8 +28,8 @@ A complete AI-powered marketing automation platform with Growth Workspace, SEO I
 
 ### Backend (Render)
 - Root Directory: backend
-- Build Command: `npm install && npx prisma generate`
-- Start Command: `npm run dev` or `npm start`
+- Build Command: `npm install && npx prisma generate && npx puppeteer browsers install chrome && npx prisma migrate deploy`
+- Start Command: `npm start`
 - Environment Variables:
   - DATABASE_URL
   - JWT_SECRET
@@ -43,6 +43,7 @@ A complete AI-powered marketing automation platform with Growth Workspace, SEO I
   - JINA_API_KEY
   - CEREBRAS_API_KEY
   - DEEPSEEK_API_KEY
+  - PUPPETEER_EXECUTABLE_PATH (set after first deploy — read from Render build logs)
 
 ### Frontend (Vercel)
 - Root Directory: frontend
