@@ -80,29 +80,54 @@ export async function tryGet(paths: string[]) {
   throw last;
 }
 
-export function downloadReport(chatId: string, type: 'executive' | 'growth' | 'seo', format: string) {
+export async function downloadReport(chatId: string, type: 'executive' | 'growth' | 'seo', format: string): Promise<void> {
   const token = getToken();
   const url = `${API_BASE}/chats/${chatId}/report/${type}/${format}`;
 
-  fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-    .then(res => {
-      if (!res.ok) throw new Error(`Download failed: ${res.status}`);
-      return res.blob();
-    })
-    .then(blob => {
-      const blobUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = `Report_${type}_${chatId}.${format === 'markdown' ? 'md' : format}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(blobUrl);
-      a.remove();
-    })
-    .catch(err => {
-      console.error('[Download Report]', err);
-      alert('Failed to download report. Check server connection.');
+  try {
+    const res = await fetch(url, {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     });
+
+    if (!res.ok) {
+      let errMsg = `Download failed: ${res.status}`;
+      try {
+        const errData = await res.json();
+        errMsg = errData?.error || errMsg;
+      } catch { /* ignore */ }
+      throw new Error(errMsg);
+    }
+
+    const blob = await res.blob();
+    if (blob.size === 0) throw new Error('Downloaded file is empty');
+
+    // Extract filename from Content-Disposition header or use fallback
+    const disposition = res.headers.get('Content-Disposition');
+    let filename = `Report_${type}_${chatId}.${format === 'markdown' ? 'md' : format}`;
+    if (disposition) {
+      const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (match && match[1]) {
+        filename = match[1].replace(/['"]/g, '');
+      }
+    }
+
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(blobUrl);
+    a.remove();
+  } catch (err: any) {
+    console.error('[Download Report]', err);
+    // Try to show a toast if sonner toast is available
+    try {
+      const { toast } = await import('sonner');
+      toast.error(err.message || 'Failed to download report. Check server connection.');
+    } catch {
+      alert(err.message || 'Failed to download report. Check server connection.');
+    }
+    throw err;
+  }
 }

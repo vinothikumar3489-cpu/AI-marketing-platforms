@@ -321,7 +321,7 @@ export default function SEOIntelligencePage() {
               <TrendingUp size={14} /> Download SEO Report ▾
             </button>
             <div className="dropdown-menu" style={{ position: 'absolute', right: 0, top: '100%', background: '#101622', border: '1px solid #293245', borderRadius: '8px', padding: '4px', zIndex: 100, display: 'none', minWidth: '160px' }}>
-              {['pdf', 'json', 'csv', 'markdown'].map(f => (
+              {['pdf', 'docx', 'pptx', 'json', 'csv', 'markdown'].map(f => (
                 <button key={f} onClick={() => { const id = selectedChatId || fullResults?.chat?.id; if (id) downloadReport(id, 'seo', f); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: '#9aa7bd', cursor: 'pointer', fontSize: '13px', borderRadius: '4px' }} onMouseEnter={e => (e.target as HTMLElement).style.background = '#1a2335'} onMouseLeave={e => (e.target as HTMLElement).style.background = 'none'}>{f.toUpperCase()}</button>
               ))}
             </div>

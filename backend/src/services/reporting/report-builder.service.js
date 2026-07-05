@@ -17,7 +17,18 @@ export async function buildReportData(chatId, userId) {
     prisma.productIntelligence.findUnique({ where: { chatId } }),
     prisma.competitorIntelligence.findUnique({ where: { chatId } }),
     prisma.campaignIntelligence.findUnique({ where: { chatId } }),
-    prisma.seoIntelligence.findUnique({ where: { chatId } })
+    prisma.seoIntelligence.findUnique({
+      where: { chatId },
+      include: {
+        rawCrawlData: true,
+        technicalAuditDetail: true,
+        keywordIntelligence: true,
+        competitorSeoRecord: true,
+        contentGapRecord: true,
+        geoIntelligence: true,
+        blogIntelligenceRecord: true
+      }
+    })
   ]);
 
   const input = productIntel?.inputJson || campaignIntel?.inputJson || {};
@@ -35,16 +46,7 @@ export async function buildReportData(chatId, userId) {
   const executiveStory = campaignIntel?.executiveStory || {};
   const actionPlan = campaignIntel?.actionPlan || {};
 
-  const seo = seoIntel ? {
-    scores: seoIntel.technicalAuditDetail || {},
-    keywords: seoIntel.keywordIntelligence || {},
-    competitors: seoIntel.competitorSeoRecord || {},
-    gaps: seoIntel.contentGapRecord || {},
-    geo: seoIntel.geoIntelligence || {},
-    blogs: seoIntel.blogIntelligenceRecord || {},
-    backlinks: seoIntel.rawCrawlData?.[0]?.metadata?.backlinks || {},
-    actionPlan: seoIntel.actionPlan || {}
-  } : null;
+  const seo = seoIntel ? normalizeSeoIntelligence(seoIntel) : null;
 
   const scores = {
     overallGrowthScore: campaign?.growthSummary?.overallGrowthScore || 0,
@@ -191,6 +193,10 @@ export async function generateSeoReport(chatId, userId, format = 'pdf') {
       const html = buildSeoReportHtml(data);
       return await generatePdf(html, { format: 'A4', landscape: false });
     }
+    case 'docx':
+      return await generateDocx(data);
+    case 'pptx':
+      return await generatePptx(data);
     case 'json':
       return Buffer.from(JSON.stringify(data, null, 2));
     case 'csv':
@@ -198,7 +204,7 @@ export async function generateSeoReport(chatId, userId, format = 'pdf') {
     case 'markdown':
       return Buffer.from(generateMarkdown(data, 'seo'));
     default:
-      throw new Error(`SEO report only supports PDF, JSON, CSV, and Markdown formats`);
+      throw new Error(`Unsupported format: ${format}`);
   }
 }
 
@@ -251,6 +257,49 @@ export async function generateReportCharts(chatId, userId) {
   }
 
   return charts;
+}
+
+function normalizeSeoIntelligence(seoIntel) {
+  const keywordRecord = seoIntel.keywordIntelligence || seoIntel.keywordOpportunities || {};
+  const competitorRecord = seoIntel.competitorSeoRecord || seoIntel.competitorKeywords || {};
+  const gapRecord = seoIntel.contentGapRecord || { contentGaps: seoIntel.contentGaps || [] };
+  const geoRecord = seoIntel.geoIntelligence || seoIntel.aiVisibility || {};
+  const blogRecord = seoIntel.blogIntelligenceRecord || { blogIdeas: seoIntel.blogIdeas || [] };
+
+  return {
+    scores: seoIntel.technicalAuditDetail || seoIntel.technicalAudit || {},
+    keywords: normalizeSeoKeywordArray(keywordRecord),
+    competitors: extractArray(competitorRecord?.competitors || competitorRecord?.competitorProfiles || competitorRecord),
+    gaps: extractArray(gapRecord?.contentGaps || seoIntel.contentGaps),
+    geo: {
+      chatgpt: geoRecord.chatGptScore ?? geoRecord.chatGpt ?? geoRecord.chatGptScore ?? geoRecord.chatGptScore,
+      gemini: geoRecord.geminiScore ?? geoRecord.gemini,
+      claude: geoRecord.claudeScore ?? geoRecord.claude,
+      perplexity: geoRecord.perplexityScore ?? geoRecord.perplexity,
+      googleAiOverview: geoRecord.googleAiOverviewScore ?? geoRecord.googleAiOverview,
+      ...geoRecord
+    },
+    blogs: extractArray(blogRecord?.blogIdeas || seoIntel.blogIdeas),
+    backlinks: seoIntel.rawCrawlData?.[0]?.metadata?.backlinks || seoIntel.rawCrawlData?.metadata?.backlinks || {},
+    actionPlan: seoIntel.actionPlan || {}
+  };
+}
+
+function normalizeSeoKeywordArray(keywordRecord) {
+  if (!keywordRecord) return [];
+  if (Array.isArray(keywordRecord)) return keywordRecord;
+  if (typeof keywordRecord === 'object') {
+    const result = [];
+    ['primaryKeywords', 'secondaryKeywords', 'longTailKeywords', 'questionKeywords', 'competitorKeywords', 'contentOpportunities', 'geoKeywords', 'blogIdeas'].forEach(key => {
+      if (Array.isArray(keywordRecord[key])) {
+        result.push(...keywordRecord[key]);
+      } else if (typeof keywordRecord[key] === 'string') {
+        result.push(keywordRecord[key]);
+      }
+    });
+    return result.length > 0 ? result : extractArray(keywordRecord);
+  }
+  return [];
 }
 
 function generateMarkdown(data, type = 'executive') {

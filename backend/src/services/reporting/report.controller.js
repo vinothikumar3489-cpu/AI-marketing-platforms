@@ -17,10 +17,11 @@ export const exportExecutiveReportHandler = async (req, res) => {
   }
 
   try {
-    const buffer = await generateExecutiveReport(chatId, userId, format);
+    let buffer = await generateExecutiveReport(chatId, userId, format);
+    if (!Buffer.isBuffer(buffer)) buffer = Buffer.from(buffer);
     sendFileResponse(res, buffer, format, `ExecutiveReport_${chatId}`);
   } catch (error) {
-    console.error('[Report Controller] Error:', error.message);
+    console.error('[Report Controller] Error:', error);
     return res.status(500).json({ success: false, error: error.message || 'Report generation failed' });
   }
 };
@@ -39,10 +40,11 @@ export const exportGrowthReportHandler = async (req, res) => {
   }
 
   try {
-    const buffer = await generateGrowthReport(chatId, userId, format);
+    let buffer = await generateGrowthReport(chatId, userId, format);
+    if (!Buffer.isBuffer(buffer)) buffer = Buffer.from(buffer);
     sendFileResponse(res, buffer, format, `GrowthReport_${chatId}`);
   } catch (error) {
-    console.error('[Report Controller] Error:', error.message);
+    console.error('[Report Controller] Error:', error);
     return res.status(500).json({ success: false, error: error.message || 'Report generation failed' });
   }
 };
@@ -55,16 +57,17 @@ export const exportSeoReportHandler = async (req, res) => {
     return res.status(400).json({ success: false, error: 'Missing chatId or user' });
   }
 
-  const validFormats = ['pdf', 'json', 'csv', 'markdown'];
+  const validFormats = ['pdf', 'docx', 'pptx', 'json', 'csv', 'markdown'];
   if (!validFormats.includes(format)) {
-    return res.status(400).json({ success: false, error: `Unsupported format: ${format}. SEO report supports: ${validFormats.join(', ')}` });
+    return res.status(400).json({ success: false, error: `Unsupported format: ${format}. Supported: ${validFormats.join(', ')}` });
   }
 
   try {
-    const buffer = await generateSeoReport(chatId, userId, format);
+    let buffer = await generateSeoReport(chatId, userId, format);
+    if (!Buffer.isBuffer(buffer)) buffer = Buffer.from(buffer);
     sendFileResponse(res, buffer, format, `SEOReport_${chatId}`);
   } catch (error) {
-    console.error('[Report Controller] Error:', error.message);
+    console.error('[Report Controller] Error:', error);
     return res.status(500).json({ success: false, error: error.message || 'Report generation failed' });
   }
 };
