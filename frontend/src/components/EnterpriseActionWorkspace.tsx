@@ -163,14 +163,14 @@ export function ExecutiveActionCenter({ actions, onActionUpdate }: { actions: St
               <input type="checkbox" checked={a.status === 'completed'} onChange={() => handleStatusChange(a.id, a.status === 'completed' ? 'pending' : 'completed')} style={{ width: '16px', height: '16px', accentColor: C.excellent, cursor: 'pointer' }} />
               <div style={{ flex: 1, minWidth: '200px' }}>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: a.status === 'completed' ? C.dim : C.text, textDecoration: a.status === 'completed' ? 'line-through' : 'none' }}>{a.title}</span>
-                  <span style={S.tag(priorityColor(a.priority))}>{a.priority}</span>
-                  {a.sourceModule && <span style={S.tag(C.accent)}>{a.sourceModule}</span>}
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: a.status === 'completed' ? C.dim : C.text, textDecoration: a.status === 'completed' ? 'line-through' : 'none' }}>{renderSafeValue(a.title)}</span>
+                  <span style={S.tag(priorityColor(a.priority))}>{renderSafeValue(a.priority)}</span>
+                  {a.sourceModule && <span style={S.tag(C.accent)}>{renderSafeValue(a.sourceModule)}</span>}
                 </div>
                 <div style={{ display: 'flex', gap: '12px', marginTop: '4px', fontSize: '11px', color: C.muted, flexWrap: 'wrap' }}>
-                  {a.owner && <span style={S.flexCenter}><User size={11} /> {a.owner}</span>}
-                  {a.timeline && <span style={S.flexCenter}><Clock size={11} /> {a.timeline}</span>}
-                  {a.expectedRoi && <span style={{ color: C.excellent }}>ROI: {a.expectedRoi}</span>}
+                  {a.owner && <span style={S.flexCenter}><User size={11} /> {renderSafeValue(a.owner)}</span>}
+                  {a.timeline && <span style={S.flexCenter}><Clock size={11} /> {renderSafeValue(a.timeline)}</span>}
+                  {a.expectedRoi && <span style={{ color: C.excellent }}>ROI: {renderSafeValue(a.expectedRoi)}</span>}
                   {a.confidence !== undefined && <ConfidenceBadge value={a.confidence} size="sm" />}
                 </div>
               </div>
@@ -183,7 +183,7 @@ export function ExecutiveActionCenter({ actions, onActionUpdate }: { actions: St
                     <div style={{ fontSize: '9px', color: C.dim, textAlign: 'center', marginTop: '2px' }}>{a.progress}%</div>
                   </div>
                 )}
-                <span style={S.badge(statusColor(a.status))}>{a.status}</span>
+                <span style={S.badge(statusColor(a.status))}>{renderSafeValue(a.status)}</span>
                 {a.approvalStatus && a.approvalStatus !== 'pending' && (
                   a.approvalStatus === 'approved' ? <CheckCircle2 size={14} style={{ color: C.excellent }} /> :
                   a.approvalStatus === 'rejected' ? <X size={14} style={{ color: C.critical }} /> :
@@ -209,7 +209,7 @@ export function ExecutiveActionCenter({ actions, onActionUpdate }: { actions: St
 function FilterButton({ label, active, count, onClick, color }: { label: string; active: boolean; count: number; onClick: () => void; color: string }) {
   return (
     <button onClick={onClick} style={{ padding: '5px 10px', borderRadius: '6px', border: active ? `1px solid ${color}` : `1px solid ${C.border}`, background: active ? `${color}12` : C.bg, cursor: 'pointer', fontSize: '11px', fontWeight: active ? 600 : 400, color: active ? color : C.muted, display: 'flex', alignItems: 'center', gap: '4px' }}>
-      {label} {count > 0 && <span style={{ background: active ? color : C.dim, color: '#fff', borderRadius: '8px', padding: '0 5px', fontSize: '9px', fontWeight: 700 }}>{count}</span>}
+      {renderSafeValue(label)} {count > 0 && <span style={{ background: active ? color : C.dim, color: '#fff', borderRadius: '8px', padding: '0 5px', fontSize: '9px', fontWeight: 700 }}>{count}</span>}
     </button>
   );
 }
@@ -284,10 +284,10 @@ export function TaskManager({ actions, onActionUpdate }: { actions: StoredAction
               </button>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: a.status === 'completed' ? C.dim : C.text, textDecoration: a.status === 'completed' ? 'line-through' : 'none' }}>{a.title}</span>
-                  <span style={S.tag(priorityColor(a.priority))}>{a.priority}</span>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: a.status === 'completed' ? C.dim : C.text, textDecoration: a.status === 'completed' ? 'line-through' : 'none' }}>{renderSafeValue(a.title)}</span>
+                  <span style={S.tag(priorityColor(a.priority))}>{renderSafeValue(a.priority)}</span>
                 </div>
-                {a.description && <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>{a.description}</div>}
+                {a.description && <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>{renderSafeValue(a.description)}</div>}
               </div>
               <div style={{ display: 'flex', gap: '4px' }}>
                 <button onClick={() => { setEditId(a.id); setForm({ title: a.title, description: a.description, priority: a.priority, owner: a.owner, dueDate: a.dueDate, sourceModule: a.sourceModule }); }} style={{ background: 'none', border: 'none', color: C.dim, cursor: 'pointer', padding: '4px' }}><Edit3 size={13} /></button>
@@ -295,10 +295,10 @@ export function TaskManager({ actions, onActionUpdate }: { actions: StoredAction
               </div>
             </div>
             <div style={{ display: 'flex', gap: '16px', marginTop: '8px', fontSize: '11px', color: C.muted, flexWrap: 'wrap', alignItems: 'center' }}>
-              {a.owner && <span style={S.flexCenter}><User size={11} /> {a.owner}</span>}
-              {a.dueDate && <span style={S.flexCenter}><Calendar size={11} /> {a.dueDate}</span>}
-              {a.sourceModule && <span style={S.flexCenter}><Layers size={11} /> {a.sourceModule}</span>}
-              <span style={S.badge(a.status === 'completed' ? C.excellent : a.status === 'in-progress' ? C.good : a.status === 'blocked' ? C.critical : C.needsImprovement)}>{a.status}</span>
+              {a.owner && <span style={S.flexCenter}><User size={11} /> {renderSafeValue(a.owner)}</span>}
+              {a.dueDate && <span style={S.flexCenter}><Calendar size={11} /> {renderSafeValue(a.dueDate)}</span>}
+              {a.sourceModule && <span style={S.flexCenter}><Layers size={11} /> {renderSafeValue(a.sourceModule)}</span>}
+              <span style={S.badge(a.status === 'completed' ? C.excellent : a.status === 'in-progress' ? C.good : a.status === 'blocked' ? C.critical : C.needsImprovement)}>{renderSafeValue(a.status)}</span>
               {a.progress > 0 && a.status !== 'completed' && (
                 <div style={{ flex: 1, maxWidth: '120px' }}>
                   <div style={{ height: '4px', background: '#1d2738', borderRadius: '2px', overflow: 'hidden' }}>
@@ -350,7 +350,7 @@ export function ProgressTracking({ modules, onModuleClick }: { modules: Progress
               onMouseLeave={e => { if (onModuleClick) (e.currentTarget as HTMLElement).style.borderColor = C.border; }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
                 {m.icon && <m.icon size={16} style={{ color: barColor }} />}
-                <span style={{ fontSize: '13px', fontWeight: 600, color: C.text, flex: 1 }}>{m.label}</span>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: C.text, flex: 1 }}>{renderSafeValue(m.label)}</span>
                 <span style={{ fontSize: '13px', fontWeight: 700, color: barColor }}>{Math.round(m.value)}%</span>
               </div>
               <div style={{ height: '8px', background: '#1d2738', borderRadius: '4px', overflow: 'hidden' }}>
@@ -398,8 +398,8 @@ export function TeamCollaboration({ actions, onActionUpdate }: { actions: Stored
         <div style={{ fontSize: '11px', color: C.dim, padding: '8px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tasks with Comments</div>
         {actions.filter(a => a.comments.length > 0).map(a => (
           <button key={a.id} onClick={() => setSelectedId(a.id)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', background: selectedId === a.id ? `${C.accent}12` : 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', marginBottom: '2px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: selectedId === a.id ? C.accent : C.text }}>{a.title}</div>
-            <div style={{ fontSize: '10px', color: C.dim }}><MessageSquare size={10} /> {a.comments.length} · {a.status}</div>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: selectedId === a.id ? C.accent : C.text }}>{renderSafeValue(a.title)}</div>
+            <div style={{ fontSize: '10px', color: C.dim }}><MessageSquare size={10} /> {a.comments.length} · {renderSafeValue(a.status)}</div>
           </button>
         ))}
       </div>
@@ -413,10 +413,10 @@ export function TeamCollaboration({ actions, onActionUpdate }: { actions: Stored
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', paddingBottom: '10px', borderBottom: `1px solid ${C.border}` }}>
               <div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: C.text }}>{selected.title}</div>
-                <div style={{ fontSize: '11px', color: C.muted }}>{selected.owner} · {selected.status}</div>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: C.text }}>{renderSafeValue(selected.title)}</div>
+                <div style={{ fontSize: '11px', color: C.muted }}>{renderSafeValue(selected.owner)} · {renderSafeValue(selected.status)}</div>
               </div>
-              <span style={S.tag(selected.priority === 'Critical' ? C.critical : selected.priority === 'High' ? C.orange : C.needsImprovement)}>{selected.priority}</span>
+              <span style={S.tag(selected.priority === 'Critical' ? C.critical : selected.priority === 'High' ? C.orange : C.needsImprovement)}>{renderSafeValue(selected.priority)}</span>
             </div>
             <div style={{ flex: 1, overflow: 'auto', maxHeight: '300px', display: 'grid', gap: '8px' }}>
               {selected.comments.length === 0 && <div style={{ textAlign: 'center', padding: '30px', color: C.dim, fontSize: '12px' }}>No comments yet.</div>}
@@ -424,7 +424,7 @@ export function TeamCollaboration({ actions, onActionUpdate }: { actions: Stored
                 <div key={c.id} style={{ padding: '8px 10px', background: C.bg, borderRadius: '8px', borderLeft: `3px solid ${c.resolved ? C.excellent : C.accent}`, opacity: c.resolved ? 0.7 : 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                     <div style={{ fontSize: '11px', fontWeight: 600, color: C.accent, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <User size={11} /> {c.author}
+                      <User size={11} /> {renderSafeValue(c.author)}
                       {c.mentions && c.mentions.length > 0 && c.mentions.map((m, i) => <span key={i} style={S.tag(C.needsImprovement)}>{renderSafeValue(m)}</span>)}
                     </div>
                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
@@ -434,7 +434,7 @@ export function TeamCollaboration({ actions, onActionUpdate }: { actions: Stored
                       </button>
                     </div>
                   </div>
-                  <div style={{ fontSize: '12px', color: C.muted, lineHeight: 1.5 }}>{c.text}</div>
+                  <div style={{ fontSize: '12px', color: C.muted, lineHeight: 1.5 }}>{renderSafeValue(c.text)}</div>
                 </div>
               ))}
             </div>
@@ -484,13 +484,13 @@ export function ApprovalWorkflow({ actions, onActionUpdate }: { actions: StoredA
     <div key={a.id} style={{ ...S.row, flexDirection: 'column', alignItems: 'stretch' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{a.title}</div>
-          <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>Owner: {a.owner} · {a.sourceModule || 'General'}</div>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{renderSafeValue(a.title)}</div>
+          <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>Owner: {renderSafeValue(a.owner)} · {renderSafeValue(a.sourceModule || 'General')}</div>
         </div>
-        <span style={S.tag(a.priority === 'Critical' ? C.critical : a.priority === 'High' ? C.orange : C.needsImprovement)}>{a.priority}</span>
+        <span style={S.tag(a.priority === 'Critical' ? C.critical : a.priority === 'High' ? C.orange : C.needsImprovement)}>{renderSafeValue(a.priority)}</span>
       </div>
-      {a.approverNotes && <div style={{ fontSize: '11px', color: C.needsImprovement, fontStyle: 'italic', marginTop: '4px', padding: '4px 8px', background: C.bg, borderRadius: '4px' }}>Notes: {a.approverNotes}</div>}
-      {a.approvedBy && <div style={{ fontSize: '10px', color: C.dim, marginTop: '4px' }}>By {a.approvedBy} · {a.approvedDate ? new Date(a.approvedDate).toLocaleDateString() : ''}</div>}
+      {a.approverNotes && <div style={{ fontSize: '11px', color: C.needsImprovement, fontStyle: 'italic', marginTop: '4px', padding: '4px 8px', background: C.bg, borderRadius: '4px' }}>Notes: {renderSafeValue(a.approverNotes)}</div>}
+      {a.approvedBy && <div style={{ fontSize: '10px', color: C.dim, marginTop: '4px' }}>By {renderSafeValue(a.approvedBy)} · {a.approvedDate ? new Date(a.approvedDate).toLocaleDateString() : ''}</div>}
       <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
         {a.approvalStatus === 'pending' || a.approvalStatus === 'needs-review' ? (
           <>
@@ -584,7 +584,7 @@ export function ExecutiveNotifications({ notifications, onMarkRead, onMarkAllRea
             {!n.read && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: C.accent, flexShrink: 0, marginTop: '3px' }} />}
             {iconFor(n.type)}
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '12px', color: n.read ? C.muted : C.text, fontWeight: n.read ? 400 : 600 }}>{n.message}</div>
+              <div style={{ fontSize: '12px', color: n.read ? C.muted : C.text, fontWeight: n.read ? 400 : 600 }}>{renderSafeValue(n.message)}</div>
               <div style={{ fontSize: '10px', color: C.dim, marginTop: '2px' }}>{new Date(n.timestamp).toLocaleString()}</div>
             </div>
           </div>
@@ -637,7 +637,7 @@ export function BusinessCalendar({ events, onEventClick }: { events: CalendarEve
               <div style={{ fontSize: '10px', color: C.dim, marginBottom: '2px', fontWeight: 600 }}>{day.date.getDate()}</div>
               {day.events.slice(0, 2).map(e => (
                 <div key={e.id} onClick={() => onEventClick?.(e)} style={{ padding: '2px 4px', marginBottom: '2px', borderRadius: '3px', background: `${typeColors[e.type] || C.dim}20`, color: typeColors[e.type] || C.dim, cursor: 'pointer', fontSize: '9px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {e.title}
+                  {renderSafeValue(e.title)}
                 </div>
               ))}
               {day.events.length > 2 && <div style={{ fontSize: '8px', color: C.dim }}>+{day.events.length - 2} more</div>}
@@ -667,10 +667,10 @@ export function BusinessCalendar({ events, onEventClick }: { events: CalendarEve
             onMouseLeave={ev => (ev.currentTarget as HTMLElement).style.borderColor = '#1d2738'}>
             <div style={{ width: '3px', height: '32px', borderRadius: '2px', background: typeColors[e.type] || C.dim, flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{e.title}</div>
-              <div style={{ fontSize: '11px', color: C.muted }}>{new Date(e.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {e.module || e.type}</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{renderSafeValue(e.title)}</div>
+              <div style={{ fontSize: '11px', color: C.muted }}>{new Date(e.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {renderSafeValue(e.module || e.type)}</div>
             </div>
-            <span style={S.tag(typeColors[e.type] || C.dim)}>{e.type}</span>
+            <span style={S.tag(typeColors[e.type] || C.dim)}>{renderSafeValue(e.type)}</span>
           </div>
         ))}
       </div>
@@ -714,7 +714,7 @@ export function KpiTracking({ kpis, onKpiUpdate }: { kpis: KpiData[]; onKpiUpdat
             <div key={k.id} style={{ ...S.card, padding: '14px', position: 'relative' }}>
               <button onClick={() => handleDelete(k.id)} style={{ position: 'absolute', top: '8px', right: '8px', background: 'none', border: 'none', color: C.dim, cursor: 'pointer', padding: '2px' }}><X size={12} /></button>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: C.text }}>{k.label}</span>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: C.text }}>{renderSafeValue(k.label)}</span>
                 {trendIcon(k.trend)}
               </div>
               <div style={{ fontSize: '24px', fontWeight: 700, color }}>{k.current}<span style={{ fontSize: '12px', color: C.dim }}>/{k.target}</span></div>
@@ -722,8 +722,8 @@ export function KpiTracking({ kpis, onKpiUpdate }: { kpis: KpiData[]; onKpiUpdat
                 <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '2px' }} />
               </div>
               <div style={{ display: 'flex', gap: '8px', fontSize: '10px', color: C.muted, flexWrap: 'wrap' }}>
-                {k.owner && <span><User size={10} /> {k.owner}</span>}
-                {k.deadline && <span><Calendar size={10} /> {k.deadline}</span>}
+                {k.owner && <span><User size={10} /> {renderSafeValue(k.owner)}</span>}
+                {k.deadline && <span><Calendar size={10} /> {renderSafeValue(k.deadline)}</span>}
                 {k.confidence && <ConfidenceBadge value={k.confidence} size="sm" />}
               </div>
             </div>
@@ -770,8 +770,8 @@ export function ActivityTimeline({ activities }: { activities: ActivityItem[] })
                   {item.icon ? <item.icon size={14} style={{ color: moduleColor(item.module) }} /> : <Activity size={14} style={{ color: moduleColor(item.module) }} />}
                 </div>
                 <div style={{ flex: 1, padding: '10px 12px', background: C.bg, borderRadius: '8px', border: `1px solid #1d2738` }}>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: C.text }}>{item.action}</div>
-                  <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>{item.description}</div>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: C.text }}>{renderSafeValue(item.action)}</div>
+                  <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>{renderSafeValue(item.description)}</div>
                   <div style={{ fontSize: '10px', color: C.dim, marginTop: '4px' }}>{new Date(item.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
                 </div>
               </div>
@@ -805,7 +805,7 @@ export function VersionHistory({ versions, currentVersion, onSelectVersion }: {
             onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = currentVersion === v.id ? C.accent + '60' : '#1d2738'}>
             <div style={{ width: '4px', height: '32px', borderRadius: '2px', background: currentVersion === v.id ? C.accent : C.dim, flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{v.label}</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{renderSafeValue(v.label)}</div>
               <div style={{ fontSize: '11px', color: C.muted }}>{new Date(v.date).toLocaleString()}</div>
             </div>
             {currentVersion === v.id && <span style={S.badge(C.accent)}>Current</span>}
@@ -827,7 +827,7 @@ export function VersionHistory({ versions, currentVersion, onSelectVersion }: {
       {current && compare && (
         <div style={{ ...S.card }}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: C.text, marginBottom: '12px' }}>
-            Comparing: {current.label} vs {compare.label}
+            Comparing: {renderSafeValue(current.label)} vs {renderSafeValue(compare.label)}
           </div>
           <CompareResults metrics={[
             ...Object.entries(compare.summary || {}).map(([k, val]) => ({
@@ -880,7 +880,7 @@ export function WorkspaceDashboard({ actions, notifications, activities, kpis, o
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = q.color + '60'}
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = C.border}>
                 <q.icon size={20} style={{ color: q.color, marginBottom: '6px' }} />
-                <div style={{ fontSize: '11px', color: C.muted }}>{q.label}</div>
+                <div style={{ fontSize: '11px', color: C.muted }}>{renderSafeValue(q.label)}</div>
               </button>
             ))}
           </div>
@@ -891,7 +891,7 @@ export function WorkspaceDashboard({ actions, notifications, activities, kpis, o
             {recentActivity.map(a => (
               <div key={a.id} style={{ padding: '6px 8px', background: C.bg, borderRadius: '6px', display: 'flex', gap: '8px', alignItems: 'center' }}>
                 {a.icon ? <a.icon size={12} style={{ color: C.accent }} /> : <Activity size={12} style={{ color: C.dim }} />}
-                <div style={{ flex: 1, fontSize: '11px', color: C.muted }}><strong style={{ color: C.text }}>{a.action}</strong> — {a.description}</div>
+                <div style={{ flex: 1, fontSize: '11px', color: C.muted }}><strong style={{ color: C.text }}>{renderSafeValue(a.action)}</strong> — {renderSafeValue(a.description)}</div>
                 <span style={{ fontSize: '9px', color: C.dim }}>{new Date(a.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
               </div>
             ))}
@@ -906,7 +906,7 @@ export function WorkspaceDashboard({ actions, notifications, activities, kpis, o
               const pct = k.target > 0 ? Math.round((k.current / k.target) * 100) : 0;
               return (
                 <div key={k.id} style={{ padding: '10px', background: C.bg, borderRadius: '6px' }}>
-                  <div style={{ fontSize: '10px', color: C.muted, marginBottom: '2px' }}>{k.label}</div>
+                  <div style={{ fontSize: '10px', color: C.muted, marginBottom: '2px' }}>{renderSafeValue(k.label)}</div>
                   <div style={{ fontSize: '18px', fontWeight: 700, color: pct >= 80 ? C.excellent : pct >= 50 ? C.needsImprovement : C.critical }}>{k.current}<span style={{ fontSize: '11px', color: C.dim }}>/{k.target}</span></div>
                 </div>
               );
@@ -925,7 +925,7 @@ function StatCard({ icon: Icon, label, value, color, onClick }: { icon: any; lab
       onMouseLeave={e => { if (onClick) (e.currentTarget as HTMLElement).style.borderColor = C.border; }}>
       <Icon size={22} style={{ color, marginBottom: '6px', display: 'inline-block' }} />
       <div style={{ fontSize: '26px', fontWeight: 700, color: C.text }}>{value}</div>
-      <div style={{ fontSize: '11px', color: C.muted }}>{label}</div>
+      <div style={{ fontSize: '11px', color: C.muted }}>{renderSafeValue(label)}</div>
     </div>
   );
 }
@@ -955,7 +955,7 @@ export function EnterpriseReportLibrary({ reports, onDownload, onPreview }: {
         </div>
         <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ ...S.input, width: 'auto' }}>
           <option value="all">All Types</option>
-          {[...new Set(reports.map(r => r.type))].map(t => <option key={t} value={t}>{t}</option>)}
+          {[...new Set(reports.map(r => r.type))].map(t => <option key={t} value={t}>{renderSafeValue(t)}</option>)}
         </select>
         <Badge tone="blue">{filtered.length} reports</Badge>
       </div>
@@ -972,12 +972,12 @@ export function EnterpriseReportLibrary({ reports, onDownload, onPreview }: {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <FileText size={18} style={{ color: C.accent }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{r.title}</div>
-                  <div style={{ fontSize: '11px', color: C.muted }}>{r.company}</div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{renderSafeValue(r.title)}</div>
+                  <div style={{ fontSize: '11px', color: C.muted }}>{renderSafeValue(r.company)}</div>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '4px', fontSize: '10px', color: C.dim, marginBottom: '8px', flexWrap: 'wrap' }}>
-                <span style={S.tag(C.accent)}>{r.type}</span>
+                <span style={S.tag(C.accent)}>{renderSafeValue(r.type)}</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={10} /> {new Date(r.date).toLocaleDateString()}</span>
               </div>
               <div style={{ display: 'flex', gap: '6px' }}>
@@ -1023,12 +1023,12 @@ export function SmartRecommendations({ recommendations, onApply }: {
             <div key={r.id} style={{ ...S.row, flexWrap: 'wrap' }}>
               <Sparkles size={14} style={{ color: C.accent, flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: '200px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{r.action}</div>
-                <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>{r.reason}</div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{renderSafeValue(r.action)}</div>
+                <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>{renderSafeValue(r.reason)}</div>
               </div>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={S.tag(sourceColors[r.source] || C.dim)}>{r.source}</span>
-                <span style={S.tag(r.impact === 'high' ? C.critical : r.impact === 'medium' ? C.needsImprovement : C.good)}>{r.impact}</span>
+                <span style={S.tag(sourceColors[r.source] || C.dim)}>{renderSafeValue(r.source)}</span>
+                <span style={S.tag(r.impact === 'high' ? C.critical : r.impact === 'medium' ? C.needsImprovement : C.good)}>{renderSafeValue(r.impact)}</span>
                 <ConfidenceBadge value={r.confidence} size="sm" />
                 <button onClick={() => onApply?.(r)} style={S.btn(C.excellent)}><Plus size={12} /> Apply</button>
               </div>

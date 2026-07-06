@@ -16,11 +16,11 @@ export function PositioningEngineModule() {
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-4">
           <div>
             <div className="text-xs uppercase tracking-wider text-muted-foreground">Positioning Statement</div>
-            <div className="text-sm text-foreground mt-2">{sample.positioningStatement}</div>
+            <div className="text-sm text-foreground mt-2">{renderSafeValue(sample.positioningStatement)}</div>
           </div>
           <div>
             <div className="text-xs uppercase tracking-wider text-muted-foreground">Differentiation</div>
-            <div className="text-sm text-foreground mt-2">{sample.differentiation}</div>
+            <div className="text-sm text-foreground mt-2">{renderSafeValue(sample.differentiation)}</div>
           </div>
           <div>
             <div className="text-xs uppercase tracking-wider text-muted-foreground">Messaging Angles</div>
@@ -32,11 +32,11 @@ export function PositioningEngineModule() {
           </div>
           <div>
             <div className="text-xs uppercase tracking-wider text-muted-foreground">Competitive Gaps</div>
-            <div className="text-sm text-foreground mt-2">{sample.competitiveGaps}</div>
+            <div className="text-sm text-foreground mt-2">{renderSafeValue(sample.competitiveGaps)}</div>
           </div>
           <div>
             <div className="text-xs uppercase tracking-wider text-muted-foreground">Market Wedge</div>
-            <div className="text-sm text-foreground mt-2">{sample.marketWedge}</div>
+            <div className="text-sm text-foreground mt-2">{renderSafeValue(sample.marketWedge)}</div>
           </div>
         </div>
       </Section>

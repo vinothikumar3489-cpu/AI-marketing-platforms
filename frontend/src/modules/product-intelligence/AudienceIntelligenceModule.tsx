@@ -161,7 +161,7 @@ export function AudienceIntelligenceModule() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.demographics || []).map((item: string, i: number) => (
                   <li key={i} className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                    {typeof item === 'object' ? (item.value || item.title || item.name || '') : item}
+                    {typeof item === 'object' ? renderSafeValue(item.value || item.title || item.name || '') : renderSafeValue(item)}
                   </li>
                 ))}
               </ul>
@@ -170,7 +170,7 @@ export function AudienceIntelligenceModule() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.psychographics || []).map((item: string, i: number) => (
                   <li key={i} className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                    {typeof item === 'object' ? (item.value || item.title || item.name || '') : item}
+                    {typeof item === 'object' ? renderSafeValue(item.value || item.title || item.name || '') : renderSafeValue(item)}
                   </li>
                 ))}
               </ul>
@@ -182,7 +182,7 @@ export function AudienceIntelligenceModule() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.buyingMotivations || []).map((item: string, i: number) => (
                   <li key={i} className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                    {typeof item === 'object' ? (item.value || item.title || item.name || '') : item}
+                    {typeof item === 'object' ? renderSafeValue(item.value || item.title || item.name || '') : renderSafeValue(item)}
                   </li>
                 ))}
               </ul>
@@ -191,7 +191,7 @@ export function AudienceIntelligenceModule() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.painPoints || []).map((item: string, i: number) => (
                   <li key={i} className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                    {typeof item === 'object' ? (item.value || item.title || item.name || '') : item}
+                    {typeof item === 'object' ? renderSafeValue(item.value || item.title || item.name || '') : renderSafeValue(item)}
                   </li>
                 ))}
               </ul>
@@ -220,13 +220,13 @@ export function AudienceIntelligenceModule() {
 
           <Section title="Messaging Strategy">
             <div className="rounded-2xl bg-white/5 border border-white/10 p-4 text-sm text-muted-foreground">
-              {data.messagingStrategy || "No strategy available yet."}
+              {renderSafeValue(data.messagingStrategy) || "No strategy available yet."}
             </div>
           </Section>
 
           <Section title="Final Recommendation">
             <div className="rounded-3xl bg-white/5 border border-white/10 p-6 text-sm text-muted-foreground">
-              {data.finalRecommendation || "Run audience intelligence to get a recommendation."}
+              {renderSafeValue(data.finalRecommendation) || "Run audience intelligence to get a recommendation."}
             </div>
           </Section>
         </div>

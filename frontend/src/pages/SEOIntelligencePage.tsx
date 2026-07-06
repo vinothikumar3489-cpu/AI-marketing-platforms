@@ -9,6 +9,7 @@ import { Shield, Target, TrendingUp, Zap, Search, Globe, Code, FileText, Cpu, La
 import { KPIDashboard, EnterpriseInsightCard, SmartNavigation, SearchBar, LoadingSkeleton, EnterpriseEmptyState, ProgressBar, StatusBadge, MiniRadarLegend, StorySection, ScoreSection, ExpandableSection } from '../components/EnterpriseComponents';
 import { ExecutiveSummaryCards, BusinessHealthScore, AIDecisionPanel, RecommendationPriorities, CrossModuleInsights, ExplainButton, CompareResults, OpportunityMatrix, RiskMatrix, ConfidenceVisualization, InteractiveFilters, SmartSearch, EnterpriseReportPreview, ProductivityBar, ExecutiveCommandCenter, StoryDrivenResults, AIBusinessAdvisor, DecisionSimulator, CompetitorPositioningMap, MarketOpportunityHeatmap, BusinessTimeline, ExecutiveKPIDashboard, InsightRelationships, EvidenceExplorer, ReportPreview20, PresentationMode, useWorkspaceMemory, SmartEmptyState } from '../components/EnterpriseDecisionSuite';
 import { EnterpriseActionWorkspace } from '../components/EnterpriseActionWorkspace';
+import SafeValue from '../components/SafeValue';
 
 // Safe format helpers to handle non-number values from backend
 function toNumberOrNull(value: unknown): number | null {
@@ -350,15 +351,28 @@ export default function SEOIntelligencePage() {
 
           <div className="tab-content" style={{ marginTop: '20px' }}>
             <TabErrorBoundary>
-              {activeTab === 'Executive Dashboard' && <ExecutiveDashboard data={seo} />}
-              {activeTab === 'Executive Story' && <ExecutiveStory data={seo} />}
-              {activeTab === 'Technical Audit' && <TechnicalAudit data={{ ...seo, ...seo.technicalAudit }} />}
-              {activeTab === 'Keyword Intelligence' && <KeywordIntelligence data={seo.keywordIntelligence} />}
-              {activeTab === 'Competitor SEO' && <CompetitorSEO data={seo.competitorIntelligence} />}
-              {activeTab === 'Content Gaps' && <ContentGaps data={seo.contentGapAnalysis} />}
-              {activeTab === 'GEO / AI Visibility' && <GeoIntelligence data={seo.geoIntelligence} />}
-              {activeTab === 'Blog Intelligence' && <BlogIntelligence data={seo.blogIntelligence} />}
-              {activeTab === 'Action Plan' && <ActionPlan data={seo} />}
+              {(() => {
+                try {
+                  if (activeTab === 'Executive Dashboard') return <ExecutiveDashboard data={seo} />;
+                  if (activeTab === 'Executive Story') return <ExecutiveStory data={seo} />;
+                  if (activeTab === 'Technical Audit') return <TechnicalAudit data={{ ...seo, ...seo.technicalAudit }} />;
+                  if (activeTab === 'Keyword Intelligence') return <KeywordIntelligence data={seo.keywordIntelligence} />;
+                  if (activeTab === 'Competitor SEO') return <CompetitorSEO data={seo.competitorIntelligence} />;
+                  if (activeTab === 'Content Gaps') return <ContentGaps data={seo.contentGapAnalysis} />;
+                  if (activeTab === 'GEO / AI Visibility') return <GeoIntelligence data={seo.geoIntelligence} />;
+                  if (activeTab === 'Blog Intelligence') return <BlogIntelligence data={seo.blogIntelligence} />;
+                  if (activeTab === 'Action Plan') return <ActionPlan data={seo} />;
+                  return null;
+                } catch (error) {
+                  console.error("Tab rendering error:", error);
+                  return (
+                    <div style={{ padding: '24px', borderRadius: '12px', border: '1px solid #ff4757', background: '#1a1014', color: '#ff8a8a' }}>
+                      <h3 style={{ margin: '0 0 8px 0' }}>Unable to display this section</h3>
+                      <p style={{ margin: 0, fontSize: '14px' }}>Please refresh or rerun the analysis.</p>
+                    </div>
+                  );
+                }
+              })()}
             </TabErrorBoundary>
           </div>
         </Card>

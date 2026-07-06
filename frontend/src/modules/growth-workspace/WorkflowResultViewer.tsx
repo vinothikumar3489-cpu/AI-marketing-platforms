@@ -35,7 +35,7 @@ export function WorkflowResultViewer({ results, steps }: WorkflowResultViewerPro
             value={step.key}
             className="text-xs py-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500"
           >
-            {step.label.replace(' Analysis', '').replace(' Intelligence', '').replace(' Engine', '').replace(' Generator', '').replace(' Recommendation', '')}
+            {renderSafeValue(step.label.replace(' Analysis', '').replace(' Intelligence', '').replace(' Engine', '').replace(' Generator', '').replace(' Recommendation', ''))}
           </TabsTrigger>
         ))}
       </TabsList>
@@ -163,7 +163,7 @@ function ProductAnalysisView({ data }: { data: any }) {
       <div className="space-y-4">
         <div>
           <h4 className="font-semibold text-white mb-2">Product Summary</h4>
-          <p className="text-sm text-muted-foreground">{data.productSummary}</p>
+          <p className="text-sm text-muted-foreground">{renderSafeValue(data.productSummary)}</p>
         </div>
 
         <div>
@@ -236,7 +236,7 @@ function MarketDiscoveryView({ data }: { data: any }) {
       <div className="space-y-4">
         <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-lg p-4 border border-purple-500/20">
           <div className="text-xs text-muted-foreground mb-1">Estimated Market Size</div>
-          <div className="text-2xl font-bold text-white">{data.marketSizeEstimate}</div>
+          <div className="text-2xl font-bold text-white">{renderSafeValue(data.marketSizeEstimate)}</div>
         </div>
 
         <div>
@@ -267,7 +267,7 @@ function MarketDiscoveryView({ data }: { data: any }) {
       <div className="space-y-4">
         <div className="bg-yellow-500/10 rounded-lg p-4 border border-yellow-500/20">
           <div className="text-xs text-muted-foreground mb-1">Demand Score</div>
-          <div className="text-2xl font-bold text-yellow-400">{data.demandScore}/100</div>
+          <div className="text-2xl font-bold text-yellow-400">{renderSafeValue(data.demandScore)}/100</div>
         </div>
 
         <div>
@@ -284,7 +284,7 @@ function MarketDiscoveryView({ data }: { data: any }) {
 
         <div>
           <h4 className="font-semibold text-white mb-2">Entry Strategy</h4>
-          <p className="text-sm text-muted-foreground">{data.entryStrategy}</p>
+          <p className="text-sm text-muted-foreground">{renderSafeValue(data.entryStrategy)}</p>
         </div>
       </div>
     </div>
@@ -299,8 +299,8 @@ function AudienceIntelligenceView({ data }: { data: any }) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {(data.buyerPersonas || []).map((persona: any, i: number) => (
             <div key={i} className="bg-white/5 rounded-lg p-4 border border-white/10">
-              <h5 className="font-semibold text-white mb-2">{persona.name}</h5>
-              <p className="text-sm text-muted-foreground mb-3">{persona.demographics || persona.description}</p>
+              <h5 className="font-semibold text-white mb-2">{renderSafeValue(persona.name)}</h5>
+              <p className="text-sm text-muted-foreground mb-3">{renderSafeValue(persona.demographics || persona.description)}</p>
               {persona.motivations && (
                 <div className="mb-2">
                   <div className="text-xs text-muted-foreground mb-1">Motivations:</div>
@@ -398,10 +398,10 @@ function CompetitorAnalysisView({ data }: { data: any }) {
             {directCompetitors.map((comp: any, i: number) => (
               <div key={i} className="bg-white/5 rounded-lg p-4 border border-white/10">
                 <div className="flex items-start justify-between mb-2">
-                  <h5 className="font-semibold text-white">{typeof comp === 'string' ? comp : comp.name || `Competitor ${i + 1}`}</h5>
+                  <h5 className="font-semibold text-white">{renderSafeValue(typeof comp === 'string' ? comp : comp.name || `Competitor ${i + 1}`)}</h5>
                   {comp.marketShare && (
                     <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-1 rounded">
-                      {comp.marketShare}
+                      {renderSafeValue(comp.marketShare)}
                     </span>
                   )}
                 </div>
@@ -512,7 +512,7 @@ function IntentPredictionView({ data }: { data: any }) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {highIntentSegments.map((segment: any, i: number) => (
               <div key={i} className="bg-green-500/10 rounded-lg p-4 border border-green-500/30">
-                <h5 className="font-semibold text-green-400 mb-2">{typeof segment === 'string' ? segment : segment.segment || `Segment ${i + 1}`}</h5>
+                <h5 className="font-semibold text-green-400 mb-2">{renderSafeValue(typeof segment === 'string' ? segment : segment.segment || `Segment ${i + 1}`)}</h5>
                 {segment.signals && (
                   <>
                     <div className="text-xs text-muted-foreground mb-1">Signals:</div>
@@ -586,7 +586,7 @@ function IntentPredictionView({ data }: { data: any }) {
               <ul className="space-y-2">
                 {warmSegments.map((segment: any, i: number) => (
                   <li key={i} className="text-sm bg-yellow-500/10 px-3 py-2 rounded-lg border border-yellow-500/30">
-                    {typeof segment === 'string' ? segment : segment.segment || `Segment ${i + 1}`}
+                    {renderSafeValue(typeof segment === 'string' ? segment : segment.segment || `Segment ${i + 1}`)}
                   </li>
                 ))}
               </ul>
@@ -870,7 +870,7 @@ function ChannelRecommendationView({ data }: { data: any }) {
                     </div>
                     <div>
                       <div className="text-muted-foreground mb-1">Difficulty</div>
-                      <div className="text-yellow-400 font-medium">{difficultyScore}/5</div>
+                      <div className="text-yellow-400 font-medium">{renderSafeValue(difficultyScore)}/5</div>
                     </div>
                   </div>
 

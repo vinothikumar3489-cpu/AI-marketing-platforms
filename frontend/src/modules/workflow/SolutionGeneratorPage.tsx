@@ -134,7 +134,7 @@ export function SolutionGeneratorPage() {
         <div>
           <h2 className="text-2xl font-bold mb-2">Analysis Modules Status</h2>
           <p className="text-muted-foreground">
-            {status.moduleCount} of 6 modules completed ΓÇó {status.recommendation}
+            {status.moduleCount} of 6 modules completed ΓÇó {renderSafeValue(status.recommendation)}
           </p>
         </div>
 
@@ -224,17 +224,17 @@ export function SolutionGeneratorPage() {
               {solution.contentStrategy.contentCalendar && (
                 <div>
                   <span className="text-white font-medium">Calendar: </span>
-                  {typeof solution.contentStrategy.contentCalendar === 'object' 
+                  {renderSafeValue(typeof solution.contentStrategy.contentCalendar === 'object' 
                     ? JSON.stringify(solution.contentStrategy.contentCalendar, null, 2)
-                    : solution.contentStrategy.contentCalendar}
+                    : solution.contentStrategy.contentCalendar)}
                 </div>
               )}
               {solution.contentStrategy.channels && (
                 <div>
                   <span className="text-white font-medium">Channels: </span>
-                  {Array.isArray(solution.contentStrategy.channels)
+                  {renderSafeValue(Array.isArray(solution.contentStrategy.channels)
                     ? solution.contentStrategy.channels.join(', ')
-                    : solution.contentStrategy.channels}
+                    : solution.contentStrategy.channels)}
                 </div>
               )}
             </div>
@@ -282,7 +282,7 @@ export function SolutionGeneratorPage() {
                       <div className="space-y-1">
                         {solution.campaignAssets.adCopy.headlines.map((headline: string, idx: number) => (
                           <div key={idx} className="bg-white/5 rounded-lg p-2 text-muted-foreground">
-                            {headline}
+                            {renderSafeValue(headline)}
                           </div>
                         ))}
                       </div>

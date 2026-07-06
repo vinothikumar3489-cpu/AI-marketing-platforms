@@ -26,8 +26,11 @@ export const asText = (value: any, fallback = 'Not available') => {
   }
   if (typeof value === 'object') {
     const candidate = value?.value || value?.title || value?.name || value?.summary || value?.keyword || value?.opportunity || value?.description || value?.label;
-    if (candidate && typeof candidate === 'string') return candidate.trim();
-    if (candidate && typeof candidate === 'number') return String(candidate);
+    if (candidate) {
+      if (typeof candidate === 'string') return candidate.trim();
+      if (typeof candidate === 'number') return String(candidate);
+      return renderSafeValue(candidate);
+    }
     return fallback;
   }
   return fallback;

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
 import { asArray, asText, renderSafeValue } from '../lib/normalizers';
+import SafeValue from '../components/SafeValue';
 import { Badge, Card, EmptyState, Loading, PageHeader } from '../components/UI';
 import { KPIDashboard, SmartNavigation, SearchBar, LoadingSkeleton, EnterpriseEmptyState, ProgressBar, StatusBadge } from '../components/EnterpriseComponents';
 import { Zap, Target, TrendingUp, Activity, Map, Clock, AlertTriangle, FileText, Code, Users, Building, Eye, Star, Layers, Info, Sliders, GripHorizontal, Wifi, ChevronUp, ChevronDown, Image, Video, Send, Download, Copy, CheckCircle2, Loader2, FileDown } from 'lucide-react';
@@ -237,8 +238,8 @@ function renderPlanTab(data: any) {
           const taskText = task && typeof task === 'object' ? (task.title || task.problem || task.owner || task.priority || task.difficulty || task.expectedGain || task.businessImpact || task.evidence || task.estimatedTimeline || JSON.stringify(task)) : task;
           return (
             <div key={day} style={{ display: 'flex', gap: '8px', padding: '8px', background: '#151d2b', borderRadius: '6px' }}>
-              <strong style={{ minWidth: '80px', color: '#53a7ff' }}>{day}:</strong>
-              <span style={{ color: '#9aa7bd' }}>{renderValue(task)}</span>
+              <strong style={{ minWidth: '80px', color: '#53a7ff' }}>{renderSafeValue(day)}:</strong>
+              <span style={{ color: '#9aa7bd' }}>{renderSafeValue(renderValue(task))}</span>
             </div>
           );
         })}
@@ -1093,21 +1094,21 @@ function renderContentStudioTab(data: any) {
   return (
     <div style={{ display: 'grid', gap: '16px' }}>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-        <Badge tone="green">{cs.totalGenerated || 0} assets generated</Badge>
+        <Badge tone="green">{renderSafeValue(cs.totalGenerated || 0)} assets generated</Badge>
       </div>
       {Object.entries(cs.assets).map(([type, asset]: any) => (
         <Card key={type} style={{ borderLeft: '4px solid #a855f7' }}>
-          <h4 style={{ margin: '0 0 8px 0', color: '#a855f7' }}>{asset._label || type.replace(/_/g, ' ')}</h4>
+          <h4 style={{ margin: '0 0 8px 0', color: '#a855f7' }}>{renderSafeValue(asset._label || type.replace(/_/g, ' '))}</h4>
           <div style={{ display: 'grid', gap: '6px', fontSize: '13px' }}>
-            {asset.title && <div><strong>Title:</strong> {asset.title}</div>}
-            {asset.metaDescription && <div><strong>Meta Description:</strong> {asset.metaDescription}</div>}
-            {asset.seoKeywords && <div><strong>SEO Keywords:</strong> {typeof asset.seoKeywords === 'string' ? asset.seoKeywords : Array.isArray(asset.seoKeywords) ? asset.seoKeywords.join(', ') : ''}</div>}
-            {asset.outline && <div><strong>Outline:</strong> <pre style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0', fontSize: '12px' }}>{typeof asset.outline === 'string' ? asset.outline : JSON.stringify(asset.outline, null, 2)}</pre></div>}
-            {asset.fullContent && <div><strong>Content:</strong> <p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0', maxHeight: '200px', overflow: 'auto' }}>{asset.fullContent.substring(0, 1000)}{asset.fullContent.length > 1000 ? '...' : ''}</p></div>}
+            {asset.title && <div><strong>Title:</strong> {renderSafeValue(asset.title)}</div>}
+            {asset.metaDescription && <div><strong>Meta Description:</strong> {renderSafeValue(asset.metaDescription)}</div>}
+            {asset.seoKeywords && <div><strong>SEO Keywords:</strong> {renderSafeValue(typeof asset.seoKeywords === 'string' ? asset.seoKeywords : Array.isArray(asset.seoKeywords) ? asset.seoKeywords.join(', ') : '')}</div>}
+            {asset.outline && <div><strong>Outline:</strong> <pre style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0', fontSize: '12px' }}>{renderSafeValue(typeof asset.outline === 'string' ? asset.outline : JSON.stringify(asset.outline, null, 2))}</pre></div>}
+            {asset.fullContent && <div><strong>Content:</strong> <p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0', maxHeight: '200px', overflow: 'auto' }}>{renderSafeValue(asset.fullContent.substring(0, 1000))}{renderSafeValue(asset.fullContent.length > 1000 ? '...' : '')}</p></div>}
             {asset.internalLinks && <div><strong>Internal Links:</strong> {renderValue(asset.internalLinks)}</div>}
-            {asset.cta && <div><strong>CTA:</strong> {asset.cta}</div>}
+            {asset.cta && <div><strong>CTA:</strong> {renderSafeValue(asset.cta)}</div>}
             {asset.schemaSuggestions && <div><strong>Schema:</strong> {renderValue(asset.schemaSuggestions)}</div>}
-            {asset.estimatedReadTime && <div><strong>Read Time:</strong> {asset.estimatedReadTime}</div>}
+            {asset.estimatedReadTime && <div><strong>Read Time:</strong> {renderSafeValue(asset.estimatedReadTime)}</div>}
           </div>
         </Card>
       ))}
@@ -1125,20 +1126,20 @@ function renderEmailCampaignStudioTab(data: any) {
         <p style={{ color: '#9aa7bd', fontSize: '13px', margin: 0 }}>Review and comply with CAN-SPAM, GDPR, and CASL before sending. All emails are drafts requiring manual approval. No emails are auto-sent.</p>
       </Card>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-        <Badge tone="green">{ec.totalGenerated || 0} campaigns generated</Badge>
+        <Badge tone="green">{renderSafeValue(ec.totalGenerated || 0)} campaigns generated</Badge>
       </div>
       {Object.entries(ec.campaigns).map(([type, campaign]: any) => (
         <Card key={type} style={{ borderLeft: '4px solid #53a7ff' }}>
-          <h4 style={{ margin: '0 0 8px 0', color: '#53a7ff' }}>{campaign._label || type.replace(/_/g, ' ')}</h4>
+          <h4 style={{ margin: '0 0 8px 0', color: '#53a7ff' }}>{renderSafeValue(campaign._label || type.replace(/_/g, ' '))}</h4>
           <div style={{ display: 'grid', gap: '6px', fontSize: '13px' }}>
-            {campaign.subject && <div><strong>Subject:</strong> <span style={{ color: '#e5e7eb' }}>{campaign.subject}</span></div>}
-            {campaign.previewText && <div><strong>Preview:</strong> {campaign.previewText}</div>}
-            {campaign.body && <div><strong>Body:</strong> <p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0', maxHeight: '200px', overflow: 'auto' }}>{campaign.body}</p></div>}
-            {campaign.cta && <div><strong>CTA:</strong> {campaign.cta}</div>}
-            {campaign.personalizationVariables && <div><strong>Personalization Variables:</strong> {campaign.personalizationVariables.join(', ')}</div>}
+            {campaign.subject && <div><strong>Subject:</strong> <span style={{ color: '#e5e7eb' }}>{renderSafeValue(campaign.subject)}</span></div>}
+            {campaign.previewText && <div><strong>Preview:</strong> {renderSafeValue(campaign.previewText)}</div>}
+            {campaign.body && <div><strong>Body:</strong> <p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0', maxHeight: '200px', overflow: 'auto' }}>{renderSafeValue(campaign.body)}</p></div>}
+            {campaign.cta && <div><strong>CTA:</strong> {renderSafeValue(campaign.cta)}</div>}
+            {campaign.personalizationVariables && <div><strong>Personalization Variables:</strong> {renderSafeValue(campaign.personalizationVariables.join(', '))}</div>}
             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '8px', padding: '8px', background: '#151d2b', borderRadius: '6px' }}>
-              {campaign.spamScore && <div><strong>Spam Score:</strong> <Badge tone={campaign.spamScore === 'Low' ? 'green' : campaign.spamScore === 'Medium' ? 'yellow' : 'red'}>{campaign.spamScore}</Badge></div>}
-              {campaign.readingTime && <div><strong>Reading Time:</strong> {campaign.readingTime}</div>}
+              {campaign.spamScore && <div><strong>Spam Score:</strong> <Badge tone={campaign.spamScore === 'Low' ? 'green' : campaign.spamScore === 'Medium' ? 'yellow' : 'red'}>{renderSafeValue(campaign.spamScore)}</Badge></div>}
+              {campaign.readingTime && <div><strong>Reading Time:</strong> {renderSafeValue(campaign.readingTime)}</div>}
               <div><strong>Status:</strong> <Badge tone="yellow">Draft</Badge></div>
             </div>
             {campaign.complianceChecklist && (
@@ -1164,26 +1165,26 @@ function renderCreativeStudioTab(data: any) {
   return (
     <div style={{ display: 'grid', gap: '16px' }}>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-        <Badge tone="green">{cr.totalGenerated || 0} briefs generated</Badge>
+        <Badge tone="green">{renderSafeValue(cr.totalGenerated || 0)} briefs generated</Badge>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '12px' }}>
         {Object.entries(cr.briefs).map(([type, brief]: any) => (
           <Card key={type} style={{ borderLeft: '4px solid #f59e0b' }}>
-            <h4 style={{ margin: '0 0 8px 0', color: '#f59e0b' }}>{brief._label || type.replace(/_/g, ' ')}</h4>
-            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{brief._dimensions || ''}</div>
+            <h4 style={{ margin: '0 0 8px 0', color: '#f59e0b' }}>{renderSafeValue(brief._label || type.replace(/_/g, ' '))}</h4>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{renderSafeValue(brief._dimensions || '')}</div>
             <div style={{ display: 'grid', gap: '6px', fontSize: '13px' }}>
-              {brief.headline && <div><strong>Headline:</strong> {brief.headline}</div>}
-              {brief.visualDirection && <div><strong>Visual Direction:</strong> <p style={{ color: '#9aa7bd', margin: '4px 0', fontSize: '12px' }}>{brief.visualDirection}</p></div>}
+              {brief.headline && <div><strong>Headline:</strong> {renderSafeValue(brief.headline)}</div>}
+              {brief.visualDirection && <div><strong>Visual Direction:</strong> <p style={{ color: '#9aa7bd', margin: '4px 0', fontSize: '12px' }}>{renderSafeValue(brief.visualDirection)}</p></div>}
               {brief.brandColors && <div><strong>Brand Colors:</strong> <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>{brief.brandColors.map((c: string, i: number) => <span key={i} style={{ width: '20px', height: '20px', borderRadius: '50%', background: c, border: '1px solid #293245', display: 'inline-block' }} title={c} />)}</div></div>}
-              {brief.typography && <div><strong>Typography:</strong> {brief.typography}</div>}
-              {brief.layout && <div><strong>Layout:</strong> {brief.layout}</div>}
-              {brief.cta && <div><strong>CTA:</strong> {brief.cta}</div>}
+              {brief.typography && <div><strong>Typography:</strong> {renderSafeValue(brief.typography)}</div>}
+              {brief.layout && <div><strong>Layout:</strong> {renderSafeValue(brief.layout)}</div>}
+              {brief.cta && <div><strong>CTA:</strong> {renderSafeValue(brief.cta)}</div>}
               {brief.imageGenerationPrompt && (
                 <div><strong>Image Generation Prompt:</strong>
-                  <pre style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', fontSize: '12px', margin: '4px 0', padding: '8px', background: '#101622', borderRadius: '4px' }}>{brief.imageGenerationPrompt}</pre>
+                  <pre style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', fontSize: '12px', margin: '4px 0', padding: '8px', background: '#101622', borderRadius: '4px' }}>{renderSafeValue(brief.imageGenerationPrompt)}</pre>
                 </div>
               )}
-              {brief.dimensions && <div><strong>Dimensions:</strong> {brief.dimensions}</div>}
+              {brief.dimensions && <div><strong>Dimensions:</strong> {renderSafeValue(brief.dimensions)}</div>}
             </div>
           </Card>
         ))}
@@ -1198,32 +1199,32 @@ function renderVideoStudioTab(data: any) {
   return (
     <div style={{ display: 'grid', gap: '16px' }}>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-        <Badge tone="green">{vs.totalGenerated || 0} scripts generated</Badge>
+        <Badge tone="green">{renderSafeValue(vs.totalGenerated || 0)} scripts generated</Badge>
       </div>
       {Object.entries(vs.scripts).map(([type, script]: any) => (
         <Card key={type} style={{ borderLeft: '4px solid #ef4444' }}>
-          <h4 style={{ margin: '0 0 4px 0', color: '#ef4444' }}>{script._label || type.replace(/_/g, ' ')}</h4>
-          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{script._duration || ''}</div>
+          <h4 style={{ margin: '0 0 4px 0', color: '#ef4444' }}>{renderSafeValue(script._label || type.replace(/_/g, ' '))}</h4>
+          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{renderSafeValue(script._duration || '')}</div>
           <div style={{ display: 'grid', gap: '6px', fontSize: '13px' }}>
-            {script.title && <div><strong>Title:</strong> {script.title}</div>}
-            {script.hook && <div><strong>Hook (0-3s):</strong> <span style={{ color: '#f59e0b' }}>{script.hook}</span></div>}
-            {script.script && <div><strong>Full Script:</strong> <pre style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0', fontSize: '12px', maxHeight: '250px', overflow: 'auto', background: '#101622', padding: '8px', borderRadius: '4px' }}>{script.script}</pre></div>}
-            {script.voiceover && <div><strong>Voiceover:</strong> {script.voiceover}</div>}
-            {script.camera && <div><strong>Camera:</strong> {script.camera}</div>}
-            {script.music && <div><strong>Music:</strong> {script.music}</div>}
-            {script.transitions && <div><strong>Transitions:</strong> {script.transitions}</div>}
-            {script.cta && <div><strong>CTA:</strong> {script.cta}</div>}
+            {script.title && <div><strong>Title:</strong> {renderSafeValue(script.title)}</div>}
+            {script.hook && <div><strong>Hook (0-3s):</strong> <span style={{ color: '#f59e0b' }}>{renderSafeValue(script.hook)}</span></div>}
+            {script.script && <div><strong>Full Script:</strong> <pre style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0', fontSize: '12px', maxHeight: '250px', overflow: 'auto', background: '#101622', padding: '8px', borderRadius: '4px' }}>{renderSafeValue(script.script)}</pre></div>}
+            {script.voiceover && <div><strong>Voiceover:</strong> {renderSafeValue(script.voiceover)}</div>}
+            {script.camera && <div><strong>Camera:</strong> {renderSafeValue(script.camera)}</div>}
+            {script.music && <div><strong>Music:</strong> {renderSafeValue(script.music)}</div>}
+            {script.transitions && <div><strong>Transitions:</strong> {renderSafeValue(script.transitions)}</div>}
+            {script.cta && <div><strong>CTA:</strong> {renderSafeValue(script.cta)}</div>}
             {script.storyboard && Array.isArray(script.storyboard) && script.storyboard.length > 0 && (
               <div style={{ marginTop: '8px' }}>
                 <strong>Storyboard:</strong>
                 <div style={{ display: 'grid', gap: '6px', marginTop: '6px' }}>
                   {script.storyboard.map((scene: any, i: number) => (
                     <div key={i} style={{ padding: '8px', background: '#151d2b', borderRadius: '6px', borderLeft: '3px solid #53a7ff' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 600, color: '#53a7ff', marginBottom: '4px' }}>Scene {scene.scene || i + 1} {scene.duration ? `(${scene.duration})` : ''}</div>
-                      {scene.visual && <div style={{ color: '#9aa7bd', fontSize: '12px' }}><em>Visual:</em> {scene.visual}</div>}
-                      {scene.audio && <div style={{ color: '#9aa7bd', fontSize: '12px' }}><em>Audio:</em> {scene.audio}</div>}
-                      {scene.camera && <div style={{ color: '#9aa7bd', fontSize: '12px' }}><em>Camera:</em> {scene.camera}</div>}
-                      {scene.transitions && <div style={{ color: '#9aa7bd', fontSize: '12px' }}><em>Transition:</em> {scene.transitions}</div>}
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: '#53a7ff', marginBottom: '4px' }}>Scene {renderSafeValue(scene.scene || i + 1)} {renderSafeValue(scene.duration ? `(${scene.duration})` : '')}</div>
+                      {scene.visual && <div style={{ color: '#9aa7bd', fontSize: '12px' }}><em>Visual:</em> {renderSafeValue(scene.visual)}</div>}
+                      {scene.audio && <div style={{ color: '#9aa7bd', fontSize: '12px' }}><em>Audio:</em> {renderSafeValue(scene.audio)}</div>}
+                      {scene.camera && <div style={{ color: '#9aa7bd', fontSize: '12px' }}><em>Camera:</em> {renderSafeValue(scene.camera)}</div>}
+                      {scene.transitions && <div style={{ color: '#9aa7bd', fontSize: '12px' }}><em>Transition:</em> {renderSafeValue(scene.transitions)}</div>}
                     </div>
                   ))}
                 </div>
@@ -1242,28 +1243,28 @@ function renderCampaignPlannerTab(data: any) {
   return (
     <div style={{ display: 'grid', gap: '16px' }}>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-        <Badge tone="green">{cp.totalGenerated || 0} plans generated</Badge>
+        <Badge tone="green">{renderSafeValue(cp.totalGenerated || 0)} plans generated</Badge>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '12px' }}>
         {Object.entries(cp.plans).map(([type, plan]: any) => (
           <Card key={type} style={{ borderLeft: '4px solid #10e18b' }}>
-            <h4 style={{ margin: '0 0 4px 0', color: '#10e18b' }}>{plan._label || type.replace(/_/g, ' ')}</h4>
-            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{plan._days || 0} days</div>
+            <h4 style={{ margin: '0 0 4px 0', color: '#10e18b' }}>{renderSafeValue(plan._label || type.replace(/_/g, ' '))}</h4>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{renderSafeValue(plan._days || 0)} days</div>
             <div style={{ display: 'grid', gap: '6px', fontSize: '13px' }}>
-              {plan.campaignName && <div><strong>Campaign:</strong> {plan.campaignName}</div>}
-              {plan.campaignGoal && <div><strong>Goal:</strong> {plan.campaignGoal}</div>}
-              {plan.budget && <div><strong>Budget:</strong> <span style={{ color: '#f59e0b' }}>{typeof plan.budget === 'object' ? plan.budget.total || JSON.stringify(plan.budget) : plan.budget}</span></div>}
-              {plan.expectedROI && <div><strong>Expected ROI:</strong> {plan.expectedROI}</div>}
-              {plan.priority && <div><strong>Priority:</strong> <Badge tone={plan.priority === 'High' ? 'pink' : plan.priority === 'Medium' ? 'yellow' : 'blue'}>{plan.priority}</Badge></div>}
-              {plan.owner && <div><strong>Owner:</strong> {plan.owner}</div>}
-              {plan.businessJustification && <div><strong>Business Justification:</strong> <p style={{ color: '#9aa7bd', fontSize: '12px', margin: '4px 0' }}>{plan.businessJustification}</p></div>}
-              {plan.kpis?.primary && <div><strong>Primary KPIs:</strong> {plan.kpis.primary.map((k: any, i: number) => <div key={i} style={{ fontSize: '12px', color: '#9aa7bd', paddingLeft: '12px' }}>• {k.metric}: {k.target}</div>)}</div>}
+              {plan.campaignName && <div><strong>Campaign:</strong> {renderSafeValue(plan.campaignName)}</div>}
+              {plan.campaignGoal && <div><strong>Goal:</strong> {renderSafeValue(plan.campaignGoal)}</div>}
+              {plan.budget && <div><strong>Budget:</strong> <span style={{ color: '#f59e0b' }}>{renderSafeValue(typeof plan.budget === 'object' ? plan.budget.total || JSON.stringify(plan.budget) : plan.budget)}</span></div>}
+              {plan.expectedROI && <div><strong>Expected ROI:</strong> {renderSafeValue(plan.expectedROI)}</div>}
+              {plan.priority && <div><strong>Priority:</strong> <Badge tone={plan.priority === 'High' ? 'pink' : plan.priority === 'Medium' ? 'yellow' : 'blue'}>{renderSafeValue(plan.priority)}</Badge></div>}
+              {plan.owner && <div><strong>Owner:</strong> {renderSafeValue(plan.owner)}</div>}
+              {plan.businessJustification && <div><strong>Business Justification:</strong> <p style={{ color: '#9aa7bd', fontSize: '12px', margin: '4px 0' }}>{renderSafeValue(plan.businessJustification)}</p></div>}
+              {plan.kpis?.primary && <div><strong>Primary KPIs:</strong> {plan.kpis.primary.map((k: any, i: number) => <div key={i} style={{ fontSize: '12px', color: '#9aa7bd', paddingLeft: '12px' }}>• {renderSafeValue(k.metric)}: {renderSafeValue(k.target)}</div>)}</div>}
               {plan.timeline?.phases && (
                 <div><strong>Timeline Phases:</strong>
                   {plan.timeline.phases.map((p: any, i: number) => (
                     <div key={i} style={{ padding: '6px', margin: '4px 0', background: '#151d2b', borderRadius: '4px', fontSize: '12px' }}>
-                      <div style={{ color: '#53a7ff' }}>{p.phase} ({p.duration})</div>
-                      <div style={{ color: '#9aa7bd' }}>{p.activities?.join(', ')}</div>
+                      <div style={{ color: '#53a7ff' }}>{renderSafeValue(p.phase)} ({renderSafeValue(p.duration)})</div>
+                      <div style={{ color: '#9aa7bd' }}>{renderSafeValue(p.activities?.join(', '))}</div>
                     </div>
                   ))}
                 </div>
@@ -1271,11 +1272,11 @@ function renderCampaignPlannerTab(data: any) {
               {plan.risk?.risks && (
                 <div><strong>Risk Assessment:</strong>
                   {plan.risk.risks.map((r: any, i: number) => (
-                    <div key={i} style={{ fontSize: '12px', color: '#9aa7bd', padding: '4px 0' }}>• {r.risk} <Badge tone={r.likelihood === 'High' ? 'red' : r.likelihood === 'Medium' ? 'yellow' : 'green'}>{r.likelihood}</Badge></div>
+                    <div key={i} style={{ fontSize: '12px', color: '#9aa7bd', padding: '4px 0' }}>• {renderSafeValue(r.risk)} <Badge tone={r.likelihood === 'High' ? 'red' : r.likelihood === 'Medium' ? 'yellow' : 'green'}>{renderSafeValue(r.likelihood)}</Badge></div>
                   ))}
                 </div>
               )}
-              {plan.dependencies?.length > 0 && <div><strong>Dependencies:</strong> {plan.dependencies.join(', ')}</div>}
+              {plan.dependencies?.length > 0 && <div><strong>Dependencies:</strong> {renderSafeValue(plan.dependencies.join(', '))}</div>}
             </div>
           </Card>
         ))}
@@ -1290,15 +1291,15 @@ function renderSocialCalendarTab(data: any) {
   return (
     <div style={{ display: 'grid', gap: '16px' }}>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-        <Badge tone="green">{sc.totalGenerated || 0} calendars generated</Badge>
+        <Badge tone="green">{renderSafeValue(sc.totalGenerated || 0)} calendars generated</Badge>
       </div>
       {Object.entries(sc.calendars).map(([type, cal]: any) => (
         <Card key={type}>
-          <h4 style={{ margin: '0 0 4px 0', color: '#53a7ff' }}>{cal._label || type.replace(/_/g, ' ')}</h4>
-          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{cal._days || 0} days</div>
+          <h4 style={{ margin: '0 0 4px 0', color: '#53a7ff' }}>{renderSafeValue(cal._label || type.replace(/_/g, ' '))}</h4>
+          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{renderSafeValue(cal._days || 0)} days</div>
           <div style={{ display: 'grid', gap: '8px', fontSize: '13px' }}>
-            {cal.weeklyTheme?.length > 0 && <div><strong>Weekly Themes:</strong> {cal.weeklyTheme.join(' → ')}</div>}
-            {cal.contentMix && <div><strong>Content Mix:</strong> <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>{Object.entries(cal.contentMix).map(([k, v]: any) => <Badge key={k}>{k}: {renderSafeValue(v)}</Badge>)}</div></div>}
+            {cal.weeklyTheme?.length > 0 && <div><strong>Weekly Themes:</strong> {renderSafeValue(cal.weeklyTheme.join(' → '))}</div>}
+            {cal.contentMix && <div><strong>Content Mix:</strong> <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>{Object.entries(cal.contentMix).map(([k, v]: any) => <Badge key={k}>{renderSafeValue(k)}: {renderSafeValue(v)}</Badge>)}</div></div>}
             {cal.bestPostingTimes && <div><strong>Best Posting Times:</strong> <pre style={{ color: '#9aa7bd', fontSize: '12px', margin: '4px 0' }}>{JSON.stringify(cal.bestPostingTimes, null, 2)}</pre></div>}
             {cal.calendar && Array.isArray(cal.calendar) && (
               <div style={{ maxHeight: '400px', overflow: 'auto' }}>
@@ -1313,19 +1314,19 @@ function renderSocialCalendarTab(data: any) {
                   <tbody>
                     {cal.calendar.slice(0, 30).map((entry: any, i: number) => (
                       <tr key={i} style={{ borderBottom: '1px solid #1d2738' }}>
-                        <td style={{ padding: '6px', color: '#53a7ff' }}>Day {entry.day}</td>
-                        <td style={{ padding: '6px' }}><Badge>{entry.platform}</Badge></td>
-                        <td style={{ padding: '6px', color: '#e5e7eb' }}>{entry.topic || entry.caption?.substring(0, 60)}</td>
-                        <td style={{ padding: '6px', color: '#9aa7bd' }}>{entry.bestPostingTime || ''}</td>
-                        <td style={{ padding: '6px', color: '#9aa7bd' }}>{entry.contentTheme || ''}</td>
+                        <td style={{ padding: '6px', color: '#53a7ff' }}>Day {renderSafeValue(entry.day)}</td>
+                        <td style={{ padding: '6px' }}><Badge>{renderSafeValue(entry.platform)}</Badge></td>
+                        <td style={{ padding: '6px', color: '#e5e7eb' }}>{renderSafeValue(entry.topic || entry.caption?.substring(0, 60))}</td>
+                        <td style={{ padding: '6px', color: '#9aa7bd' }}>{renderSafeValue(entry.bestPostingTime || '')}</td>
+                        <td style={{ padding: '6px', color: '#9aa7bd' }}>{renderSafeValue(entry.contentTheme || '')}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {cal.calendar.length > 30 && <div style={{ color: '#9aa7bd', fontSize: '12px', padding: '8px', textAlign: 'center' }}>Showing 30 of {cal.calendar.length} entries</div>}
+                {cal.calendar.length > 30 && <div style={{ color: '#9aa7bd', fontSize: '12px', padding: '8px', textAlign: 'center' }}>Showing 30 of {renderSafeValue(cal.calendar.length)} entries</div>}
               </div>
             )}
-            {cal.hashtagStrategy && <div><strong>Hashtag Strategy:</strong> {Object.entries(cal.hashtagStrategy).map(([k, v]: any) => <div key={k} style={{ fontSize: '12px', color: '#9aa7bd', paddingLeft: '12px' }}>{k}: {(Array.isArray(v) ? v : []).join(', ')}</div>)}</div>}
+            {cal.hashtagStrategy && <div><strong>Hashtag Strategy:</strong> {Object.entries(cal.hashtagStrategy).map(([k, v]: any) => <div key={k} style={{ fontSize: '12px', color: '#9aa7bd', paddingLeft: '12px' }}>{renderSafeValue(k)}: {renderSafeValue((Array.isArray(v) ? v : []).join(', '))}</div>)}</div>}
           </div>
         </Card>
       ))}
@@ -1709,3 +1710,7 @@ export default function AutomationCenterPage() {
     </div>
   );
 }
+
+
+
+
