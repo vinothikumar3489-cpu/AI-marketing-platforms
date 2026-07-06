@@ -1,5 +1,7 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+import { sanitizeSeoForDisplay } from './normalizers';
+
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export class ApiError extends Error {
@@ -51,7 +53,16 @@ async function request<T>(method: Method, path: string, body?: any): Promise<T> 
 
   // Unwrap standardized { success: true, data: ... } format
   if (data && data.success && data.data !== undefined) {
-    return data.data as T;
+    data = data.data as T;
+  }
+
+  // Hard safety: sanitize SEO data in full-results response to prevent React error #31
+  if (path.includes('full-results') && data && typeof data === 'object') {
+    return {
+      ...data,
+      seoIntelligence: sanitizeSeoForDisplay(data?.seoIntelligence),
+      seo: sanitizeSeoForDisplay(data?.seo),
+    } as T;
   }
 
   return data as T;

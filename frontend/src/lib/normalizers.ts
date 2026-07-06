@@ -178,6 +178,80 @@ export const normalizeSeoDisplay = (value: any): any => {
   return String(value);
 };
 
+export const seoSafeText = (value: any): string => {
+  if (value === null || value === undefined) return "Not available";
+
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(seoSafeText).join(", ");
+  }
+
+  if (typeof value === "object") {
+    if ("score" in value || "reason" in value || "source" in value || "category" in value || "priority" in value) {
+      return [
+        value.score !== undefined ? `Score: ${seoSafeText(value.score)}` : null,
+        value.reason !== undefined ? `Reason: ${seoSafeText(value.reason)}` : null,
+        value.source !== undefined ? `Source: ${seoSafeText(value.source)}` : null,
+        value.category !== undefined ? `Category: ${seoSafeText(value.category)}` : null,
+        value.priority !== undefined ? `Priority: ${seoSafeText(value.priority)}` : null,
+      ].filter(Boolean).join(" | ");
+    }
+
+    if ("value" in value || "impact" in value || "confidence" in value) {
+      return [
+        value.value !== undefined ? `Value: ${seoSafeText(value.value)}` : null,
+        value.impact !== undefined ? `Impact: ${seoSafeText(value.impact)}` : null,
+        value.confidence !== undefined ? `Confidence: ${seoSafeText(value.confidence)}` : null,
+      ].filter(Boolean).join(" | ");
+    }
+
+    return Object.entries(value)
+      .map(([key, val]) => `${key}: ${seoSafeText(val)}`)
+      .join(" | ");
+  }
+
+  return String(value);
+};
+
+export const sanitizeSeoForDisplay = (value: any): any => {
+  if (value === null || value === undefined) return value;
+
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(sanitizeSeoForDisplay);
+  }
+
+  if (typeof value === "object") {
+    if ("score" in value || "reason" in value || "source" in value || "category" in value || "priority" in value) {
+      return seoSafeText(value);
+    }
+
+    if ("value" in value || "impact" in value || "confidence" in value) {
+      return seoSafeText(value);
+    }
+
+    return Object.fromEntries(
+      Object.entries(value).map(([key, val]) => [key, sanitizeSeoForDisplay(val)])
+    );
+  }
+
+  return String(value);
+};
+
 export const normalizeDeep = (value: any): any => {
   if (value === null || value === undefined) return value;
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
@@ -264,8 +338,8 @@ export function normalizeFullResults(data: any) {
         actionPlan: safeParse(growth.actionPlan, growth.actionPlan),
         summary: growth.summary || null,
       },
-      seoIntelligence: normalizeSeo(root.seoIntelligence || root.seo || {}),
-      seo: normalizeSeo(root.seoIntelligence || root.seo || {}), // Legacy compatibility
+      seoIntelligence: sanitizeSeoForDisplay(normalizeSeo(root.seoIntelligence || root.seo || {})),
+      seo: sanitizeSeoForDisplay(normalizeSeo(root.seoIntelligence || root.seo || {})), // Legacy compatibility
       agents: asArray(root.agentRuns || []),
       automation: root.automationPlan || {},
       hasGrowthWorkspace: root.hasGrowthWorkspace === false ? false : hasRealGrowthContent,
@@ -305,8 +379,8 @@ export function normalizeFullResults(data: any) {
       actionPlan: safeParse(actPlan, actPlan),
       summary: growth.summary || safeParse(growth.summary, growth.summary) || null,
     },
-    seoIntelligence: normalizeSeo(root.seoIntelligence || root.seo || {}),
-    seo: normalizeSeo(root.seoIntelligence || root.seo || {}), // Legacy compatibility
+    seoIntelligence: sanitizeSeoForDisplay(normalizeSeo(root.seoIntelligence || root.seo || {})),
+    seo: sanitizeSeoForDisplay(normalizeSeo(root.seoIntelligence || root.seo || {})), // Legacy compatibility
     agents: asArray(root.agentRuns || []),
     automation: root.automationPlan || root.automationPlans || root.automation || {},
     hasGrowthWorkspace: !!(productIntel?.productAnalysis || competitorIntel?.competitorAnalysis || campaignIntel?.campaignGenerator),

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, Component } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api, downloadReport } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
-import { asArray, asNumber, asText, normalizeSeo, normalizeSeoDisplay, renderSafeValue } from '../lib/normalizers';
+import { asArray, asNumber, asText, normalizeSeo, normalizeSeoDisplay, seoSafeText, sanitizeSeoForDisplay, renderSafeValue } from '../lib/normalizers';
 import { Badge, Card, EmptyState, Loading, PageHeader, ScoreCard, SectionTitle } from '../components/UI';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { Shield, Target, TrendingUp, Zap, Search, Globe, Code, FileText, Cpu, LayoutList, CheckCircle, AlertTriangle, Loader2, Building, Activity, Map, Clock, Layers, Eye, Users, Star, PieChart, Info, Sliders, GripHorizontal } from 'lucide-react';
@@ -237,8 +237,8 @@ export default function SEOIntelligencePage() {
       const rawSeo = res.seoIntelligence || res.data || res;
       if (rawSeo && typeof rawSeo === 'object' && Object.keys(rawSeo).length > 0) {
         // Sanitize SEO objects to prevent React error #31
-        const sanitizedSeo = normalizeSeoDisplay(rawSeo);
-        setSeo(normalizeSeo(sanitizedSeo));
+        const safeSeoResult = sanitizeSeoForDisplay(rawSeo);
+        setSeo(normalizeSeo(safeSeoResult));
       }
 
       console.log('[SEO UI] refreshing full results');
