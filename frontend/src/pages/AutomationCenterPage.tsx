@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
-import { asArray, asText } from '../lib/normalizers';
+import { asArray, asText, renderSafeValue } from '../lib/normalizers';
 import { Badge, Card, EmptyState, Loading, PageHeader } from '../components/UI';
 import { KPIDashboard, SmartNavigation, SearchBar, LoadingSkeleton, EnterpriseEmptyState, ProgressBar, StatusBadge } from '../components/EnterpriseComponents';
 import { Zap, Target, TrendingUp, Activity, Map, Clock, AlertTriangle, FileText, Code, Users, Building, Eye, Star, Layers, Info, Sliders, GripHorizontal, Wifi, ChevronUp, ChevronDown, Image, Video, Send, Download, Copy, CheckCircle2, Loader2, FileDown } from 'lucide-react';
@@ -67,7 +67,12 @@ function renderValue(v: any): React.ReactNode {
     if (keys.length === 0) return <span style={{ color: '#9aa7bd' }}>Unavailable</span>;
     const preferredFields = ['title', 'problem', 'owner', 'priority', 'difficulty', 'expectedGain', 'businessImpact', 'evidence', 'estimatedTimeline'];
     const structuredFields = preferredFields.filter(f => keys.includes(f) && v[f] !== undefined && v[f] !== null);
-    return renderObjectCard(v, structuredFields.length > 0 ? structuredFields : keys);
+    if (structuredFields.length > 0) return renderObjectCard(v, structuredFields);
+    const scoreKeys = ['score', 'reason', 'source', 'category', 'priority'];
+    if (scoreKeys.some(k => keys.includes(k))) {
+      return <span style={{ color: '#9aa7bd' }}>{renderSafeValue(v)}</span>;
+    }
+    return renderObjectCard(v, keys);
   }
   return <span style={{ color: '#9aa7bd' }}>Unavailable</span>;
 }

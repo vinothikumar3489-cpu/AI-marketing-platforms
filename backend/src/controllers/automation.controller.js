@@ -700,7 +700,13 @@ export const getExecutionData = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    const plan = await prisma.automationPlan.findUnique({ where: { chatId } });
+    let plan = null;
+    try {
+      plan = await prisma.automationPlan.findUnique({ where: { chatId } });
+    } catch (dbErr) {
+      console.warn('[getExecutionData] DB query failed, schema may be out of sync:', dbErr.message);
+      return res.json({ success: true, exists: false, data: null });
+    }
     if (!plan) return res.json({ success: true, exists: false, data: null });
 
     if (plan.userId !== userId) return res.status(403).json({ success: false, error: "Unauthorized" });

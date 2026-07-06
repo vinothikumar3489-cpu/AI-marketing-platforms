@@ -181,14 +181,19 @@ export const getFullResults = async (req, res) => {
     where: { chatId },
     orderBy: { createdAt: 'desc' },
   });
-  const automationPlan = await prisma.automationPlan.findUnique({
-    where: { chatId },
-    include: {
-      assets: {
-        orderBy: { createdAt: 'asc' }
+  let automationPlan = null;
+  try {
+    automationPlan = await prisma.automationPlan.findUnique({
+      where: { chatId },
+      include: {
+        assets: {
+          orderBy: { createdAt: 'asc' }
+        }
       }
-    }
-  });
+    });
+  } catch (e) {
+    console.warn('[FullResults] automationPlan query failed (DB schema may be out of sync):', e.message);
+  }
 
   // Helper function to normalize SEO action plan to canonical shape
   function normalizeSeoActionPlan(executiveDashboard, seoIntelligence) {

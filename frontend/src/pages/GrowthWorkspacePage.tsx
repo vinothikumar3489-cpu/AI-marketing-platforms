@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { api, downloadReport } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
-import { asArray, asNumber, asText, asInsight } from '../lib/normalizers';
+import { asArray, asNumber, asText, asInsight, renderSafeValue } from '../lib/normalizers';
 import { Badge, Card, EmptyState, Loading, PageHeader, ScoreCard, SectionTitle, InsightCard, PersonaCard, CompetitorCard, EvidenceBadge, DataQualityPanel, ReportPreview } from '../components/UI';
 import { TechnologyCard } from '../components/IntelligenceCards';
 import { KPIDashboard, EnterpriseCompetitorCard, EnterpriseAudienceCard, EnterpriseInsightCard, Timeline, SmartNavigation, SearchBar, LoadingSkeleton, EnterpriseEmptyState, ProgressBar, StatusBadge, ConfidenceBadge, PriorityChip, ScoreSection, MiniRadarLegend, StorySection, ExpandableSection } from '../components/EnterpriseComponents';
@@ -1317,10 +1317,11 @@ function CampaignStrategy({ data }: { data: any }) {
 function RecommendationCard({ item, index, type, compact }: { item: any, index: number, type: string, compact?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const val = item.value || item.angle || item.hook || item;
-  if (typeof val === 'string' && compact) {
+  const safeVal = typeof val === 'object' ? renderSafeValue(val) : val;
+  if ((typeof val === 'string' || typeof safeVal === 'string') && compact) {
     return (
       <div style={{ padding: '10px', background: '#151d2b', borderRadius: '8px', borderLeft: '3px solid #a855f7' }}>
-        <div style={{ fontSize: '13px', color: '#e5e7eb' }}>{val}</div>
+        <div style={{ fontSize: '13px', color: '#e5e7eb' }}>{typeof val === 'string' ? val : safeVal}</div>
       </div>
     );
   }
@@ -1328,7 +1329,7 @@ function RecommendationCard({ item, index, type, compact }: { item: any, index: 
   return (
     <Card style={{ borderLeft: '4px solid #a855f7' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-        <h4 style={{ margin: 0, fontSize: '15px' }}>{val || item.title || `${type} ${index + 1}`}</h4>
+        <h4 style={{ margin: 0, fontSize: '15px' }}>{safeVal || item.title || `${type} ${index + 1}`}</h4>
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {item.priority && <Badge tone={item.priority === 'Critical' ? 'pink' : item.priority === 'High' ? 'blue' : item.priority === 'Medium' ? 'yellow' : 'dark'}>{item.priority}</Badge>}
           {item.confidence && <EvidenceBadge evidence={{ source: item.evidence || 'AI', confidence: item.confidence }} size="sm" />}
@@ -1486,7 +1487,7 @@ function ActionCard({ item }: { item: any }) {
   return (
     <div style={{ padding: '14px', background: '#151d2b', borderRadius: '8px', border: '1px solid #293245' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-        <strong style={{ fontSize: '15px', color: '#fff' }}>{asText(item.title || item)}</strong>
+        <strong style={{ fontSize: '15px', color: '#fff' }}>{item.title ? asText(item.title) : (typeof item === 'object' ? renderSafeValue(item) : asText(item))}</strong>
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {item.priority && <Badge tone={item.priority === 'Critical' ? 'pink' : item.priority === 'High' ? 'blue' : item.priority === 'Medium' ? 'yellow' : 'dark'}>{item.priority}</Badge>}
           {item.difficulty && <Badge tone={item.difficulty === 'High' ? 'pink' : item.difficulty === 'Medium' ? 'yellow' : 'green'}>{item.difficulty}</Badge>}

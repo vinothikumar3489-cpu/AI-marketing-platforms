@@ -80,6 +80,15 @@ export const firstOf = (obj: any, keys: string[], fallback: any = undefined) => 
   return fallback;
 };
 
+export const renderSafeValue = (value: any): string => {
+  if (value == null) return "N/A";
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (typeof value === "object") {
+    return value.score ?? value.reason ?? JSON.stringify(value);
+  }
+  return String(value);
+};
+
 // Safe JSON parser for stringified nested fields (recursive)
 export const safeParse = (value: any, fallback: any = {}): any => {
   if (!value) return fallback;
