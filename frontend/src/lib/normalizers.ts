@@ -123,6 +123,28 @@ export const renderSafeValue = (value: any): string => {
   return String(value);
 };
 
+export const sanitizeForReact = (value: any): any => {
+  if (value === null || value === undefined) return value;
+
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) return value;
+
+  if (Array.isArray(value)) {
+    return value.map(sanitizeForReact);
+  }
+
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, val]) => [key, sanitizeForReact(val)])
+    );
+  }
+
+  return String(value);
+};
+
 export const normalizeDeep = (value: any): any => {
   if (value === null || value === undefined) return value;
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;

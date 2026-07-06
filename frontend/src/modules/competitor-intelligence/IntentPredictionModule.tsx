@@ -1,4 +1,5 @@
 ﻿import { Section } from "@/components/ui-kit";
+import SafeValue from "@/components/SafeValue";
 
 const sample = {
   buyerIntentScore: "82",
@@ -30,7 +31,7 @@ function InfoCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
       <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{label}</div>
-      <div className="text-sm text-foreground">{value}</div>
+      <div className="text-sm text-foreground"><SafeValue value={value} /></div>
     </div>
   );
 }
