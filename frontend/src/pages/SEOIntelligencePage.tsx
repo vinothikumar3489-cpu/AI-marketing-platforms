@@ -1236,7 +1236,7 @@ function TechnicalAudit({ data }: { data: any }) {
                   <strong style={{ color: '#ff8a8a', fontSize: '15px' }}>{asText(c?.issue || c?.title, c?.type || 'Technical issue')}</strong>
                   <Badge className="pink">Critical</Badge>
                 </div>
-                {c.source && <Badge className="blue" style={{ fontSize: '10px', marginBottom: '8px' }}>{c.source}</Badge>}
+                {c.source && <Badge className="blue" style={{ fontSize: '10px', marginBottom: '8px' }}>{renderSafeValue(c.source)}</Badge>}
                 <div style={{ fontSize: '13px', color: '#9aa7bd', marginBottom: '10px' }}>
                   Impact: <b>High</b> - Immediate fix required.
                 </div>
@@ -1264,7 +1264,7 @@ function TechnicalAudit({ data }: { data: any }) {
                   <strong style={{ color: '#ffb347', fontSize: '15px' }}>{asText(h?.issue || h?.title, h?.type || 'Improvement needed')}</strong>
                   <Badge className="blue">High</Badge>
                 </div>
-                {h.source && <Badge className="blue" style={{ fontSize: '10px', marginBottom: '8px' }}>{h.source}</Badge>}
+                {h.source && <Badge className="blue" style={{ fontSize: '10px', marginBottom: '8px' }}>{renderSafeValue(h.source)}</Badge>}
                 {h.recommendation && (
                   <div style={{ padding: '10px', background: '#0b1220', borderRadius: '6px', fontSize: '13px', borderLeft: '3px solid #53a7ff', marginTop: '10px' }}>
                     <span style={{ color: '#53a7ff', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>Recommended Action:</span>
@@ -1605,7 +1605,7 @@ function ContentGaps({ data }: { data: any }) {
                   <Badge className="pink">{asText(g?.priority || g?.businessImpact || 'High')}</Badge>
                 </div>
                 {g.source && g.source !== 'Unavailable' && (
-                  <Badge className="blue" style={{ fontSize: '10px' }}>{g.source}</Badge>
+                  <Badge className="blue" style={{ fontSize: '10px' }}>{renderSafeValue(g.source)}</Badge>
                 )}
                 <div style={{ display: 'flex', gap: '15px', fontSize: '13px', color: '#9aa7bd', background: '#0b1220', padding: '10px', borderRadius: '6px', width: '100%' }}>
                   {g.targetKeyword && <span>🎯 <b>Keyword:</b> <span style={{ color: '#fff' }}>{renderSafeValue(g.targetKeyword)}</span></span>}
@@ -1623,12 +1623,12 @@ function ContentGaps({ data }: { data: any }) {
                 <div style={{ fontSize: '13px', color: '#9aa7bd', lineHeight: '1.5' }}>{asText(g?.evidence || g?.whyItMatters || g?.reason || g?.contentType, g?.pageType || 'Content opportunity')}</div>
                 {g.recommendedSections && (
                   <div style={{ fontSize: '12px', marginTop: '4px', color: '#53a7ff', borderTop: '1px solid #1d2738', paddingTop: '8px', width: '100%' }}>
-                    <b>Recommended Sections:</b> {Array.isArray(g.recommendedSections) ? g.recommendedSections.join(' • ') : g.recommendedSections}
+                    <b>Recommended Sections:</b> {Array.isArray(g.recommendedSections) ? g.recommendedSections.join(' • ') : renderSafeValue(g.recommendedSections)}
                   </div>
                 )}
                 {g.competitorEvidence && g.competitorEvidence.length > 0 && (
                   <div style={{ fontSize: '12px', marginTop: '4px', color: '#ffa502' }}>
-                    <b>Competitor Evidence:</b> {Array.isArray(g.competitorEvidence) ? g.competitorEvidence.join(', ') : g.competitorEvidence}
+                    <b>Competitor Evidence:</b> {Array.isArray(g.competitorEvidence) ? g.competitorEvidence.join(', ') : renderSafeValue(g.competitorEvidence)}
                   </div>
                 )}
               </div>
@@ -1645,7 +1645,7 @@ function ContentGaps({ data }: { data: any }) {
               <div key={i} style={{ padding: '12px', background: '#151d2b', borderRadius: '8px', borderLeft: '3px solid #53a7ff' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                   <b style={{ fontSize: '14px' }}>{asText(l?.title || l?.pageTitle || l?.targetKeyword, 'Landing page')}</b>
-                  {l.source && l.source !== 'Unavailable' && <Badge className="blue" style={{ fontSize: '10px' }}>{l.source}</Badge>}
+                  {l.source && l.source !== 'Unavailable' && <Badge className="blue" style={{ fontSize: '10px' }}>{renderSafeValue(l.source)}</Badge>}
                 </div>
                 <div style={{ fontSize: '12px', color: '#9aa7bd' }}>Target: <span style={{ color: '#10e18b' }}>{asText(l?.targetKeyword, l?.keyword || 'Not specified')}</span></div>
                 {l.searchVolume !== null && <div style={{ fontSize: '12px', color: '#9aa7bd' }}>Volume: <span style={{ color: '#10e18b' }}>{formatNumber(l.searchVolume)}</span></div>}
@@ -1815,7 +1815,7 @@ function BlogIntelligence({ data }: { data: any }) {
                     </div>
                     {b.outline && (
                       <div style={{ fontSize: '12px', color: '#9aa7bd', lineHeight: '1.4' }}>
-                        {Array.isArray(b.outline) ? b.outline.join(' • ') : b.outline}
+                        {Array.isArray(b.outline) ? b.outline.join(' • ') : renderSafeValue(b.outline)}
                       </div>
                     )}
                     {b.evidence && (
@@ -1829,7 +1829,7 @@ function BlogIntelligence({ data }: { data: any }) {
                     {formatNumber(b.searchVolume)}
                   </td>
                   <td style={{ padding: '12px', color: b.keywordDifficulty ? '#ffa502' : '#9aa7bd' }}>
-                    {b.keywordDifficulty !== null && b.keywordDifficulty !== undefined ? b.keywordDifficulty : 'Unavailable'}
+                    {b.keywordDifficulty !== null && b.keywordDifficulty !== undefined ? renderSafeValue(b.keywordDifficulty) : 'Unavailable'}
                   </td>
                   <td style={{ padding: '12px' }}>
                     <Badge className="dark">{asText(b?.intent || 'Informational')}</Badge>
@@ -1878,7 +1878,7 @@ function BlogIntelligence({ data }: { data: any }) {
                 <div style={{ fontSize: '12px', color: '#9aa7bd' }}>
                   {asArray(cluster.blogIdeas || cluster.items || []).slice(0, 3).map((idea: any) => {
                     if (typeof idea === 'string') return idea;
-                    return idea.title || idea.targetKeyword || idea.keyword || 'Blog topic';
+                    return renderSafeValue(idea.title || idea.targetKeyword || idea.keyword) || 'Blog topic';
                   }).join(', ')}
                   {asArray(cluster.blogIdeas || cluster.items || []).length > 3 && '...'}
                 </div>

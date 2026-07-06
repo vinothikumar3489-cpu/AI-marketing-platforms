@@ -239,13 +239,13 @@ export function EnterpriseInsightCard({ insight, defaultOpen = false }: { insigh
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-              {insight.title && <h4 style={{ margin: 0, fontSize: '14px', color: '#e5e7eb', fontWeight: 600 }}>{insight.title}</h4>}
+              {insight.title && <h4 style={{ margin: 0, fontSize: '14px', color: '#e5e7eb', fontWeight: 600 }}>{renderSafeValue(insight.title)}</h4>}
               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                 {insight.severity && <StatusBadge status={insight.severity} />}
                 {insight.confidence !== undefined && <ConfidenceBadge value={insight.confidence} />}
               </div>
             </div>
-            {insight.description && <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#9aa7bd', lineHeight: 1.5 }}>{insight.description}</p>}
+            {insight.description && <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#9aa7bd', lineHeight: 1.5 }}>{renderSafeValue(insight.description)}</p>}
           </div>
           <div style={{ color: '#6b7280', flexShrink: 0, marginTop: '2px' }}>
             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -258,21 +258,21 @@ export function EnterpriseInsightCard({ insight, defaultOpen = false }: { insigh
           {insight.businessImpact && (
             <div style={{ marginTop: '10px', padding: '10px 12px', background: 'rgba(16,225,139,0.06)', borderRadius: '8px', borderLeft: '3px solid #10e18b' }}>
               <div style={{ fontSize: '11px', color: '#10e18b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>Business Impact</div>
-              <div style={{ fontSize: '13px', color: '#d1d5db' }}>{insight.businessImpact}</div>
+              <div style={{ fontSize: '13px', color: '#d1d5db' }}>{renderSafeValue(insight.businessImpact)}</div>
             </div>
           )}
 
           {insight.recommendation && (
             <div style={{ marginTop: '8px', padding: '10px 12px', background: 'rgba(42,163,255,0.06)', borderRadius: '8px', borderLeft: '3px solid #53a7ff' }}>
               <div style={{ fontSize: '11px', color: '#53a7ff', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>Recommendation</div>
-              <div style={{ fontSize: '13px', color: '#d1d5db' }}>{insight.recommendation}</div>
+              <div style={{ fontSize: '13px', color: '#d1d5db' }}>{renderSafeValue(insight.recommendation)}</div>
             </div>
           )}
 
           {insight.whyItMatters && (
             <div style={{ marginTop: '10px', padding: '10px 12px', background: 'rgba(255,179,71,0.06)', borderRadius: '8px', borderLeft: '3px solid #ffb347' }}>
               <div style={{ fontSize: '11px', color: '#ffb347', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>Why It Matters</div>
-              <div style={{ fontSize: '13px', color: '#d1d5db' }}>{insight.whyItMatters}</div>
+              <div style={{ fontSize: '13px', color: '#d1d5db' }}>{renderSafeValue(insight.whyItMatters)}</div>
             </div>
           )}
 
@@ -307,7 +307,7 @@ function DetailChip({ icon: Icon, label, value }: { icon: any; label: string; va
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', background: '#0f1729', borderRadius: '6px', fontSize: '11px' }}>
       <Icon size={12} style={{ color: '#6b7280', flexShrink: 0 }} />
-      <div><span style={{ color: '#6b7280' }}>{label}: </span><span style={{ color: '#d1d5db', fontWeight: 500 }}>{value}</span></div>
+      <div><span style={{ color: '#6b7280' }}>{label}: </span><span style={{ color: '#d1d5db', fontWeight: 500 }}>{renderSafeValue(value)}</span></div>
     </div>
   );
 }
@@ -331,7 +331,7 @@ function EvidenceDetail({ insight }: { insight: EnterpriseInsight }) {
           {item.url && <a href={item.url} target="_blank" rel="noreferrer" style={{ color: '#53a7ff', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><ExternalLink size={12} />Source URL</a>}
         </div>
       ))}
-      {insight.evidence && <div style={{ marginTop: '8px', padding: '8px', background: '#151d2b', borderRadius: '6px', fontSize: '12px', color: '#9aa7bd', fontStyle: 'italic' }}>"{insight.evidence}"</div>}
+      {insight.evidence && <div style={{ marginTop: '8px', padding: '8px', background: '#151d2b', borderRadius: '6px', fontSize: '12px', color: '#9aa7bd', fontStyle: 'italic' }}>"{renderSafeValue(insight.evidence)}"</div>}
     </div>
   );
 }
@@ -357,20 +357,20 @@ export function Timeline({ phases }: { phases: TimelinePhase[] }) {
             <div style={{ position: 'absolute', left: '10px', top: '4px', bottom: i < phases.length - 1 ? '4px' : 'auto', width: '2px', background: '#1d2738' }} />
             <div style={{ position: 'absolute', left: '0', top: '4px', width: '22px', height: '22px', borderRadius: '50%', background: phase.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 700, color: '#fff' }}>{phase.days}</div>
             <div style={{ background: '#151d2b', borderRadius: '10px', border: '1px solid #293245', padding: '12px 14px' }}>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: phase.color, marginBottom: '8px' }}>{phase.label}</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: phase.color, marginBottom: '8px' }}>{renderSafeValue(phase.label)}</div>
               {phase.tasks.map((task, j) => (
                 <div key={j} style={{ padding: '6px 0', borderBottom: j < phase.tasks.length - 1 ? '1px solid #1d2738' : 'none' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
                       <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: phase.color, flexShrink: 0 }} />
-                      <span style={{ fontSize: '12px', color: '#d1d5db' }}>{task.title || 'Task'}</span>
+                      <span style={{ fontSize: '12px', color: '#d1d5db' }}>{renderSafeValue(task.title) || 'Task'}</span>
                     </div>
                     {task.priority && <PriorityChip priority={task.priority} />}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px', marginLeft: '14px', fontSize: '11px', color: '#6b7280' }}>
-                    {task.owner && <span>Owner: {task.owner}</span>}
-                    {task.dependencies && <span>Depends: {task.dependencies}</span>}
-                    {task.expectedKpi && <span style={{ color: '#10e18b' }}>KPI: {task.expectedKpi}</span>}
+                    {task.owner && <span>Owner: {renderSafeValue(task.owner)}</span>}
+                    {task.dependencies && <span>Depends: {renderSafeValue(task.dependencies)}</span>}
+                    {task.expectedKpi && <span style={{ color: '#10e18b' }}>KPI: {renderSafeValue(task.expectedKpi)}</span>}
                   </div>
                 </div>
               ))}
@@ -406,10 +406,10 @@ export function EnterpriseCompetitorCard({ competitor }: { competitor: any }) {
       <div style={{ padding: '16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
           <div>
-            <h4 style={{ margin: '0 0 2px', fontSize: '15px', color: '#e5e7eb' }}>{competitor.name || competitor.domain || 'Unknown'}</h4>
+            <h4 style={{ margin: '0 0 2px', fontSize: '15px', color: '#e5e7eb' }}>{renderSafeValue(competitor.name || competitor.domain) || 'Unknown'}</h4>
             {(competitor.website || competitor.domain) && (
               <a href={competitor.website || `https://${competitor.domain}`} target="_blank" rel="noreferrer" style={{ fontSize: '12px', color: '#53a7ff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <ExternalLink size={10} />{competitor.domain || competitor.website}
+                <ExternalLink size={10} />{renderSafeValue(competitor.domain || competitor.website)}
               </a>
             )}
           </div>
@@ -461,13 +461,13 @@ export function EnterpriseCompetitorCard({ competitor }: { competitor: any }) {
                 <span style={{ fontSize: '11px', color: '#6b7280' }}>Technology: </span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
                   {technologies.slice(0, 8).map((t: any, i: number) => (
-                    <span key={i} style={{ padding: '2px 6px', background: '#151d2b', borderRadius: '4px', fontSize: '10px', color: '#53a7ff' }}>{typeof t === 'string' ? t : t.name || t}</span>
+                    <span key={i} style={{ padding: '2px 6px', background: '#151d2b', borderRadius: '4px', fontSize: '10px', color: '#53a7ff' }}>{renderSafeValue(typeof t === 'string' ? t : t.name || t)}</span>
                   ))}
                 </div>
               </div>
             )}
             {competitor.opportunityScore && (
-              <div style={{ fontSize: '12px', color: '#10e18b' }}>Opportunity Score: {competitor.opportunityScore}/100</div>
+              <div style={{ fontSize: '12px', color: '#10e18b' }}>Opportunity Score: {renderSafeValue(competitor.opportunityScore)}/100</div>
             )}
           </div>
         )}
@@ -481,7 +481,7 @@ function MetricMini({ icon: Icon, label, value }: { icon: any; label: string; va
     <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px', background: '#0f1729', borderRadius: '6px', fontSize: '11px' }}>
       <Icon size={12} style={{ color: '#6b7280' }} />
       <span style={{ color: '#6b7280' }}>{label}</span>
-      <span style={{ color: '#d1d5db', fontWeight: 500 }}>{value}</span>
+      <span style={{ color: '#d1d5db', fontWeight: 500 }}>{renderSafeValue(value)}</span>
     </div>
   );
 }
@@ -500,7 +500,7 @@ export function EnterpriseAudienceCard({ persona }: { persona: any }) {
       <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', marginBottom: '14px' }}>
         <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #a855f7, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>{initials}</div>
         <div style={{ flex: 1 }}>
-          <h4 style={{ margin: '0 0 2px', fontSize: '15px', color: '#e5e7eb' }}>{persona.role || persona.name || 'Target Persona'}</h4>
+          <h4 style={{ margin: '0 0 2px', fontSize: '15px', color: '#e5e7eb' }}>{renderSafeValue(persona.role || persona.name) || 'Target Persona'}</h4>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
             {persona.companySize && <BadgePill label="Company Size" value={persona.companySize} />}
             {persona.intentScore && <BadgePill label="Intent" value={`${persona.intentScore}%`} color="#ffb347" />}
@@ -545,7 +545,7 @@ export function EnterpriseAudienceCard({ persona }: { persona: any }) {
 
 function BadgePill({ label, value, color = '#6b7280' }: { label: string; value: string; color?: string }) {
   if (!value) return null;
-  return <span style={{ fontSize: '10px', padding: '2px 8px', background: `${color}12`, color, borderRadius: '4px', fontWeight: 500 }}>{label}: {value}</span>;
+  return <span style={{ fontSize: '10px', padding: '2px 8px', background: `${color}12`, color, borderRadius: '4px', fontWeight: 500 }}>{label}: {renderSafeValue(value)}</span>;
 }
 
 // ──────────────────────────────────────────────
@@ -594,8 +594,8 @@ export function TechnologyDashboard({ technologies }: { technologies: any[] }) {
                 return (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#0f1729', borderRadius: '6px', border: '1px solid #1d2738' }}>
                     <div>
-                      <span style={{ fontSize: '12px', color: '#d1d5db', fontWeight: 500 }}>{t.name}</span>
-                      <div style={{ fontSize: '10px', color: '#6b7280', marginTop: '1px' }}>Detected by: {t.source || t.evidence?.source || 'Firecrawl'}</div>
+                      <span style={{ fontSize: '12px', color: '#d1d5db', fontWeight: 500 }}>{renderSafeValue(t.name)}</span>
+                      <div style={{ fontSize: '10px', color: '#6b7280', marginTop: '1px' }}>Detected by: {renderSafeValue(t.source || t.evidence?.source) || 'Firecrawl'}</div>
                     </div>
                     <ConfidenceBadge value={conf} />
                   </div>
@@ -742,9 +742,9 @@ export function MiniRadarLegend({ items }: { items: { label: string; value: numb
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
       {items.map((item, i) => (
         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: '#0f1729', borderRadius: '6px' }}>
-          <div style={{ flex: 1, fontSize: '11px', color: '#9aa7bd' }}>{item.label}</div>
+          <div style={{ flex: 1, fontSize: '11px', color: '#9aa7bd' }}>{renderSafeValue(item.label)}</div>
           <ProgressBar value={item.value} height="4px" showValue={false} />
-          <span style={{ fontSize: '11px', fontWeight: 600, color: item.value >= 70 ? '#10e18b' : item.value >= 40 ? '#ffb347' : '#ff4757', minWidth: '28px', textAlign: 'right' }}>{item.value}</span>
+          <span style={{ fontSize: '11px', fontWeight: 600, color: item.value >= 70 ? '#10e18b' : item.value >= 40 ? '#ffb347' : '#ff4757', minWidth: '28px', textAlign: 'right' }}>{renderSafeValue(item.value)}</span>
         </div>
       ))}
     </div>

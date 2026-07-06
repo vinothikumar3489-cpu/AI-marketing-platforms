@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import AppLayout from './components/AppLayout';
+import ErrorBoundary from './components/ErrorBoundary';
 import { ProjectProvider } from './context/ProjectContext';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
@@ -30,18 +31,18 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/app" element={<Protected><ProjectProvider><AppLayout /></ProjectProvider></Protected>}>
-        <Route index element={<DashboardPage />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="growth-workspace" element={<GrowthWorkspacePage />} />
+        <Route index element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
+        <Route path="dashboard" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
+        <Route path="growth-workspace" element={<ErrorBoundary><GrowthWorkspacePage /></ErrorBoundary>} />
         <Route path="product-intelligence" element={<Navigate to="/app/growth-workspace" replace />} />
-        <Route path="seo" element={<SEOIntelligencePage />} />
-        <Route path="campaigns" element={<CampaignIntelligencePage />} />
-        <Route path="executive-story" element={<ExecutiveStoryPage />} />
-        <Route path="automation-center" element={<AutomationCenterPage />} />
-        <Route path="content-studio" element={<ContentStudioPage />} />
-        <Route path="chat-history" element={<ChatHistoryPage />} />
-        <Route path="profile" element={<ProfilePage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route path="seo" element={<ErrorBoundary><SEOIntelligencePage /></ErrorBoundary>} />
+        <Route path="campaigns" element={<ErrorBoundary><CampaignIntelligencePage /></ErrorBoundary>} />
+        <Route path="executive-story" element={<ErrorBoundary><ExecutiveStoryPage /></ErrorBoundary>} />
+        <Route path="automation-center" element={<ErrorBoundary><AutomationCenterPage /></ErrorBoundary>} />
+        <Route path="content-studio" element={<ErrorBoundary><ContentStudioPage /></ErrorBoundary>} />
+        <Route path="chat-history" element={<ErrorBoundary><ChatHistoryPage /></ErrorBoundary>} />
+        <Route path="profile" element={<ErrorBoundary><ProfilePage /></ErrorBoundary>} />
+        <Route path="settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

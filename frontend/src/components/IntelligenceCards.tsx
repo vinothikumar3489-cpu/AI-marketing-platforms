@@ -52,7 +52,7 @@ export function InsightCard({ insight, icon: Icon = Info }: { insight: Insight |
         </div>
       </div>
       
-      <p style={{ margin: '0 0 10px 0', lineHeight: '1.5', fontSize: '15px' }}>{insight.value}</p>
+      <p style={{ margin: '0 0 10px 0', lineHeight: '1.5', fontSize: '15px' }}>{renderSafeValue(insight.value)}</p>
       
       {insight.recommendedAction && (
         <div style={{ background: '#151d2b', padding: '10px', borderRadius: '8px', marginBottom: '10px', display: 'flex', gap: '8px' }}>
@@ -76,7 +76,7 @@ export function InsightCard({ insight, icon: Icon = Info }: { insight: Insight |
               {insight.evidence && typeof insight.evidence === 'string' && (
                 <div style={{ display: 'flex', gap: '8px', marginBottom: insight.source ? '8px' : 0 }}>
                   <AlertCircle size={14} style={{ color: '#ff4757', flexShrink: 0, marginTop: '2px' }} />
-                  <span style={{ color: '#9aa7bd', fontStyle: 'italic' }}>"{insight.evidence}"</span>
+                  <span style={{ color: '#9aa7bd', fontStyle: 'italic' }}>"{renderSafeValue(insight.evidence)}"</span>
                 </div>
               )}
               {insight.evidence && typeof insight.evidence === 'object' && (

@@ -90,23 +90,44 @@ export const renderSafeValue = (value: any): string => {
     return String(value);
   }
   if (Array.isArray(value)) {
-    return value
-      .map((item) => renderSafeValue(item))
-      .filter(Boolean)
-      .join(", ");
+    return value.map((item) => renderSafeValue(item)).filter(Boolean).join(", ");
   }
   if (typeof value === "object") {
-    if ("score" in value && "reason" in value) {
-      return `${value.score ?? "N/A"} — ${value.reason ?? ""}`;
+    if ("value" in value || "impact" in value || "confidence" in value) {
+      return [
+        value.value !== undefined ? `Value: ${renderSafeValue(value.value)}` : null,
+        value.impact !== undefined ? `Impact: ${renderSafeValue(value.impact)}` : null,
+        value.confidence !== undefined ? `Confidence: ${renderSafeValue(value.confidence)}` : null,
+      ].filter(Boolean).join(" | ");
     }
-    if ("value" in value && "impact" in value) {
-      return `${value.value ?? "N/A"} — Impact: ${value.impact ?? "N/A"} — Confidence: ${value.confidence ?? "N/A"}`;
+    if ("score" in value || "reason" in value || "source" in value || "category" in value || "priority" in value) {
+      return [
+        value.score !== undefined ? `Score: ${renderSafeValue(value.score)}` : null,
+        value.reason !== undefined ? `Reason: ${renderSafeValue(value.reason)}` : null,
+        value.source !== undefined ? `Source: ${renderSafeValue(value.source)}` : null,
+        value.category !== undefined ? `Category: ${renderSafeValue(value.category)}` : null,
+        value.priority !== undefined ? `Priority: ${renderSafeValue(value.priority)}` : null,
+      ].filter(Boolean).join(" | ");
     }
-    if ("title" in value) return String(value.title);
-    if ("name" in value) return String(value.name);
-    if ("label" in value) return String(value.label);
-    if ("description" in value) return String(value.description);
-    return JSON.stringify(value);
+    if ("title" in value) return renderSafeValue(value.title);
+    if ("name" in value) return renderSafeValue(value.name);
+    if ("label" in value) return renderSafeValue(value.label);
+    if ("description" in value) return renderSafeValue(value.description);
+    return Object.entries(value)
+      .map(([key, val]) => `${key}: ${renderSafeValue(val)}`)
+      .join(" | ");
+  }
+  return String(value);
+};
+
+export const normalizeDeep = (value: any): any => {
+  if (value === null || value === undefined) return value;
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value)) return value.map(normalizeDeep);
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, val]) => [key, normalizeDeep(val)])
+    );
   }
   return String(value);
 };

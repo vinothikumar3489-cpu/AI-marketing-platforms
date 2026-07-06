@@ -705,20 +705,20 @@ function ExecutiveStory({ data }: { data: any }) {
       <Card style={{ background: 'linear-gradient(135deg, #0f1729 0%, #1a1040 100%)', border: '1px solid #a855f7' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h2 style={{ margin: '0 0 5px 0', color: '#a855f7', fontSize: '20px' }}>{executiveSummary?.title || 'Enterprise Business Intelligence Report'}</h2>
-            <p style={{ margin: 0, color: '#9aa7bd', fontSize: '13px' }}>{executiveSummary?.methodology?.slice(0, 120)}</p>
+            <h2 style={{ margin: '0 0 5px 0', color: '#a855f7', fontSize: '20px' }}>{renderSafeValue(executiveSummary?.title) || 'Enterprise Business Intelligence Report'}</h2>
+            <p style={{ margin: 0, color: '#9aa7bd', fontSize: '13px' }}>{renderSafeValue(executiveSummary?.methodology)?.slice(0, 120)}</p>
           </div>
           <div style={{ textAlign: 'right' }}>
             <Badge tone={executiveSummary?.confidenceLevel === 'High' ? 'green' : executiveSummary?.confidenceLevel === 'Medium' ? 'blue' : 'yellow'}>
               {executiveSummary?.confidenceLevel || 'Unknown'} Confidence
             </Badge>
-            {executiveSummary?.assessmentDate && <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>{executiveSummary.assessmentDate}</div>}
+            {executiveSummary?.assessmentDate && <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>{renderSafeValue(executiveSummary.assessmentDate)}</div>}
           </div>
         </div>
         <div style={{ display: 'flex', gap: '16px', marginTop: '15px', flexWrap: 'wrap' }}>
-          <div style={{ fontSize: '12px', color: '#9aa7bd' }}><strong>Sources:</strong> {executiveSummary?.evidenceSourcesUsed || 0}</div>
-          <div style={{ fontSize: '12px', color: '#9aa7bd' }}><strong>Data Gaps:</strong> {executiveSummary?.dataGaps || 0}</div>
-          <div style={{ fontSize: '12px', color: '#9aa7bd' }}><strong>Version:</strong> {executiveSummary?.version || '2.0.0'}</div>
+          <div style={{ fontSize: '12px', color: '#9aa7bd' }}><strong>Sources:</strong> {renderSafeValue(executiveSummary?.evidenceSourcesUsed) || 0}</div>
+          <div style={{ fontSize: '12px', color: '#9aa7bd' }}><strong>Data Gaps:</strong> {renderSafeValue(executiveSummary?.dataGaps) || 0}</div>
+          <div style={{ fontSize: '12px', color: '#9aa7bd' }}><strong>Version:</strong> {renderSafeValue(executiveSummary?.version) || '2.0.0'}</div>
         </div>
       </Card>
 
@@ -736,7 +736,7 @@ function ExecutiveStory({ data }: { data: any }) {
           <div style={{ marginTop: '12px', display: 'grid', gap: '10px' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
               {revenueModel.pricingTiers?.map((t: any, i: number) => (
-                <span key={i} style={{ padding: '4px 10px', background: '#151d2b', borderRadius: '6px', fontSize: '13px', color: '#e5e7eb' }}>{t.name || t}</span>
+                <span key={i} style={{ padding: '4px 10px', background: '#151d2b', borderRadius: '6px', fontSize: '13px', color: '#e5e7eb' }}>{renderSafeValue(t.name || t)}</span>
               ))}
               {revenueModel.hasFreeTier && <Badge tone="green">Free Tier</Badge>}
               {revenueModel.hasFreeTrial && <Badge tone="blue">Free Trial</Badge>}
@@ -744,7 +744,7 @@ function ExecutiveStory({ data }: { data: any }) {
               {revenueModel.hasCustomPricing && <Badge tone="yellow">Custom Pricing</Badge>}
             </div>
             <div style={{ fontSize: '13px', color: '#9aa7bd' }}>
-              {revenueModel.currency && <span><strong>Currency:</strong> {revenueModel.currency} </span>}
+              {revenueModel.currency && <span><strong>Currency:</strong> {renderSafeValue(revenueModel.currency)} </span>}
               {revenueModel.billingPeriods?.length > 0 && <span><strong>Billing:</strong> {revenueModel.billingPeriods.join(', ')}</span>}
             </div>
           </div>
@@ -793,8 +793,8 @@ function ExecutiveStory({ data }: { data: any }) {
           {keyFindings?.map((f: any, i: number) => (
             <div key={i} style={{ padding: '10px 14px', background: '#151d2b', borderRadius: '8px', border: '1px solid #293245', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', color: '#e5e7eb', marginBottom: '4px' }}>{f.finding || f.value || ''}</div>
-                <div style={{ fontSize: '11px', color: '#6b7280' }}>Evidence: {f.evidence || ''}</div>
+                <div style={{ fontSize: '13px', color: '#e5e7eb', marginBottom: '4px' }}>{renderSafeValue(f.finding || f.value) || ''}</div>
+                <div style={{ fontSize: '11px', color: '#6b7280' }}>Evidence: {renderSafeValue(f.evidence) || ''}</div>
               </div>
               <div style={{ display: 'flex', gap: '8px', marginLeft: '12px', flexShrink: 0 }}>
                 {f.confidence && <EvidenceBadge evidence={{ source: f.evidence || 'AI', confidence: f.confidence }} size="sm" />}
@@ -814,18 +814,18 @@ function ExecutiveStory({ data }: { data: any }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#a855f7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>{(p.priority || i+1)}</div>
-                  <strong style={{ fontSize: '15px', color: '#e5e7eb' }}>{p.action || p.title || ''}</strong>
+                  <strong style={{ fontSize: '15px', color: '#e5e7eb' }}>{renderSafeValue(p.action || p.title) || ''}</strong>
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                   {p.confidence && <EvidenceBadge evidence={{ source: p.evidence || 'AI', confidence: p.confidence }} size="sm" />}
                 </div>
               </div>
-              <p style={{ margin: '0 0 8px 38px', fontSize: '13px', color: '#9aa7bd' }}>{p.rationale || p.reason || ''}</p>
+              <p style={{ margin: '0 0 8px 38px', fontSize: '13px', color: '#9aa7bd' }}>{renderSafeValue(p.rationale || p.reason) || ''}</p>
               <div style={{ marginLeft: '38px', display: 'flex', gap: '16px', fontSize: '12px', color: '#9aa7bd', flexWrap: 'wrap' }}>
-                {p.roi && <span><strong style={{ color: '#10e18b' }}>ROI:</strong> {p.roi}</span>}
-                {p.timeline && <span><strong style={{ color: '#53a7ff' }}>Timeline:</strong> {p.timeline}</span>}
-                {p.owner && <span><strong style={{ color: '#ffb347' }}>Owner:</strong> {p.owner}</span>}
-                {p.kpi && <span><strong style={{ color: '#a855f7' }}>KPI:</strong> {p.kpi}</span>}
+                {p.roi && <span><strong style={{ color: '#10e18b' }}>ROI:</strong> {renderSafeValue(p.roi)}</span>}
+                {p.timeline && <span><strong style={{ color: '#53a7ff' }}>Timeline:</strong> {renderSafeValue(p.timeline)}</span>}
+                {p.owner && <span><strong style={{ color: '#ffb347' }}>Owner:</strong> {renderSafeValue(p.owner)}</span>}
+                {p.kpi && <span><strong style={{ color: '#a855f7' }}>KPI:</strong> {renderSafeValue(p.kpi)}</span>}
               </div>
             </div>
           ))}
@@ -838,7 +838,7 @@ function ExecutiveStory({ data }: { data: any }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <h3 style={{ color: '#a855f7', margin: '0 0 10px 0' }}>Executive Recommendation</h3>
-              <p style={{ color: '#e5e7eb', fontSize: '15px', lineHeight: '1.6', margin: 0 }}>{executiveRecommendation.recommendation || ''}</p>
+              <p style={{ color: '#e5e7eb', fontSize: '15px', lineHeight: '1.6', margin: 0 }}>{renderSafeValue(executiveRecommendation.recommendation) || ''}</p>
             </div>
             {executiveRecommendation.confidenceLevel && (
               <Badge tone={executiveRecommendation.confidenceLevel === 'High' ? 'green' : executiveRecommendation.confidenceLevel === 'Medium' ? 'blue' : 'yellow'}>
@@ -850,7 +850,7 @@ function ExecutiveStory({ data }: { data: any }) {
             <div style={{ marginTop: '15px' }}>
               <strong style={{ fontSize: '13px', color: '#a855f7' }}>Next Steps:</strong>
               <ul style={{ margin: '8px 0 0 20px', color: '#9aa7bd', fontSize: '13px' }}>
-                {executiveRecommendation.nextSteps.map((s: string, i: number) => <li key={i}>{s}</li>)}
+                {executiveRecommendation.nextSteps.map((s: string, i: number) => <li key={i}>{renderSafeValue(s)}</li>)}
               </ul>
             </div>
           )}
@@ -869,11 +869,12 @@ function SectionBlock({ icon: Icon, title, color, data }: { icon: any, title: st
     if (typeof val === 'boolean') return val ? 'Yes' : 'No';
     if (typeof val === 'object' && val !== null) {
       if (val.evidence) return <EvidenceBadge evidence={val.evidence} size="sm" />;
-      if (val.value || val.name) return val.value || val.name;
+      if (val.value || val.name) return renderSafeValue(val.value || val.name);
       if (Array.isArray(val)) return val.join(', ');
       return JSON.stringify(val).slice(0, 80);
     }
-    return val;
+    if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') return val;
+    return renderSafeValue(val);
   };
   const skipKeys = ['evidence', 'sources', 'warnings'];
   const entries = Object.entries(data).filter(([k]) => !skipKeys.includes(k) && renderValue(k) !== null);
@@ -961,7 +962,7 @@ function MarketIntelligence({ data }: { data: any }) {
         <Card>
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Building size={18} style={{ color: '#2aa3ff' }} /> Industry Size</h3>
           <div style={{ fontSize: '15px', color: market.industrySize && market.industrySize !== 'Unknown' ? '#e5e7eb' : '#6b7280', fontStyle: market.industrySize === 'Unknown' ? 'italic' : 'normal' }}>
-            {market.industrySize && market.industrySize !== 'Unknown' ? market.industrySize : 'Verified data unavailable'}
+            {market.industrySize && market.industrySize !== 'Unknown' ? renderSafeValue(market.industrySize) : 'Verified data unavailable'}
           </div>
           {market.evidence && <div style={{ marginTop: '8px' }}><EvidenceBadge evidence={market.evidence} size="sm" /></div>}
         </Card>
@@ -970,7 +971,7 @@ function MarketIntelligence({ data }: { data: any }) {
           <div style={{ display: 'grid', gap: '6px' }}>
             {market.investmentTrends?.length > 0 ? market.investmentTrends.map((t: any, i: number) => (
               <div key={i} style={{ fontSize: '13px', color: '#9aa7bd', padding: '6px 8px', background: '#151d2b', borderRadius: '4px' }}>
-                {t.trend || t.value || t}
+                {renderSafeValue(t.trend || t.value || t)}
                 {t.evidence && <div style={{ marginTop: '4px' }}><EvidenceBadge evidence={t.evidence} size="sm" /></div>}
               </div>
             )) : <span style={{ fontStyle: 'italic', color: '#6b7280', fontSize: '13px' }}>Verified data unavailable</span>}
@@ -981,7 +982,7 @@ function MarketIntelligence({ data }: { data: any }) {
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Shield size={18} style={{ color: '#ff4757' }} /> Regulations</h3>
             <div style={{ display: 'grid', gap: '6px' }}>
               {market.regulations.map((r: any, i: number) => (
-                <div key={i} style={{ fontSize: '13px', color: '#9aa7bd', padding: '6px 8px', background: '#151d2b', borderRadius: '4px' }}>{r.value || r}</div>
+                <div key={i} style={{ fontSize: '13px', color: '#9aa7bd', padding: '6px 8px', background: '#151d2b', borderRadius: '4px' }}>{renderSafeValue(r.value || r)}</div>
               ))}
             </div>
           </Card>
@@ -991,7 +992,7 @@ function MarketIntelligence({ data }: { data: any }) {
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Clock size={18} style={{ color: '#ffb347' }} /> Seasonality</h3>
             <div style={{ display: 'grid', gap: '6px' }}>
               {market.seasonality.map((s: any, i: number) => (
-                <div key={i} style={{ fontSize: '13px', color: '#9aa7bd', padding: '6px 8px', background: '#151d2b', borderRadius: '4px' }}>{s.value || s}</div>
+                <div key={i} style={{ fontSize: '13px', color: '#9aa7bd', padding: '6px 8px', background: '#151d2b', borderRadius: '4px' }}>{renderSafeValue(s.value || s)}</div>
               ))}
             </div>
           </Card>
@@ -1069,7 +1070,7 @@ function AudienceIntelligence({ data }: { data: any }) {
             <div style={{ display: 'grid', gap: '8px', marginTop: '10px' }}>
               {audience.decisionMakers.map((d: any, i: number) => (
                 <div key={i} style={{ padding: '8px 10px', background: '#151d2b', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '13px', color: '#e5e7eb' }}>{d.title || d}</span>
+                  <span style={{ fontSize: '13px', color: '#e5e7eb' }}>{renderSafeValue(d.title || d)}</span>
                   {d.confidence && <EvidenceBadge evidence={{ source: d.evidence?.source || 'AI', confidence: d.confidence }} size="sm" />}
                 </div>
               ))}
@@ -1082,7 +1083,7 @@ function AudienceIntelligence({ data }: { data: any }) {
             <div style={{ display: 'grid', gap: '8px', marginTop: '10px' }}>
               {audience.buyingCommittee.map((c: any, i: number) => (
                 <div key={i} style={{ padding: '8px 10px', background: '#151d2b', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '13px', color: '#e5e7eb' }}>{c.title || c}</span>
+                  <span style={{ fontSize: '13px', color: '#e5e7eb' }}>{renderSafeValue(c.title || c)}</span>
                   {c.influence && <Badge tone="blue">{c.influence}</Badge>}
                 </div>
               ))}
@@ -1093,18 +1094,18 @@ function AudienceIntelligence({ data }: { data: any }) {
 
       {/* Budget, Intent, Tech Maturity, LTV */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
-        {audience.budget && (
-          <Card><h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#10e18b' }}><DollarSign size={16} /> Budget</h4><div style={{ fontSize: '15px', color: '#e5e7eb' }}>{typeof audience.budget === 'object' ? audience.budget.estimatedRange || audience.budget.value : audience.budget}</div></Card>
-        )}
-        {audience.companySize && (
-          <Card><h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#53a7ff' }}><Building size={16} /> Company Size</h4><div style={{ fontSize: '15px', color: '#e5e7eb' }}>{audience.companySize}</div></Card>
-        )}
-        {audience.techMaturity && (
-          <Card><h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#ffb347' }}><Code size={16} /> Tech Maturity</h4><div style={{ fontSize: '15px', color: '#e5e7eb' }}>{audience.techMaturity}</div></Card>
-        )}
-        {audience.lifetimeValue && (
-          <Card><h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#a855f7' }}><TrendingUp size={16} /> Lifetime Value</h4><div style={{ fontSize: '15px', color: '#e5e7eb' }}>{typeof audience.lifetimeValue === 'object' ? audience.lifetimeValue.estimatedRange || audience.lifetimeValue.value : audience.lifetimeValue}</div></Card>
-        )}
+          {audience.budget && (
+            <Card><h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#10e18b' }}><DollarSign size={16} /> Budget</h4><div style={{ fontSize: '15px', color: '#e5e7eb' }}>{typeof audience.budget === 'object' ? renderSafeValue(audience.budget.estimatedRange || audience.budget.value) : renderSafeValue(audience.budget)}</div></Card>
+          )}
+          {audience.companySize && (
+            <Card><h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#53a7ff' }}><Building size={16} /> Company Size</h4><div style={{ fontSize: '15px', color: '#e5e7eb' }}>{renderSafeValue(audience.companySize)}</div></Card>
+          )}
+          {audience.techMaturity && (
+            <Card><h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#ffb347' }}><Code size={16} /> Tech Maturity</h4><div style={{ fontSize: '15px', color: '#e5e7eb' }}>{renderSafeValue(audience.techMaturity)}</div></Card>
+          )}
+          {audience.lifetimeValue && (
+            <Card><h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#a855f7' }}><TrendingUp size={16} /> Lifetime Value</h4><div style={{ fontSize: '15px', color: '#e5e7eb' }}>{typeof audience.lifetimeValue === 'object' ? renderSafeValue(audience.lifetimeValue.estimatedRange || audience.lifetimeValue.value) : renderSafeValue(audience.lifetimeValue)}</div></Card>
+          )}
       </div>
 
       {/* Pain Points & Buying Triggers */}
@@ -1139,7 +1140,7 @@ function AudienceIntelligence({ data }: { data: any }) {
           <div style={{ display: 'grid', gap: '8px' }}>
             {audience.intent?.map((n: any, i: number) => (
               <div key={i} style={{ padding: '8px 10px', background: '#151d2b', borderRadius: '6px', fontSize: '13px', display: 'flex', justifyContent: 'space-between' }}>
-                <span>{n.segment || n.value || n}</span>
+                <span>{renderSafeValue(n.segment || n.value || n)}</span>
                 {n.intentLevel && <Badge tone={n.intentLevel.includes('High') ? 'green' : n.intentLevel.includes('Medium') ? 'blue' : 'yellow'}>{n.intentLevel}</Badge>}
               </div>
             ))}
@@ -1150,7 +1151,7 @@ function AudienceIntelligence({ data }: { data: any }) {
               const ev = c.evidence || null;
               return (
                 <span key={i} style={{ padding: '4px 10px', background: '#151d2b', borderRadius: '6px', fontSize: '12px', color: '#2aa3ff', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  {name}
+                  {renderSafeValue(name)}
                   {ev && <EvidenceBadge evidence={ev} size="sm" />}
                 </span>
               );
@@ -1337,20 +1338,20 @@ function RecommendationCard({ item, index, type, compact }: { item: any, index: 
         </div>
       </div>
       
-      {item.problem && <div style={{ fontSize: '13px', color: '#ff8a8a', marginBottom: '6px' }}><strong>Problem:</strong> {item.problem}</div>}
-      {item.why && <div style={{ fontSize: '13px', color: '#9aa7bd', marginBottom: '6px' }}><strong>Why:</strong> {item.why}</div>}
-      {item.rationale && <div style={{ fontSize: '13px', color: '#9aa7bd', marginBottom: '6px' }}><strong>Rationale:</strong> {item.rationale}</div>}
-      {item.recommendedAction && <div style={{ fontSize: '13px', color: '#53a7ff', marginBottom: '6px' }}><strong>Action:</strong> {item.recommendedAction}</div>}
-      {item.roi && <div style={{ fontSize: '13px', color: '#10e18b', marginBottom: '6px' }}><strong>Expected ROI:</strong> {item.roi}</div>}
-      {item.businessImpact && <div style={{ fontSize: '13px', color: '#10e18b', marginBottom: '6px' }}><strong>Business Impact:</strong> {item.businessImpact}</div>}
-      {item.businessJustification && <div style={{ fontSize: '13px', color: '#9aa7bd', marginBottom: '6px' }}><strong>Business Justification:</strong> {item.businessJustification}</div>}
+      {item.problem && <div style={{ fontSize: '13px', color: '#ff8a8a', marginBottom: '6px' }}><strong>Problem:</strong> {renderSafeValue(item.problem)}</div>}
+      {item.why && <div style={{ fontSize: '13px', color: '#9aa7bd', marginBottom: '6px' }}><strong>Why:</strong> {renderSafeValue(item.why)}</div>}
+      {item.rationale && <div style={{ fontSize: '13px', color: '#9aa7bd', marginBottom: '6px' }}><strong>Rationale:</strong> {renderSafeValue(item.rationale)}</div>}
+      {item.recommendedAction && <div style={{ fontSize: '13px', color: '#53a7ff', marginBottom: '6px' }}><strong>Action:</strong> {renderSafeValue(item.recommendedAction)}</div>}
+      {item.roi && <div style={{ fontSize: '13px', color: '#10e18b', marginBottom: '6px' }}><strong>Expected ROI:</strong> {renderSafeValue(item.roi)}</div>}
+      {item.businessImpact && <div style={{ fontSize: '13px', color: '#10e18b', marginBottom: '6px' }}><strong>Business Impact:</strong> {renderSafeValue(item.businessImpact)}</div>}
+      {item.businessJustification && <div style={{ fontSize: '13px', color: '#9aa7bd', marginBottom: '6px' }}><strong>Business Justification:</strong> {renderSafeValue(item.businessJustification)}</div>}
       
       <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#9aa7bd', flexWrap: 'wrap', marginTop: '8px' }}>
-        {item.owner && <span><strong>Owner:</strong> {item.owner}</span>}
-        {item.timeline || item.estimatedTimeline ? <span><strong>Timeline:</strong> {item.timeline || item.estimatedTimeline}</span> : null}
-        {item.dependencies && <span><strong>Dependencies:</strong> {Array.isArray(item.dependencies) ? item.dependencies.join(', ') : item.dependencies}</span>}
-        {item.kpis && <span><strong>KPIs:</strong> {Array.isArray(item.kpis) ? item.kpis.join(', ') : item.kpis}</span>}
-        {item.expectedKPI && <span><strong>KPI:</strong> {item.expectedKPI}</span>}
+        {item.owner && <span><strong>Owner:</strong> {renderSafeValue(item.owner)}</span>}
+        {item.timeline || item.estimatedTimeline ? <span><strong>Timeline:</strong> {renderSafeValue(item.timeline || item.estimatedTimeline)}</span> : null}
+        {item.dependencies && <span><strong>Dependencies:</strong> {Array.isArray(item.dependencies) ? item.dependencies.join(', ') : renderSafeValue(item.dependencies)}</span>}
+        {item.kpis && <span><strong>KPIs:</strong> {Array.isArray(item.kpis) ? item.kpis.join(', ') : renderSafeValue(item.kpis)}</span>}
+        {item.expectedKPI && <span><strong>KPI:</strong> {renderSafeValue(item.expectedKPI)}</span>}
       </div>
       
       {item.evidence && typeof item.evidence === 'object' && !item.evidence.source && (
@@ -1497,42 +1498,42 @@ function ActionCard({ item }: { item: any }) {
       {/* WHY explanation */}
       {item.why && (
         <div style={{ fontSize: '13px', color: '#9aa7bd', marginBottom: '8px', padding: '8px 10px', background: '#0b1220', borderRadius: '6px', borderLeft: '3px solid #a855f7' }}>
-          <strong style={{ color: '#a855f7' }}>Why:</strong> {item.why}
+          <strong style={{ color: '#a855f7' }}>Why:</strong> {renderSafeValue(item.why)}
         </div>
       )}
       {item.problem && (
         <div style={{ fontSize: '13px', color: '#ff8a8a', marginBottom: '6px' }}>
-          <strong>Problem:</strong> {item.problem}
+          <strong>Problem:</strong> {renderSafeValue(item.problem)}
         </div>
       )}
       {item.rationale && (
         <div style={{ fontSize: '13px', color: '#9aa7bd', marginBottom: '6px' }}>
-          <strong>Rationale:</strong> {item.rationale}
+          <strong>Rationale:</strong> {renderSafeValue(item.rationale)}
         </div>
       )}
       {item.businessJustification && (
         <div style={{ fontSize: '13px', color: '#10e18b', marginBottom: '6px' }}>
-          <strong>Business Justification:</strong> {item.businessJustification}
+          <strong>Business Justification:</strong> {renderSafeValue(item.businessJustification)}
         </div>
       )}
       {item.roi && (
         <div style={{ fontSize: '13px', color: '#10e18b', marginBottom: '6px' }}>
-          <strong>Expected ROI:</strong> {item.roi}
+          <strong>Expected ROI:</strong> {renderSafeValue(item.roi)}
         </div>
       )}
       {item.businessImpact && (
         <div style={{ fontSize: '13px', color: '#10e18b', marginBottom: '6px' }}>
-          <strong>Business Impact:</strong> {item.businessImpact}
+          <strong>Business Impact:</strong> {renderSafeValue(item.businessImpact)}
         </div>
       )}
 
       <div style={{ display: 'flex', gap: '15px', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #1d2738', fontSize: '12px', color: '#9aa7bd', flexWrap: 'wrap' }}>
-        {item.owner && <span><strong>Owner:</strong> {item.owner}</span>}
-        {item.timeline && <span><strong>Timeline:</strong> {item.timeline}</span>}
-        {item.estimatedTimeline && <span><strong>Timeline:</strong> {item.estimatedTimeline}</span>}
-        {item.kpis && <span><strong>KPIs:</strong> {Array.isArray(item.kpis) ? item.kpis.join(', ') : item.kpis}</span>}
-        {item.expectedKPI && <span><strong>Expected KPI:</strong> {item.expectedKPI}</span>}
-        {item.dependencies && <span><strong>Dependencies:</strong> {Array.isArray(item.dependencies) ? item.dependencies.join(', ') : item.dependencies}</span>}
+        {item.owner && <span><strong>Owner:</strong> {renderSafeValue(item.owner)}</span>}
+        {item.timeline && <span><strong>Timeline:</strong> {renderSafeValue(item.timeline)}</span>}
+        {item.estimatedTimeline && <span><strong>Timeline:</strong> {renderSafeValue(item.estimatedTimeline)}</span>}
+        {item.kpis && <span><strong>KPIs:</strong> {Array.isArray(item.kpis) ? item.kpis.join(', ') : renderSafeValue(item.kpis)}</span>}
+        {item.expectedKPI && <span><strong>Expected KPI:</strong> {renderSafeValue(item.expectedKPI)}</span>}
+        {item.dependencies && <span><strong>Dependencies:</strong> {Array.isArray(item.dependencies) ? item.dependencies.join(', ') : renderSafeValue(item.dependencies)}</span>}
       </div>
 
       {item.evidence && (

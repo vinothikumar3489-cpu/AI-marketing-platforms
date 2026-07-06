@@ -4,6 +4,7 @@ import { Card, SectionTitle, InsightCard, Loading, EmptyState } from '../compone
 import { TrendingUp, Users, Target, Search, Activity, Briefcase } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { downloadReport } from '../lib/api';
+import { renderSafeValue } from '../lib/normalizers';
 
 export default function ExecutiveStoryPage() {
   const { fullResults, loading, selectedChatId } = useProject();
@@ -51,7 +52,7 @@ export default function ExecutiveStoryPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
             <div style={{ padding: '15px', background: '#101622', borderRadius: '8px', borderLeft: '3px solid #10e18b' }}>
               <h4 style={{ color: '#9aa7bd', margin: '0 0 5px 0' }}>TAM</h4>
-              <div style={{ fontSize: '24px', color: '#fff', fontWeight: 'bold' }}>{market?.tam || '$X B'}</div>
+              <div style={{ fontSize: '24px', color: '#fff', fontWeight: 'bold' }}>{renderSafeValue(market?.tam) || '$X B'}</div>
             </div>
             <div style={{ padding: '15px', background: '#101622', borderRadius: '8px', borderLeft: '3px solid #ffb347' }}>
               <h4 style={{ color: '#9aa7bd', margin: '0 0 5px 0' }}>Top Trend</h4>
@@ -63,13 +64,13 @@ export default function ExecutiveStoryPage() {
             </div>
             <div style={{ padding: '15px', background: '#101622', borderRadius: '8px', borderLeft: '3px solid #53a7ff' }}>
               <h4 style={{ color: '#9aa7bd', margin: '0 0 5px 0' }}>Expected ROI</h4>
-              <div style={{ fontSize: '24px', color: '#fff', fontWeight: 'bold' }}>{expectedRoi}%</div>
+              <div style={{ fontSize: '24px', color: '#fff', fontWeight: 'bold' }}>{renderSafeValue(expectedRoi)}%</div>
             </div>
           </div>
           <div style={{ marginTop: '20px', padding: '20px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
             <h4 style={{ margin: '0 0 10px 0', color: '#53a7ff' }}>Core Value Proposition</h4>
             <p style={{ fontStyle: 'italic', color: '#fff', fontSize: '18px', lineHeight: '1.5', margin: 0 }}>
-              "{positioning?.positioningStatement || positioning?.statement || 'A premium solution built for scale.'}"
+              "{renderSafeValue(positioning?.positioningStatement || positioning?.statement) || 'A premium solution built for scale.'}"
             </p>
           </div>
         </Card>
@@ -91,13 +92,13 @@ export default function ExecutiveStoryPage() {
             {(audience?.buyingTriggers || []).slice(0, 3).map((trigger: any, idx: number) => (
               <div key={idx} style={{ padding: '15px', background: '#151d2b', borderRadius: '8px', borderLeft: '3px solid #ffb347' }}>
                 <h4 style={{ color: '#ffb347', margin: '0 0 5px 0' }}>Buying Trigger</h4>
-                <p style={{ color: '#fff', margin: 0, fontSize: '14px' }}>{typeof trigger === 'object' ? trigger.value : trigger}</p>
+                <p style={{ color: '#fff', margin: 0, fontSize: '14px' }}>{typeof trigger === 'object' ? renderSafeValue(trigger.value) : renderSafeValue(trigger)}</p>
               </div>
             ))}
             {(intent?.hotSegments || []).slice(0, 2).map((seg: any, idx: number) => (
               <div key={idx} style={{ padding: '15px', background: '#151d2b', borderRadius: '8px', borderLeft: '3px solid #ff6b6b' }}>
                 <h4 style={{ color: '#ff6b6b', margin: '0 0 5px 0' }}>Hot Segment</h4>
-                <p style={{ color: '#fff', margin: 0, fontSize: '14px' }}>{typeof seg === 'object' ? seg.value : seg}</p>
+                <p style={{ color: '#fff', margin: 0, fontSize: '14px' }}>{typeof seg === 'object' ? renderSafeValue(seg.value) : renderSafeValue(seg)}</p>
               </div>
             ))}
           </div>
@@ -111,16 +112,16 @@ export default function ExecutiveStoryPage() {
               {(campaign.actionPlan.thirtyDay || []).map((task: any, idx: number) => (
                 <div key={idx} style={{ display: 'flex', gap: '15px', padding: '15px', background: '#151d2b', borderRadius: '8px', borderLeft: '4px solid #53a7ff' }}>
                   <div style={{ width: '100%' }}>
-                    <h4 style={{ margin: '0 0 5px 0', color: '#fff' }}>{task.title || task.task}</h4>
-                    <p style={{ color: '#9aa7bd', fontSize: '13px', margin: '0 0 10px 0' }}>{task.description || task.expectedGain || task.businessImpact}</p>
+                    <h4 style={{ margin: '0 0 5px 0', color: '#fff' }}>{renderSafeValue(task.title || task.task)}</h4>
+                    <p style={{ color: '#9aa7bd', fontSize: '13px', margin: '0 0 10px 0' }}>{renderSafeValue(task.description || task.expectedGain || task.businessImpact)}</p>
                     
                     {(task.problem || task.evidence) && (
                       <details style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px', border: '1px solid #293245' }}>
                         <summary style={{ cursor: 'pointer', color: '#53a7ff', fontSize: '13px', fontWeight: 'bold' }}>View Strategic Reasoning</summary>
                         <div style={{ marginTop: '10px', fontSize: '13px', color: '#9aa7bd', display: 'grid', gap: '8px' }}>
-                          {task.problem && <div><strong style={{ color: '#ff6b6b' }}>Problem:</strong> {task.problem}</div>}
-                          {task.evidence && <div><strong style={{ color: '#ffb347' }}>Evidence:</strong> {task.evidence}</div>}
-                          {task.businessImpact && <div><strong style={{ color: '#53a7ff' }}>Impact:</strong> {task.businessImpact}</div>}
+                          {task.problem && <div><strong style={{ color: '#ff6b6b' }}>Problem:</strong> {renderSafeValue(task.problem)}</div>}
+                          {task.evidence && <div><strong style={{ color: '#ffb347' }}>Evidence:</strong> {renderSafeValue(task.evidence)}</div>}
+                          {task.businessImpact && <div><strong style={{ color: '#53a7ff' }}>Impact:</strong> {renderSafeValue(task.businessImpact)}</div>}
                         </div>
                       </details>
                     )}
