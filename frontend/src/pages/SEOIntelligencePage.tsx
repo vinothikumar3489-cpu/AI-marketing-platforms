@@ -16,13 +16,10 @@ function findRiskyObjects(obj: any, path = "root") {
   if (!obj || typeof obj !== "object") return;
 
   if (
-    "score" in obj &&
-    "reason" in obj &&
-    "source" in obj &&
-    "category" in obj &&
-    "priority" in obj
+    ("score" in obj && "reason" in obj && "source" in obj && "category" in obj) ||
+    ("score" in obj && "reason" in obj && "source" in obj && "category" in obj && "priority" in obj)
   ) {
-    console.warn("FOUND RISKY SCORE OBJECT:", path, obj);
+    console.warn("[SEO RISKY OBJECT]", path, obj);
   }
 
   if (Array.isArray(obj)) {
@@ -226,10 +223,15 @@ export default function SEOIntelligencePage() {
     setMode('running');
     try {
       console.log('[SEO UI] run started for chat:', chatId, 'url:', url);
-      
+
       console.log('[SEO UI] Sending POST /chats/' + chatId + '/seo-intelligence/run');
       const res: any = await api.post(`/chats/${chatId}/seo-intelligence/run`, { websiteUrl: url, url });
       console.log('[SEO UI] run completed');
+
+      // Crash detector: find risky objects in SEO response
+      if (import.meta.env.DEV) {
+        findRiskyObjects(res.seoIntelligence || res.data || res, "seo-response");
+      }
 
       // Store API response data directly in local state (like Growth Workspace does)
       const rawSeo = res.seoIntelligence || res.data || res;
@@ -240,9 +242,14 @@ export default function SEOIntelligencePage() {
       console.log('[SEO UI] refreshing full results');
       await loadFullResults(chatId);
 
+      // Crash detector: find risky objects in full results after refresh
+      if (import.meta.env.DEV) {
+        findRiskyObjects(fullResults?.seoIntelligence ?? fullResults?.seo, "full-results-seo");
+      }
+
       // Refresh chat history so the analyzed chat shows latest
       await refreshChats();
-      
+
       // Only set mode to results after full results are loaded
       setMode('results');
     } catch (e: any) {

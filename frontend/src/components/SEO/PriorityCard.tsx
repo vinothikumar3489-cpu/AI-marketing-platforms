@@ -1,5 +1,6 @@
 import React from 'react';
 import { FileText, Target, Search, Code, Copy, Settings, HelpCircle, Activity, CheckCircle } from 'lucide-react';
+import SafeValue from '../SafeValue';
 
 export const PriorityBadge = ({ priority }: { priority: string }) => {
   const p = (priority && typeof priority === 'string' ? priority.toLowerCase() : '') || 'medium';
@@ -183,43 +184,43 @@ export const PriorityCard = ({ data }: { data: any }) => {
     const time = data.estimatedTime || data.time || '1-2 hours';
     const source = data.source || 'Technical Audit';
     const affectedMetric = data.affectedMetric || data.metric || 'N/A';
-    
+
     return (
-      <div style={{ 
-        background: '#151d2b', 
-        borderRadius: '12px', 
-        padding: '20px', 
+      <div style={{
+        background: '#151d2b',
+        borderRadius: '12px',
+        padding: '20px',
         border: '1px solid #1d2738',
         boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
         borderLeft: '4px solid #ff4757'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
           <h3 style={{ margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: '#fff' }}>
-            <Code size={16} color="#ff4757" /> {title}
+            <Code size={16} color="#ff4757" /> <SafeValue value={title} />
           </h3>
           <PriorityBadge priority={priority} />
         </div>
-        <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#9aa7bd', lineHeight: '1.5' }}>{description}</p>
+        <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#9aa7bd', lineHeight: '1.5' }}><SafeValue value={description} /></p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: '#0b1220', padding: '12px', borderRadius: '6px' }}>
           <div>
             <span style={{ display: 'block', fontSize: '11px', color: '#9aa7bd', textTransform: 'uppercase', marginBottom: '4px' }}>Affected Metric</span>
-            <span style={{ fontSize: '13px', color: '#53a7ff' }}>{affectedMetric}</span>
+            <span style={{ fontSize: '13px', color: '#53a7ff' }}><SafeValue value={affectedMetric} /></span>
           </div>
           <div>
             <span style={{ display: 'block', fontSize: '11px', color: '#9aa7bd', textTransform: 'uppercase', marginBottom: '4px' }}>Impact</span>
-            <span style={{ fontSize: '13px', color: '#10e18b' }}>{impact}</span>
+            <span style={{ fontSize: '13px', color: '#10e18b' }}><SafeValue value={impact} /></span>
           </div>
           <div>
             <span style={{ display: 'block', fontSize: '11px', color: '#9aa7bd', textTransform: 'uppercase', marginBottom: '4px' }}>Difficulty</span>
-            <span style={{ fontSize: '13px', color: '#e2e8f0' }}>{difficulty}</span>
+            <span style={{ fontSize: '13px', color: '#e2e8f0' }}><SafeValue value={difficulty} /></span>
           </div>
           <div>
             <span style={{ display: 'block', fontSize: '11px', color: '#9aa7bd', textTransform: 'uppercase', marginBottom: '4px' }}>Time</span>
-            <span style={{ fontSize: '13px', color: '#e2e8f0' }}>{time}</span>
+            <span style={{ fontSize: '13px', color: '#e2e8f0' }}><SafeValue value={time} /></span>
           </div>
           <div style={{ gridColumn: '1 / -1' }}>
             <span style={{ display: 'block', fontSize: '11px', color: '#9aa7bd', textTransform: 'uppercase', marginBottom: '4px' }}>Source</span>
-            <span style={{ fontSize: '13px', color: '#53a7ff' }}>{source}</span>
+            <span style={{ fontSize: '13px', color: '#53a7ff' }}><SafeValue value={source} /></span>
           </div>
         </div>
       </div>
@@ -233,34 +234,34 @@ export const PriorityCard = ({ data }: { data: any }) => {
     const description = data.description || data.reason || 'Improve AI search engine visibility.';
     const platforms = data.platforms || data.aiPlatforms || ['ChatGPT', 'Gemini', 'Claude'];
     const impact = data.impact || data.expectedImpact || '+25% AI Traffic';
-    
+
     return (
-      <div style={{ 
-        background: '#151d2b', 
-        borderRadius: '12px', 
-        padding: '20px', 
+      <div style={{
+        background: '#151d2b',
+        borderRadius: '12px',
+        padding: '20px',
         border: '1px solid #1d2738',
         boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
         borderLeft: '4px solid #a855f7'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
           <h3 style={{ margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: '#fff' }}>
-            <Activity size={16} color="#a855f7" /> {title}
+            <Activity size={16} color="#a855f7" /> <SafeValue value={title} />
           </h3>
           <PriorityBadge priority={priority} />
         </div>
-        <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#9aa7bd', lineHeight: '1.5' }}>{description}</p>
+        <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#9aa7bd', lineHeight: '1.5' }}><SafeValue value={description} /></p>
         <div style={{ marginBottom: '12px' }}>
           <span style={{ display: 'block', fontSize: '11px', color: '#9aa7bd', textTransform: 'uppercase', marginBottom: '6px' }}>Target Platforms</span>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {Array.isArray(platforms) ? platforms.map((p, i) => (
-              <span key={i} style={{ background: '#1d2738', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', color: '#e2e8f0' }}>{p}</span>
-            )) : <span style={{ fontSize: '13px', color: '#e2e8f0' }}>{platforms}</span>}
+              <span key={i} style={{ background: '#1d2738', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', color: '#e2e8f0' }}><SafeValue value={p} /></span>
+            )) : <span style={{ fontSize: '13px', color: '#e2e8f0' }}><SafeValue value={platforms} /></span>}
           </div>
         </div>
         <div style={{ background: '#0b1220', padding: '12px', borderRadius: '6px' }}>
           <span style={{ display: 'block', fontSize: '11px', color: '#9aa7bd', textTransform: 'uppercase', marginBottom: '4px' }}>Expected Impact</span>
-          <span style={{ fontSize: '13px', color: '#10e18b' }}>{impact}</span>
+          <span style={{ fontSize: '13px', color: '#10e18b' }}><SafeValue value={impact} /></span>
         </div>
       </div>
     );
@@ -278,7 +279,7 @@ export const PriorityCard = ({ data }: { data: any }) => {
   const cta = data.CTASuggestion || data.cta || 'Explore Features';
   const rawScore = data.opportunityScore || data.confidenceScore || data.score || Math.floor(Math.random() * 30) + 70;
   const score = typeof rawScore === 'object' && rawScore !== null ? (rawScore.value || rawScore.score || 70) : rawScore;
-  
+
   // Extract expected impacts
   const estimatedTraffic = data.estimatedTraffic || '+18% Organic Traffic';
   const visibility = data.aiVisibility || 'Better AI Visibility';
@@ -286,10 +287,10 @@ export const PriorityCard = ({ data }: { data: any }) => {
   const time = data.estimatedTime || data.time || '2 Days';
 
   return (
-    <div style={{ 
-      background: '#151d2b', 
-      borderRadius: '12px', 
-      padding: '24px', 
+    <div style={{
+      background: '#151d2b',
+      borderRadius: '12px',
+      padding: '24px',
       border: '1px solid #1d2738',
       boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
       transition: 'transform 0.2s, box-shadow 0.2s',
@@ -304,11 +305,11 @@ export const PriorityCard = ({ data }: { data: any }) => {
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
           <h3 style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px', color: '#fff' }}>
-            <FileText size={18} color="#a855f7" /> {title}
+            <FileText size={18} color="#a855f7" /> <SafeValue value={title} />
           </h3>
           <PriorityBadge priority={priority} />
         </div>
-        <span style={{ fontSize: '13px', color: '#9aa7bd' }}>Content Type: <b style={{ color: '#e2e8f0' }}>{contentType}</b></span>
+        <span style={{ fontSize: '13px', color: '#9aa7bd' }}>Content Type: <b style={{ color: '#e2e8f0' }}><SafeValue value={contentType} /></b></span>
       </div>
 
       {/* Grid Specs */}
@@ -316,18 +317,18 @@ export const PriorityCard = ({ data }: { data: any }) => {
         <div>
           <span style={{ display: 'block', fontSize: '11px', color: '#9aa7bd', textTransform: 'uppercase', marginBottom: '4px' }}>Target Keyword</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#53a7ff', fontWeight: '500' }}>
-            <Target size={14} /> {targetKeyword}
+            <Target size={14} /> <SafeValue value={targetKeyword} />
           </div>
         </div>
         <div>
           <span style={{ display: 'block', fontSize: '11px', color: '#9aa7bd', textTransform: 'uppercase', marginBottom: '4px' }}>Search Intent</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#fff' }}>
-            <Search size={14} /> <span style={{ textTransform: 'capitalize' }}>{searchIntent}</span>
+            <Search size={14} /> <span style={{ textTransform: 'capitalize' }}><SafeValue value={searchIntent} /></span>
           </div>
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
           <span style={{ display: 'block', fontSize: '11px', color: '#9aa7bd', textTransform: 'uppercase', marginBottom: '4px' }}>Suggested H1</span>
-          <div style={{ fontSize: '15px', color: '#fff', fontWeight: 'bold' }}>{suggestedH1}</div>
+          <div style={{ fontSize: '15px', color: '#fff', fontWeight: 'bold' }}><SafeValue value={suggestedH1} /></div>
         </div>
       </div>
 
@@ -336,8 +337,8 @@ export const PriorityCard = ({ data }: { data: any }) => {
         <h4 style={{ fontSize: '14px', color: '#fff', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <HelpCircle size={14} color="#ffa502" /> Why This Matters
         </h4>
-        <p style={{ margin: 0, fontSize: '13px', color: '#9aa7bd', lineHeight: '1.6' }}>{whyItMatters}</p>
-        
+        <p style={{ margin: 0, fontSize: '13px', color: '#9aa7bd', lineHeight: '1.6' }}><SafeValue value={whyItMatters} /></p>
+
         <h4 style={{ fontSize: '14px', color: '#fff', margin: '16px 0 8px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Settings size={14} color="#10e18b" /> Recommended Sections
         </h4>
@@ -349,7 +350,7 @@ export const PriorityCard = ({ data }: { data: any }) => {
         <div>
           <span style={{ display: 'block', fontSize: '12px', color: '#9aa7bd', marginBottom: '8px' }}>Primary CTA</span>
           <span style={{ display: 'inline-block', background: '#1d2738', padding: '6px 12px', borderRadius: '4px', fontSize: '13px', color: '#fff', border: '1px solid #293245' }}>
-            {cta}
+            <SafeValue value={cta} />
           </span>
         </div>
         <div>
@@ -363,15 +364,15 @@ export const PriorityCard = ({ data }: { data: any }) => {
         <div>
           <h4 style={{ fontSize: '12px', color: '#9aa7bd', margin: '0 0 10px 0', textTransform: 'uppercase' }}>Expected Impact</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <span style={{ fontSize: '13px', color: '#10e18b', display: 'flex', alignItems: 'center', gap: '6px' }}><Activity size={12} /> {estimatedTraffic}</span>
-            <span style={{ fontSize: '13px', color: '#10e18b', display: 'flex', alignItems: 'center', gap: '6px' }}><Activity size={12} /> {visibility}</span>
+            <span style={{ fontSize: '13px', color: '#10e18b', display: 'flex', alignItems: 'center', gap: '6px' }}><Activity size={12} /> <SafeValue value={estimatedTraffic} /></span>
+            <span style={{ fontSize: '13px', color: '#10e18b', display: 'flex', alignItems: 'center', gap: '6px' }}><Activity size={12} /> <SafeValue value={visibility} /></span>
           </div>
         </div>
         <div>
           <h4 style={{ fontSize: '12px', color: '#9aa7bd', margin: '0 0 10px 0', textTransform: 'uppercase' }}>Implementation</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#e2e8f0' }}>
-            <span>Difficulty: <b style={{ color: (difficulty && typeof difficulty === 'string' ? difficulty.toLowerCase() : '') === 'hard' ? '#ff4757' : (difficulty && typeof difficulty === 'string' ? difficulty.toLowerCase() : '') === 'medium' ? '#ffa502' : '#10e18b', textTransform: 'capitalize' }}>{difficulty}</b></span>
-            <span>Time: <b>{time}</b></span>
+            <span>Difficulty: <b style={{ color: (difficulty && typeof difficulty === 'string' ? difficulty.toLowerCase() : '') === 'hard' ? '#ff4757' : (difficulty && typeof difficulty === 'string' ? difficulty.toLowerCase() : '') === 'medium' ? '#ffa502' : '#10e18b', textTransform: 'capitalize' }}><SafeValue value={difficulty} /></b></span>
+            <span>Time: <b><SafeValue value={time} /></b></span>
           </div>
         </div>
       </div>
