@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, Component } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api, downloadReport } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
-import { asArray, asNumber, asText, normalizeSeo, renderSafeValue } from '../lib/normalizers';
+import { asArray, asNumber, asText, normalizeSeo, normalizeSeoDisplay, renderSafeValue } from '../lib/normalizers';
 import { Badge, Card, EmptyState, Loading, PageHeader, ScoreCard, SectionTitle } from '../components/UI';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { Shield, Target, TrendingUp, Zap, Search, Globe, Code, FileText, Cpu, LayoutList, CheckCircle, AlertTriangle, Loader2, Building, Activity, Map, Clock, Layers, Eye, Users, Star, PieChart, Info, Sliders, GripHorizontal } from 'lucide-react';
@@ -236,7 +236,9 @@ export default function SEOIntelligencePage() {
       // Store API response data directly in local state (like Growth Workspace does)
       const rawSeo = res.seoIntelligence || res.data || res;
       if (rawSeo && typeof rawSeo === 'object' && Object.keys(rawSeo).length > 0) {
-        setSeo(normalizeSeo(rawSeo));
+        // Sanitize SEO objects to prevent React error #31
+        const sanitizedSeo = normalizeSeoDisplay(rawSeo);
+        setSeo(normalizeSeo(sanitizedSeo));
       }
 
       console.log('[SEO UI] refreshing full results');

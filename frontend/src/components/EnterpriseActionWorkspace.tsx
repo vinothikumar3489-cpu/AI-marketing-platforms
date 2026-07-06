@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import SafeValue from './SafeValue';
 import {
   AlertTriangle, CheckCircle2, Lightbulb, Zap, Target, TrendingUp, Shield,
   ChevronDown, ChevronUp, Info, X, Search, Copy, Download, Share2,
@@ -924,7 +925,7 @@ function StatCard({ icon: Icon, label, value, color, onClick }: { icon: any; lab
       onMouseEnter={e => { if (onClick) (e.currentTarget as HTMLElement).style.borderColor = color + '50'; }}
       onMouseLeave={e => { if (onClick) (e.currentTarget as HTMLElement).style.borderColor = C.border; }}>
       <Icon size={22} style={{ color, marginBottom: '6px', display: 'inline-block' }} />
-      <div style={{ fontSize: '26px', fontWeight: 700, color: C.text }}>{value}</div>
+      <div style={{ fontSize: '26px', fontWeight: 700, color: C.text }}><SafeValue value={value} /></div>
       <div style={{ fontSize: '11px', color: C.muted }}>{renderSafeValue(label)}</div>
     </div>
   );

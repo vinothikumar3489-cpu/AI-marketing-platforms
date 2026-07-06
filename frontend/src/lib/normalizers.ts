@@ -145,6 +145,39 @@ export const sanitizeForReact = (value: any): any => {
   return String(value);
 };
 
+// Backend-safe frontend normalizer for SEO objects
+// Normalizes objects with {score, reason, source, category, priority} structure
+export const normalizeSeoDisplay = (value: any): any => {
+  if (value === null || value === undefined) return value;
+
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) return value;
+
+  if (Array.isArray(value)) return value.map(normalizeSeoDisplay);
+
+  if (typeof value === "object") {
+    // Detect SEO score objects and normalize them
+    if ("score" in value && "reason" in value && "source" in value && "category" in value) {
+      return {
+        score: value.score ?? "Not available",
+        reason: value.reason ?? "Not available",
+        source: value.source ?? "Not available",
+        category: value.category ?? "Not available",
+        priority: value.priority ?? "Not available",
+      };
+    }
+
+    return Object.fromEntries(
+      Object.entries(value).map(([key, val]) => [key, normalizeSeoDisplay(val)])
+    );
+  }
+
+  return String(value);
+};
+
 export const normalizeDeep = (value: any): any => {
   if (value === null || value === undefined) return value;
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Badge, EvidenceBadge } from './UI';
 import { renderSafeValue } from '../lib/normalizers';
+import SafeValue from './SafeValue';
 import { ChevronDown, ChevronUp, Link as LinkIcon, AlertCircle, Info, Target, Users, Zap, TrendingUp, BarChart2, DollarSign, Building, Code, Star, Shield, PieChart } from 'lucide-react';
 
 export interface Insight {
@@ -23,7 +24,7 @@ export function InsightCard({ insight, icon: Icon = Info }: { insight: Insight |
       <Card className="insight-card">
         <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
           <Icon size={18} style={{ color: '#53a7ff', marginTop: '2px' }} />
-          <p style={{ margin: 0, lineHeight: '1.5' }}>{insight}</p>
+          <p style={{ margin: 0, lineHeight: '1.5' }}><SafeValue value={insight} /></p>
         </div>
       </Card>
     );
@@ -57,7 +58,7 @@ export function InsightCard({ insight, icon: Icon = Info }: { insight: Insight |
       {insight.recommendedAction && (
         <div style={{ background: '#151d2b', padding: '10px', borderRadius: '8px', marginBottom: '10px', display: 'flex', gap: '8px' }}>
           <Target size={16} style={{ color: '#ffb347' }} />
-          <span style={{ fontSize: '13px', color: '#9aa7bd' }}><b>Action:</b> {insight.recommendedAction}</span>
+          <span style={{ fontSize: '13px', color: '#9aa7bd' }}><b>Action:</b> <SafeValue value={insight.recommendedAction} /></span>
         </div>
       )}
 

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import SafeValue from './SafeValue';
 import {
   Shield, TrendingUp, Target, AlertTriangle, CheckCircle2, Lightbulb, Zap,
   ChevronDown, ChevronUp, Info, X, Search, Copy, Download, Share2,
@@ -276,7 +277,7 @@ export function ExplainButton({ explanation, label = 'Explain' }: { explanation?
 
 function ExplainRow({ icon: Icon, label, value, color }: { icon: any; label: string; value: string; color: string }) {
   if (!value) return null;
-  return <div style={{ marginBottom: '6px', padding: '6px 8px', background: C.bg, borderRadius: '6px', borderLeft: `3px solid ${color}` }}><div style={{ fontSize: '10px', color, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}><Icon size={10} /> {label}</div><div style={{ fontSize: '12px', color: C.muted, lineHeight: 1.4 }}>{value}</div></div>;
+  return <div style={{ marginBottom: '6px', padding: '6px 8px', background: C.bg, borderRadius: '6px', borderLeft: `3px solid ${color}` }}><div style={{ fontSize: '10px', color, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}><Icon size={10} /> <SafeValue value={label} /></div><div style={{ fontSize: '12px', color: C.muted, lineHeight: 1.4 }}><SafeValue value={value} /></div></div>;
 }
 
 export interface CompareData { label: string; current: number; previous: number; unit?: string; }
@@ -688,7 +689,7 @@ export function AIBusinessAdvisor({ answers, onClose }: { answers: AdvisorAnswer
 }
 
 function DetailRow({ icon: Icon, label, value, color }: { icon: any; label: string; value: string; color: string }) {
-  return <div style={{ padding: '6px 8px', background: '#0f1729', borderRadius: '6px', borderLeft: `3px solid ${color}` }}><div style={{ fontSize: '9px', color, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}><Icon size={10} /> {label}</div><div style={{ fontSize: '12px', color: C.muted }}>{value}</div></div>;
+  return <div style={{ padding: '6px 8px', background: '#0f1729', borderRadius: '6px', borderLeft: `3px solid ${color}` }}><div style={{ fontSize: '9px', color, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}><Icon size={10} /> <SafeValue value={label} /></div><div style={{ fontSize: '12px', color: C.muted }}><SafeValue value={value} /></div></div>;
 }
 
 // ── Part 4 — Decision Simulator ──

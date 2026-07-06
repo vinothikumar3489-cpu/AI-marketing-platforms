@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { renderSafeValue } from '../lib/normalizers';
+import SafeValue from './SafeValue';
 import {
   ChevronDown, ChevronUp, ChevronRight, ExternalLink, Clock, Shield, AlertTriangle,
   CheckCircle2, Target, Users, TrendingUp, Zap, DollarSign, Building, Code,
@@ -18,11 +19,11 @@ export function EnterpriseEmptyState({ icon: Icon = AlertTriangle, title = 'Veri
       <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(42,163,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
         <Icon size={24} style={{ color: '#53a7ff' }} />
       </div>
-      <h3 style={{ margin: '0 0 6px', fontSize: '16px', color: '#e5e7eb' }}>{title}</h3>
-      <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#6b7280', maxWidth: '400px' }}>{message}</p>
+      <h3 style={{ margin: '0 0 6px', fontSize: '16px', color: '#e5e7eb' }}><SafeValue value={title} /></h3>
+      <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#6b7280', maxWidth: '400px' }}><SafeValue value={message} /></p>
       {action && actionLabel && (
         <button onClick={action} style={{ padding: '8px 16px', background: '#1d2738', border: '1px solid #293245', borderRadius: '8px', color: '#53a7ff', cursor: 'pointer', fontSize: '13px' }}>
-          {actionLabel}
+          <SafeValue value={actionLabel} />
         </button>
       )}
     </div>
@@ -131,7 +132,7 @@ export function PriorityChip({ priority }: { priority?: string }) {
     low: { color: '#10e18b', bg: 'rgba(16,225,139,0.15)' },
   };
   const s = map[priority.toLowerCase()] || { color: '#9aa7bd', bg: 'rgba(154,167,189,0.1)' };
-  return <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', background: s.bg, color: s.color, borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{priority}</span>;
+  return <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', background: s.bg, color: s.color, borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}><SafeValue value={priority} /></span>;
 }
 
 export function RoiIndicator({ value, suffix = '%' }: { value?: number; suffix?: string }) {
