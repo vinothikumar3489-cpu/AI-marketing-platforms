@@ -2,6 +2,7 @@
 import { api } from '@/lib/api';
 import { getActiveProject } from '@/lib/project-store';
 import { AlertCircle, CheckCircle, Sparkles, Download, Calendar, Search, Megaphone, Settings, Clock, ArrowRight, Loader2 } from 'lucide-react';
+import { renderSafeValue } from '../../lib/normalizers';
 
 interface SolutionStatus {
   canGenerate: boolean;
@@ -205,7 +206,7 @@ export function SolutionGeneratorPage() {
             <div className="flex flex-wrap gap-2">
               {solution.metadata.modulesUsed.map((module, idx) => (
                 <span key={idx} className="text-xs bg-white/10 px-3 py-1 rounded-full">
-                  {module}
+                  {renderSafeValue(module)}
                 </span>
               ))}
             </div>
@@ -254,7 +255,7 @@ export function SolutionGeneratorPage() {
                   <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                     {Array.isArray(solution.seoImplementation.priorityFixes)
                       ? solution.seoImplementation.priorityFixes.map((fix, idx) => (
-                          <li key={idx}>{fix}</li>
+                          <li key={idx}>{renderSafeValue(fix)}</li>
                         ))
                       : <li>{solution.seoImplementation.priorityFixes}</li>}
                   </ul>
@@ -324,7 +325,7 @@ export function SolutionGeneratorPage() {
                   <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
                     {Array.isArray(solution.nextActions.thisWeek)
                       ? solution.nextActions.thisWeek.map((action, idx) => (
-                          <li key={idx}>{action}</li>
+                          <li key={idx}>{renderSafeValue(action)}</li>
                         ))
                       : <li>{solution.nextActions.thisWeek}</li>}
                   </ul>
@@ -336,7 +337,7 @@ export function SolutionGeneratorPage() {
                   <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
                     {Array.isArray(solution.nextActions.thisMonth)
                       ? solution.nextActions.thisMonth.map((action, idx) => (
-                          <li key={idx}>{action}</li>
+                          <li key={idx}>{renderSafeValue(action)}</li>
                         ))
                       : <li>{solution.nextActions.thisMonth}</li>}
                   </ul>

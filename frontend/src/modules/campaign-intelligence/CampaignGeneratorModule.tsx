@@ -5,6 +5,7 @@ import { AlertCircle, Sparkles, Copy } from "lucide-react";
 import { Section } from "@/components/ui-kit";
 import { getActiveProject } from "@/lib/project-store";
 import { api } from "@/lib/api";
+import { renderSafeValue } from '../../lib/normalizers';
 
 const emptyForm = {
   productName: "",
@@ -159,7 +160,7 @@ export function CampaignGeneratorModule() {
 
           <Section title="Campaign Strategy">
             <div className="rounded-2xl bg-white/5 border border-white/10 p-4 text-sm text-muted-foreground">
-              {data.campaignStrategy || "No strategy available yet."}
+              {renderSafeValue(data.campaignStrategy) || "No strategy available yet."}
             </div>
           </Section>
 
@@ -176,7 +177,7 @@ export function CampaignGeneratorModule() {
                       <Copy className="w-4 h-4" />
                     </button>
                   </div>
-                  {copy}
+                  {renderSafeValue(copy)}
                 </div>
               ))}
             </div>
@@ -195,7 +196,7 @@ export function CampaignGeneratorModule() {
                       <Copy className="w-4 h-4" />
                     </button>
                   </div>
-                  {post}
+                  {renderSafeValue(post)}
                 </div>
               ))}
             </div>
@@ -205,7 +206,7 @@ export function CampaignGeneratorModule() {
             <div className="space-y-3">
               {(data.emailCampaign || []).map((email: string, index: number) => (
                 <div key={index} className="rounded-2xl bg-white/5 border border-white/10 p-4 text-sm flex justify-between items-center">
-                  <span>{email}</span>
+                  <span>{renderSafeValue(email)}</span>
                   <button
                     onClick={() => copyToClipboard(email)}
                     className="text-muted-foreground hover:text-white transition-colors"
@@ -221,7 +222,7 @@ export function CampaignGeneratorModule() {
             <div className="flex flex-wrap gap-2">
               {(data.hashtags || []).map((hashtag: string, index: number) => (
                 <div key={index} className="rounded-xl bg-white/5 border border-white/10 px-4 py-2 text-sm flex items-center gap-2">
-                  <span>{hashtag}</span>
+                  <span>{renderSafeValue(hashtag)}</span>
                   <button
                     onClick={() => copyToClipboard(hashtag)}
                     className="text-muted-foreground hover:text-white transition-colors"
@@ -235,7 +236,7 @@ export function CampaignGeneratorModule() {
 
           <Section title="Landing Page Headline">
             <div className="rounded-2xl bg-white/5 border border-white/10 p-4 text-sm flex justify-between items-center">
-              <span>{data.landingPageHeadline || "No headline available yet."}</span>
+              <span>{renderSafeValue(data.landingPageHeadline) || "No headline available yet."}</span>
               <button
                 onClick={() => copyToClipboard(data.landingPageHeadline)}
                 className="text-muted-foreground hover:text-white transition-colors"
@@ -249,7 +250,7 @@ export function CampaignGeneratorModule() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {(data.ctaSuggestions || []).map((cta: string, index: number) => (
                 <div key={index} className="rounded-2xl bg-white/5 border border-white/10 p-4 text-sm flex justify-between items-center">
-                  <span>{cta}</span>
+                  <span>{renderSafeValue(cta)}</span>
                   <button
                     onClick={() => copyToClipboard(cta)}
                     className="text-muted-foreground hover:text-white transition-colors"
@@ -266,8 +267,8 @@ export function CampaignGeneratorModule() {
               {(data.sevenDayContentCalendar || []).map((day: any, index: number) => (
                 <div key={index} className="rounded-2xl bg-white/5 border border-white/10 p-4 text-sm flex justify-between items-center">
                   <div>
-                    <div className="font-semibold">{day.day}</div>
-                    <div className="text-muted-foreground">{day.content}</div>
+                    <div className="font-semibold">{renderSafeValue(day.day)}</div>
+                    <div className="text-muted-foreground">{renderSafeValue(day.content)}</div>
                   </div>
                   <button
                     onClick={() => copyToClipboard(`${day.day}: ${day.content}`)}
@@ -282,7 +283,7 @@ export function CampaignGeneratorModule() {
 
           <Section title="Final Recommendation">
             <div className="rounded-3xl bg-white/5 border border-white/10 p-6 text-sm text-muted-foreground">
-              {data.finalRecommendation || "Run campaign generator to get a recommendation."}
+              {renderSafeValue(data.finalRecommendation) || "Run campaign generator to get a recommendation."}
             </div>
           </Section>
         </div>

@@ -1,4 +1,5 @@
 ﻿import { Section } from "@/components/ui-kit";
+import { renderSafeValue } from '../../lib/normalizers';
 
 const sample = {
   positioningStatement: "A smarter acquisition platform for teams that need fast, signal-driven growth.",
@@ -25,7 +26,7 @@ export function PositioningEngineModule() {
             <div className="text-xs uppercase tracking-wider text-muted-foreground">Messaging Angles</div>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
               {sample.messagingAngles.map((item) => (
-                <div key={item} className="rounded-2xl bg-white/5 p-3 text-sm">{item}</div>
+                <div key={renderSafeValue(item)} className="rounded-2xl bg-white/5 p-3 text-sm">{renderSafeValue(item)}</div>
               ))}
             </div>
           </div>

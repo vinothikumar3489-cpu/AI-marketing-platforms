@@ -5,6 +5,7 @@ import { AlertCircle, Sparkles } from "lucide-react";
 import { Section } from "@/components/ui-kit";
 import { getActiveProject } from "@/lib/project-store";
 import { api } from "@/lib/api";
+import { renderSafeValue } from '../../lib/normalizers';
 
 const emptyForm = {
   productName: "",
@@ -151,7 +152,7 @@ export function CompetitorAnalysisModule() {
             <ul className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {(data.competitorList || []).map((comp: string, idx: number) => (
                 <li key={idx} className="rounded-2xl bg-white/5 border border-white/10 p-4 text-sm">
-                  {comp}
+                  {renderSafeValue(comp)}
                 </li>
               ))}
             </ul>
@@ -163,7 +164,7 @@ export function CompetitorAnalysisModule() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.competitorStrengths || []).map((strength: string, idx: number) => (
                   <li key={idx} className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                    {strength}
+                    {renderSafeValue(strength)}
                   </li>
                 ))}
               </ul>
@@ -172,7 +173,7 @@ export function CompetitorAnalysisModule() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.competitorWeaknesses || []).map((weakness: string, idx: number) => (
                   <li key={idx} className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                    {weakness}
+                    {renderSafeValue(weakness)}
                   </li>
                 ))}
               </ul>
@@ -185,7 +186,7 @@ export function CompetitorAnalysisModule() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.pricingInsights || []).map((insight: string, idx: number) => (
                   <li key={idx} className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                    {insight}
+                    {renderSafeValue(insight)}
                   </li>
                 ))}
               </ul>
@@ -194,7 +195,7 @@ export function CompetitorAnalysisModule() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {(data.opportunitiesToBeatCompetitors || []).map((opp: string, idx: number) => (
                   <li key={idx} className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                    {opp}
+                    {renderSafeValue(opp)}
                   </li>
                 ))}
               </ul>
@@ -204,7 +205,7 @@ export function CompetitorAnalysisModule() {
           {/* Positioning & Feature Gaps */}
           <Section title="Positioning Comparison">
             <div className="rounded-2xl bg-white/5 border border-white/10 p-4 text-sm text-muted-foreground">
-              {data.positioningComparison || "No comparison available yet."}
+              {renderSafeValue(data.positioningComparison) || "No comparison available yet."}
             </div>
           </Section>
 
@@ -212,7 +213,7 @@ export function CompetitorAnalysisModule() {
             <ul className="space-y-2 text-sm text-muted-foreground">
               {(data.featureGapAnalysis || []).map((gap: string, idx: number) => (
                 <li key={idx} className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                  {gap}
+                  {renderSafeValue(gap)}
                 </li>
               ))}
             </ul>
@@ -221,13 +222,13 @@ export function CompetitorAnalysisModule() {
           {/* Final Stuff */}
           <Section title="Recommended Strategy">
             <div className="rounded-2xl bg-white/5 border border-white/10 p-4 text-sm text-muted-foreground">
-              {data.recommendedStrategy || "No strategy available yet."}
+              {renderSafeValue(data.recommendedStrategy) || "No strategy available yet."}
             </div>
           </Section>
 
           <Section title="Final Recommendation">
             <div className="rounded-3xl bg-white/5 border border-white/10 p-6 text-sm text-muted-foreground">
-              {data.finalRecommendation || "Run competitor analysis to get a recommendation."}
+              {renderSafeValue(data.finalRecommendation) || "Run competitor analysis to get a recommendation."}
             </div>
           </Section>
         </div>

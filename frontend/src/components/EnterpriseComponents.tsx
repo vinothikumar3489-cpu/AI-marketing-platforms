@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { renderSafeValue } from '../lib/normalizers';
 import {
   ChevronDown, ChevronUp, ChevronRight, ExternalLink, Clock, Shield, AlertTriangle,
   CheckCircle2, Target, Users, TrendingUp, Zap, DollarSign, Building, Code,
@@ -433,7 +434,7 @@ export function EnterpriseCompetitorCard({ competitor }: { competitor: any }) {
             <div>
               <div style={{ fontSize: '10px', color: '#10e18b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Strengths</div>
               <ul style={{ margin: 0, paddingLeft: '14px', fontSize: '12px', color: '#9aa7bd' }}>
-                {strengths.slice(0, 3).map((s: string, i: number) => <li key={i}>{s}</li>)}
+                {strengths.slice(0, 3).map((s: string, i: number) => <li key={i}>{renderSafeValue(s)}</li>)}
               </ul>
             </div>
           )}
@@ -441,7 +442,7 @@ export function EnterpriseCompetitorCard({ competitor }: { competitor: any }) {
             <div>
               <div style={{ fontSize: '10px', color: '#ff4757', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Weaknesses</div>
               <ul style={{ margin: 0, paddingLeft: '14px', fontSize: '12px', color: '#9aa7bd' }}>
-                {weaknesses.slice(0, 3).map((w: string, i: number) => <li key={i}>{w}</li>)}
+                {weaknesses.slice(0, 3).map((w: string, i: number) => <li key={i}>{renderSafeValue(w)}</li>)}
               </ul>
             </div>
           )}
@@ -514,7 +515,7 @@ export function EnterpriseAudienceCard({ persona }: { persona: any }) {
           <div>
             <div style={{ fontSize: '10px', color: '#ff4757', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Pain Points</div>
             <ul style={{ margin: 0, paddingLeft: '14px', fontSize: '12px', color: '#9aa7bd' }}>
-              {(persona.painPoints || persona.frustrations || []).slice(0, 3).map((p: string, i: number) => <li key={i}>{p}</li>)}
+              {(persona.painPoints || persona.frustrations || []).slice(0, 3).map((p: string, i: number) => <li key={i}>{renderSafeValue(p)}</li>)}
             </ul>
           </div>
         )}
@@ -522,7 +523,7 @@ export function EnterpriseAudienceCard({ persona }: { persona: any }) {
           <div>
             <div style={{ fontSize: '10px', color: '#10e18b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Goals</div>
             <ul style={{ margin: 0, paddingLeft: '14px', fontSize: '12px', color: '#9aa7bd' }}>
-              {persona.goals.slice(0, 3).map((g: string, i: number) => <li key={i}>{g}</li>)}
+              {persona.goals.slice(0, 3).map((g: string, i: number) => <li key={i}>{renderSafeValue(g)}</li>)}
             </ul>
           </div>
         )}
@@ -532,7 +533,7 @@ export function EnterpriseAudienceCard({ persona }: { persona: any }) {
           <div style={{ fontSize: '10px', color: '#ffb347', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>Buying Triggers</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
             {(persona.buyingTriggers || []).slice(0, 4).map((bt: string, i: number) => (
-              <span key={i} style={{ fontSize: '11px', padding: '2px 8px', background: 'rgba(255,179,71,0.08)', color: '#ffb347', borderRadius: '4px' }}>{bt}</span>
+              <span key={i} style={{ fontSize: '11px', padding: '2px 8px', background: 'rgba(255,179,71,0.08)', color: '#ffb347', borderRadius: '4px' }}>{renderSafeValue(bt)}</span>
             ))}
           </div>
         </div>

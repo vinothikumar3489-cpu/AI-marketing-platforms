@@ -5,6 +5,7 @@ import { AlertCircle, Target, TrendingUp, DollarSign, Sparkles } from "lucide-re
 import { Section } from "@/components/ui-kit";
 import { getActiveProject } from "@/lib/project-store";
 import { api } from "@/lib/api";
+import { renderSafeValue } from '../../lib/normalizers';
 
 const emptyForm = {
   productName: "",
@@ -139,12 +140,12 @@ export function MarketDiscoveryModule() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Section title="Market Overview">
               <div className="rounded-2xl bg-white/5 border border-white/10 p-4 text-sm text-muted-foreground">
-                {data.marketOverview || "No overview available yet."}
+                {renderSafeValue(data.marketOverview) || "No overview available yet."}
               </div>
             </Section>
             <Section title="Market Demand">
               <div className="rounded-2xl bg-white/5 border border-white/10 p-4 text-sm text-muted-foreground">
-                {data.marketDemand || "No demand data available yet."}
+                {renderSafeValue(data.marketDemand) || "No demand data available yet."}
               </div>
             </Section>
           </div>
@@ -155,7 +156,7 @@ export function MarketDiscoveryModule() {
               {(data.currentTrends || []).map((trend: string, idx: number) => (
                 <li key={idx} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-brand-cyan flex-shrink-0" />
-                  {trend}
+                  {renderSafeValue(trend)}
                 </li>
               ))}
             </ul>
@@ -168,7 +169,7 @@ export function MarketDiscoveryModule() {
                 {(data.targetCustomerSegments || []).map((seg: string, idx: number) => (
                   <li key={idx} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-center gap-2">
                     <Target className="w-4 h-4 text-brand-purple flex-shrink-0" />
-                    {seg}
+                    {renderSafeValue(seg)}
                   </li>
                 ))}
               </ul>
@@ -178,7 +179,7 @@ export function MarketDiscoveryModule() {
                 {(data.growthOpportunities || []).map((opp: string, idx: number) => (
                   <li key={idx} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-brand-green flex-shrink-0" />
-                    {opp}
+                    {renderSafeValue(opp)}
                   </li>
                 ))}
               </ul>
@@ -192,7 +193,7 @@ export function MarketDiscoveryModule() {
                 {(data.risks || []).map((risk: string, idx: number) => (
                   <li key={idx} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-orange-400 flex-shrink-0" />
-                    {risk}
+                    {renderSafeValue(risk)}
                   </li>
                 ))}
               </ul>
@@ -202,7 +203,7 @@ export function MarketDiscoveryModule() {
                 {(data.pricingSuggestions || []).map((price: string, idx: number) => (
                   <li key={idx} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-center gap-2">
                     <DollarSign className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                    {price}
+                    {renderSafeValue(price)}
                   </li>
                 ))}
               </ul>
@@ -212,13 +213,13 @@ export function MarketDiscoveryModule() {
           {/* Entry Strategy & Final Recommendation */}
           <Section title="Recommended Market Entry Strategy">
             <div className="rounded-2xl bg-white/5 border border-white/10 p-4 text-sm text-muted-foreground">
-              {data.recommendedMarketEntryStrategy || "No entry strategy available yet."}
+              {renderSafeValue(data.recommendedMarketEntryStrategy) || "No entry strategy available yet."}
             </div>
           </Section>
 
           <Section title="Final Recommendation">
             <div className="rounded-3xl bg-white/5 border border-white/10 p-6 text-sm text-muted-foreground">
-              {data.finalRecommendation || "Run market discovery to get a recommendation."}
+              {renderSafeValue(data.finalRecommendation) || "Run market discovery to get a recommendation."}
             </div>
           </Section>
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Badge, EvidenceBadge } from './UI';
+import { renderSafeValue } from '../lib/normalizers';
 import { ChevronDown, ChevronUp, Link as LinkIcon, AlertCircle, Info, Target, Users, Zap, TrendingUp, BarChart2, DollarSign, Building, Code, Star, Shield, PieChart } from 'lucide-react';
 
 export interface Insight {
@@ -113,13 +114,13 @@ export function PersonaCard({ persona }: { persona: any }) {
         <div>
           <strong style={{ fontSize: '12px', color: '#10e18b', textTransform: 'uppercase', letterSpacing: '1px' }}>Goals</strong>
           <ul style={{ paddingLeft: '15px', margin: '5px 0', fontSize: '13px' }}>
-            {(persona.goals || []).slice(0, 3).map((g: string, i: number) => <li key={i}>{g}</li>)}
+            {(persona.goals || []).slice(0, 3).map((g: string, i: number) => <li key={i}>{renderSafeValue(g)}</li>)}
           </ul>
         </div>
         <div>
           <strong style={{ fontSize: '12px', color: '#ff4757', textTransform: 'uppercase', letterSpacing: '1px' }}>Frustrations / Pain Points</strong>
           <ul style={{ paddingLeft: '15px', margin: '5px 0', fontSize: '13px' }}>
-            {(persona.painPoints || persona.frustrations || []).slice(0, 3).map((f: string, i: number) => <li key={i}>{f}</li>)}
+            {(persona.painPoints || persona.frustrations || []).slice(0, 3).map((f: string, i: number) => <li key={i}>{renderSafeValue(f)}</li>)}
           </ul>
         </div>
       </div>
@@ -220,7 +221,7 @@ export function CompetitorCard({ competitor }: { competitor: any }) {
               <span style={{ color: '#9aa7bd', fontSize: '12px' }}>Technologies: </span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
                 {ef.technologies.slice(0, 5).map((t: string, i: number) => (
-                  <span key={i} style={{ padding: '2px 6px', background: '#1d2738', borderRadius: '4px', fontSize: '11px', color: '#2aa3ff' }}><Code size={10} style={{ marginRight: '3px' }}/>{t}</span>
+                  <span key={i} style={{ padding: '2px 6px', background: '#1d2738', borderRadius: '4px', fontSize: '11px', color: '#2aa3ff' }}><Code size={10} style={{ marginRight: '3px' }}/>{renderSafeValue(t)}</span>
                 ))}
               </div>
             </div>
@@ -232,14 +233,14 @@ export function CompetitorCard({ competitor }: { competitor: any }) {
         <div>
           <strong style={{ fontSize: '12px', color: '#10e18b' }}>Strengths</strong>
           <ul style={{ paddingLeft: '15px', margin: '5px 0', fontSize: '13px' }}>
-            {(competitor.strengths || ef.strengths || []).slice(0, 3).map((s: string, i: number) => <li key={i}>{s}</li>)}
+            {(competitor.strengths || ef.strengths || []).slice(0, 3).map((s: string, i: number) => <li key={i}>{renderSafeValue(s)}</li>)}
             {!(competitor.strengths || ef.strengths || []).length && <li style={{ color: '#6b7280' }}>Unknown</li>}
           </ul>
         </div>
         <div>
           <strong style={{ fontSize: '12px', color: '#ff4757' }}>Weaknesses (Exploitable)</strong>
           <ul style={{ paddingLeft: '15px', margin: '5px 0', fontSize: '13px' }}>
-            {(competitor.weaknesses || ef.weaknesses || []).slice(0, 3).map((w: string, i: number) => <li key={i}>{w}</li>)}
+            {(competitor.weaknesses || ef.weaknesses || []).slice(0, 3).map((w: string, i: number) => <li key={i}>{renderSafeValue(w)}</li>)}
             {!(competitor.weaknesses || ef.weaknesses || []).length && <li style={{ color: '#6b7280' }}>Unknown</li>}
           </ul>
         </div>

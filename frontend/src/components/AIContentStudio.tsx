@@ -32,7 +32,7 @@ import { Badge, Card, EmptyState, Loading, PageHeader, ScoreCard, SectionTitle, 
 import { useWorkspaceMemory } from './EnterpriseDecisionSuite';
 import { api } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
-import { asArray, asText, asNumber } from '../lib/normalizers';
+import { asArray, asText, asNumber, renderSafeValue } from '../lib/normalizers';
 import { getIntegrationHealth, sendTestEmail, generatePosterImage, renderVideo } from '../lib/api';
 
 const C = {
@@ -487,7 +487,7 @@ export function ContentStudio({ evidence, onSave }: { evidence: EvidenceRef[]; o
           </div>
           {asset.warnings && asset.warnings.map((w, i) => (
             <div key={i} style={{ padding: '6px 10px', background: 'rgba(255,179,71,0.08)', borderRadius: '6px', border: '1px solid rgba(255,179,71,0.2)', fontSize: '11px', color: C.needsImprovement, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <AlertTriangle size={12} /> {w}
+              <AlertTriangle size={12} /> {renderSafeValue(w)}
             </div>
           ))}
           {editMode ? (
@@ -648,7 +648,7 @@ export function EmailStudio({ evidence, onSave }: { evidence: EvidenceRef[]; onS
           </div>
           {asset.warnings?.map((w, i) => (
             <div key={i} style={{ padding: '6px 10px', background: 'rgba(255,179,71,0.08)', borderRadius: '6px', border: '1px solid rgba(255,179,71,0.2)', fontSize: '11px', color: C.needsImprovement, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <AlertTriangle size={12} /> {w}
+              <AlertTriangle size={12} /> {renderSafeValue(w)}
             </div>
           ))}
           {editMode ? (
@@ -791,11 +791,11 @@ export function SocialStudio({ evidence, onSave }: { evidence: EvidenceRef[]; on
                   <button onClick={() => onSave(a)} style={S.btn(C.excellent)}><Save size={12} /> Save</button>
                 </div>
               </div>
-              <div style={{ fontSize: '12px', color: C.muted, lineHeight: 1.6, whiteSpace: 'pre-wrap', padding: '8px', background: C.bg, borderRadius: '6px', maxHeight: '150px', overflow: 'auto' }}>{a.content.caption}</div>
+              <div style={{ fontSize: '12px', color: C.muted, lineHeight: 1.6, whiteSpace: 'pre-wrap', padding: '8px', background: C.bg, borderRadius: '6px', maxHeight: '150px', overflow: 'auto' }}>{renderSafeValue(a.content.caption)}</div>
               <div style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '10px', color: C.dim, flexWrap: 'wrap' }}>
                 <span>Best time: {a.content.bestPostingTime}</span>
                 {a.content.hashtags && <span>Hashtags: {a.content.hashtags.join(', ')}</span>}
-                {a.content.visualSuggestion && <span>Visual: {a.content.visualSuggestion}</span>}
+                {a.content.visualSuggestion && <span>Visual: {renderSafeValue(a.content.visualSuggestion)}</span>}
               </div>
             </div>
           ))}
@@ -912,7 +912,7 @@ export function CreativeStudio({ evidence, onSave }: { evidence: EvidenceRef[]; 
               <div style={{ fontSize: '15px', fontWeight: 700, color: C.text }}>{asset.title}</div>
               <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
                 <ConfidenceBadge value={asset.confidence} />
-                <span style={S.tag(asset.content.dimensions)}>{asset.content.dimensions}</span>
+                <span style={S.tag(asset.content.dimensions)}>{renderSafeValue(asset.content.dimensions)}</span>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '4px' }}>
@@ -928,9 +928,9 @@ export function CreativeStudio({ evidence, onSave }: { evidence: EvidenceRef[]; 
             <div style={{ padding: '8px', background: C.bg, borderRadius: '6px' }}><strong style={{ fontSize: '10px', color: C.accent, display: 'block', marginBottom: '2px' }}>TYPOGRAPHY</strong><span style={{ fontSize: '12px', color: C.muted }}>{asset.content.typography}</span></div>
             <div style={{ gridColumn: '1 / -1', padding: '8px', background: C.bg, borderRadius: '6px' }}><strong style={{ fontSize: '10px', color: C.accent, display: 'block', marginBottom: '2px' }}>IMAGE PROMPT</strong><span style={{ fontSize: '12px', color: C.muted, fontStyle: 'italic' }}>{asset.content.imagePrompt}</span></div>
             <div style={{ padding: '8px', background: C.bg, borderRadius: '6px' }}><strong style={{ fontSize: '10px', color: C.accent, display: 'block', marginBottom: '2px' }}>CTA</strong><span style={{ fontSize: '12px', color: C.excellent }}>{asset.content.cta}</span></div>
-            <div style={{ padding: '8px', background: C.bg, borderRadius: '6px' }}><strong style={{ fontSize: '10px', color: C.accent, display: 'block', marginBottom: '2px' }}>DIMENSIONS</strong><span style={{ fontSize: '12px', color: C.muted }}>{asset.content.dimensions}</span></div>
+            <div style={{ padding: '8px', background: C.bg, borderRadius: '6px' }}><strong style={{ fontSize: '10px', color: C.accent, display: 'block', marginBottom: '2px' }}>DIMENSIONS</strong><span style={{ fontSize: '12px', color: C.muted }}>{renderSafeValue(asset.content.dimensions)}</span></div>
           </div>
-          {asset.content.evidenceRef && <div style={{ marginTop: '8px', fontSize: '10px', color: C.dim }}>Evidence: {asset.content.evidenceRef}</div>}
+          {asset.content.evidenceRef && <div style={{ marginTop: '8px', fontSize: '10px', color: C.dim }}>Evidence: {renderSafeValue(asset.content.evidenceRef)}</div>}
 
           {/* Generate Poster Image */}
           <div style={{ marginTop: '16px', padding: '14px', background: C.bg, borderRadius: '8px', border: `1px solid ${C.border}` }}>
@@ -959,7 +959,7 @@ export function CreativeStudio({ evidence, onSave }: { evidence: EvidenceRef[]; 
                     </div>
                     {imageResult.warnings?.map((w: string, i: number) => (
                       <div key={i} style={{ marginTop: '6px', padding: '6px 8px', background: 'rgba(255,179,71,0.08)', borderRadius: '4px', fontSize: '10px', color: C.needsImprovement, display: 'flex', gap: '4px', alignItems: 'center' }}>
-                        <AlertTriangle size={10} /> {w}
+                        <AlertTriangle size={10} /> {renderSafeValue(w)}
                       </div>
                     ))}
                   </div>
@@ -1100,12 +1100,12 @@ export function VideoStudio({ evidence, onSave }: { evidence: EvidenceRef[]; onS
 
           <div style={{ padding: '10px', background: C.bg, borderRadius: '8px', marginBottom: '12px' }}>
             <div style={{ fontSize: '10px', color: C.accent, fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>Hook</div>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: C.text }}>{asset.content.hook}</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: C.text }}>{renderSafeValue(asset.content.hook)}</div>
           </div>
 
           <div style={{ marginBottom: '12px' }}>
             <div style={{ fontSize: '10px', color: C.accent, fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>Script</div>
-            <div style={{ fontSize: '12px', color: C.muted, lineHeight: 1.6, whiteSpace: 'pre-wrap', padding: '8px', background: C.bg, borderRadius: '6px', maxHeight: '200px', overflow: 'auto' }}>{asset.content.script}</div>
+            <div style={{ fontSize: '12px', color: C.muted, lineHeight: 1.6, whiteSpace: 'pre-wrap', padding: '8px', background: C.bg, borderRadius: '6px', maxHeight: '200px', overflow: 'auto' }}>{renderSafeValue(asset.content.script)}</div>
           </div>
 
           {asset.content.storyboard && Array.isArray(asset.content.storyboard) && (
@@ -1115,9 +1115,9 @@ export function VideoStudio({ evidence, onSave }: { evidence: EvidenceRef[]; onS
                 {asset.content.storyboard.map((s: any, i: number) => (
                   <div key={i} style={{ padding: '8px', background: C.bg, borderRadius: '6px', borderLeft: '3px solid #53a7ff' }}>
                     <div style={{ fontSize: '10px', color: C.brand, fontWeight: 600 }}>Scene {s.scene} ({s.duration})</div>
-                    <div style={{ fontSize: '11px', color: C.muted }}><strong>Visual:</strong> {s.visual}</div>
-                    <div style={{ fontSize: '11px', color: C.muted }}><strong>Audio:</strong> {s.audio}</div>
-                    <div style={{ fontSize: '11px', color: C.muted }}><strong>Transition:</strong> {s.transitions}</div>
+                    <div style={{ fontSize: '11px', color: C.muted }}><strong>Visual:</strong> {renderSafeValue(s.visual)}</div>
+                    <div style={{ fontSize: '11px', color: C.muted }}><strong>Audio:</strong> {renderSafeValue(s.audio)}</div>
+                    <div style={{ fontSize: '11px', color: C.muted }}><strong>Transition:</strong> {renderSafeValue(s.transitions)}</div>
                   </div>
                 ))}
               </div>
@@ -1176,7 +1176,7 @@ export function VideoStudio({ evidence, onSave }: { evidence: EvidenceRef[]; onS
                 )}
                 {videoResult.warnings?.map((w: string, i: number) => (
                   <div key={i} style={{ marginTop: '6px', padding: '6px 8px', background: 'rgba(255,179,71,0.08)', borderRadius: '4px', fontSize: '10px', color: C.needsImprovement, display: 'flex', gap: '4px', alignItems: 'center' }}>
-                    <AlertTriangle size={10} /> {w}
+                    <AlertTriangle size={10} /> {renderSafeValue(w)}
                   </div>
                 ))}
               </div>
@@ -1284,7 +1284,7 @@ export function CampaignPlanner({ evidence, onSave }: { evidence: EvidenceRef[];
                 <div style={{ display: 'grid', gap: '6px' }}>
                   {asset.content.weeklyPlan.map((w: any, i: number) => (
                     <div key={i} style={{ padding: '8px', background: C.bg, borderRadius: '6px', borderLeft: '3px solid #53a7ff' }}>
-                      <div style={{ fontSize: '11px', fontWeight: 600, color: C.brand }}>Week {w.week}: {w.theme}</div>
+                      <div style={{ fontSize: '11px', fontWeight: 600, color: C.brand }}>Week {w.week}: {renderSafeValue(w.theme)}</div>
                       <div style={{ fontSize: '11px', color: C.muted }}>Activities: {w.activities.join(', ')}</div>
                       <div style={{ fontSize: '11px', color: C.muted }}>Deliverables: {w.deliverables.join(', ')}</div>
                     </div>
@@ -1414,7 +1414,7 @@ export function AssetLibrary({ assets, onUpdate, onDelete }: {
           </div>
           {selectedAsset.warnings?.map((w, i) => (
             <div key={i} style={{ padding: '6px 8px', background: 'rgba(255,179,71,0.08)', borderRadius: '6px', border: '1px solid rgba(255,179,71,0.2)', fontSize: '11px', color: C.needsImprovement, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <AlertTriangle size={12} /> {w}
+              <AlertTriangle size={12} /> {renderSafeValue(w)}
             </div>
           ))}
           <div style={{ fontSize: '12px', color: C.muted, lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: '400px', overflow: 'auto', padding: '10px', background: C.bg, borderRadius: '6px' }}>

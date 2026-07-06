@@ -5,6 +5,7 @@ import { AlertCircle, Sparkles } from "lucide-react";
 import { Section } from "@/components/ui-kit";
 import { getActiveProject } from "@/lib/project-store";
 import { api } from "@/lib/api";
+import { renderSafeValue } from '../../lib/normalizers';
 
 const emptyForm = {
   productName: "",
@@ -148,8 +149,8 @@ export function AudienceIntelligenceModule() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {(data.customerPersonas || []).map((persona: any, index: number) => (
                 <div key={index} className="rounded-2xl bg-white/5 border border-white/10 p-5">
-                  <div className="text-lg font-semibold mb-2">{persona.name}</div>
-                  <div className="text-sm text-muted-foreground">{persona.description}</div>
+                  <div className="text-lg font-semibold mb-2">{renderSafeValue(persona.name)}</div>
+                  <div className="text-sm text-muted-foreground">{renderSafeValue(persona.description)}</div>
                 </div>
               ))}
             </div>
@@ -201,7 +202,7 @@ export function AudienceIntelligenceModule() {
             <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {(data.preferredChannels || []).map((channel: string, index: number) => (
                 <li key={index} className="rounded-2xl bg-white/5 border border-white/10 p-4 text-sm">
-                  {channel}
+                  {renderSafeValue(channel)}
                 </li>
               ))}
             </ul>
@@ -211,7 +212,7 @@ export function AudienceIntelligenceModule() {
             <ul className="space-y-2 text-sm text-muted-foreground">
               {(data.contentIdeas || []).map((idea: string, i: number) => (
                 <li key={i} className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                  {idea}
+                  {renderSafeValue(idea)}
                 </li>
               ))}
             </ul>

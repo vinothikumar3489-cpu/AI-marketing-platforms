@@ -21,7 +21,7 @@ import {
 import { ProgressBar, StatusBadge, ConfidenceBadge, PriorityChip, EnterpriseInsightCard, KPIDashboard, MiniRadarLegend, EnterpriseEmptyState, SmartNavigation, SearchBar, LoadingSkeleton } from './EnterpriseComponents';
 import { Badge, Card, EmptyState, Loading, PageHeader, ScoreCard, SectionTitle, InsightCard, EvidenceBadge } from './UI';
 import { ExecutiveSummaryCards, BusinessHealthScore, AIDecisionPanel, RecommendationPriorities, CrossModuleInsights, ExplainButton, CompareResults, OpportunityMatrix, RiskMatrix, ConfidenceVisualization, InteractiveFilters, SmartSearch, EnterpriseReportPreview, ProductivityBar, ExecutiveCommandCenter, StoryDrivenResults, AIBusinessAdvisor, DecisionSimulator, CompetitorPositioningMap, MarketOpportunityHeatmap, BusinessTimeline, ExecutiveKPIDashboard, InsightRelationships, EvidenceExplorer, ReportPreview20, PresentationMode, useWorkspaceMemory, SmartEmptyData, SmartEmptyState } from './EnterpriseDecisionSuite';
-import { asArray, asNumber, asText } from '../lib/normalizers';
+import { asArray, asNumber, asText, renderSafeValue } from '../lib/normalizers';
 
 const C = {
   excellent: '#10e18b', good: '#53a7ff', needsImprovement: '#ffb347',
@@ -425,7 +425,7 @@ export function TeamCollaboration({ actions, onActionUpdate }: { actions: Stored
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                     <div style={{ fontSize: '11px', fontWeight: 600, color: C.accent, display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <User size={11} /> {c.author}
-                      {c.mentions && c.mentions.length > 0 && c.mentions.map((m, i) => <span key={i} style={S.tag(C.needsImprovement)}>{m}</span>)}
+                      {c.mentions && c.mentions.length > 0 && c.mentions.map((m, i) => <span key={i} style={S.tag(C.needsImprovement)}>{renderSafeValue(m)}</span>)}
                     </div>
                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                       <span style={{ fontSize: '10px', color: C.dim }}>{new Date(c.timestamp).toLocaleDateString()}</span>
@@ -813,7 +813,7 @@ export function VersionHistory({ versions, currentVersion, onSelectVersion }: {
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {Object.entries(v.summary).map(([k, val]) => (
                   <span key={k} style={{ fontSize: '10px', color: val >= 0 ? C.excellent : C.critical }}>
-                    {k}: {val >= 0 ? '+' : ''}{val}%
+                    {k}: {typeof val === 'number' ? (val >= 0 ? '+' : '') + val + '%' : renderSafeValue(val)}
                   </span>
                 ))}
               </div>

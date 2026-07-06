@@ -2,6 +2,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ModuleResultCard } from './ModuleResultCard';
 import { asArray, asText, hasData, normalizeResults } from '@/lib/growth-workspace-utils';
+import { renderSafeValue } from '../../lib/normalizers';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 
@@ -171,7 +172,7 @@ function ProductAnalysisView({ data }: { data: any }) {
             {(data.usp || []).map((usp: string, i: number) => (
               <li key={i} className="text-sm flex items-start gap-2">
                 <span className="text-purple-400">Γ£ô</span>
-                <span>{usp}</span>
+                <span>{renderSafeValue(usp)}</span>
               </li>
             ))}
           </ul>
@@ -182,7 +183,7 @@ function ProductAnalysisView({ data }: { data: any }) {
           <div className="grid grid-cols-1 gap-2">
             {(data.features || []).map((feature: string, i: number) => (
               <div key={i} className="text-sm bg-white/5 rounded-lg px-3 py-2 border border-white/10">
-                {feature}
+                {renderSafeValue(feature)}
               </div>
             ))}
           </div>
@@ -196,7 +197,7 @@ function ProductAnalysisView({ data }: { data: any }) {
             {(data.benefits || []).map((benefit: string, i: number) => (
               <li key={i} className="text-sm flex items-start gap-2">
                 <span className="text-green-400">ΓåÆ</span>
-                <span>{benefit}</span>
+                <span>{renderSafeValue(benefit)}</span>
               </li>
             ))}
           </ul>
@@ -208,7 +209,7 @@ function ProductAnalysisView({ data }: { data: any }) {
             {(data.painPoints || []).map((pain: string, i: number) => (
               <li key={i} className="text-sm flex items-start gap-2">
                 <span className="text-red-400">ΓÇó</span>
-                <span>{pain}</span>
+                <span>{renderSafeValue(pain)}</span>
               </li>
             ))}
           </ul>
@@ -219,7 +220,7 @@ function ProductAnalysisView({ data }: { data: any }) {
           <div className="flex flex-wrap gap-2">
             {(data.targetUsers || []).map((user: string, i: number) => (
               <span key={i} className="text-xs bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full border border-blue-500/30">
-                {user}
+                {renderSafeValue(user)}
               </span>
             ))}
           </div>
@@ -244,7 +245,7 @@ function MarketDiscoveryView({ data }: { data: any }) {
             {(data.marketTrends || []).map((trend: string, i: number) => (
               <li key={i} className="text-sm flex items-start gap-2">
                 <span className="text-blue-400">≡ƒôê</span>
-                <span>{trend}</span>
+                <span>{renderSafeValue(trend)}</span>
               </li>
             ))}
           </ul>
@@ -256,7 +257,7 @@ function MarketDiscoveryView({ data }: { data: any }) {
             {(data.growthOpportunities || []).map((opp: string, i: number) => (
               <li key={i} className="text-sm flex items-start gap-2">
                 <span className="text-green-400">Γ£ô</span>
-                <span>{opp}</span>
+                <span>{renderSafeValue(opp)}</span>
               </li>
             ))}
           </ul>
@@ -275,7 +276,7 @@ function MarketDiscoveryView({ data }: { data: any }) {
             {(data.marketRisks || []).map((risk: string, i: number) => (
               <li key={i} className="text-sm flex items-start gap-2">
                 <span className="text-red-400">ΓÜá</span>
-                <span>{risk}</span>
+                <span>{renderSafeValue(risk)}</span>
               </li>
             ))}
           </ul>
@@ -306,7 +307,7 @@ function AudienceIntelligenceView({ data }: { data: any }) {
                   <div className="flex flex-wrap gap-1">
                     {persona.motivations.map((m: string, j: number) => (
                       <span key={j} className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">
-                        {m}
+                        {renderSafeValue(m)}
                       </span>
                     ))}
                   </div>
@@ -318,7 +319,7 @@ function AudienceIntelligenceView({ data }: { data: any }) {
                   <div className="flex flex-wrap gap-1">
                     {persona.painPoints.map((p: string, j: number) => (
                       <span key={j} className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">
-                        {p}
+                        {renderSafeValue(p)}
                       </span>
                     ))}
                   </div>
@@ -336,7 +337,7 @@ function AudienceIntelligenceView({ data }: { data: any }) {
             {(data.buyingTriggers || []).map((trigger: string, i: number) => (
               <li key={i} className="text-sm flex items-start gap-2">
                 <span className="text-purple-400">ΓÜí</span>
-                <span>{trigger}</span>
+                <span>{renderSafeValue(trigger)}</span>
               </li>
             ))}
           </ul>
@@ -348,7 +349,7 @@ function AudienceIntelligenceView({ data }: { data: any }) {
             {(data.objections || []).map((objection: string, i: number) => (
               <li key={i} className="text-sm flex items-start gap-2">
                 <span className="text-yellow-400">?</span>
-                <span>{objection}</span>
+                <span>{renderSafeValue(objection)}</span>
               </li>
             ))}
           </ul>
@@ -360,7 +361,7 @@ function AudienceIntelligenceView({ data }: { data: any }) {
         <div className="flex flex-wrap gap-2">
           {(data.bestChannels || []).map((channel: string, i: number) => (
             <span key={i} className="bg-blue-500/20 text-blue-400 px-4 py-2 rounded-lg border border-blue-500/30 text-sm font-medium">
-              {channel}
+              {renderSafeValue(channel)}
             </span>
           ))}
         </div>
@@ -410,7 +411,7 @@ function CompetitorAnalysisView({ data }: { data: any }) {
                     <div className="flex flex-wrap gap-1">
                       {asArray(comp.strengths).map((s: string, j: number) => (
                         <span key={j} className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">
-                          {s}
+                          {renderSafeValue(s)}
                         </span>
                       ))}
                     </div>
@@ -422,7 +423,7 @@ function CompetitorAnalysisView({ data }: { data: any }) {
                     <div className="flex flex-wrap gap-1">
                       {asArray(comp.weaknesses).map((w: string, j: number) => (
                         <span key={j} className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">
-                          {w}
+                          {renderSafeValue(w)}
                         </span>
                       ))}
                     </div>
@@ -443,8 +444,8 @@ function CompetitorAnalysisView({ data }: { data: any }) {
             <ul className="space-y-2">
               {marketGaps.map((gap: string, i: number) => (
                 <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-yellow-400">≡ƒÆí</span>
-                  <span>{gap}</span>
+                <span className="text-yellow-400">≡ƒÆí</span>
+                <span>{renderSafeValue(gap)}</span>
                 </li>
               ))}
             </ul>
@@ -460,7 +461,7 @@ function CompetitorAnalysisView({ data }: { data: any }) {
               {differentiationOpportunities.map((opp: string, i: number) => (
                 <li key={i} className="text-sm flex items-start gap-2">
                   <span className="text-green-400">Γ£ô</span>
-                  <span>{opp}</span>
+                  <span>{renderSafeValue(opp)}</span>
                 </li>
               ))}
             </ul>
@@ -474,7 +475,7 @@ function CompetitorAnalysisView({ data }: { data: any }) {
           <div className="flex flex-wrap gap-2">
             {indirectCompetitors.map((comp: string, i: number) => (
               <span key={i} className="text-sm bg-white/5 px-3 py-1 rounded-lg border border-white/10">
-                {comp}
+                {renderSafeValue(comp)}
               </span>
             ))}
           </div>
@@ -518,7 +519,7 @@ function IntentPredictionView({ data }: { data: any }) {
                     <div className="flex flex-wrap gap-1">
                       {asArray(segment.signals).map((signal: string, j: number) => (
                         <span key={j} className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">
-                          {signal}
+                          {renderSafeValue(signal)}
                         </span>
                       ))}
                     </div>
@@ -540,7 +541,7 @@ function IntentPredictionView({ data }: { data: any }) {
               {buyingSignals.map((signal: string, i: number) => (
                 <li key={i} className="text-sm flex items-start gap-2">
                   <span className="text-green-400">Γ£ô</span>
-                  <span>{signal}</span>
+                  <span>{renderSafeValue(signal)}</span>
                 </li>
               ))}
             </ul>
@@ -556,7 +557,7 @@ function IntentPredictionView({ data }: { data: any }) {
               {triggerEvents.map((event: string, i: number) => (
                 <li key={i} className="text-sm flex items-start gap-2">
                   <span className="text-purple-400">ΓÜí</span>
-                  <span>{event}</span>
+                  <span>{renderSafeValue(event)}</span>
                 </li>
               ))}
             </ul>
@@ -570,7 +571,7 @@ function IntentPredictionView({ data }: { data: any }) {
           <div className="grid grid-cols-1 gap-2">
             {leadScoringRules.map((rule: string, i: number) => (
               <div key={i} className="text-sm bg-white/5 rounded-lg px-3 py-2 border border-white/10">
-                {rule}
+                {renderSafeValue(rule)}
               </div>
             ))}
           </div>
@@ -598,7 +599,7 @@ function IntentPredictionView({ data }: { data: any }) {
               <ul className="space-y-2">
                 {coldSegments.map((segment: string, i: number) => (
                   <li key={i} className="text-sm bg-white/5 px-3 py-2 rounded-lg border border-white/10">
-                    {segment}
+                    {renderSafeValue(segment)}
                   </li>
                 ))}
               </ul>
@@ -633,23 +634,23 @@ function PositioningEngineView({ data }: { data: any }) {
     <div className="space-y-6">
       <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg p-6 border border-purple-500/20">
         <h4 className="font-semibold text-white mb-2">Positioning Statement</h4>
-        <p className="text-lg text-white">{positioningStatement}</p>
+        <p className="text-lg text-white">{renderSafeValue(positioningStatement)}</p>
       </div>
 
       <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-lg p-6 border border-blue-500/20">
         <h4 className="font-semibold text-white mb-2">Value Proposition</h4>
-        <p className="text-lg text-white">{valueProposition}</p>
+        <p className="text-lg text-white">{renderSafeValue(valueProposition)}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
           <h4 className="font-semibold text-white mb-2">Differentiation Angle</h4>
-          <p className="text-sm text-muted-foreground">{differentiationAngle}</p>
+          <p className="text-sm text-muted-foreground">{renderSafeValue(differentiationAngle)}</p>
         </div>
 
         <div>
           <h4 className="font-semibold text-white mb-2">Brand Promise</h4>
-          <p className="text-sm text-muted-foreground">{brandPromise}</p>
+          <p className="text-sm text-muted-foreground">{renderSafeValue(brandPromise)}</p>
         </div>
       </div>
 
@@ -661,7 +662,7 @@ function PositioningEngineView({ data }: { data: any }) {
               <div key={i} className="bg-white/5 rounded-lg px-4 py-3 border border-white/10">
                 <div className="flex items-center gap-2">
                   <span className="text-purple-400 font-bold">{i + 1}</span>
-                  <span className="text-sm">{pillar}</span>
+                  <span className="text-sm">{renderSafeValue(pillar)}</span>
                 </div>
               </div>
             ))}
@@ -675,7 +676,7 @@ function PositioningEngineView({ data }: { data: any }) {
           <div className="flex flex-wrap gap-2">
             {competitorWeakness.map((weakness: string, i: number) => (
               <span key={i} className="text-sm bg-red-500/10 text-red-400 px-3 py-2 rounded-lg border border-red-500/30">
-                {weakness}
+                {renderSafeValue(weakness)}
               </span>
             ))}
           </div>
@@ -709,7 +710,7 @@ function CampaignGeneratorView({ data }: { data: any }) {
     <div className="space-y-6">
       <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-lg p-6 border border-purple-500/20">
         <h4 className="font-semibold text-white mb-2">Campaign Objective</h4>
-        <p className="text-lg text-white">{campaignObjective}</p>
+        <p className="text-lg text-white">{renderSafeValue(campaignObjective)}</p>
       </div>
 
       {campaignPlan && typeof campaignPlan === 'object' && (
@@ -719,7 +720,7 @@ function CampaignGeneratorView({ data }: { data: any }) {
             {Object.entries(campaignPlan).map(([day, action]: [string, any], i) => (
               <div key={i} className="flex items-start gap-3 bg-white/5 rounded-lg px-4 py-3 border border-white/10">
                 <span className="text-purple-400 font-bold">{day.toUpperCase()}</span>
-                <span className="text-sm">{action}</span>
+                <span className="text-sm">{renderSafeValue(action)}</span>
               </div>
             ))}
           </div>
@@ -736,7 +737,7 @@ function CampaignGeneratorView({ data }: { data: any }) {
               {campaignIdeas.map((idea: string, i: number) => (
                 <li key={i} className="text-sm flex items-start gap-2">
                   <span className="text-purple-400">≡ƒÆí</span>
-                  <span>{idea}</span>
+                  <span>{renderSafeValue(idea)}</span>
                 </li>
               ))}
             </ul>
@@ -752,7 +753,7 @@ function CampaignGeneratorView({ data }: { data: any }) {
               {adHooks.map((hook: string, i: number) => (
                 <li key={i} className="text-sm flex items-start gap-2">
                   <span className="text-blue-400">≡ƒÄ»</span>
-                  <span>{hook}</span>
+                  <span>{renderSafeValue(hook)}</span>
                 </li>
               ))}
             </ul>
@@ -769,7 +770,7 @@ function CampaignGeneratorView({ data }: { data: any }) {
             <div className="space-y-2">
               {ctaSuggestions.map((cta: string, i: number) => (
                 <div key={i} className="bg-green-500/10 text-green-400 px-4 py-2 rounded-lg border border-green-500/30 text-sm text-center font-medium">
-                  {cta}
+                  {renderSafeValue(cta)}
                 </div>
               ))}
             </div>
@@ -784,7 +785,7 @@ function CampaignGeneratorView({ data }: { data: any }) {
             <div className="space-y-2">
               {emailSequence.map((email: string, i: number) => (
                 <div key={i} className="text-xs bg-white/5 rounded-lg px-3 py-2 border border-white/10">
-                  Email {i + 1}: {email}
+                  Email {i + 1}: {renderSafeValue(email)}
                 </div>
               ))}
             </div>
@@ -799,7 +800,7 @@ function CampaignGeneratorView({ data }: { data: any }) {
             <div className="space-y-2">
               {socialPostIdeas.slice(0, 3).map((post: string, i: number) => (
                 <div key={i} className="text-xs bg-white/5 rounded-lg px-3 py-2 border border-white/10">
-                  {post}
+                  {renderSafeValue(post)}
                 </div>
               ))}
             </div>
@@ -846,26 +847,26 @@ function ChannelRecommendationView({ data }: { data: any }) {
               return (
                 <div key={i} className="bg-white/5 rounded-lg p-4 border border-white/10">
                   <div className="flex items-start justify-between mb-3">
-                    <h5 className="font-semibold text-white text-lg">{channelName}</h5>
+                    <h5 className="font-semibold text-white text-lg">{renderSafeValue(channelName)}</h5>
                     <span className="bg-purple-500/20 text-purple-400 px-3 py-1 rounded text-sm font-medium">
                       {budgetAllocation}
                     </span>
                   </div>
                   
-                  {fit && <p className="text-sm text-muted-foreground mb-4">{fit}</p>}
+                  {fit && <p className="text-sm text-muted-foreground mb-4">{renderSafeValue(fit)}</p>}
 
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                     <div>
                       <div className="text-muted-foreground mb-1">Posting Frequency</div>
-                      <div className="text-white font-medium">{postingFrequency}</div>
+                      <div className="text-white font-medium">{renderSafeValue(postingFrequency)}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground mb-1">Best Time</div>
-                      <div className="text-white font-medium">{bestPostingTime}</div>
+                      <div className="text-white font-medium">{renderSafeValue(bestPostingTime)}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground mb-1">Expected Reach</div>
-                      <div className="text-green-400 font-medium">{expectedReach}</div>
+                      <div className="text-green-400 font-medium">{renderSafeValue(expectedReach)}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground mb-1">Difficulty</div>
@@ -879,7 +880,7 @@ function ChannelRecommendationView({ data }: { data: any }) {
                       <div className="flex flex-wrap gap-2">
                         {contentTypes.map((type: string, j: number) => (
                           <span key={j} className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">
-                            {type}
+                            {renderSafeValue(type)}
                           </span>
                         ))}
                       </div>
@@ -895,7 +896,7 @@ function ChannelRecommendationView({ data }: { data: any }) {
       {channelStrategy && (
         <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-lg p-6 border border-purple-500/20">
           <h4 className="font-semibold text-white mb-2">Overall Channel Strategy</h4>
-          <p className="text-sm text-muted-foreground">{channelStrategy}</p>
+          <p className="text-sm text-muted-foreground">{renderSafeValue(channelStrategy)}</p>
         </div>
       )}
     </div>

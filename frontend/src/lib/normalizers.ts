@@ -81,10 +81,32 @@ export const firstOf = (obj: any, keys: string[], fallback: any = undefined) => 
 };
 
 export const renderSafeValue = (value: any): string => {
-  if (value == null) return "N/A";
-  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (value === null || value === undefined) return "Not available";
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => renderSafeValue(item))
+      .filter(Boolean)
+      .join(", ");
+  }
   if (typeof value === "object") {
-    return value.score ?? value.reason ?? JSON.stringify(value);
+    if ("score" in value && "reason" in value) {
+      return `${value.score ?? "N/A"} — ${value.reason ?? ""}`;
+    }
+    if ("value" in value && "impact" in value) {
+      return `${value.value ?? "N/A"} — Impact: ${value.impact ?? "N/A"} — Confidence: ${value.confidence ?? "N/A"}`;
+    }
+    if ("title" in value) return String(value.title);
+    if ("name" in value) return String(value.name);
+    if ("label" in value) return String(value.label);
+    if ("description" in value) return String(value.description);
+    return JSON.stringify(value);
   }
   return String(value);
 };

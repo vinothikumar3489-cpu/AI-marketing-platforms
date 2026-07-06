@@ -1298,7 +1298,7 @@ function renderSocialCalendarTab(data: any) {
           <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{cal._days || 0} days</div>
           <div style={{ display: 'grid', gap: '8px', fontSize: '13px' }}>
             {cal.weeklyTheme?.length > 0 && <div><strong>Weekly Themes:</strong> {cal.weeklyTheme.join(' → ')}</div>}
-            {cal.contentMix && <div><strong>Content Mix:</strong> <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>{Object.entries(cal.contentMix).map(([k, v]: any) => <Badge key={k}>{k}: {v}</Badge>)}</div></div>}
+            {cal.contentMix && <div><strong>Content Mix:</strong> <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>{Object.entries(cal.contentMix).map(([k, v]: any) => <Badge key={k}>{k}: {renderSafeValue(v)}</Badge>)}</div></div>}
             {cal.bestPostingTimes && <div><strong>Best Posting Times:</strong> <pre style={{ color: '#9aa7bd', fontSize: '12px', margin: '4px 0' }}>{JSON.stringify(cal.bestPostingTimes, null, 2)}</pre></div>}
             {cal.calendar && Array.isArray(cal.calendar) && (
               <div style={{ maxHeight: '400px', overflow: 'auto' }}>

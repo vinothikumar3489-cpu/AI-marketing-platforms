@@ -12,6 +12,7 @@ import {
 import { ProgressBar, StatusBadge, ConfidenceBadge, PriorityChip, EnterpriseInsightCard, KPIDashboard, MiniRadarLegend } from './EnterpriseComponents';
 import { EvidenceBadge } from './UI';
 import { downloadReport } from '../lib/api';
+import { renderSafeValue } from '../lib/normalizers';
 
 const C = {
   excellent: '#10e18b', good: '#53a7ff', needsImprovement: '#ffb347',
@@ -265,7 +266,7 @@ export function ExplainButton({ explanation, label = 'Explain' }: { explanation?
           <ExplainRow icon={TrendingUp} label="Business Impact" value={explanation.businessImpact} color={C.excellent} />
           <ExplainRow icon={DollarSign} label="Expected ROI" value={explanation.expectedRoi} color="#10e18b" />
           {explanation.dependencies.length > 0 && (
-            <div style={{ marginTop: '8px' }}><div style={{ fontSize: '10px', color: C.dim, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Dependencies</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>{explanation.dependencies.map((d, i) => <span key={i} style={{ fontSize: '10px', padding: '2px 6px', background: C.bg, borderRadius: '4px', color: C.muted }}>{d}</span>)}</div></div>
+            <div style={{ marginTop: '8px' }}><div style={{ fontSize: '10px', color: C.dim, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Dependencies</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>{explanation.dependencies.map((d, i) => <span key={i} style={{ fontSize: '10px', padding: '2px 6px', background: C.bg, borderRadius: '4px', color: C.muted }}>{renderSafeValue(d)}</span>)}</div></div>
           )}
         </div>
       )}
@@ -424,7 +425,7 @@ export function InteractiveFilters({ options, activeFilters, onFilterChange }: {
               <div style={{ position: 'absolute', top: '100%', left: '0', zIndex: 50, marginTop: '4px', minWidth: '160px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '6px', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
                 {opt.values.map(v => {
                   const isActive = active.includes(v);
-                  return <button key={v} onClick={() => { const next = isActive ? active.filter(x => x !== v) : [...active, v]; onFilterChange(opt.key, next); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 10px', background: isActive ? `${C.accent}15` : 'none', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', color: isActive ? C.accent : C.muted }}>{isActive ? '✓ ' : ''}{v}</button>;
+                  return <button key={renderSafeValue(v)} onClick={() => { const next = isActive ? active.filter(x => x !== v) : [...active, v]; onFilterChange(opt.key, next); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 10px', background: isActive ? `${C.accent}15` : 'none', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', color: isActive ? C.accent : C.muted }}>{isActive ? '✓ ' : ''}{renderSafeValue(v)}</button>;
                 })}
               </div>
             )}
@@ -453,7 +454,7 @@ export function SmartSearch({ modules, onSearch }: { modules: string[]; onSearch
           </button>
           {showModules && (
             <div style={{ position: 'absolute', top: '100%', right: '0', zIndex: 50, marginTop: '4px', minWidth: '160px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '6px', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
-              {modules.map(m => { const active = selectedModules.includes(m); return <button key={m} onClick={() => { const next = active ? selectedModules.filter(x => x !== m) : [...selectedModules, m]; setSelectedModules(next); onSearch(query, next); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 10px', background: active ? `${C.accent}15` : 'none', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', color: active ? C.accent : C.muted }}>{active ? '✓ ' : ''}{m}</button>; })}
+              {modules.map(m => { const active = selectedModules.includes(m); return <button key={renderSafeValue(m)} onClick={() => { const next = active ? selectedModules.filter(x => x !== m) : [...selectedModules, m]; setSelectedModules(next); onSearch(query, next); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 10px', background: active ? `${C.accent}15` : 'none', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', color: active ? C.accent : C.muted }}>{active ? '✓ ' : ''}{renderSafeValue(m)}</button>; })}
             </div>
           )}
         </div>
@@ -551,9 +552,9 @@ export function SmartEmptyState({ data, icon: Icon = AlertTriangle }: { data: Sm
       <button onClick={() => setExpanded(!expanded)} style={{ padding: '8px 18px', borderRadius: '8px', border: `1px solid ${C.accent}`, background: 'transparent', cursor: 'pointer', color: C.accent, fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Info size={14} /> {expanded ? 'Hide Details' : 'Why & How to Fix'}</button>
       {expanded && (
         <div style={{ marginTop: '16px', textAlign: 'left', maxWidth: '500px', margin: '16px auto 0' }}>
-          {data.missingData.length > 0 && <div style={{ marginBottom: '12px' }}><div style={{ fontSize: '11px', color: C.critical, fontWeight: 600, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Missing Data</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>{data.missingData.map((d, i) => <span key={i} style={{ padding: '3px 8px', background: 'rgba(255,71,87,0.1)', borderRadius: '4px', fontSize: '11px', color: '#ff8a8a' }}>{d}</span>)}</div></div>}
+          {data.missingData.length > 0 && <div style={{ marginBottom: '12px' }}><div style={{ fontSize: '11px', color: C.critical, fontWeight: 600, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Missing Data</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>{data.missingData.map((d, i) => <span key={i} style={{ padding: '3px 8px', background: 'rgba(255,71,87,0.1)', borderRadius: '4px', fontSize: '11px', color: '#ff8a8a' }}>{renderSafeValue(d)}</span>)}</div></div>}
           <div style={{ marginBottom: '10px' }}><div style={{ fontSize: '11px', color: C.good, fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>How to Improve</div><p style={{ fontSize: '12px', color: C.muted, margin: 0, lineHeight: 1.5 }}>{data.howToImprove}</p></div>
-          {data.apisToConnect && data.apisToConnect.length > 0 && <div style={{ marginBottom: '10px' }}><div style={{ fontSize: '11px', color: C.needsImprovement, fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>APIs to Connect</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>{data.apisToConnect.map((a, i) => <span key={i} style={{ padding: '3px 8px', background: 'rgba(255,179,71,0.1)', borderRadius: '4px', fontSize: '11px', color: '#ffb347' }}>{a}</span>)}</div></div>}
+          {data.apisToConnect && data.apisToConnect.length > 0 && <div style={{ marginBottom: '10px' }}><div style={{ fontSize: '11px', color: C.needsImprovement, fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>APIs to Connect</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>{data.apisToConnect.map((a, i) => <span key={i} style={{ padding: '3px 8px', background: 'rgba(255,179,71,0.1)', borderRadius: '4px', fontSize: '11px', color: '#ffb347' }}>{renderSafeValue(a)}</span>)}</div></div>}
           <div><div style={{ fontSize: '11px', color: C.excellent, fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Expected Benefit</div><p style={{ fontSize: '12px', color: C.muted, margin: 0, lineHeight: 1.5 }}>{data.expectedBenefit}</p></div>
         </div>
       )}
@@ -637,7 +638,7 @@ export function StoryDrivenResults({ steps, activeStep, onStepClick }: { steps: 
                   <span style={{ fontSize: isActive ? '14px' : '13px', fontWeight: 600, color: isActive ? step.color : C.muted, transition: 'all 0.3s' }}>{i + 1}. {step.title}</span>
                   {isPast && <CheckCircle2 size={14} style={{ color: C.excellent }} />}
                 </div>
-                {isActive && <div style={{ animation: 'fadeIn 0.3s ease' }}><p style={{ fontSize: '13px', color: C.muted, lineHeight: 1.6, margin: '0 0 8px' }}>{step.content}</p>{step.details && step.details.length > 0 && <ul style={{ margin: '4px 0 0', paddingLeft: '18px', fontSize: '12px', color: C.dim, lineHeight: 1.8 }}>{step.details.map((d, j) => <li key={j}>{d}</li>)}</ul>}</div>}
+                {isActive && <div style={{ animation: 'fadeIn 0.3s ease' }}><p style={{ fontSize: '13px', color: C.muted, lineHeight: 1.6, margin: '0 0 8px' }}>{step.content}</p>{step.details && step.details.length > 0 && <ul style={{ margin: '4px 0 0', paddingLeft: '18px', fontSize: '12px', color: C.dim, lineHeight: 1.8 }}>{step.details.map((d, j) => <li key={j}>{renderSafeValue(d)}</li>)}</ul>}</div>}
               </div>
               {i < steps.length - 1 && isActive && <div style={{ textAlign: 'center', padding: '6px 0', color: C.dim }}><ChevronDown size={14} /></div>}
             </div>

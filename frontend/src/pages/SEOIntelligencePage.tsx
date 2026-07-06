@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, Component } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api, downloadReport } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
-import { asArray, asNumber, asText, normalizeSeo } from '../lib/normalizers';
+import { asArray, asNumber, asText, normalizeSeo, renderSafeValue } from '../lib/normalizers';
 import { Badge, Card, EmptyState, Loading, PageHeader, ScoreCard, SectionTitle } from '../components/UI';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { Shield, Target, TrendingUp, Zap, Search, Globe, Code, FileText, Cpu, LayoutList, CheckCircle, AlertTriangle, Loader2, Building, Activity, Map, Clock, Layers, Eye, Users, Star, PieChart, Info, Sliders, GripHorizontal } from 'lucide-react';
@@ -783,7 +783,7 @@ function ExecutiveStory({ data }: { data: any }) {
               <strong>Top Issues:</strong>
               <ul style={{ margin: '5px 0 0 20px', color: '#9aa7bd' }}>
                 {story.technicalFindings.topIssues.map((issue: any, i: number) => (
-                  <li key={i}>{issue.issue} - {issue.fix}</li>
+                  <li key={i}>{renderSafeValue(issue.issue)} - {renderSafeValue(issue.fix)}</li>
                 ))}
               </ul>
             </div>
@@ -803,7 +803,7 @@ function ExecutiveStory({ data }: { data: any }) {
               <strong>Top Keywords:</strong>
               <ul style={{ margin: '5px 0 0 20px', color: '#9aa7bd' }}>
                 {story.keywordFindings.topKeywords.map((kw: any, i: number) => (
-                  <li key={i}>{kw.keyword} (Vol: {kw.searchVolume}, Diff: {kw.difficulty})</li>
+                  <li key={i}>{renderSafeValue(kw.keyword)} (Vol: {renderSafeValue(kw.searchVolume)}, Diff: {renderSafeValue(kw.difficulty)})</li>
                 ))}
               </ul>
             </div>
@@ -822,7 +822,7 @@ function ExecutiveStory({ data }: { data: any }) {
               <strong>Top Competitors:</strong>
               <ul style={{ margin: '5px 0 0 20px', color: '#9aa7bd' }}>
                 {story.competitorFindings.topCompetitors.map((comp: any, i: number) => (
-                  <li key={i}>{comp.name} (Threat: {comp.threatScore}, Weakness: {comp.weakness})</li>
+                  <li key={i}>{renderSafeValue(comp.name)} (Threat: {renderSafeValue(comp.threatScore)}, Weakness: {renderSafeValue(comp.weakness)})</li>
                 ))}
               </ul>
             </div>
@@ -842,7 +842,7 @@ function ExecutiveStory({ data }: { data: any }) {
               <strong>Top Gaps:</strong>
               <ul style={{ margin: '5px 0 0 20px', color: '#9aa7bd' }}>
                 {story.contentGapFindings.topGaps.map((gap: any, i: number) => (
-                  <li key={i}>{gap.title} (Priority: {gap.priority})</li>
+                  <li key={i}>{renderSafeValue(gap.title)} (Priority: {renderSafeValue(gap.priority)})</li>
                 ))}
               </ul>
             </div>
@@ -864,7 +864,7 @@ function ExecutiveStory({ data }: { data: any }) {
               <strong>Top Opportunities:</strong>
               <ul style={{ margin: '5px 0 0 20px', color: '#9aa7bd' }}>
                 {story.aiVisibilityFindings.topOpportunities.map((opp: any, i: number) => (
-                  <li key={i}>{opp.opportunity} (Impact: {opp.impact})</li>
+                  <li key={i}>{renderSafeValue(opp.opportunity)} (Impact: {renderSafeValue(opp.impact)})</li>
                 ))}
               </ul>
             </div>
@@ -880,7 +880,7 @@ function ExecutiveStory({ data }: { data: any }) {
             <ul style={{ margin: '0 0 0 20px', color: '#9aa7bd' }}>
               {story.mainRisks.map((risk: any, i: number) => (
                 <li key={i}>
-                  <strong>{risk.category}:</strong> {risk.risk} (Impact: {risk.impact}) - {risk.recommendation}
+                  <strong>{renderSafeValue(risk.category)}:</strong> {renderSafeValue(risk.risk)} (Impact: {renderSafeValue(risk.impact)}) - {renderSafeValue(risk.recommendation)}
                 </li>
               ))}
             </ul>
@@ -898,7 +898,7 @@ function ExecutiveStory({ data }: { data: any }) {
             <ul style={{ margin: '0 0 0 20px', color: '#9aa7bd' }}>
               {story.mainOpportunities.map((opp: any, i: number) => (
                 <li key={i}>
-                  <strong>{opp.category}:</strong> {opp.opportunity} (Potential: {opp.potential}) - {opp.action}
+                  <strong>{renderSafeValue(opp.category)}:</strong> {renderSafeValue(opp.opportunity)} (Potential: {renderSafeValue(opp.potential)}) - {renderSafeValue(opp.action)}
                 </li>
               ))}
             </ul>
@@ -917,7 +917,7 @@ function ExecutiveStory({ data }: { data: any }) {
             {story.actionPlan?.day7?.length > 0 ? (
               <ul style={{ margin: '0 0 0 20px', color: '#9aa7bd' }}>
                 {story.actionPlan.day7.map((action: any, i: number) => (
-                  <li key={i}>{action.action} (Priority: {action.priority}) - Source: {action.source}</li>
+                  <li key={i}>{renderSafeValue(action.action)} (Priority: {renderSafeValue(action.priority)}) - Source: {renderSafeValue(action.source)}</li>
                 ))}
               </ul>
             ) : (
@@ -929,7 +929,7 @@ function ExecutiveStory({ data }: { data: any }) {
             {story.actionPlan?.day30?.length > 0 ? (
               <ul style={{ margin: '0 0 0 20px', color: '#9aa7bd' }}>
                 {story.actionPlan.day30.map((action: any, i: number) => (
-                  <li key={i}>{action.action} (Priority: {action.priority}) - Source: {action.source}</li>
+                  <li key={i}>{renderSafeValue(action.action)} (Priority: {renderSafeValue(action.priority)}) - Source: {renderSafeValue(action.source)}</li>
                 ))}
               </ul>
             ) : (
@@ -941,7 +941,7 @@ function ExecutiveStory({ data }: { data: any }) {
             {story.actionPlan?.day60?.length > 0 ? (
               <ul style={{ margin: '0 0 0 20px', color: '#9aa7bd' }}>
                 {story.actionPlan.day60.map((action: any, i: number) => (
-                  <li key={i}>{action.action} (Priority: {action.priority}) - Source: {action.source}</li>
+                  <li key={i}>{renderSafeValue(action.action)} (Priority: {renderSafeValue(action.priority)}) - Source: {renderSafeValue(action.source)}</li>
                 ))}
               </ul>
             ) : (
@@ -953,7 +953,7 @@ function ExecutiveStory({ data }: { data: any }) {
             {story.actionPlan?.day90?.length > 0 ? (
               <ul style={{ margin: '0 0 0 20px', color: '#9aa7bd' }}>
                 {story.actionPlan.day90.map((action: any, i: number) => (
-                  <li key={i}>{action.action} (Priority: {action.priority}) - Source: {action.source}</li>
+                  <li key={i}>{renderSafeValue(action.action)} (Priority: {renderSafeValue(action.priority)}) - Source: {renderSafeValue(action.source)}</li>
                 ))}
               </ul>
             ) : (
@@ -971,7 +971,7 @@ function ExecutiveStory({ data }: { data: any }) {
           <div><strong>Priority Actions:</strong></div>
           <ul style={{ margin: '5px 0 0 20px', color: '#9aa7bd' }}>
             {story.executiveRecommendation?.priorityActions?.map((action: string, i: number) => (
-              <li key={i}>{action}</li>
+              <li key={i}>{renderSafeValue(action)}</li>
             ))}
           </ul>
           <div><strong>Expected Timeline:</strong> {story.executiveRecommendation?.expectedTimeline || 'N/A'}</div>
@@ -1477,7 +1477,7 @@ function CompetitorSEO({ data }: { data: any }) {
                   <div style={{ padding: '10px', background: '#0b1220', borderRadius: '6px' }}>
                     <div style={{ fontSize: '11px', color: '#9aa7bd', textTransform: 'uppercase' }}>Authority Score</div>
                     <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#a855f7' }}>
-                      {c.estimatedAuthority !== null && c.estimatedAuthority !== undefined ? c.estimatedAuthority : 'Unavailable'}
+                      {c.estimatedAuthority !== null && c.estimatedAuthority !== undefined ? renderSafeValue(c.estimatedAuthority) : 'Unavailable'}
                     </div>
                   </div>
                   <div style={{ padding: '10px', background: '#0b1220', borderRadius: '6px' }}>
@@ -1608,12 +1608,12 @@ function ContentGaps({ data }: { data: any }) {
                   <Badge className="blue" style={{ fontSize: '10px' }}>{g.source}</Badge>
                 )}
                 <div style={{ display: 'flex', gap: '15px', fontSize: '13px', color: '#9aa7bd', background: '#0b1220', padding: '10px', borderRadius: '6px', width: '100%' }}>
-                  {g.targetKeyword && <span>🎯 <b>Keyword:</b> <span style={{ color: '#fff' }}>{g.targetKeyword}</span></span>}
+                  {g.targetKeyword && <span>🎯 <b>Keyword:</b> <span style={{ color: '#fff' }}>{renderSafeValue(g.targetKeyword)}</span></span>}
                   {g.searchVolume !== null && g.searchVolume !== undefined && <span>📊 <b>Volume:</b> <span style={{ color: '#10e18b' }}>{formatNumber(g.searchVolume)}</span></span>}
                   {g.searchVolume === null && <span>📊 <b>Volume:</b> <span style={{ color: '#9aa7bd' }}>Unavailable</span></span>}
-                  {g.keywordDifficulty !== null && g.keywordDifficulty !== undefined && <span>📈 <b>KD:</b> <span style={{ color: '#ffa502' }}>{g.keywordDifficulty}</span></span>}
+                  {g.keywordDifficulty !== null && g.keywordDifficulty !== undefined && <span>📈 <b>KD:</b> <span style={{ color: '#ffa502' }}>{renderSafeValue(g.keywordDifficulty)}</span></span>}
                   {g.keywordDifficulty === null && <span>📈 <b>KD:</b> <span style={{ color: '#9aa7bd' }}>Unavailable</span></span>}
-                  {g.intent && <span>💡 <b>Intent:</b> <span style={{ color: '#53a7ff' }}>{g.intent}</span></span>}
+                  {g.intent && <span>💡 <b>Intent:</b> <span style={{ color: '#53a7ff' }}>{renderSafeValue(g.intent)}</span></span>}
                 </div>
                 {g.confidence && (
                   <div style={{ fontSize: '12px', color: '#9aa7bd' }}>
