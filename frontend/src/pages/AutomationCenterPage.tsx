@@ -4,7 +4,10 @@ import { useProject } from '../context/ProjectContext';
 import { asArray, asText } from '../lib/normalizers';
 import { Badge, Card, EmptyState, Loading, PageHeader } from '../components/UI';
 import { KPIDashboard, SmartNavigation, SearchBar, LoadingSkeleton, EnterpriseEmptyState, ProgressBar, StatusBadge } from '../components/EnterpriseComponents';
-import { Zap, Target, TrendingUp, Activity, Map, Clock, AlertTriangle, FileText, Code, Users, Building, Eye, Star, Layers, Info } from 'lucide-react';
+import { Zap, Target, TrendingUp, Activity, Map, Clock, AlertTriangle, FileText, Code, Users, Building, Eye, Star, Layers, Info, Sliders, GripHorizontal, Wifi, ChevronUp, ChevronDown, Image, Video, Send, Download, Copy, CheckCircle2, Loader2, FileDown } from 'lucide-react';
+import { ExecutiveSummaryCards, BusinessHealthScore, AIDecisionPanel, RecommendationPriorities, CrossModuleInsights, CompareResults, OpportunityMatrix, RiskMatrix, ConfidenceVisualization, InteractiveFilters, SmartSearch, EnterpriseReportPreview, ProductivityBar, ExecutiveCommandCenter, StoryDrivenResults, AIBusinessAdvisor, DecisionSimulator, CompetitorPositioningMap, MarketOpportunityHeatmap, BusinessTimeline, ExecutiveKPIDashboard, InsightRelationships, EvidenceExplorer, ReportPreview20, PresentationMode, useWorkspaceMemory, SmartEmptyState } from '../components/EnterpriseDecisionSuite';
+import { EnterpriseActionWorkspace } from '../components/EnterpriseActionWorkspace';
+import { getIntegrationHealth, sendTestEmail, generatePosterImage, renderVideo } from '../lib/api';
 
 function formatValue(v: any): string {
   if (v === null || v === undefined) return 'Unavailable';
@@ -72,6 +75,10 @@ function renderValue(v: any): React.ReactNode {
 function renderPlanTab(data: any) {
   if (!data || Object.keys(data).length === 0) return <EnterpriseEmptyState title="No automation plan" message="Click Generate Automation Plan to create one." icon={Zap} />;
 
+  const [showDecisionPanel, setShowDecisionPanel] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
+
   const sections: { title: string; content: React.ReactNode }[] = [];
 
   const kpiItems = [
@@ -81,6 +88,104 @@ function renderPlanTab(data: any) {
     data.channels?.length ? { label: 'Channels', value: `${data.channels.length}`, icon: Activity, color: '#ffb347' } : null,
     data.budgetSplit ? { label: 'Budget Allocated', value: 'Yes', icon: Map, color: '#ff4757' } : null,
   ].filter(Boolean);
+
+  // Phase 6C: Executive Summary data for automation
+  const readiness = data.readinessScore || 70;
+  const execSummaryData = {
+    keyFindings: [
+      { text: `Campaign readiness score is ${readiness}%`, confidence: 85, impact: 'high' },
+      { text: `${data.channels?.length || 0} channels configured for multi-channel outreach`, confidence: 80, impact: 'medium' },
+      { text: data.campaignObjective ? `Campaign objective: ${data.campaignObjective}` : 'Campaign objective defined', confidence: 75, impact: 'high' },
+    ],
+    biggestRisks: [
+      ...(readiness < 60 ? [{ text: 'Low automation readiness may impact execution quality', severity: 'high' as const, probability: 70 }] : []),
+      { text: 'Channel fatigue from over-automation', severity: 'medium' as const, probability: 50 },
+      { text: 'Insufficient personalization in automated sequences', severity: 'medium' as const, probability: 45 },
+    ],
+    biggestOpportunities: [
+      { text: 'Multi-channel orchestration for 360° customer view', roi: '200%', effort: 'Medium' },
+      { text: 'A/B test automation to optimize conversion', roi: '150%', effort: 'Low' },
+      { text: 'Trigger-based email sequences for lead nurturing', roi: '180%', effort: 'Low' },
+    ],
+    overallHealth: {
+      score: readiness,
+      label: readiness >= 80 ? 'Excellent' : readiness >= 60 ? 'Good' : readiness >= 40 ? 'Needs Improvement' : 'Critical',
+      color: readiness >= 80 ? '#10e18b' : readiness >= 60 ? '#53a7ff' : readiness >= 40 ? '#ffb347' : '#ff4757'
+    },
+    executiveRecommendation: {
+      text: data.campaignObjective || 'Launch the automated multi-channel campaign with continuous optimization.',
+      reasoning: `Readiness score of ${readiness}% ${readiness >= 60 ? 'supports immediate execution.' : 'suggests preparation before launch.'}`,
+      confidence: readiness
+    }
+  };
+
+  // Phase 6C: Health score
+  const healthScoreData = {
+    overall: readiness,
+    components: [
+      { label: 'Automation Readiness', value: readiness, color: '#53a7ff' },
+      { label: 'Channel Coverage', value: Math.min((data.channels?.length || 0) * 20, 100), color: '#10e18b' },
+      { label: 'Campaign Structure', value: data.campaignName ? 80 : 40, color: '#a855f7' },
+      { label: 'Targeting Quality', value: data.targetAudience ? 75 : 30, color: '#ffb347' },
+      { label: 'KPI Tracking', value: data.kpis ? 85 : 50, color: '#818cf8' },
+    ]
+  };
+
+  // Phase 6C: AI Decisions
+  const autoDecisions = [
+    { label: 'Should Launch Campaign?', question: 'Should campaign launch now?', answer: (readiness >= 60 ? 'Yes' : 'No') as 'Yes' | 'No', reasoning: `Readiness score of ${readiness}% ${readiness >= 60 ? 'meets the launch threshold.' : 'is below the 60% threshold.'}`, confidence: readiness },
+    { label: 'Should Scale Channels?', question: 'Scale to more channels?', answer: ((data.channels?.length || 0) >= 3 ? 'Likely' : 'No') as 'Likely' | 'No', reasoning: `Currently ${data.channels?.length || 0} channels configured.`, confidence: 75 },
+    { label: 'Should Improve Targeting?', question: 'Improve audience targeting?', answer: (data.targetAudience ? 'No' : 'Yes') as 'No' | 'Yes', reasoning: data.targetAudience ? 'Target audience is defined.' : 'No target audience defined.', confidence: 80 },
+  ];
+
+  // Phase 6C: Recommendations
+  const autoRecommendations = [
+    ...(data.channels || []).slice(0, 5).map((ch: any, i: number) => ({
+      title: `Optimize ${ch.channel || ch.name || 'channel'} automation`,
+      description: ch.reason || `Improve ${ch.channel || ch.name || 'channel'} performance through A/B testing.`,
+      group: i < 2 ? 'Quick Wins' as const : 'High ROI' as const,
+      priority: (i < 2 ? 'High' : 'Medium') as 'High' | 'Medium',
+      difficulty: 35 + i * 10,
+      roi: '150%',
+      timeline: `${i + 1}5 days`,
+      owner: ch.owner || 'Automation Team',
+      confidence: 80 - i * 5
+    })),
+    { title: 'Set up trigger-based email sequences', description: 'Automate lead nurturing with behavior-based triggers.', group: 'High ROI' as const, priority: 'High' as const, difficulty: 40, roi: '200%', timeline: '14 days', owner: 'Email Marketing', confidence: 75 },
+    { title: 'Create A/B testing framework', description: 'Systematically test subject lines, CTAs, and send times.', group: 'Quick Wins' as const, priority: 'Medium' as const, difficulty: 30, roi: '120%', timeline: '7 days', owner: 'Growth Team', confidence: 85 },
+    { title: 'Build cross-channel attribution', description: 'Track and attribute conversions across all channels.', group: 'Long-Term' as const, priority: 'Medium' as const, difficulty: 70, roi: '250%', timeline: '60 days', owner: 'Analytics Team', confidence: 65 },
+  ];
+
+  // Phase 6C: Risk items
+  const autoRisks = [
+    { title: 'Low automation readiness', category: 'Business' as const, probability: 100 - readiness, impact: (readiness < 50 ? 'high' : 'medium') as 'high' | 'medium', mitigation: 'Review and improve automation infrastructure before launch.', owner: 'Engineering' },
+    { title: 'Channel fatigue risk', category: 'Market' as const, probability: 40, impact: 'medium' as const, mitigation: 'Implement frequency capping and smart scheduling.', owner: 'Marketing' },
+    { title: 'Deliverability issues', category: 'Technical' as const, probability: 35, impact: 'high' as const, mitigation: 'Warm up domains and monitor sender reputation.', owner: 'Email Operations' },
+  ];
+
+  // Phase 6C: Cross module insights
+  const crossModuleItems = [
+    ...(!data.emailSequence?.length ? [{ title: 'No Email Sequences Configured', description: 'Email marketing is a high-ROI automation channel that is not yet configured.', sourceModule: 'Automation' as const, targetModule: 'Growth' as const, impact: 'high' as const, type: 'Missing Channel' }] : []),
+    ...(!data.contentCalendar?.length ? [{ title: 'Content Calendar Not Set', description: 'A structured content calendar improves campaign consistency and ROI tracking.', sourceModule: 'Automation' as const, targetModule: 'Reports' as const, impact: 'medium' as const, type: 'Opportunity' }] : []),
+  ];
+
+  const confidenceData = [
+    { section: 'Campaign Strategy', confidence: data.campaignName ? 80 : 50, evidenceStrength: 75, sourceCount: data.channels?.length || 2, dataFreshness: 'Today' },
+    { section: 'Channel Planning', confidence: Math.min((data.channels?.length || 0) * 20, 100), evidenceStrength: 70, sourceCount: data.channels?.length || 2, dataFreshness: 'Today' },
+    { section: 'KPI Framework', confidence: data.kpis ? 85 : 40, evidenceStrength: data.kpis ? 80 : 30, sourceCount: data.kpis ? 3 : 1, dataFreshness: 'Today' },
+  ];
+
+  const filterOptions = [
+    { key: 'priority', label: 'Priority', values: ['Critical', 'High', 'Medium', 'Low'] },
+    { key: 'channel', label: 'Channel', values: ['Email', 'LinkedIn', 'Instagram', 'Google Ads', 'Content'] },
+  ];
+  const handleFilterChange = (key: string, values: string[]) => setActiveFilters(prev => ({ ...prev, [key]: values }));
+
+  const productivityItems = [
+    { label: 'Campaign Summary', content: data.campaignObjective || 'Automation campaign plan' },
+    { label: 'Channel List', content: (data.channels || []).map((c: any) => c.channel || c.name || '').join('\n') },
+    { label: 'Key Recommendations', content: autoRecommendations.map(r => r.title).join('\n') },
+  ];
 
   if (data.campaignName) {
     sections.push({ title: 'Campaign Overview', content: (
@@ -138,13 +243,119 @@ function renderPlanTab(data: any) {
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
+      {/* Phase 6C: Filters + Decision Toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <button onClick={() => setShowFilters(!showFilters)}
+          style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #293245', background: showFilters ? 'rgba(129,140,248,0.1)' : '#0f1729', cursor: 'pointer', fontSize: '11px', color: showFilters ? '#818cf8' : '#9aa7bd', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <Sliders size={12} /> Filters
+        </button>
+        <button onClick={() => setShowDecisionPanel(true)}
+          style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #818cf8', background: 'rgba(129,140,248,0.1)', cursor: 'pointer', fontSize: '11px', color: '#818cf8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <GripHorizontal size={12} /> AI Decisions
+        </button>
+      </div>
+      {showFilters && <InteractiveFilters options={filterOptions} activeFilters={activeFilters} onFilterChange={handleFilterChange} />}
+
+      {/* Phase 6C: Executive Summary + Health */}
+      <ExecutiveSummaryCards data={execSummaryData} />
+      <ProductivityBar items={productivityItems} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        <BusinessHealthScore data={healthScoreData} />
+        <div>{kpiItems.length > 0 && <KPIDashboard items={kpiItems} columns={2} />}</div>
+      </div>
+
+      {/* Phase 6C: Risk Matrix + Opportunity Matrix */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        <OpportunityMatrix items={[
+          { title: 'Email automation sequences', impact: 85, effort: 30 },
+          { title: 'LinkedIn DM automation', impact: 70, effort: 40 },
+          { title: 'Google Ads smart bidding', impact: 75, effort: 35 },
+          { title: 'Instagram content scheduling', impact: 60, effort: 25 },
+          { title: 'Cross-channel attribution', impact: 80, effort: 70 },
+        ]} />
+        <RiskMatrix items={autoRisks} />
+      </div>
+
+      {/* Phase 6C: Recommendations */}
+      <RecommendationPriorities items={autoRecommendations} />
+
+      {/* Phase 6C: Cross Module + Compare */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        {crossModuleItems.length > 0 && <CrossModuleInsights items={crossModuleItems} />}
+        <ConfidenceVisualization items={confidenceData} />
+      </div>
+
+      {/* Phase 6C: AI Decision Panel */}
+      {showDecisionPanel && (
+        <AIDecisionPanel decisions={autoDecisions} onClose={() => setShowDecisionPanel(false)} />
+      )}
+
+      {/* Existing sections */}
       {sections.map((s, i) => (
         <Card key={i}>
           <h3 style={{ margin: '0 0 12px 0' }}>{s.title}</h3>
           {s.content}
         </Card>
       ))}
-      {sections.length === 0 && <EnterpriseEmptyState title="No plan data" message="Generate an automation plan first." icon={FileText} />}
+    </div>
+  );
+}
+
+function EmailSendSection() {
+  const { selectedChatId } = useProject();
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [approvalChecked, setApprovalChecked] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+
+  const handleSend = async () => {
+    if (!selectedChatId) return;
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await sendTestEmail(selectedChatId, {
+        recipientEmail: recipientEmail.trim(),
+        subject: subject.trim() || 'Test Email from AI Marketing Platform',
+        body: body.trim() || 'This is a test email sent from the Automation Center.',
+        approvalChecked,
+        senderName: 'AI Marketing Platform',
+      });
+      setResult(res);
+    } catch (err: any) {
+      setResult({ success: false, error: err.message || 'Failed to send' });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div style={{ padding: '14px', background: '#101622', borderRadius: '8px', border: '1px solid #293245' }}>
+      <div style={{ fontSize: '12px', fontWeight: 600, color: '#e5e7eb', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <Send size={14} style={{ color: '#53a7ff' }} /> Send Test Email via Brevo
+      </div>
+      <div style={{ display: 'grid', gap: '10px' }}>
+        <input value={recipientEmail} onChange={e => setRecipientEmail(e.target.value)} placeholder="Recipient email * (one only)" style={{ width: '100%', padding: '8px 12px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px', outline: 'none' }} />
+        <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Email subject" style={{ width: '100%', padding: '8px 12px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px', outline: 'none' }} />
+        <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Email body" rows={4} style={{ width: '100%', padding: '8px 12px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px', outline: 'none', resize: 'vertical' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <input type="checkbox" id="approval-auto" checked={approvalChecked} onChange={e => setApprovalChecked(e.target.checked)} style={{ accentColor: '#10e18b' }} />
+          <label htmlFor="approval-auto" style={{ fontSize: '11px', color: '#9aa7bd' }}>I approve sending this test email. Manual approval only. One recipient.</label>
+        </div>
+        <button onClick={handleSend} disabled={sending || !recipientEmail.trim() || !approvalChecked || !selectedChatId} style={{ padding: '8px 20px', borderRadius: '6px', border: '1px solid #a855f7', background: 'rgba(168,85,247,0.15)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: '#a855f7', display: 'inline-flex', alignItems: 'center', gap: '4px', alignSelf: 'flex-start' }}>
+          {sending ? <><Loader2 className="spin" size={14} /> Sending...</> : <><Send size={14} /> Send Test Email</>}
+        </button>
+        {result && (
+          <div style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '11px', display: 'flex', alignItems: 'flex-start', gap: '6px', background: result.success ? 'rgba(16,225,139,0.08)' : 'rgba(255,71,87,0.08)', border: `1px solid ${result.success ? 'rgba(16,225,139,0.2)' : 'rgba(255,71,87,0.2)'}` }}>
+            {result.success ? <CheckCircle2 size={14} style={{ color: '#10e18b', flexShrink: 0, marginTop: '1px' }} /> : <AlertTriangle size={14} style={{ color: '#ff4757', flexShrink: 0, marginTop: '1px' }} />}
+            <div>
+              {result.success ? <>Sent! ID: {result.messageId} | To: {result.recipient} | Via: {result.provider}</> : <>Failed: {result.error}{result.details ? ` — ${result.details}` : ''}</>}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -164,6 +375,8 @@ function renderEmailTab(data: any) {
           No emails are auto-sent from this system.
         </p>
       </Card>
+
+      <EmailSendSection />
 
       {emails.map((email: any, i: number) => (
         <Card key={i}>
@@ -299,6 +512,81 @@ function renderGoogleAdsTab(data: any) {
   );
 }
 
+function PosterGenerateSection() {
+  const { selectedChatId } = useProject();
+  const [prompt, setPrompt] = useState('');
+  const [headline, setHeadline] = useState('');
+  const [cta, setCta] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [result, setResult] = useState<any>(null);
+
+  const handleGenerate = async () => {
+    if (!selectedChatId || !prompt.trim()) return;
+    setGenerating(true);
+    setResult(null);
+    try {
+      const res = await generatePosterImage(selectedChatId, {
+        prompt: prompt.trim(),
+        headline: headline.trim() || undefined,
+        cta: cta.trim() || undefined,
+        platform: 'linkedin',
+        brandColors: ['#2563eb', '#111827'],
+      });
+      setResult(res);
+    } catch (err: any) {
+      setResult({ success: false, error: err.message || 'Failed to generate poster' });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  return (
+    <div style={{ padding: '14px', background: '#101622', borderRadius: '8px', border: '1px solid #293245' }}>
+      <div style={{ fontSize: '12px', fontWeight: 600, color: '#e5e7eb', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <Image size={14} style={{ color: '#f59e0b' }} /> Generate Poster Image
+      </div>
+      <div style={{ display: 'grid', gap: '10px' }}>
+        <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="Image prompt *" rows={2} style={{ width: '100%', padding: '8px 12px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px', outline: 'none', resize: 'vertical' }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          <input value={headline} onChange={e => setHeadline(e.target.value)} placeholder="Headline (optional)" style={{ padding: '8px 12px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px', outline: 'none' }} />
+          <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA (optional)" style={{ padding: '8px 12px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px', outline: 'none' }} />
+        </div>
+        <button onClick={handleGenerate} disabled={generating || !prompt.trim() || !selectedChatId} style={{ padding: '8px 20px', borderRadius: '6px', border: '1px solid #f59e0b', background: 'rgba(245,158,11,0.15)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: '#f59e0b', display: 'inline-flex', alignItems: 'center', gap: '4px', alignSelf: 'flex-start' }}>
+          {generating ? <><Loader2 className="spin" size={14} /> Generating...</> : <><Image size={14} /> Generate Poster</>}
+        </button>
+        {result && (
+          <div>
+            {result.success ? (
+              <div>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, background: 'rgba(16,225,139,0.15)', color: '#10e18b' }}>Provider: {result.provider}</span>
+                </div>
+                <div style={{ background: '#151d2b', borderRadius: '8px', border: '1px solid #293245', overflow: 'hidden' }}>
+                  <img src={result.imageUrl} alt="Generated poster" style={{ width: '100%', maxHeight: '400px', objectFit: 'contain', display: 'block' }} />
+                </div>
+                <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+                  <a href={result.imageUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #10e18b', background: 'rgba(16,225,139,0.1)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: '#10e18b', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Download size={12} /> Download</a>
+                  <button onClick={() => navigator.clipboard.writeText(result.imageUrl)} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #818cf8', background: 'rgba(129,140,248,0.1)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: '#818cf8', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Copy size={12} /> Copy URL</button>
+                  <button onClick={() => navigator.clipboard.writeText(result.prompt)} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #a855f7', background: 'rgba(168,85,247,0.1)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: '#a855f7', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Copy size={12} /> Copy Prompt</button>
+                </div>
+                {result.warnings?.map((w: string, i: number) => (
+                  <div key={i} style={{ marginTop: '6px', padding: '6px 8px', background: 'rgba(255,179,71,0.08)', borderRadius: '4px', fontSize: '10px', color: '#ffb347', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <AlertTriangle size={10} /> {w}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '11px', background: 'rgba(255,71,87,0.08)', border: '1px solid rgba(255,71,87,0.2)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertTriangle size={14} style={{ color: '#ff4757' }} /> {result.error}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function renderPosterTab(data: any) {
   const posters = asArray(data.posterPrompts).filter(p => p);
   const images = asArray(data.imageAdIdeas).filter(i => i);
@@ -307,6 +595,8 @@ function renderPosterTab(data: any) {
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
+      <PosterGenerateSection />
+
       {posters.length > 0 && (
         <Card>
           <h3 style={{ margin: '0 0 12px 0' }}>Poster/Creative Prompts</h3>
@@ -343,12 +633,102 @@ function renderPosterTab(data: any) {
   );
 }
 
+function VideoRenderSection() {
+  const { selectedChatId } = useProject();
+  const [script, setScript] = useState('');
+  const [scenesText, setScenesText] = useState('');
+  const [rendering, setRendering] = useState(false);
+  const [result, setResult] = useState<any>(null);
+
+  const handleRender = async () => {
+    if (!selectedChatId) return;
+    setRendering(true);
+    setResult(null);
+    try {
+      const scenes = scenesText.trim() ? scenesText.split('\n').filter(Boolean).map((line, i) => ({
+        title: `Scene ${i + 1}`,
+        visual: line,
+        voiceover: '',
+        duration: 5,
+      })) : [{ title: 'Scene 1', visual: script || 'Marketing video scene', voiceover: '', duration: 30 }];
+      const res = await renderVideo(selectedChatId, {
+        script: script.trim() || 'Marketing video',
+        scenes,
+        duration: scenes.reduce((sum, s) => sum + s.duration, 0),
+        platform: 'linkedin',
+        aspectRatio: '16:9',
+      });
+      setResult(res);
+    } catch (err: any) {
+      setResult({ success: false, error: err.message || 'Failed to render video' });
+    } finally {
+      setRendering(false);
+    }
+  };
+
+  return (
+    <div style={{ padding: '14px', background: '#101622', borderRadius: '8px', border: '1px solid #293245' }}>
+      <div style={{ fontSize: '12px', fontWeight: 600, color: '#e5e7eb', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <Video size={14} style={{ color: '#ef4444' }} /> Render MP4 Video
+      </div>
+      <div style={{ display: 'grid', gap: '10px' }}>
+        <textarea value={script} onChange={e => setScript(e.target.value)} placeholder="Video script (optional)" rows={3} style={{ width: '100%', padding: '8px 12px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px', outline: 'none', resize: 'vertical' }} />
+        <textarea value={scenesText} onChange={e => setScenesText(e.target.value)} placeholder="Scene visuals (one per line, optional)" rows={3} style={{ width: '100%', padding: '8px 12px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px', outline: 'none', resize: 'vertical' }} />
+        <button onClick={handleRender} disabled={rendering || !selectedChatId} style={{ padding: '8px 20px', borderRadius: '6px', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.15)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px', alignSelf: 'flex-start' }}>
+          {rendering ? <><Loader2 className="spin" size={14} /> Rendering MP4...</> : <><Video size={14} /> Render MP4</>}
+        </button>
+        {result && (
+          <div>
+            {result.success && result.videoUrl ? (
+              <div>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, background: 'rgba(16,225,139,0.15)', color: '#10e18b' }}>Provider: {result.provider}</span>
+                  <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, background: 'rgba(83,167,255,0.15)', color: '#53a7ff' }}>{result.duration}s</span>
+                </div>
+                <video controls style={{ width: '100%', maxHeight: '400px', borderRadius: '8px', background: '#000' }}>
+                  <source src={result.videoUrl} type="video/mp4" />
+                </video>
+                <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+                  <a href={result.videoUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #10e18b', background: 'rgba(16,225,139,0.1)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: '#10e18b', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Download size={12} /> Download MP4</a>
+                  <button onClick={() => navigator.clipboard.writeText(result.videoUrl)} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #818cf8', background: 'rgba(129,140,248,0.1)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: '#818cf8', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Copy size={12} /> Copy URL</button>
+                </div>
+              </div>
+            ) : result.success && result.storyboard ? (
+              <div>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, background: 'rgba(255,179,71,0.15)', color: '#ffb347' }}>Provider: {result.provider}</span>
+                </div>
+                <div style={{ padding: '12px', background: '#151d2b', borderRadius: '8px', border: '1px solid #293245', fontSize: '12px', color: '#9aa7bd', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: '300px', overflow: 'auto' }}>{result.storyboard}</div>
+                <div style={{ marginTop: '6px', fontSize: '10px', color: '#ffb347', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <AlertTriangle size={10} /> MP4 unavailable — showing storyboard fallback
+                </div>
+                <button onClick={() => { const blob = new Blob([result.storyboard], { type: 'text/markdown' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `storyboard-${Date.now()}.md`; a.click(); URL.revokeObjectURL(url); }} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #10e18b', background: 'rgba(16,225,139,0.1)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: '#10e18b', display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '8px' }}><FileDown size={12} /> Export Storyboard</button>
+              </div>
+            ) : (
+              <div style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '11px', background: 'rgba(255,71,87,0.08)', border: '1px solid rgba(255,71,87,0.2)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertTriangle size={14} style={{ color: '#ff4757' }} /> {result.error}
+              </div>
+            )}
+            {result.warnings?.map((w: string, i: number) => (
+              <div key={i} style={{ marginTop: '6px', padding: '6px 8px', background: 'rgba(255,179,71,0.08)', borderRadius: '4px', fontSize: '10px', color: '#ffb347', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                <AlertTriangle size={10} /> {w}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function renderVideoTab(data: any) {
   const scripts = asArray(data.videoScripts).filter(s => s);
   if (scripts.length === 0) return <EnterpriseEmptyState title="No Video Ad Scripts" message="Generate an automation plan first." icon={Code} />;
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
+      <VideoRenderSection />
+
       {scripts.map((vs: any, i: number) => {
         const scenes = asArray(vs.scenes || vs.sceneBySceneBreakdown || vs.sceneBreakdown);
         return (
@@ -659,24 +1039,32 @@ function WorkflowTabContent() {
   );
 }
 
+const logActionColors: Record<string, string> = {
+  generated: '#10e18b', approved: '#53a7ff', rejected: '#ff4757',
+  email_sent: '#a855f7', poster_generated: '#f59e0b', video_rendered: '#ef4444',
+  asset_uploaded: '#10e18b', fallback_used: '#ffb347', error_occurred: '#ff4757',
+};
+
 function renderLogsTab(data: any) {
   const logs = asArray(data.logs).filter(l => l);
-  if (logs.length === 0) return <EnterpriseEmptyState title="No Automation Logs" message="Generate an automation plan to see logs." icon={Activity} />;
+  if (logs.length === 0) return <EnterpriseEmptyState title="No Automation Logs" message="Generate an automation plan or run integrations to see logs." icon={Activity} />;
 
   return (
     <Card>
-      <h3 style={{ margin: '0 0 12px 0' }}>Automation History</h3>
+      <h3 style={{ margin: '0 0 12px 0' }}>Automation & Integration History</h3>
       <div style={{ display: 'grid', gap: '8px' }}>
         {logs.map((log: any, i: number) => (
           <div key={i} style={{ padding: '10px', background: '#151d2b', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <Badge tone={log.action === 'generated' ? 'green' : log.action === 'approved' ? 'blue' : log.action === 'rejected' ? 'red' : 'yellow'}>{log.action}</Badge>
+                <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, background: `${logActionColors[log.action] || '#9aa7bd'}20`, color: logActionColors[log.action] || '#9aa7bd' }}>{log.action.replace(/_/g, ' ')}</span>
                 <span style={{ color: '#fff' }}>{log.message || 'No message'}</span>
               </div>
               {log.metadata && typeof log.metadata === 'object' && Object.keys(log.metadata).length > 0 && (
                 <div style={{ marginTop: '6px', fontSize: '12px', color: '#9aa7bd' }}>
-                  {renderObjectCard(log.metadata, Object.keys(log.metadata))}
+                  {Object.entries(log.metadata).map(([k, v]) => (
+                    <div key={k} style={{ display: 'inline-block', marginRight: '12px' }}><strong>{k}:</strong> {String(v).slice(0, 100)}</div>
+                  ))}
                 </div>
               )}
             </div>
@@ -1116,15 +1504,24 @@ const tabRenderers: Record<string, (d: any) => JSX.Element> = {
 
 export default function AutomationCenterPage() {
   const { selectedChatId, fullResults } = useProject();
-  const [active, setActive] = useState('Plan');
+  const [active, setActive] = useWorkspaceMemory('auto-activeTab', 'Plan');
   const [data, setData] = useState<any>(null);
   const [genError, setGenError] = useState<string | null>(null);
   const [genLoading, setGenLoading] = useState(false);
   const [execLoading, setExecLoading] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
   const [execData, setExecData] = useState<any>(null);
+  const [health, setHealth] = useState<any>(null);
+  const [showHealth, setShowHealth] = useState(true);
+  const [emailSending, setEmailSending] = useState<string | null>(null);
+  const [emailResult, setEmailResult] = useState<any>(null);
+  const [posterGenerating, setPosterGenerating] = useState<string | null>(null);
+  const [posterResult, setPosterResult] = useState<any>(null);
+  const [videoRendering, setVideoRendering] = useState<string | null>(null);
+  const [videoResult, setVideoResult] = useState<any>(null);
 
   useEffect(() => {
+    getIntegrationHealth().then(d => setHealth(d)).catch(() => {});
     if (!selectedChatId) { setData(null); setExecData(null); return; }
     let cancelled = false;
     api.get(`/automation/${selectedChatId}/plan`)
@@ -1179,7 +1576,36 @@ export default function AutomationCenterPage() {
 
   return (
     <div>
+      <Card style={{ marginBottom: '20px' }}>
+        <EnterpriseActionWorkspace />
+      </Card>
       <PageHeader eyebrow="Automation Center" title="Automation Command Center" subtitle="Generate and manage cross-channel marketing execution." />
+
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+          <button onClick={() => setShowHealth(!showHealth)} style={{ background: 'none', border: 'none', color: '#9aa7bd', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {showHealth ? <ChevronUp size={12} /> : <ChevronDown size={12} />} Provider Health
+          </button>
+        </div>
+        {showHealth && health && (
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', padding: '10px 14px', background: '#151d2b', borderRadius: '8px', border: '1px solid #293245' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#9aa7bd', display: 'flex', alignItems: 'center', gap: '4px' }}><Wifi size={12} /> Integration Status:</div>
+            {[
+              { label: 'Email', ok: health.providers.email.configured, detail: health.providers.email.provider || 'Not configured' },
+              { label: 'Image', ok: health.providers.image.huggingface || health.providers.image.replicate, detail: `${health.providers.image.huggingface ? 'HF' : ''}${health.providers.image.huggingface && health.providers.image.replicate ? ' + ' : ''}${health.providers.image.replicate ? 'Replicate' : ''}${!health.providers.image.huggingface && !health.providers.image.replicate ? 'None' : ''}` },
+              { label: 'Storage', ok: health.providers.storage.cloudinary, detail: health.providers.storage.cloudinary ? 'Cloudinary' : 'Local fallback' },
+              { label: 'Video', ok: health.providers.video.configured, detail: health.providers.video.provider || 'Not available' },
+              { label: 'AI', ok: health.providers.ai.gemini || health.providers.ai.groq, detail: `${health.providers.ai.gemini ? 'Gemini' : ''}${health.providers.ai.gemini && health.providers.ai.groq ? ' + ' : ''}${health.providers.ai.groq ? 'Groq' : ''}${!health.providers.ai.gemini && !health.providers.ai.groq ? 'None' : ''}` },
+            ].map(item => (
+              <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '4px', background: item.ok ? 'rgba(16,225,139,0.08)' : 'rgba(255,179,71,0.08)', border: `1px solid ${item.ok ? 'rgba(16,225,139,0.2)' : 'rgba(255,179,71,0.2)'}` }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: item.ok ? '#10e18b' : '#ffb347' }} />
+                <span style={{ fontSize: '10px', color: item.ok ? '#10e18b' : '#ffb347', fontWeight: 600 }}>{item.label}</span>
+                <span style={{ fontSize: '9px', color: '#6b7280' }}>{item.detail}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <Card style={{ marginBottom: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>

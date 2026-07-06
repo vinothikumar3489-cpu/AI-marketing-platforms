@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import compression from "compression";
+import path from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
 
@@ -202,6 +203,33 @@ const automationLimiter = rateLimit({
   skip: () => !isProduction,
 });
 
+// Email send limiter — 5 per hour per IP
+const emailLimiter = rateLimit({
+  windowMs: 60 * minute,
+  max: isProduction ? 5 : 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => !isProduction,
+});
+
+// Image generation limiter — 10 per hour per IP
+const imageLimiter = rateLimit({
+  windowMs: 60 * minute,
+  max: isProduction ? 10 : 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => !isProduction,
+});
+
+// Video render limiter — 3 per hour per IP
+const videoLimiter = rateLimit({
+  windowMs: 60 * minute,
+  max: isProduction ? 3 : 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => !isProduction,
+});
+
 // CORS Configuration
 const allowedOrigins = [
   ...(process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',').map(s => s.trim()) : ["http://localhost:5173"]),
@@ -268,6 +296,10 @@ app.use("/api/chats", growthWorkspaceRouter);
 app.use("/api/product-analysis", productAnalysisRouter);
 app.use("/api/automation", automationLimiter, automationRouter);
 app.use("/api/chats", reportRouter);
+
+// Serve local fallback assets for Cloudinary-free operation
+const localAssetsDir = path.join(process.cwd(), 'local-assets');
+app.use('/api/local-assets', express.static(localAssetsDir));
 
 // 404 handler
 app.use((req, res) => {

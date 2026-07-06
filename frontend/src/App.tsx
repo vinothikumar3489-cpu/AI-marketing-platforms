@@ -14,6 +14,7 @@ import ChatHistoryPage from './pages/ChatHistoryPage';
 import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
 import ExecutiveStoryPage from './pages/ExecutiveStoryPage';
+import ContentStudioPage from './pages/ContentStudioPage';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="campaigns" element={<CampaignIntelligencePage />} />
         <Route path="executive-story" element={<ExecutiveStoryPage />} />
         <Route path="automation-center" element={<AutomationCenterPage />} />
+        <Route path="content-studio" element={<ContentStudioPage />} />
         <Route path="chat-history" element={<ChatHistoryPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="settings" element={<SettingsPage />} />

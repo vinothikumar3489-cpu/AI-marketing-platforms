@@ -80,6 +80,81 @@ export async function tryGet(paths: string[]) {
   throw last;
 }
 
+// ============================================
+// PHASE 9 — Integration API Functions
+// ============================================
+
+export async function getIntegrationHealth() {
+  return api.get<{
+    success: boolean;
+    providers: {
+      email: { configured: boolean; provider: string | null };
+      image: { huggingface: boolean; replicate: boolean };
+      storage: { cloudinary: boolean };
+      video: { configured: boolean; provider: string | null };
+      ai: { gemini: boolean; groq: boolean };
+    };
+  }>('/integrations/health');
+}
+
+export async function sendTestEmail(chatId: string, payload: {
+  recipientEmail: string;
+  subject: string;
+  body: string;
+  approvalChecked: boolean;
+  senderName?: string;
+}) {
+  return api.post<{
+    success: boolean;
+    provider?: string;
+    messageId?: string;
+    sentAt?: string;
+    recipient?: string;
+    warnings?: string[];
+    error?: string;
+    details?: string;
+  }>(`/integrations/${chatId}/studio/email/send-test`, payload);
+}
+
+export async function generatePosterImage(chatId: string, payload: {
+  prompt: string;
+  headline?: string;
+  cta?: string;
+  platform?: string;
+  dimensions?: string;
+  brandColors?: string[];
+}) {
+  return api.post<{
+    success: boolean;
+    provider?: string;
+    imageUrl?: string;
+    cloudinaryPublicId?: string;
+    prompt?: string;
+    generatedAt?: string;
+    warnings?: string[];
+    error?: string;
+  }>(`/integrations/${chatId}/studio/creative/generate-image`, payload);
+}
+
+export async function renderVideo(chatId: string, payload: {
+  script?: string;
+  scenes: Array<{ title?: string; visual?: string; voiceover?: string; duration?: number }>;
+  duration?: number;
+  platform?: string;
+  aspectRatio?: string;
+}) {
+  return api.post<{
+    success: boolean;
+    provider?: string;
+    videoUrl?: string | null;
+    storyboard?: string;
+    duration?: number;
+    generatedAt?: string;
+    warnings?: string[];
+    error?: string;
+  }>(`/integrations/${chatId}/studio/video/render`, payload);
+}
+
 export async function downloadReport(chatId: string, type: 'executive' | 'growth' | 'seo', format: string): Promise<void> {
   const token = getToken();
   const url = `${API_BASE}/chats/${chatId}/report/${type}/${format}`;

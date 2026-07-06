@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import { Bot, Home, Rocket, Search, Settings, User, WandSparkles, Menu, X, Briefcase } from 'lucide-react';
+import { Bot, Home, Rocket, Search, Settings, User, WandSparkles, Menu, X, Briefcase, PenTool } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useProject } from '../context/ProjectContext';
 import { useState } from 'react';
@@ -10,6 +10,7 @@ const links = [
   { to: '/app/growth-workspace', label: 'Growth Workspace', icon: Rocket },
   { to: '/app/seo', label: 'SEO Intelligence', icon: Search },
   { to: '/app/automation-center', label: 'AI Automation', icon: Bot },
+  { to: '/app/content-studio', label: 'Content Studio', icon: PenTool },
   { to: '/app/profile', label: 'Profile', icon: User },
   { to: '/app/settings', label: 'Settings', icon: Settings },
 ];

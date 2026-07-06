@@ -1,12 +1,53 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import { requireAuth } from "../middleware/auth.middleware.js";
+import { getHealth, sendEmail, generatePosterImage, renderVideoHandler } from "../controllers/integrations.controller.js";
 
 export const integrationsRouter = express.Router();
 
+const isProduction = process.env.NODE_ENV === "production";
+const minute = 60 * 1000;
+
+const emailLimiter = rateLimit({
+  windowMs: 60 * minute,
+  max: isProduction ? 5 : 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => !isProduction,
+});
+
+const imageLimiter = rateLimit({
+  windowMs: 60 * minute,
+  max: isProduction ? 10 : 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => !isProduction,
+});
+
+const videoLimiter = rateLimit({
+  windowMs: 60 * minute,
+  max: isProduction ? 3 : 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => !isProduction,
+});
+
 integrationsRouter.use(requireAuth);
 
+// Provider health check
+integrationsRouter.get("/health", getHealth);
+
+// Email sending — rate limited
+integrationsRouter.post("/:chatId/studio/email/send-test", emailLimiter, sendEmail);
+
+// Image generation — rate limited
+integrationsRouter.post("/:chatId/studio/creative/generate-image", imageLimiter, generatePosterImage);
+
+// Video rendering — rate limited
+integrationsRouter.post("/:chatId/studio/video/render", videoLimiter, renderVideoHandler);
+
+// Legacy SEO status (keep for backward compat)
 integrationsRouter.post("/seo/connect", (req, res) => {
-  // Placeholder: in real app we'd persist credentials securely
   return res.json({ status: "ok", message: "Connection endpoint received" });
 });
 
