@@ -78,12 +78,12 @@ function renderValue(v: any): React.ReactNode {
   return <span style={{ color: '#9aa7bd' }}>Unavailable</span>;
 }
 
-function renderPlanTab(data: any) {
-  if (!data || Object.keys(data).length === 0) return <EnterpriseEmptyState title="No automation plan" message="Click Generate Automation Plan to create one." icon={Zap} />;
-
+function PlanTabContent({ data }: { data: any }) {
   const [showDecisionPanel, setShowDecisionPanel] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
+
+  if (!data || Object.keys(data).length === 0) return <EnterpriseEmptyState title="No automation plan" message="Click Generate Automation Plan to create one." icon={Zap} />;
 
   const sections: { title: string; content: React.ReactNode }[] = [];
 
@@ -1485,7 +1485,7 @@ const tabs = [
 ];
 
 const tabRenderers: Record<string, (d: any) => JSX.Element> = {
-  Plan: renderPlanTab,
+  Plan: (d: any) => <PlanTabContent data={d} />,
   Email: renderEmailTab,
   LinkedIn: renderLinkedInTab,
   Instagram: renderInstagramTab,
@@ -1703,7 +1703,7 @@ export default function AutomationCenterPage() {
             ))}
           </div>
           <div>
-            {tabRenderers[active] ? tabRenderers[active](planData) : renderPlanTab(planData)}
+            {tabRenderers[active] ? tabRenderers[active](planData) : <PlanTabContent data={planData} />}
           </div>
         </Card>
       )}
