@@ -11,6 +11,29 @@ import { ExecutiveSummaryCards, BusinessHealthScore, AIDecisionPanel, Recommenda
 import { EnterpriseActionWorkspace } from '../components/EnterpriseActionWorkspace';
 import SafeValue from '../components/SafeValue';
 
+// Crash detector to find risky objects that cause React error #31
+function findRiskyObjects(obj: any, path = "root") {
+  if (!obj || typeof obj !== "object") return;
+
+  if (
+    "score" in obj &&
+    "reason" in obj &&
+    "source" in obj &&
+    "category" in obj &&
+    "priority" in obj
+  ) {
+    console.warn("FOUND RISKY SCORE OBJECT:", path, obj);
+  }
+
+  if (Array.isArray(obj)) {
+    obj.forEach((item, i) => findRiskyObjects(item, `${path}[${i}]`));
+  } else {
+    Object.entries(obj).forEach(([key, value]) =>
+      findRiskyObjects(value, `${path}.${key}`)
+    );
+  }
+}
+
 // Safe format helpers to handle non-number values from backend
 function toNumberOrNull(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -149,6 +172,11 @@ export default function SEOIntelligencePage() {
     if (isNewAnalysis) return;
     if (!selectedChatId) return;
     const r = fullResults.seoIntelligence || fullResults.seo || {};
+    
+    // Crash detector: find risky objects that cause React error #31
+    if (import.meta.env.DEV) {
+      findRiskyObjects(fullResults, "fullResults");
+    }
     if (hasRealSeoData(r)) {
       storedChatRef.current = selectedChatId;
       setSeo(r);

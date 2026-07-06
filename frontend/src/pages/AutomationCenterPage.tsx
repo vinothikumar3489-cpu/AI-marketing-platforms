@@ -235,7 +235,7 @@ function renderPlanTab(data: any) {
     sections.push({ title: 'Weekly Plan', content: (
       <div style={{ display: 'grid', gap: '8px' }}>
         {Object.entries(data.weeklyPlan).map(([day, task]: any) => {
-          const taskText = task && typeof task === 'object' ? (task.title || task.problem || task.owner || task.priority || task.difficulty || task.expectedGain || task.businessImpact || task.evidence || task.estimatedTimeline || JSON.stringify(task)) : task;
+          const taskText = task && typeof task === 'object' ? renderSafeValue(task) : task;
           return (
             <div key={day} style={{ display: 'flex', gap: '8px', padding: '8px', background: '#151d2b', borderRadius: '6px' }}>
               <strong style={{ minWidth: '80px', color: '#53a7ff' }}>{renderSafeValue(day)}:</strong>
@@ -784,7 +784,7 @@ function renderContentCalendarTab(data: any) {
 
   if (data.weeklyPlan && typeof data.weeklyPlan === 'object') {
     Object.entries(data.weeklyPlan).forEach(([day, task]: any) => {
-      const taskText = task && typeof task === 'object' ? (task.title || task.problem || task.owner || task.priority || task.difficulty || task.expectedGain || task.businessImpact || task.evidence || task.estimatedTimeline || JSON.stringify(task)) : task;
+      const taskText = task && typeof task === 'object' ? renderSafeValue(task) : task;
       calendarEntries.push({ date: day, channel: 'multi', content: formatValue(taskText) });
     });
   }
@@ -918,7 +918,7 @@ function renderKpiTab(data: any) {
                   acc[a.status] = (acc[a.status] || 0) + 1;
                   return acc;
                 }, {} as Record<string, number>)).map(([status, count]) => (
-                  <span key={String(status)} style={{ marginRight: '12px' }}><Badge>{String(status)}</Badge>: {String(count)}</span>
+                  <span key={String(status)} style={{ marginRight: '12px' }}><Badge>{renderSafeValue(status)}</Badge>: {renderSafeValue(count)}</span>
                 ))}
               </div>
             )}
@@ -1069,7 +1069,7 @@ function renderLogsTab(data: any) {
               {log.metadata && typeof log.metadata === 'object' && Object.keys(log.metadata).length > 0 && (
                 <div style={{ marginTop: '6px', fontSize: '12px', color: '#9aa7bd' }}>
                   {Object.entries(log.metadata).map(([k, v]) => (
-                    <div key={k} style={{ display: 'inline-block', marginRight: '12px' }}><strong>{k}:</strong> {String(v).slice(0, 100)}</div>
+                    <div key={k} style={{ display: 'inline-block', marginRight: '12px' }}><strong>{k}:</strong> {renderSafeValue(v)}</div>
                   ))}
                 </div>
               )}
@@ -1147,7 +1147,7 @@ function renderEmailCampaignStudioTab(data: any) {
                 <strong style={{ color: '#ffb347' }}>Compliance Checklist:</strong>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginTop: '4px', fontSize: '12px' }}>
                   {Object.entries(campaign.complianceChecklist).map(([key, val]: any) => (
-                    <div key={key} style={{ color: val ? '#10e18b' : '#ff4757' }}>{val ? '✓' : '✗'} {key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}</div>
+                    <div key={key} style={{ color: val ? '#10e18b' : '#ff4757' }}>{val ? '✓' : '✗'} {renderSafeValue(key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()))}</div>
                   ))}
                 </div>
               </div>
