@@ -12,6 +12,9 @@ export const AUTOMATION_PLAN_ALLOWED_FIELDS = new Set([
   'idealLeadProfile', 'leadSources', 'outreachAngles', 'sampleLeads',
   'readinessScore', 'status', 'provider', 'fallbackUsed',
   'googleAds', 'contentCalendar', 'crmWorkflows', 'workflows',
+  // Phase 6 — Marketing Execution Platform
+  'contentStudio', 'emailCampaigns', 'creativeStudio', 'videoStudio',
+  'campaignPlans', 'socialCalendars', 'analyticsData',
 ]);
 
 export function sanitizeAutomationPlanData(data) {

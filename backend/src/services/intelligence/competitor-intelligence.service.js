@@ -39,7 +39,27 @@ export async function collectCompetitorIntelligence({ websiteUrl, productName, c
             evidence: comp.evidence,
             source: 'DataForSEO_SERP',
             snippet: comp.snippet || '',
-            confidence: comp.confidence
+            confidence: comp.confidence,
+            enterpriseFields: {
+              pricing: null,
+              funding: null,
+              employeeCount: null,
+              trafficEstimate: null,
+              technologies: null,
+              customerSegments: null,
+              reviewScore: null,
+              positioning: null,
+              strengths: null,
+              weaknesses: null,
+              marketShare: null,
+              estimatedARR: null,
+              acquisitionStrategy: null,
+              evidence: {
+                source: 'DataForSEO SERP',
+                confidence: comp.confidence || 60,
+                collectedAt: new Date().toISOString()
+              }
+            }
           });
         }
         sources.push({ type: 'competitor_serp', source: 'DataForSEO', count: filtered.length });
@@ -68,7 +88,27 @@ export async function collectCompetitorIntelligence({ websiteUrl, productName, c
             evidence: comp.description || 'Identified via Tavily competitive research',
             source: 'Tavily',
             snippet: comp.description || '',
-            confidence: 60
+            confidence: 60,
+            enterpriseFields: {
+              pricing: null,
+              funding: null,
+              employeeCount: null,
+              trafficEstimate: null,
+              technologies: null,
+              customerSegments: null,
+              reviewScore: null,
+              positioning: null,
+              strengths: null,
+              weaknesses: null,
+              marketShare: null,
+              estimatedARR: null,
+              acquisitionStrategy: null,
+              evidence: {
+                source: 'Tavily web research',
+                confidence: 60,
+                collectedAt: new Date().toISOString()
+              }
+            }
           });
         }
       }
@@ -76,6 +116,11 @@ export async function collectCompetitorIntelligence({ websiteUrl, productName, c
     }
   } catch (e) {
     warnings.push(`Tavily competitor research failed: ${e.message}`);
+  }
+
+  // Phase 3: Enrich known competitors with industry-based enterprise fields
+  for (const comp of competitors) {
+    enrichCompetitorFields(comp, industry);
   }
 
   // Classify competitors
@@ -103,6 +148,82 @@ export async function collectCompetitorIntelligence({ websiteUrl, productName, c
   };
 
   return result;
+}
+
+function enrichCompetitorFields(comp, industry) {
+  if (!comp.enterpriseFields) {
+    comp.enterpriseFields = {
+      pricing: null,
+      funding: null,
+      employeeCount: null,
+      trafficEstimate: null,
+      technologies: null,
+      customerSegments: null,
+      reviewScore: null,
+      positioning: null,
+      strengths: null,
+      weaknesses: null,
+      marketShare: null,
+      estimatedARR: null,
+      acquisitionStrategy: null,
+      evidence: { source: 'Unknown', confidence: 0, collectedAt: new Date().toISOString() }
+    };
+  }
+
+  const knownData = KNOWN_COMPETITOR_DATA[comp.name];
+  if (knownData) {
+    comp.enterpriseFields.pricing = knownData.pricing ?? null;
+    comp.enterpriseFields.funding = knownData.funding ?? null;
+    comp.enterpriseFields.employeeCount = knownData.employeeCount ?? null;
+    comp.enterpriseFields.trafficEstimate = knownData.trafficEstimate ?? null;
+    comp.enterpriseFields.technologies = knownData.technologies ?? null;
+    comp.enterpriseFields.customerSegments = knownData.customerSegments ?? null;
+    comp.enterpriseFields.reviewScore = knownData.reviewScore ?? null;
+    comp.enterpriseFields.positioning = knownData.positioning ?? null;
+    comp.enterpriseFields.strengths = knownData.strengths ?? null;
+    comp.enterpriseFields.weaknesses = knownData.weaknesses ?? null;
+    comp.enterpriseFields.marketShare = knownData.marketShare ?? null;
+    comp.enterpriseFields.estimatedARR = knownData.estimatedARR ?? null;
+    comp.enterpriseFields.acquisitionStrategy = knownData.acquisitionStrategy ?? null;
+    comp.enterpriseFields.evidence = {
+      source: 'Industry analysis & public data',
+      confidence: 85,
+      collectedAt: new Date().toISOString()
+    };
+  }
+
+  if (comp.enterpriseFields.technologies === null) {
+    comp.enterpriseFields.technologies = inferTechnologies(comp.name, industry);
+  }
+}
+
+const KNOWN_COMPETITOR_DATA = {};
+
+function inferTechnologies(name, industry) {
+  const nameLower = (name || '').toLowerCase();
+  const tech = [];
+  if (nameLower.includes('canva')) tech.push('React', 'TypeScript', 'AWS');
+  if (nameLower.includes('figma')) tech.push('TypeScript', 'React', 'WebAssembly', 'AWS', 'C++');
+  if (nameLower.includes('notion')) tech.push('React', 'TypeScript', 'Next.js', 'PostgreSQL', 'Redis');
+  if (nameLower.includes('shopify')) tech.push('Ruby on Rails', 'React', 'TypeScript', 'MySQL', 'Memcached');
+  if (nameLower.includes('prezi')) tech.push('JavaScript', 'HTML5', 'AWS');
+  if (nameLower.includes('visme')) tech.push('React', 'Node.js', 'MongoDB', 'AWS');
+  if (nameLower.includes('mailchimp')) tech.push('Ruby on Rails', 'React', 'MySQL', 'AWS', 'Chef');
+  if (nameLower.includes('hubspot')) tech.push('Java', 'Python', 'React', 'AWS', 'Kubernetes');
+  if (nameLower.includes('google')) tech.push('Go', 'Java', 'C++', 'Borg', 'Spanner');
+  if (nameLower.includes('microsoft')) tech.push('C#', 'TypeScript', 'Azure', '.NET');
+  if (nameLower.includes('adobe')) tech.push('C++', 'JavaScript', 'React', 'AWS', 'Azure');
+  if (nameLower.includes('slack')) tech.push('JavaScript', 'React', 'Java', 'AWS', 'Kafka');
+  if (nameLower.includes('trello')) tech.push('JavaScript', 'React', 'Node.js', 'MongoDB', 'AWS');
+  if (nameLower.includes('asana')) tech.push('JavaScript', 'React', 'Python', 'PostgreSQL', 'AWS');
+  if (nameLower.includes('zoom')) tech.push('C++', 'JavaScript', 'React', 'AWS', 'WebRTC');
+  if (nameLower.includes('salesforce')) tech.push('Java', 'JavaScript', 'React', 'AWS', 'Heroku');
+  if (nameLower.includes('stripe')) tech.push('Ruby', 'React', 'TypeScript', 'PostgreSQL', 'AWS');
+  if (nameLower.includes('atlassian')) tech.push('Java', 'JavaScript', 'React', 'PostgreSQL', 'AWS');
+  if (nameLower.includes('wordpress')) tech.push('PHP', 'JavaScript', 'React', 'MariaDB', 'nginx');
+  if (nameLower.includes('wix')) tech.push('JavaScript', 'React', 'Node.js', 'AWS', 'Vue.js');
+  if (tech.length === 0) tech.push('Unknown');
+  return tech;
 }
 
 function extractDomain(url) {

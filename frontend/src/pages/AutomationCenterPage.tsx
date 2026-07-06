@@ -3,6 +3,8 @@ import { api } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
 import { asArray, asText } from '../lib/normalizers';
 import { Badge, Card, EmptyState, Loading, PageHeader } from '../components/UI';
+import { KPIDashboard, SmartNavigation, SearchBar, LoadingSkeleton, EnterpriseEmptyState, ProgressBar, StatusBadge } from '../components/EnterpriseComponents';
+import { Zap, Target, TrendingUp, Activity, Map, Clock, AlertTriangle, FileText, Code, Users, Building, Eye, Star, Layers, Info } from 'lucide-react';
 
 function formatValue(v: any): string {
   if (v === null || v === undefined) return 'Unavailable';
@@ -68,13 +70,22 @@ function renderValue(v: any): React.ReactNode {
 }
 
 function renderPlanTab(data: any) {
-  if (!data || Object.keys(data).length === 0) return <EmptyState title="No automation plan" text="Click Generate Automation Plan to create one." />;
+  if (!data || Object.keys(data).length === 0) return <EnterpriseEmptyState title="No automation plan" message="Click Generate Automation Plan to create one." icon={Zap} />;
 
   const sections: { title: string; content: React.ReactNode }[] = [];
+
+  const kpiItems = [
+    data.readinessScore ? { label: 'Readiness', value: `${data.readinessScore}%`, icon: Zap, color: '#53a7ff' } : null,
+    data.campaignName ? { label: 'Campaign', value: data.campaignName.slice(0, 20), icon: Target, color: '#a855f7' } : null,
+    data.kpis?.conversionRate ? { label: 'Conversion', value: `${data.kpis.conversionRate}%`, icon: TrendingUp, color: '#10e18b' } : null,
+    data.channels?.length ? { label: 'Channels', value: `${data.channels.length}`, icon: Activity, color: '#ffb347' } : null,
+    data.budgetSplit ? { label: 'Budget Allocated', value: 'Yes', icon: Map, color: '#ff4757' } : null,
+  ].filter(Boolean);
 
   if (data.campaignName) {
     sections.push({ title: 'Campaign Overview', content: (
       <div style={{ display: 'grid', gap: '12px' }}>
+        {kpiItems.length > 0 && <KPIDashboard items={kpiItems} columns={5} />}
         {renderObjectCard(data, ['campaignName', 'campaignObjective', 'readinessScore', 'status'], { readinessScore: 'Readiness Score' })}
         {data.targetAudience && (
           <Card>
@@ -133,7 +144,7 @@ function renderPlanTab(data: any) {
           {s.content}
         </Card>
       ))}
-      {sections.length === 0 && <EmptyState title="No plan data" text="Generate an automation plan first." />}
+      {sections.length === 0 && <EnterpriseEmptyState title="No plan data" message="Generate an automation plan first." icon={FileText} />}
     </div>
   );
 }
@@ -142,7 +153,7 @@ function renderEmailTab(data: any) {
   const emails: any[] = [];
   if (data.emailSequence && Array.isArray(data.emailSequence)) emails.push(...data.emailSequence);
   if (data.emailSubjects && Array.isArray(data.emailSubjects)) emails.push(...data.emailSubjects.map((s: any) => typeof s === 'string' ? { subject: s } : s));
-  if (emails.length === 0) return <EmptyState title="No Cold Email Drafts" text="Generate an automation plan first." />;
+  if (emails.length === 0) return <EnterpriseEmptyState title="No Cold Email Drafts" message="Generate an automation plan first." icon={FileText} />;
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
@@ -181,7 +192,7 @@ function renderEmailTab(data: any) {
 function renderLinkedInTab(data: any) {
   const posts = asArray(data.linkedInPosts);
   const templates = asArray(data.linkedInDmTemplates);
-  if (posts.length === 0 && templates.length === 0) return <EmptyState title="No LinkedIn Content" text="Generate an automation plan first." />;
+  if (posts.length === 0 && templates.length === 0) return <EnterpriseEmptyState title="No LinkedIn Content" message="Generate an automation plan first." icon={Users} />;
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
@@ -225,7 +236,7 @@ function renderLinkedInTab(data: any) {
 function renderInstagramTab(data: any) {
   const captions = asArray(data.instagramCaptions);
   const reelIdeas = asArray(data.instagramReelIdeas);
-  if (captions.length === 0 && reelIdeas.length === 0) return <EmptyState title="No Instagram Content" text="Generate an automation plan first." />;
+  if (captions.length === 0 && reelIdeas.length === 0) return <EnterpriseEmptyState title="No Instagram Content" message="Generate an automation plan first." icon={Eye} />;
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
@@ -266,7 +277,7 @@ function renderInstagramTab(data: any) {
 
 function renderGoogleAdsTab(data: any) {
   const ads = asArray(data.googleAds || data.imageAdIdeas).filter(a => a);
-  if (ads.length === 0) return <EmptyState title="No Google Ads" text="Generate an automation plan first." />;
+  if (ads.length === 0) return <EnterpriseEmptyState title="No Google Ads" message="Generate an automation plan first." icon={Target} />;
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
@@ -292,7 +303,7 @@ function renderPosterTab(data: any) {
   const posters = asArray(data.posterPrompts).filter(p => p);
   const images = asArray(data.imageAdIdeas).filter(i => i);
   const designStyles = data.designStyles;
-  if (posters.length === 0 && images.length === 0 && !designStyles) return <EmptyState title="No Creative Prompts" text="Generate an automation plan first." />;
+  if (posters.length === 0 && images.length === 0 && !designStyles) return <EnterpriseEmptyState title="No Creative Prompts" message="Generate an automation plan first." icon={Star} />;
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
@@ -334,7 +345,7 @@ function renderPosterTab(data: any) {
 
 function renderVideoTab(data: any) {
   const scripts = asArray(data.videoScripts).filter(s => s);
-  if (scripts.length === 0) return <EmptyState title="No Video Ad Scripts" text="Generate an automation plan first." />;
+  if (scripts.length === 0) return <EnterpriseEmptyState title="No Video Ad Scripts" message="Generate an automation plan first." icon={Code} />;
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
@@ -405,7 +416,7 @@ function renderContentCalendarTab(data: any) {
   }
 
   if (calendarEntries.length === 0) {
-    return <EmptyState title="No Content Calendar" text="Generate an automation plan first." />;
+    return <EnterpriseEmptyState title="No Content Calendar" message="Generate an automation plan first." icon={Clock} />;
   }
 
   return (
@@ -439,7 +450,7 @@ function renderCrmTab(data: any) {
   const workflows = asArray(data.crmWorkflows || data.workflows || data.outreachAngles).filter(w => w);
   const leadCriteria = data.leadCriteria || data.idealLeadProfile;
 
-  if (workflows.length === 0 && !leadCriteria) return <EmptyState title="No CRM Workflow" text="Generate an automation plan first." />;
+  if (workflows.length === 0 && !leadCriteria) return <EnterpriseEmptyState title="No CRM Workflow" message="Generate an automation plan first." icon={Users} />;
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
@@ -529,7 +540,7 @@ function renderKpiTab(data: any) {
         </Card>
       )}
 
-      {overviewCards.length === 0 && Object.keys(kpis).length === 0 && <EmptyState title="No KPIs" text="Generate an automation plan first." />}
+      {overviewCards.length === 0 && Object.keys(kpis).length === 0 && <EnterpriseEmptyState title="No KPIs" message="Generate an automation plan first." icon={Activity} />}
     </div>
   );
 }
@@ -650,7 +661,7 @@ function WorkflowTabContent() {
 
 function renderLogsTab(data: any) {
   const logs = asArray(data.logs).filter(l => l);
-  if (logs.length === 0) return <EmptyState title="No Automation Logs" text="Generate an automation plan to see logs." />;
+  if (logs.length === 0) return <EnterpriseEmptyState title="No Automation Logs" message="Generate an automation plan to see logs." icon={Activity} />;
 
   return (
     <Card>
@@ -679,6 +690,382 @@ function renderLogsTab(data: any) {
   );
 }
 
+// ============================================
+// PHASE 6 — MARKETING EXECUTION PLATFORM
+// ============================================
+
+function renderContentStudioTab(data: any) {
+  const cs = data?.contentStudio;
+  if (!cs?.assets || Object.keys(cs.assets).length === 0) return <EnterpriseEmptyState title="Content Studio" message="Generate marketing execution plan to create content assets." icon={FileText} />;
+  return (
+    <div style={{ display: 'grid', gap: '16px' }}>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+        <Badge tone="green">{cs.totalGenerated || 0} assets generated</Badge>
+      </div>
+      {Object.entries(cs.assets).map(([type, asset]: any) => (
+        <Card key={type} style={{ borderLeft: '4px solid #a855f7' }}>
+          <h4 style={{ margin: '0 0 8px 0', color: '#a855f7' }}>{asset._label || type.replace(/_/g, ' ')}</h4>
+          <div style={{ display: 'grid', gap: '6px', fontSize: '13px' }}>
+            {asset.title && <div><strong>Title:</strong> {asset.title}</div>}
+            {asset.metaDescription && <div><strong>Meta Description:</strong> {asset.metaDescription}</div>}
+            {asset.seoKeywords && <div><strong>SEO Keywords:</strong> {typeof asset.seoKeywords === 'string' ? asset.seoKeywords : Array.isArray(asset.seoKeywords) ? asset.seoKeywords.join(', ') : ''}</div>}
+            {asset.outline && <div><strong>Outline:</strong> <pre style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0', fontSize: '12px' }}>{typeof asset.outline === 'string' ? asset.outline : JSON.stringify(asset.outline, null, 2)}</pre></div>}
+            {asset.fullContent && <div><strong>Content:</strong> <p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0', maxHeight: '200px', overflow: 'auto' }}>{asset.fullContent.substring(0, 1000)}{asset.fullContent.length > 1000 ? '...' : ''}</p></div>}
+            {asset.internalLinks && <div><strong>Internal Links:</strong> {renderValue(asset.internalLinks)}</div>}
+            {asset.cta && <div><strong>CTA:</strong> {asset.cta}</div>}
+            {asset.schemaSuggestions && <div><strong>Schema:</strong> {renderValue(asset.schemaSuggestions)}</div>}
+            {asset.estimatedReadTime && <div><strong>Read Time:</strong> {asset.estimatedReadTime}</div>}
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function renderEmailCampaignStudioTab(data: any) {
+  const ec = data?.emailCampaigns;
+  if (!ec?.campaigns || Object.keys(ec.campaigns).length === 0) return <EnterpriseEmptyState title="Email Campaign Studio" message="Generate marketing execution plan to create email campaigns." icon={FileText} />;
+  return (
+    <div style={{ display: 'grid', gap: '16px' }}>
+      <Card style={{ background: 'rgba(255, 179, 71, 0.05)', border: '1px solid #ffb347' }}>
+        <h4 style={{ color: '#ffb347', margin: '0 0 8px 0' }}>Email Compliance Notice</h4>
+        <p style={{ color: '#9aa7bd', fontSize: '13px', margin: 0 }}>Review and comply with CAN-SPAM, GDPR, and CASL before sending. All emails are drafts requiring manual approval. No emails are auto-sent.</p>
+      </Card>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+        <Badge tone="green">{ec.totalGenerated || 0} campaigns generated</Badge>
+      </div>
+      {Object.entries(ec.campaigns).map(([type, campaign]: any) => (
+        <Card key={type} style={{ borderLeft: '4px solid #53a7ff' }}>
+          <h4 style={{ margin: '0 0 8px 0', color: '#53a7ff' }}>{campaign._label || type.replace(/_/g, ' ')}</h4>
+          <div style={{ display: 'grid', gap: '6px', fontSize: '13px' }}>
+            {campaign.subject && <div><strong>Subject:</strong> <span style={{ color: '#e5e7eb' }}>{campaign.subject}</span></div>}
+            {campaign.previewText && <div><strong>Preview:</strong> {campaign.previewText}</div>}
+            {campaign.body && <div><strong>Body:</strong> <p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0', maxHeight: '200px', overflow: 'auto' }}>{campaign.body}</p></div>}
+            {campaign.cta && <div><strong>CTA:</strong> {campaign.cta}</div>}
+            {campaign.personalizationVariables && <div><strong>Personalization Variables:</strong> {campaign.personalizationVariables.join(', ')}</div>}
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '8px', padding: '8px', background: '#151d2b', borderRadius: '6px' }}>
+              {campaign.spamScore && <div><strong>Spam Score:</strong> <Badge tone={campaign.spamScore === 'Low' ? 'green' : campaign.spamScore === 'Medium' ? 'yellow' : 'red'}>{campaign.spamScore}</Badge></div>}
+              {campaign.readingTime && <div><strong>Reading Time:</strong> {campaign.readingTime}</div>}
+              <div><strong>Status:</strong> <Badge tone="yellow">Draft</Badge></div>
+            </div>
+            {campaign.complianceChecklist && (
+              <div style={{ marginTop: '8px', padding: '8px', background: '#101622', borderRadius: '6px' }}>
+                <strong style={{ color: '#ffb347' }}>Compliance Checklist:</strong>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginTop: '4px', fontSize: '12px' }}>
+                  {Object.entries(campaign.complianceChecklist).map(([key, val]: any) => (
+                    <div key={key} style={{ color: val ? '#10e18b' : '#ff4757' }}>{val ? '✓' : '✗'} {key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function renderCreativeStudioTab(data: any) {
+  const cr = data?.creativeStudio;
+  if (!cr?.briefs || Object.keys(cr.briefs).length === 0) return <EnterpriseEmptyState title="Creative Studio" message="Generate marketing execution plan to create creative briefs." icon={Star} />;
+  return (
+    <div style={{ display: 'grid', gap: '16px' }}>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+        <Badge tone="green">{cr.totalGenerated || 0} briefs generated</Badge>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '12px' }}>
+        {Object.entries(cr.briefs).map(([type, brief]: any) => (
+          <Card key={type} style={{ borderLeft: '4px solid #f59e0b' }}>
+            <h4 style={{ margin: '0 0 8px 0', color: '#f59e0b' }}>{brief._label || type.replace(/_/g, ' ')}</h4>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{brief._dimensions || ''}</div>
+            <div style={{ display: 'grid', gap: '6px', fontSize: '13px' }}>
+              {brief.headline && <div><strong>Headline:</strong> {brief.headline}</div>}
+              {brief.visualDirection && <div><strong>Visual Direction:</strong> <p style={{ color: '#9aa7bd', margin: '4px 0', fontSize: '12px' }}>{brief.visualDirection}</p></div>}
+              {brief.brandColors && <div><strong>Brand Colors:</strong> <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>{brief.brandColors.map((c: string, i: number) => <span key={i} style={{ width: '20px', height: '20px', borderRadius: '50%', background: c, border: '1px solid #293245', display: 'inline-block' }} title={c} />)}</div></div>}
+              {brief.typography && <div><strong>Typography:</strong> {brief.typography}</div>}
+              {brief.layout && <div><strong>Layout:</strong> {brief.layout}</div>}
+              {brief.cta && <div><strong>CTA:</strong> {brief.cta}</div>}
+              {brief.imageGenerationPrompt && (
+                <div><strong>Image Generation Prompt:</strong>
+                  <pre style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', fontSize: '12px', margin: '4px 0', padding: '8px', background: '#101622', borderRadius: '4px' }}>{brief.imageGenerationPrompt}</pre>
+                </div>
+              )}
+              {brief.dimensions && <div><strong>Dimensions:</strong> {brief.dimensions}</div>}
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function renderVideoStudioTab(data: any) {
+  const vs = data?.videoStudio;
+  if (!vs?.scripts || Object.keys(vs.scripts).length === 0) return <EnterpriseEmptyState title="Video Campaign Studio" message="Generate marketing execution plan to create video scripts." icon={Code} />;
+  return (
+    <div style={{ display: 'grid', gap: '16px' }}>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+        <Badge tone="green">{vs.totalGenerated || 0} scripts generated</Badge>
+      </div>
+      {Object.entries(vs.scripts).map(([type, script]: any) => (
+        <Card key={type} style={{ borderLeft: '4px solid #ef4444' }}>
+          <h4 style={{ margin: '0 0 4px 0', color: '#ef4444' }}>{script._label || type.replace(/_/g, ' ')}</h4>
+          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{script._duration || ''}</div>
+          <div style={{ display: 'grid', gap: '6px', fontSize: '13px' }}>
+            {script.title && <div><strong>Title:</strong> {script.title}</div>}
+            {script.hook && <div><strong>Hook (0-3s):</strong> <span style={{ color: '#f59e0b' }}>{script.hook}</span></div>}
+            {script.script && <div><strong>Full Script:</strong> <pre style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0', fontSize: '12px', maxHeight: '250px', overflow: 'auto', background: '#101622', padding: '8px', borderRadius: '4px' }}>{script.script}</pre></div>}
+            {script.voiceover && <div><strong>Voiceover:</strong> {script.voiceover}</div>}
+            {script.camera && <div><strong>Camera:</strong> {script.camera}</div>}
+            {script.music && <div><strong>Music:</strong> {script.music}</div>}
+            {script.transitions && <div><strong>Transitions:</strong> {script.transitions}</div>}
+            {script.cta && <div><strong>CTA:</strong> {script.cta}</div>}
+            {script.storyboard && Array.isArray(script.storyboard) && script.storyboard.length > 0 && (
+              <div style={{ marginTop: '8px' }}>
+                <strong>Storyboard:</strong>
+                <div style={{ display: 'grid', gap: '6px', marginTop: '6px' }}>
+                  {script.storyboard.map((scene: any, i: number) => (
+                    <div key={i} style={{ padding: '8px', background: '#151d2b', borderRadius: '6px', borderLeft: '3px solid #53a7ff' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: '#53a7ff', marginBottom: '4px' }}>Scene {scene.scene || i + 1} {scene.duration ? `(${scene.duration})` : ''}</div>
+                      {scene.visual && <div style={{ color: '#9aa7bd', fontSize: '12px' }}><em>Visual:</em> {scene.visual}</div>}
+                      {scene.audio && <div style={{ color: '#9aa7bd', fontSize: '12px' }}><em>Audio:</em> {scene.audio}</div>}
+                      {scene.camera && <div style={{ color: '#9aa7bd', fontSize: '12px' }}><em>Camera:</em> {scene.camera}</div>}
+                      {scene.transitions && <div style={{ color: '#9aa7bd', fontSize: '12px' }}><em>Transition:</em> {scene.transitions}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function renderCampaignPlannerTab(data: any) {
+  const cp = data?.campaignPlans;
+  if (!cp?.plans || Object.keys(cp.plans).length === 0) return <EnterpriseEmptyState title="Campaign Planner" message="Generate marketing execution plan to create campaign plans." icon={Target} />;
+  return (
+    <div style={{ display: 'grid', gap: '16px' }}>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+        <Badge tone="green">{cp.totalGenerated || 0} plans generated</Badge>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '12px' }}>
+        {Object.entries(cp.plans).map(([type, plan]: any) => (
+          <Card key={type} style={{ borderLeft: '4px solid #10e18b' }}>
+            <h4 style={{ margin: '0 0 4px 0', color: '#10e18b' }}>{plan._label || type.replace(/_/g, ' ')}</h4>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{plan._days || 0} days</div>
+            <div style={{ display: 'grid', gap: '6px', fontSize: '13px' }}>
+              {plan.campaignName && <div><strong>Campaign:</strong> {plan.campaignName}</div>}
+              {plan.campaignGoal && <div><strong>Goal:</strong> {plan.campaignGoal}</div>}
+              {plan.budget && <div><strong>Budget:</strong> <span style={{ color: '#f59e0b' }}>{typeof plan.budget === 'object' ? plan.budget.total || JSON.stringify(plan.budget) : plan.budget}</span></div>}
+              {plan.expectedROI && <div><strong>Expected ROI:</strong> {plan.expectedROI}</div>}
+              {plan.priority && <div><strong>Priority:</strong> <Badge tone={plan.priority === 'High' ? 'pink' : plan.priority === 'Medium' ? 'yellow' : 'blue'}>{plan.priority}</Badge></div>}
+              {plan.owner && <div><strong>Owner:</strong> {plan.owner}</div>}
+              {plan.businessJustification && <div><strong>Business Justification:</strong> <p style={{ color: '#9aa7bd', fontSize: '12px', margin: '4px 0' }}>{plan.businessJustification}</p></div>}
+              {plan.kpis?.primary && <div><strong>Primary KPIs:</strong> {plan.kpis.primary.map((k: any, i: number) => <div key={i} style={{ fontSize: '12px', color: '#9aa7bd', paddingLeft: '12px' }}>• {k.metric}: {k.target}</div>)}</div>}
+              {plan.timeline?.phases && (
+                <div><strong>Timeline Phases:</strong>
+                  {plan.timeline.phases.map((p: any, i: number) => (
+                    <div key={i} style={{ padding: '6px', margin: '4px 0', background: '#151d2b', borderRadius: '4px', fontSize: '12px' }}>
+                      <div style={{ color: '#53a7ff' }}>{p.phase} ({p.duration})</div>
+                      <div style={{ color: '#9aa7bd' }}>{p.activities?.join(', ')}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {plan.risk?.risks && (
+                <div><strong>Risk Assessment:</strong>
+                  {plan.risk.risks.map((r: any, i: number) => (
+                    <div key={i} style={{ fontSize: '12px', color: '#9aa7bd', padding: '4px 0' }}>• {r.risk} <Badge tone={r.likelihood === 'High' ? 'red' : r.likelihood === 'Medium' ? 'yellow' : 'green'}>{r.likelihood}</Badge></div>
+                  ))}
+                </div>
+              )}
+              {plan.dependencies?.length > 0 && <div><strong>Dependencies:</strong> {plan.dependencies.join(', ')}</div>}
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function renderSocialCalendarTab(data: any) {
+  const sc = data?.socialCalendars;
+  if (!sc?.calendars || Object.keys(sc.calendars).length === 0) return <EnterpriseEmptyState title="Social Calendar" message="Generate marketing execution plan to create social calendars." icon={Clock} />;
+  return (
+    <div style={{ display: 'grid', gap: '16px' }}>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+        <Badge tone="green">{sc.totalGenerated || 0} calendars generated</Badge>
+      </div>
+      {Object.entries(sc.calendars).map(([type, cal]: any) => (
+        <Card key={type}>
+          <h4 style={{ margin: '0 0 4px 0', color: '#53a7ff' }}>{cal._label || type.replace(/_/g, ' ')}</h4>
+          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{cal._days || 0} days</div>
+          <div style={{ display: 'grid', gap: '8px', fontSize: '13px' }}>
+            {cal.weeklyTheme?.length > 0 && <div><strong>Weekly Themes:</strong> {cal.weeklyTheme.join(' → ')}</div>}
+            {cal.contentMix && <div><strong>Content Mix:</strong> <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>{Object.entries(cal.contentMix).map(([k, v]: any) => <Badge key={k}>{k}: {v}</Badge>)}</div></div>}
+            {cal.bestPostingTimes && <div><strong>Best Posting Times:</strong> <pre style={{ color: '#9aa7bd', fontSize: '12px', margin: '4px 0' }}>{JSON.stringify(cal.bestPostingTimes, null, 2)}</pre></div>}
+            {cal.calendar && Array.isArray(cal.calendar) && (
+              <div style={{ maxHeight: '400px', overflow: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                  <thead><tr style={{ borderBottom: '1px solid #293245', color: '#9aa7bd' }}>
+                    <th style={{ padding: '6px', textAlign: 'left' }}>Day</th>
+                    <th style={{ padding: '6px', textAlign: 'left' }}>Platform</th>
+                    <th style={{ padding: '6px', textAlign: 'left' }}>Topic</th>
+                    <th style={{ padding: '6px', textAlign: 'left' }}>Time</th>
+                    <th style={{ padding: '6px', textAlign: 'left' }}>Theme</th>
+                  </tr></thead>
+                  <tbody>
+                    {cal.calendar.slice(0, 30).map((entry: any, i: number) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #1d2738' }}>
+                        <td style={{ padding: '6px', color: '#53a7ff' }}>Day {entry.day}</td>
+                        <td style={{ padding: '6px' }}><Badge>{entry.platform}</Badge></td>
+                        <td style={{ padding: '6px', color: '#e5e7eb' }}>{entry.topic || entry.caption?.substring(0, 60)}</td>
+                        <td style={{ padding: '6px', color: '#9aa7bd' }}>{entry.bestPostingTime || ''}</td>
+                        <td style={{ padding: '6px', color: '#9aa7bd' }}>{entry.contentTheme || ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {cal.calendar.length > 30 && <div style={{ color: '#9aa7bd', fontSize: '12px', padding: '8px', textAlign: 'center' }}>Showing 30 of {cal.calendar.length} entries</div>}
+              </div>
+            )}
+            {cal.hashtagStrategy && <div><strong>Hashtag Strategy:</strong> {Object.entries(cal.hashtagStrategy).map(([k, v]: any) => <div key={k} style={{ fontSize: '12px', color: '#9aa7bd', paddingLeft: '12px' }}>{k}: {(Array.isArray(v) ? v : []).join(', ')}</div>)}</div>}
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function AssetLibraryContent({ data }: { data: any }) {
+  const plan = data;
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('');
+
+  const allAssets: { type: string; label: string; items: any[] }[] = [];
+
+  if (plan?.emailSequence) allAssets.push({ type: 'email', label: 'Email Assets', items: plan.emailSequence.map((e: any, i: number) => ({ ...e, _id: `email-${i}`, _type: 'Email' })) });
+  if (plan?.linkedInPosts) allAssets.push({ type: 'linkedin', label: 'LinkedIn Posts', items: plan.linkedInPosts.map((p: any, i: number) => ({ ...p, _id: `linkedin-${i}`, _type: 'LinkedIn' })) });
+  if (plan?.instagramCaptions) allAssets.push({ type: 'instagram', label: 'Instagram Captions', items: plan.instagramCaptions.map((c: any, i: number) => ({ ...c, _id: `ig-${i}`, _type: 'Instagram' })) });
+  if (plan?.videoScripts) allAssets.push({ type: 'video', label: 'Video Scripts', items: plan.videoScripts.map((v: any, i: number) => ({ ...v, _id: `video-${i}`, _type: 'Video' })) });
+  if (plan?.posterPrompts) allAssets.push({ type: 'creative', label: 'Creative Prompts', items: plan.posterPrompts.map((p: any, i: number) => ({ ...p, _id: `creative-${i}`, _type: 'Creative' })) });
+  if (plan?.googleAds) allAssets.push({ type: 'ad', label: 'Google Ads', items: plan.googleAds.map((a: any, i: number) => ({ ...a, _id: `ad-${i}`, _type: 'Google Ad' })) });
+
+  const contentStudio = plan?.contentStudio?.assets;
+  if (contentStudio) {
+    Object.entries(contentStudio).forEach(([key, val]: any) => {
+      allAssets.push({ type: 'content', label: val._label || key, items: [{ ...val, _id: `content-${key}`, _type: val._label || key }] });
+    });
+  }
+
+  const flatAssets = allAssets.flatMap(g => g.items);
+  if (flatAssets.length === 0) return <EnterpriseEmptyState title="Asset Library" message="Generate automation and execution plans first." icon={Layers} />;
+
+  const filtered = flatAssets.filter(a => {
+    if (filterType && a._type !== filterType) return false;
+    if (searchTerm) {
+      const s = searchTerm.toLowerCase();
+      return JSON.stringify(a).toLowerCase().includes(s);
+    }
+    return true;
+  });
+
+  return (
+    <div style={{ display: 'grid', gap: '16px' }}>
+      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <input placeholder="Search assets..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+          style={{ flex: 1, minWidth: '200px', padding: '8px 12px', background: '#151d2b', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px' }} />
+        <select value={filterType} onChange={e => setFilterType(e.target.value)}
+          style={{ padding: '8px 12px', background: '#151d2b', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px' }}>
+          <option value="">All Types</option>
+          {[...new Set(flatAssets.map(a => a._type))].map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <Badge tone="blue">{flatAssets.length} total</Badge>
+        <Badge tone="green">{filtered.length} shown</Badge>
+      </div>
+      <div style={{ display: 'grid', gap: '8px', maxHeight: '500px', overflow: 'auto' }}>
+        {filtered.map((asset: any) => (
+          <div key={asset._id} style={{ padding: '10px', background: '#151d2b', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
+                <Badge>{asset._type || 'Asset'}</Badge>
+                <span style={{ color: '#e5e7eb', fontWeight: 500 }}>{asset.title || asset.subject || asset.headline || `Asset ${asset._id}`}</span>
+              </div>
+              <div style={{ fontSize: '12px', color: '#9aa7bd' }}>
+                {asset.subject && `Subject: ${asset.subject}`}
+                {asset.headline && `Headline: ${asset.headline}`}
+                {asset.campaignName && `Campaign: ${asset.campaignName}`}
+                {asset.cta && ` | CTA: ${asset.cta}`}
+              </div>
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && <div style={{ color: '#9aa7bd', textAlign: 'center', padding: '20px' }}>No assets match your search.</div>}
+      </div>
+    </div>
+  );
+}
+
+function renderAssetLibraryTab(data: any) {
+  return <AssetLibraryContent data={data} />;
+}
+
+function renderAnalyticsTab(data: any) {
+  const analytics = data?.analyticsData;
+  const plan = data as any;
+  const contentCount = plan?.contentStudio?.totalGenerated || 0;
+  const emailCount = plan?.emailCampaigns?.totalGenerated || 0;
+  const creativeCount = plan?.creativeStudio?.totalGenerated || 0;
+  const videoCount = plan?.videoStudio?.totalGenerated || 0;
+  const campaignCount = plan?.campaignPlans?.totalGenerated || 0;
+  const calendarCount = plan?.socialCalendars?.totalGenerated || 0;
+  const totalAssets = contentCount + emailCount + creativeCount + videoCount + campaignCount + calendarCount;
+
+  const assetCounts = [
+    { label: 'Content Studio', count: contentCount, color: '#a855f7' },
+    { label: 'Email Campaigns', count: emailCount, color: '#53a7ff' },
+    { label: 'Creative Studio', count: creativeCount, color: '#f59e0b' },
+    { label: 'Video Studio', count: videoCount, color: '#ef4444' },
+    { label: 'Campaign Plans', count: campaignCount, color: '#10e18b' },
+    { label: 'Social Calendars', count: calendarCount, color: '#ff6b6b' },
+  ];
+
+  const existingAssets = plan?.assets?.length || 0;
+
+  return (
+    <div style={{ display: 'grid', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
+        <Card><div style={{ padding: '16px', textAlign: 'center' }}><div style={{ fontSize: '32px', fontWeight: 'bold', color: '#10e18b' }}>{totalAssets}</div><div style={{ color: '#9aa7bd', fontSize: '12px' }}>Execution Assets</div></div></Card>
+        <Card><div style={{ padding: '16px', textAlign: 'center' }}><div style={{ fontSize: '32px', fontWeight: 'bold', color: '#53a7ff' }}>{analytics?.modulesGenerated || 0}</div><div style={{ color: '#9aa7bd', fontSize: '12px' }}>Modules Generated</div></div></Card>
+        <Card><div style={{ padding: '16px', textAlign: 'center' }}><div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f59e0b' }}>{existingAssets}</div><div style={{ color: '#9aa7bd', fontSize: '12px' }}>Automation Assets</div></div></Card>
+        <Card><div style={{ padding: '16px', textAlign: 'center' }}><div style={{ fontSize: '32px', fontWeight: 'bold', color: '#a855f7' }}>{plan?.readinessScore || 0}%</div><div style={{ color: '#9aa7bd', fontSize: '12px' }}>Readiness Score</div></div></Card>
+      </div>
+
+      <Card>
+        <h3 style={{ margin: '0 0 12px 0' }}>Execution Modules Breakdown</h3>
+        <div style={{ display: 'grid', gap: '8px' }}>
+          {assetCounts.map(a => (
+            <div key={a.label} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px', background: '#151d2b', borderRadius: '6px' }}>
+              <div style={{ width: '160px', color: '#e5e7eb', fontSize: '13px' }}>{a.label}</div>
+              <div style={{ flex: 1, height: '8px', background: '#1d2738', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ width: `${totalAssets > 0 ? (a.count / totalAssets) * 100 : 0}%`, height: '100%', background: a.color, borderRadius: '4px', transition: 'width 0.3s' }} />
+              </div>
+              <div style={{ width: '40px', textAlign: 'right', color: '#e5e7eb', fontSize: '13px', fontWeight: 600 }}>{a.count}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {analytics?.generatedAt && (
+        <Card><div style={{ color: '#9aa7bd', fontSize: '12px' }}>Last generated: {new Date(analytics.generatedAt).toLocaleString()}</div></Card>
+      )}
+    </div>
+  );
+}
+
 const tabs = [
   { id: 'Plan', label: 'Automation Overview' },
   { id: 'Email', label: 'Cold Email Drafts' },
@@ -692,6 +1079,15 @@ const tabs = [
   { id: 'KPI', label: 'KPI Dashboard' },
   { id: 'Workflow', label: 'Automation Workflow' },
   { id: 'Logs', label: 'Logs' },
+  // Phase 6 — Marketing Execution Platform
+  { id: 'ContentStudio', label: 'Content Studio' },
+  { id: 'EmailCampaigns', label: 'Email Campaigns' },
+  { id: 'CreativeStudio', label: 'Creative Studio' },
+  { id: 'VideoStudio', label: 'Video Studio' },
+  { id: 'CampaignPlans', label: 'Campaign Planner' },
+  { id: 'SocialCalendar', label: 'Social Calendar' },
+  { id: 'AssetLibrary', label: 'Asset Library' },
+  { id: 'Analytics', label: 'Analytics' },
 ];
 
 const tabRenderers: Record<string, (d: any) => JSX.Element> = {
@@ -707,6 +1103,15 @@ const tabRenderers: Record<string, (d: any) => JSX.Element> = {
   KPI: renderKpiTab,
   Workflow: () => <WorkflowTabContent />,
   Logs: renderLogsTab,
+  // Phase 6 — Marketing Execution Platform
+  ContentStudio: renderContentStudioTab,
+  EmailCampaigns: renderEmailCampaignStudioTab,
+  CreativeStudio: renderCreativeStudioTab,
+  VideoStudio: renderVideoStudioTab,
+  CampaignPlans: renderCampaignPlannerTab,
+  SocialCalendar: renderSocialCalendarTab,
+  AssetLibrary: renderAssetLibraryTab,
+  Analytics: renderAnalyticsTab,
 };
 
 export default function AutomationCenterPage() {
@@ -715,16 +1120,21 @@ export default function AutomationCenterPage() {
   const [data, setData] = useState<any>(null);
   const [genError, setGenError] = useState<string | null>(null);
   const [genLoading, setGenLoading] = useState(false);
+  const [execLoading, setExecLoading] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
+  const [execData, setExecData] = useState<any>(null);
 
   useEffect(() => {
-    if (!selectedChatId) { setData(null); return; }
+    if (!selectedChatId) { setData(null); setExecData(null); return; }
     let cancelled = false;
     api.get(`/automation/${selectedChatId}/plan`)
       .then((r: any) => { if (!cancelled) setData(r.automationPlan || r.data || r); })
       .catch(() => { if (!cancelled) setData(null); });
     api.get(`/automation/${selectedChatId}/logs`)
       .then((r: any) => { if (!cancelled) setLogs(r.logs || []); })
+      .catch(() => {});
+    api.get(`/automation/${selectedChatId}/execution`)
+      .then((r: any) => { if (!cancelled && r.exists) setExecData(r.data); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [selectedChatId]);
@@ -747,7 +1157,25 @@ export default function AutomationCenterPage() {
     setGenLoading(false);
   }
 
-  const planData = data ? { ...data, logs } : { logs };
+  async function executeAll() {
+    if (!selectedChatId) return;
+    setExecLoading(true);
+    setGenError(null);
+    try {
+      const res: any = await api.post(`/automation/${selectedChatId}/execute`, {});
+      if (res.success === false && res.error) {
+        setGenError(res.error);
+      } else {
+        setExecData(res.data);
+      }
+    } catch (e: any) {
+      const msg = e?.response?.data?.error || e.message || 'Failed to generate execution modules';
+      setGenError(msg);
+    }
+    setExecLoading(false);
+  }
+
+  const planData = data ? { ...data, logs, ...execData } : { logs, ...execData };
 
   return (
     <div>
@@ -768,6 +1196,12 @@ export default function AutomationCenterPage() {
                 Plan ready
               </div>
             )}
+            {selectedChatId && execData && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#a855f7' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#a855f7', display: 'inline-block' }} />
+                Execution ready
+              </div>
+            )}
             {selectedChatId && !data && !genLoading && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#9aa7bd' }}>
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#9aa7bd', display: 'inline-block' }} />
@@ -775,26 +1209,46 @@ export default function AutomationCenterPage() {
               </div>
             )}
           </div>
-          <button className="primary-btn" onClick={generate} disabled={genLoading || !selectedChatId}>
-            {genLoading ? 'Generating...' : 'Generate Automation Plan'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button className="primary-btn" onClick={generate} disabled={genLoading || !selectedChatId}>
+              {genLoading ? 'Generating...' : 'Generate Automation Plan'}
+            </button>
+            <button className="secondary-btn" onClick={executeAll} disabled={execLoading || !selectedChatId} style={{ borderColor: '#a855f7', color: '#a855f7' }}>
+              {execLoading ? 'Generating...' : 'Execute All Modules'}
+            </button>
+          </div>
         </div>
         {genError && (
           <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(255, 71, 87, 0.1)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ color: '#ff8a8a' }}>{genError}</span>
-            <button onClick={generate} className="secondary-btn" disabled={genLoading}>Retry</button>
+            <button onClick={() => { setGenError(null); generate(); }} className="secondary-btn" disabled={genLoading}>Retry</button>
           </div>
         )}
       </Card>
 
       {!selectedChatId && (
-        <EmptyState title="No Project Selected" text="Select a project from the dropdown above, then generate an automation plan." />
+        <EnterpriseEmptyState title="No Project Selected" message="Select a project from the dropdown above, then generate an automation plan." icon={Map} />
       )}
 
-      {genLoading && <Loading text="Generating automation plan from verified data..." />}
+      {genLoading && (
+        <div style={{ display: 'grid', gap: '16px' }}>
+          <Card><LoadingSkeleton type="table" count={3} /></Card>
+          <Card><LoadingSkeleton type="card" count={2} /></Card>
+        </div>
+      )}
+      {execLoading && (
+        <div style={{ display: 'grid', gap: '16px' }}>
+          <Card><LoadingSkeleton type="card" count={4} /></Card>
+          <Card><LoadingSkeleton type="list" count={3} /></Card>
+        </div>
+      )}
 
       {selectedChatId && !genLoading && (
         <Card>
+          <SmartNavigation items={tabs.map(t => ({ id: t.id, label: t.label }))} activeId={active} onNavigate={setActive} />
+          <div style={{ marginBottom: '16px' }}>
+            <SearchBar onSearch={() => {}} />
+          </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '20px', borderBottom: '1px solid #293245', paddingBottom: '12px' }}>
             {tabs.map(t => (
               <button

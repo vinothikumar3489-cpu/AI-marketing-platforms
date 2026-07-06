@@ -1,6 +1,7 @@
 import { prisma } from "../config/prisma.js";
 import { generateAutomationPlanWithAI, sanitizeAutomationPlanData } from "../services/automation.service.js";
 import { callAI } from "../ai/services/aiRouter.service.js";
+import { generateAllExecutionModules, generateSingleModule } from "../services/execution/marketing-execution.service.js";
 
 /**
  * GET /api/automation/:chatId/demo
@@ -538,5 +539,187 @@ export const getAutomationLogs = async (req, res) => {
       success: false,
       error: error.message || 'Failed to fetch automation logs'
     });
+  }
+};
+
+// ============================================
+// PHASE 6 — Marketing Execution Platform
+// ============================================
+
+/**
+ * POST /api/automation/:chatId/execute
+ * Generate all marketing execution modules at once
+ */
+export const executeAllModules = async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    console.log('🚀 [MarketingExecution] Generating all modules for:', { chatId, userId });
+
+    const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
+    if (!chat) return res.status(404).json({ success: false, error: "Chat not found" });
+
+    const [productIntelligence, competitorIntelligence, campaignIntelligence, seoIntelligence, plan] = await Promise.all([
+      prisma.productIntelligence.findUnique({ where: { chatId } }),
+      prisma.competitorIntelligence.findUnique({ where: { chatId } }),
+      prisma.campaignIntelligence.findUnique({ where: { chatId } }),
+      prisma.seoIntelligence.findUnique({ where: { chatId } }),
+      prisma.automationPlan.findUnique({ where: { chatId } }),
+    ]);
+
+    const context = {
+      productName: chat.productName || chat.title,
+      companyName: chat.productName,
+      targetAudience: productIntelligence?.productAnalysis?.targetAudience || productIntelligence?.audienceIntelligence?.primaryAudience,
+      industry: productIntelligence?.productAnalysis?.industry,
+      productUsp: productIntelligence?.productAnalysis?.usp,
+      seoData: seoIntelligence?.seoScore != null ? `SEO Score: ${seoIntelligence.seoScore}` : null,
+      growthData: campaignIntelligence?.campaignGenerator?.growthSummary,
+      totalBudget: plan?.budgetSplit ? 'Configured in plan' : null,
+      brandColors: plan?.designStyles?.colors?.join(', '),
+      campaignGoal: plan?.campaignObjective,
+      platforms: plan?.channels?.map(c => c.channel || c.name).filter(Boolean),
+    };
+
+    const executionData = await generateAllExecutionModules(context);
+
+    await prisma.automationPlan.upsert({
+      where: { chatId },
+      update: {
+        contentStudio: executionData.contentStudio,
+        emailCampaigns: executionData.emailCampaigns,
+        creativeStudio: executionData.creativeStudio,
+        videoStudio: executionData.videoStudio,
+        campaignPlans: executionData.campaignPlans,
+        socialCalendars: executionData.socialCalendars,
+        analyticsData: executionData._summary,
+      },
+      create: {
+        userId, chatId,
+        campaignName: chat.title || 'Marketing Execution',
+        contentStudio: executionData.contentStudio,
+        emailCampaigns: executionData.emailCampaigns,
+        creativeStudio: executionData.creativeStudio,
+        videoStudio: executionData.videoStudio,
+        campaignPlans: executionData.campaignPlans,
+        socialCalendars: executionData.socialCalendars,
+        analyticsData: executionData._summary,
+        readinessScore: 0,
+        status: 'draft',
+      },
+    });
+
+    await prisma.automationLog.create({
+      data: {
+        userId, chatId,
+        action: 'execution_generated',
+        message: `Marketing execution plan generated with ${executionData._summary.totalAssetsGenerated} assets across ${executionData._summary.modulesGenerated} modules`,
+        metadata: executionData._summary,
+      },
+    });
+
+    console.log('✅ [MarketingExecution] All modules generated:', executionData._summary);
+    return res.json({ success: true, data: executionData });
+  } catch (error) {
+    console.error('❌ [MarketingExecution] Error:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Failed to generate execution modules' });
+  }
+};
+
+/**
+ * POST /api/automation/:chatId/execute/:module
+ * Generate a single execution module
+ */
+export const executeSingleModule = async (req, res) => {
+  const { chatId, module: moduleType } = req.params;
+  const userId = req.user.id;
+
+  try {
+    console.log('🚀 [MarketingExecution] Generating single module:', { chatId, moduleType });
+
+    const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
+    if (!chat) return res.status(404).json({ success: false, error: "Chat not found" });
+
+    const [productIntelligence, seoIntelligence, campaignIntelligence, plan] = await Promise.all([
+      prisma.productIntelligence.findUnique({ where: { chatId } }),
+      prisma.seoIntelligence.findUnique({ where: { chatId } }),
+      prisma.campaignIntelligence.findUnique({ where: { chatId } }),
+      prisma.automationPlan.findUnique({ where: { chatId } }),
+    ]);
+
+    const context = {
+      productName: chat.productName || chat.title,
+      companyName: chat.productName,
+      targetAudience: productIntelligence?.productAnalysis?.targetAudience,
+      industry: productIntelligence?.productAnalysis?.industry,
+      productUsp: productIntelligence?.productAnalysis?.usp,
+      seoData: seoIntelligence?.seoScore != null ? `SEO Score: ${seoIntelligence.seoScore}` : null,
+      totalBudget: plan?.budgetSplit ? 'Configured in plan' : null,
+      brandColors: plan?.designStyles?.colors?.join(', '),
+      campaignGoal: plan?.campaignObjective,
+    };
+
+    const result = await generateSingleModule(moduleType, context);
+
+    const fieldMap = {
+      'content-studio': 'contentStudio',
+      'email-campaigns': 'emailCampaigns',
+      'creative-studio': 'creativeStudio',
+      'video-studio': 'videoStudio',
+      'campaign-plans': 'campaignPlans',
+      'social-calendars': 'socialCalendars',
+    };
+
+    const prismaField = fieldMap[moduleType];
+    if (prismaField && result.data) {
+      await prisma.automationPlan.upsert({
+        where: { chatId },
+        update: { [prismaField]: result.data },
+        create: { userId, chatId, campaignName: chat.title || 'Marketing Execution', [prismaField]: result.data, readinessScore: 0, status: 'draft' },
+      });
+    }
+
+    await prisma.automationLog.create({
+      data: { userId, chatId, action: `module_${moduleType}_generated`, message: `${moduleType} module generated with ${result.data?.totalGenerated || 0} assets`, metadata: { module: moduleType, result: result.data } },
+    });
+
+    return res.json({ success: true, data: result.data });
+  } catch (error) {
+    console.error('❌ [MarketingExecution] Error:', error);
+    return res.status(500).json({ success: false, error: error.message || `Failed to generate module: ${req.params.module}` });
+  }
+};
+
+/**
+ * GET /api/automation/:chatId/execution
+ * Get execution data for a chat
+ */
+export const getExecutionData = async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const plan = await prisma.automationPlan.findUnique({ where: { chatId } });
+    if (!plan) return res.json({ success: true, exists: false, data: null });
+
+    if (plan.userId !== userId) return res.status(403).json({ success: false, error: "Unauthorized" });
+
+    return res.json({
+      success: true,
+      exists: true,
+      data: {
+        contentStudio: plan.contentStudio,
+        emailCampaigns: plan.emailCampaigns,
+        creativeStudio: plan.creativeStudio,
+        videoStudio: plan.videoStudio,
+        campaignPlans: plan.campaignPlans,
+        socialCalendars: plan.socialCalendars,
+        analyticsData: plan.analyticsData,
+      },
+    });
+  } catch (error) {
+    console.error('❌ [MarketingExecution] Error fetching:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Failed to fetch execution data' });
   }
 };

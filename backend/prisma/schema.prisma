@@ -827,6 +827,15 @@ model AutomationPlan {
   outreachAngles   Json?
   sampleLeads      Json?
 
+  // Phase 6 — Marketing Execution Platform
+  contentStudio      Json? // Blog articles, landing pages, case studies, etc.
+  emailCampaigns     Json? // Email campaign drafts with compliance checklists
+  creativeStudio     Json? // Creative briefs for posters, banners, carousels, etc.
+  videoStudio        Json? // Video scripts with storyboards
+  campaignPlans      Json? // 30/60/90 day campaign plans
+  socialCalendars    Json? // Social media content calendars
+  analyticsData      Json? // Execution analytics and metrics tracking
+
   // Automation Assets
   assets AutomationAsset[]
 

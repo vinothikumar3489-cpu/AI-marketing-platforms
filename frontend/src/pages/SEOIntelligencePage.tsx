@@ -5,7 +5,8 @@ import { useProject } from '../context/ProjectContext';
 import { asArray, asNumber, asText, normalizeSeo } from '../lib/normalizers';
 import { Badge, Card, EmptyState, Loading, PageHeader, ScoreCard, SectionTitle } from '../components/UI';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
-import { Shield, Target, TrendingUp, Zap, Search, Globe, Code, FileText, Cpu, LayoutList, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { Shield, Target, TrendingUp, Zap, Search, Globe, Code, FileText, Cpu, LayoutList, CheckCircle, AlertTriangle, Loader2, Building, Activity, Map, Clock, Layers, Eye, Users, Star, PieChart, Info } from 'lucide-react';
+import { KPIDashboard, EnterpriseInsightCard, SmartNavigation, SearchBar, LoadingSkeleton, EnterpriseEmptyState, ProgressBar, StatusBadge, MiniRadarLegend, StorySection, ScoreSection, ExpandableSection } from '../components/EnterpriseComponents';
 
 // Safe format helpers to handle non-number values from backend
 function toNumberOrNull(value: unknown): number | null {
@@ -65,9 +66,10 @@ class TabErrorBoundary extends Component<{ children: React.ReactNode }, { hasErr
     if (this.state.hasError) {
       return (
         <Card>
-          <EmptyState 
+          <EnterpriseEmptyState 
             title="Tab Error" 
-            text={`This tab encountered an error: ${this.state.error?.message || 'Unknown error'}. Please try refreshing or check the data.`}
+            message={`This tab encountered an error: ${this.state.error?.message || 'Unknown error'}. Please try refreshing or check the data.`}
+            icon={AlertTriangle}
           />
         </Card>
       );
@@ -298,24 +300,27 @@ export default function SEOIntelligencePage() {
       )}
 
       {mode === 'running' && (
-        <Card>
-          <div style={{ padding: '20px' }}>
-            <h3 style={{ margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Loader2 className="spin" size={20} /> Running SEO Intelligence
-            </h3>
-            <div style={{ height: '8px', background: '#1d2738', borderRadius: '4px', overflow: 'hidden', marginBottom: '15px' }}>
-              <div style={{ height: '100%', width: `${Math.min((progress / 8) * 100, 90)}%`, background: 'linear-gradient(90deg, #10e18b, #2aa3ff)', borderRadius: '4px', transition: 'width 0.5s ease' }} />
+        <div style={{ display: 'grid', gap: '20px' }}>
+          <Card>
+            <div style={{ padding: '20px' }}>
+              <h3 style={{ margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Loader2 className="spin" size={20} /> Running SEO Intelligence
+              </h3>
+              <ProgressBar value={Math.min((progress / 8) * 100, 90)} max={100} color="#53a7ff" />
+              <div style={{ color: '#9aa7bd', fontSize: '14px', display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
+                <span>{currentStage}</span>
+                <span>{Math.round((progress / 8) * 100)}%</span>
+              </div>
             </div>
-            <div style={{ color: '#9aa7bd', fontSize: '14px', display: 'flex', justifyContent: 'space-between' }}>
-              <span>{currentStage}</span>
-              <span>{Math.round((progress / 8) * 100)}%</span>
-            </div>
-          </div>
-        </Card>
+          </Card>
+          <LoadingSkeleton type="table" count={3} />
+          <LoadingSkeleton type="card" count={4} />
+        </div>
       )}
 
       {mode === 'results' && hasData && (<>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px', gap: '8px' }}>
+          <button onClick={handleNewAnalysis} className="secondary-btn" style={{ padding: '8px 16px' }}>New Analysis</button>
           <div className="dropdown" style={{ position: 'relative' }}>
             <button className="secondary-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px' }}>
               <TrendingUp size={14} /> Download SEO Report ▾
@@ -328,6 +333,10 @@ export default function SEOIntelligencePage() {
           </div>
         </div>
         <Card>
+          <SmartNavigation items={tabs.map(t => ({ id: t, label: t }))} activeId={activeTab} onNavigate={setActiveTab} />
+          <div style={{ marginBottom: '16px' }}>
+            <SearchBar onSearch={() => {}} />
+          </div>
           <div className="tab-row" style={{ overflowX: 'auto', whiteSpace: 'nowrap' }}>
             {tabs.map(t => (
               <button key={t} onClick={() => setActiveTab(t)} className={activeTab === t ? 'active' : ''}>{t}</button>
@@ -351,7 +360,7 @@ export default function SEOIntelligencePage() {
       </>)}
 
       {mode === 'form' && !hasData && !loading && (
-        <EmptyState title="No SEO data yet" text="Enter a URL and run the analysis to generate SEO & GEO intelligence." />
+        <EnterpriseEmptyState title="No SEO data yet" message="Enter a URL and run the analysis to generate SEO & GEO intelligence." icon={Search} />
       )}
 
       
@@ -458,44 +467,34 @@ function ExecutiveDashboard({ data }: { data: any }) {
     []
   ).slice(0, 5);
 
+  const kpiItems = [
+    overallSeoScore !== null ? { label: 'Overall SEO Score', value: `${Math.round(overallSeoScore)}`, icon: Globe, color: '#a855f7' } : null,
+    technicalHealth !== null ? { label: 'Technical Health', value: `${Math.round(technicalHealth)}`, icon: Code, color: '#53a7ff' } : null,
+    contentAuthority !== null ? { label: 'Content Authority', value: `${Math.round(contentAuthority)}`, icon: FileText, color: '#10e18b' } : null,
+    aiVisibility !== null ? { label: 'AI Visibility (GEO)', value: `${Math.round(aiVisibility)}`, icon: Cpu, color: '#ffb347' } : null,
+  ].filter(Boolean);
+
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
-      <div className="score-grid">
-        <ScoreCard
-          label="Overall SEO Score"
-          value={overallSeoScore}
-        />
-        <ScoreCard
-          label="Technical Health"
-          value={technicalHealth}
-          tone="blue"
-        />
-        <ScoreCard
-          label="Content Authority"
-          value={contentAuthority}
-          tone="green"
-        />
-        <ScoreCard
-          label="AI Visibility (GEO)"
-          value={aiVisibility}
-          tone="pink"
-        />
-      </div>
+      {kpiItems.length > 0 && <KPIDashboard items={kpiItems} columns={4} />}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         <Card style={{ height: 'auto', minHeight: '350px' }}>
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Globe size={18} /> SEO Health Radar</h3>
           {radarData.some(d => d.A !== null) ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
-                <PolarGrid stroke="#293245" />
-                <PolarAngleAxis dataKey="subject" tick={{ fill: '#9aa7bd', fontSize: 12 }} />
-                <Tooltip cursor={{ fill: '#1a2335' }} contentStyle={{ background: '#101622', border: '1px solid #293245', borderRadius: '8px' }} />
-                <Radar name="Score" dataKey="A" stroke="#a855f7" fill="#a855f7" fillOpacity={0.4} />
-              </RadarChart>
-            </ResponsiveContainer>
+            <>
+              <MiniRadarLegend items={radarData.filter(d => d.A !== null).map(d => ({ label: d.subject, value: d.A || 0 }))} />
+              <ResponsiveContainer width="100%" height={260}>
+                <RadarChart cx="50%" cy="50%" outerRadius="65%" data={radarData}>
+                  <PolarGrid stroke="#293245" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#9aa7bd', fontSize: 12 }} />
+                  <Tooltip cursor={{ fill: '#1a2335' }} contentStyle={{ background: '#101622', border: '1px solid #293245', borderRadius: '8px' }} />
+                  <Radar name="Score" dataKey="A" stroke="#a855f7" fill="#a855f7" fillOpacity={0.4} />
+                </RadarChart>
+              </ResponsiveContainer>
+            </>
           ) : (
-            <EmptyState title="No radar data available" text="Run complete SEO analysis to see health radar." />
+            <EnterpriseEmptyState title="No radar data available" message="Run complete SEO analysis to see health radar." icon={Globe} />
           )}
         </Card>
         
@@ -508,7 +507,7 @@ function ExecutiveDashboard({ data }: { data: any }) {
             {priorities.length > 0 ? (
               priorities.map((p: any, i: number) => <PriorityCard key={i} data={p} />)
             ) : (
-              <EmptyState title="No priorities found" text="Run a complete scan to see recommendations." />
+              <EnterpriseEmptyState title="No priorities found" message="Run a complete scan to see recommendations." icon={Zap} />
             )}
           </div>
         </div>
@@ -518,18 +517,9 @@ function ExecutiveDashboard({ data }: { data: any }) {
 }
 
 function ExecutiveStory({ data }: { data: any }) {
-  if (import.meta.env.DEV) {
-    console.log('===== TAB: ExecutiveStory =====');
-    console.log('data.executiveStory:', data.executiveStory ? 'EXISTS' : 'MISSING');
-    console.log('data.executiveDashboard?.executiveStory:', data.executiveDashboard?.executiveStory ? 'EXISTS' : 'MISSING');
-    console.log('data.executiveDashboard?.metadata?.executiveStory:', data.executiveDashboard?.metadata?.executiveStory ? 'EXISTS' : 'MISSING');
-    console.log('===== END TAB: ExecutiveStory =====');
-  }
-  // Use canonical path from normalized data with deep fallback through dashboard fields
   const story = data.executiveStory || 
                data.executiveDashboard?.metadata?.executiveStory || 
                data.executiveDashboard?.executiveStory ||
-               // Build from dashboard top-level fields if story itself is missing
                (data.executiveDashboard?.executiveOverview ? {
                  seoHealthSummary: {
                    overallScore: data.executiveDashboard?.executiveOverview?.overallSeoScore?.value || data.scoreBreakdown?.overall,
@@ -547,9 +537,10 @@ function ExecutiveStory({ data }: { data: any }) {
 
   if (!hasStory) {
     return (
-      <EmptyState 
+      <EnterpriseEmptyState 
         title="Executive Story Not Available" 
-        text="Executive Story is not available for this analysis. Re-run SEO analysis after latest update to generate the executive story."
+        message="Executive Story is not available for this analysis. Re-run SEO analysis after latest update to generate the executive story."
+        icon={FileText}
       />
     );
   }
@@ -1158,7 +1149,7 @@ function KeywordIntelligence({ data }: { data: any }) {
     console.log('clusters count:', (data?.clusters || []).length);
     console.log('===== END TAB: KeywordIntelligence =====');
   }
-  if (!data || Object.keys(data).length === 0) return <EmptyState title="No Keyword Intelligence" text="No verified keyword data available." />;
+  if (!data || Object.keys(data).length === 0) return <EnterpriseEmptyState title="No Keyword Intelligence" message="No verified keyword data available." icon={Search} />;
   
   // Filter out irrelevant brand/competitor keyword pollution
   const pollutedTerms = ['canva', 'semrush', 'wix', 'wordpress', 'shopify', 'squarespace', 'godaddy', 'weebly', 'joomla', 'magento', 'clickfunnels', 'unbounce', 'leadpages', 'instapage', 'landingi'];
@@ -1293,7 +1284,7 @@ function CompetitorSEO({ data }: { data: any }) {
     console.log('contentGaps count:', (data?.contentGaps || []).length);
     console.log('===== END TAB: CompetitorSEO =====');
   }
-  if (!data || Object.keys(data).length === 0) return <EmptyState title="No Competitor SEO" text="No verified competitor data available." />;
+  if (!data || Object.keys(data).length === 0) return <EnterpriseEmptyState title="No Competitor SEO" message="No verified competitor data available." icon={Target} />;
 
   // Read competitorProfiles from CompetitorSeoRecord (canonical shape from backend controller)
   const competitorProfiles = asArray(data.competitorProfiles || data.competitors || []);
@@ -1365,7 +1356,7 @@ function CompetitorSEO({ data }: { data: any }) {
       )}
 
       {competitorProfiles.length === 0 && (
-        <EmptyState title="No competitors found" text="No verified direct competitors found from available SERP data." />
+        <EnterpriseEmptyState title="No competitors found" message="No verified direct competitors found from available SERP data." icon={Target} />
       )}
 
       {keywordGaps.length > 0 && (
@@ -1417,7 +1408,7 @@ function ContentGaps({ data }: { data: any }) {
     console.log('comparisonPageIdeas count:', asArray(data?.comparisonPageIdeas || []).length);
     console.log('===== END TAB: ContentGaps =====');
   }
-  if (!data || Object.keys(data).length === 0) return <EmptyState title="No Content Gaps" text="No verified content gap data available." />;
+  if (!data || Object.keys(data).length === 0) return <EnterpriseEmptyState title="No Content Gaps" message="No verified content gap data available." icon={FileText} />;
 
   // Use canonical field paths from contract
   const contentGaps = asArray(data.contentGaps || []);
@@ -1521,7 +1512,7 @@ function GeoIntelligence({ data }: { data: any }) {
     console.log('entities count:', (data?.entities || []).length);
     console.log('===== END TAB: GeoIntelligence =====');
   }
-  if (!data || Object.keys(data).length === 0) return <EmptyState title="No GEO Intelligence" text="No verified GEO intelligence data available." />;
+  if (!data || Object.keys(data).length === 0) return <EnterpriseEmptyState title="No GEO Intelligence" message="No verified GEO intelligence data available." icon={Cpu} />;
 
   // Use canonical field paths from contract
   const aiVisibilityScore = data.aiVisibilityScore || null;
@@ -1612,7 +1603,7 @@ function BlogIntelligence({ data }: { data: any }) {
     console.log('blogClusters count:', asArray(data?.blogClusters || []).length);
     console.log('===== END TAB: BlogIntelligence =====');
   }
-  if (!data || Object.keys(data).length === 0) return <EmptyState title="No Blog Intelligence" text="No verified blog intelligence data available." />;
+  if (!data || Object.keys(data).length === 0) return <EnterpriseEmptyState title="No Blog Intelligence" message="No verified blog intelligence data available." icon={FileText} />;
 
   // Filter out weak/generic keywords that pollute results
   const weakKeywords = ['general', 'account', 'semrush', 'competitors', 'alternatives', 'sign up', 'login', 'pricing', 'demo', 'free trial', 'contact us', 'about us', 'template', 'download', 'gallery', 'canva', 'wix', 'wordpress', 'shopify', 'squarespace', 'godaddy', 'weebly', 'started', 'daily', 'alerts', 'outlier', 'research', 'content', 'data', 'credits', 'what', 'manage'];
@@ -1816,7 +1807,7 @@ function ActionPlan({ data }: { data: any }) {
   const hasPlan = totalActionPlanItems > 0;
 
   if (!hasPlan) {
-    return <EmptyState title="Action Plan Not Available" />;
+    return <EnterpriseEmptyState title="Action Plan Not Available" message="No action plan data generated. Run the full SEO analysis first." icon={Map} />;
   }
   
   // Normalize to phases using canonical structure

@@ -616,7 +616,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     });
     console.log('[Growth Snapshot Source]', growthSummary.sourceModules || ['All 8 modules']);
 
-    // [Business Intelligence] Generate executive story
+    // [Business Intelligence] Generate executive story (Enterprise BI 2.0)
     const companyName = input.companyName || input.productName || 'Unknown';
     const formattedCompanyName = companyName.split(' ').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
@@ -625,74 +625,65 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     let growthExecutiveStory;
     if (synthesizedIntel) {
       growthExecutiveStory = generateExecutiveStory(synthesizedIntel);
-      growthExecutiveStory.companyOverview = {
-        name: formattedCompanyName,
-        website: input.websiteUrl || '',
-        industry: input.industry || synthesizedIntel.companyIntelligence?.industry || 'Not specified',
-      };
-      growthExecutiveStory.productSummary = {
-        usp: normalizedResults.product?.usp || 'Not available',
-        features: asArray(normalizedResults.product?.keyFeatures || normalizedResults.product?.features).slice(0, 5),
-        targetUsers: asArray(normalizedResults.product?.targetUsers).slice(0, 3),
+      growthExecutiveStory.companyOverview.website = input.websiteUrl || '';
+      growthExecutiveStory.evidenceReferences = {
+        totalSources: (synthesizedIntel.evidence?.sources || []).length,
+        dataQuality: synthesizedIntel.evidence?.sources?.length > 5 ? 'High - Multiple verified sources' : synthesizedIntel.evidence?.sources?.length > 0 ? 'Medium - Some verified sources' : 'Low - Limited verified sources',
+        confidence: synthesizedIntel.evidence?.sources?.length > 5 ? 85 : synthesizedIntel.evidence?.sources?.length > 0 ? 65 : 40
       };
       logReportGenerated(growthExecutiveStory);
-      console.log('[Business Intelligence] Executive story generated with verified intelligence');
+      console.log('[Business Intelligence] Enterprise BI 2.0 executive story generated with verified intelligence');
     } else {
       growthExecutiveStory = {
+        executiveSummary: {
+          title: `Enterprise Business Intelligence Report: ${formattedCompanyName}`,
+          company: formattedCompanyName,
+          industry: input.industry || 'Not specified',
+          assessmentDate: new Date().toISOString().split('T')[0],
+          methodology: 'Standard analysis via Growth Workspace modules',
+          confidenceLevel: 'Low',
+          evidenceSourcesUsed: 0,
+          dataGaps: 1,
+          reportType: 'Enterprise Business Intelligence 2.0',
+          version: '2.0.0'
+        },
         companyOverview: {
           name: formattedCompanyName,
           website: input.websiteUrl || '',
           industry: input.industry || 'Not specified',
+          domain: input.websiteUrl ? extractDomainSimple(input.websiteUrl) : '',
+          evidence: { source: 'User input', confidence: 50, collectedAt: new Date().toISOString() }
         },
-        productSummary: {
-          usp: normalizedResults.product?.usp || 'Not available',
-          features: asArray(normalizedResults.product?.keyFeatures || normalizedResults.product?.features).slice(0, 5),
-          targetUsers: asArray(normalizedResults.product?.targetUsers).slice(0, 3),
+        businessModel: { type: input.businessModel || 'Unknown', evidence: { source: 'User input', confidence: 50, collectedAt: new Date().toISOString() } },
+        revenueModel: { pricingTiers: [], evidence: { source: 'Not collected', confidence: 0, collectedAt: new Date().toISOString() } },
+        growthStage: { fundingStage: 'Unknown', evidence: { source: 'Not collected', confidence: 0, collectedAt: new Date().toISOString() } },
+        productMaturity: { stage: 'Unknown', evidence: { source: 'Not collected', confidence: 0, collectedAt: new Date().toISOString() } },
+        marketPosition: { tam: normalizedResults.market?.tam || 'Unknown', competitiveIntensity: 'Unknown', evidence: { source: 'Growth Workspace modules', confidence: 50, collectedAt: new Date().toISOString() } },
+        swot: {
+          strengths: [{ value: 'Insufficient evidence to determine strengths', confidence: 0, impact: 'Low' }],
+          weaknesses: [{ value: 'Business intelligence layer unavailable - data may be incomplete', confidence: 100, impact: 'High' }],
+          opportunities: [{ value: 'Run full analysis with website URL for complete intelligence', confidence: 90, impact: 'High' }],
+          threats: [{ value: 'Insufficient evidence to determine threats', confidence: 0, impact: 'Low' }]
         },
-        marketSummary: {
-          demandScore: normalizedResults.market?.demandScore || 0,
-          tam: normalizedResults.market?.tam || 'Unknown',
-          trends: asArray(normalizedResults.market?.marketTrends).slice(0, 3),
-          opportunities: asArray(normalizedResults.market?.growthOpportunities || normalizedResults.market?.opportunities).slice(0, 3),
+        keyFindings: [{ finding: 'Limited data available without website scraping and intelligence collection.', confidence: 100, evidence: 'Analysis mode', impact: 'High' }],
+        topPriorities: [{ priority: 1, action: 'Re-run analysis with website URL and complete product details', rationale: 'Full intelligence requires website data', roi: 'Complete enterprise intelligence', timeline: 'Immediate', owner: 'User', kpi: 'Complete intelligence report', evidence: 'Current analysis ran without business intelligence layer', confidence: 100 }],
+        executiveRecommendation: {
+          recommendation: `Data quality is insufficient for a definitive recommendation. Run a full analysis with website URL and complete product details to generate an enterprise-grade business intelligence report for ${formattedCompanyName}.`,
+          confidenceLevel: 'Low',
+          evidenceReferences: { dataQuality: 'Limited - Business intelligence layer unavailable' }
         },
-        audienceSummary: {
-          personas: asArray(normalizedResults.audience?.buyerPersonas).slice(0, 3),
-          bestChannels: asArray(normalizedResults.audience?.bestChannels).slice(0, 3),
-        },
-        competitorSummary: {
-          competitors: asArray(normalizedResults.competitor?.directCompetitors).slice(0, 3),
-          marketGaps: asArray(normalizedResults.competitor?.marketGaps).slice(0, 3),
-        },
-        positioningSummary: {
-          statement: normalizedResults.positioning?.positioningStatement || 'Unknown',
-          messagingPillars: asArray(normalizedResults.positioning?.messagingPillars).slice(0, 3),
-        },
-        campaignSummary: {
-          creativeAngles: asArray(normalizedResults.campaign?.creativeAngles).slice(0, 3),
-          copyHooks: asArray(normalizedResults.campaign?.copyHooks).slice(0, 3),
-        },
-        channelSummary: {
-          primaryChannel: normalizedResults.channel?.primaryChannel || 'Unknown',
-          recommendedChannels: asArray(normalizedResults.channel?.recommendedChannels).slice(0, 3),
-        },
-        keyRisks: asArray(normalizedResults.market?.risks || normalizedResults.competitor?.competitorWeaknesses).slice(0, 3),
-        keyOpportunities: asArray(normalizedResults.market?.opportunities || normalizedResults.competitor?.differentiationOpportunities).slice(0, 3),
-        finalRecommendation: `For ${formattedCompanyName}, prioritize ${normalizedResults.channel?.primaryChannel || 'content marketing'} to engage ${normalizedResults.audience?.buyerPersonas?.[0]?.name || 'target audience'}.`,
-        sourceModules: ['Product Analysis', 'Market Discovery', 'Audience Intelligence', 'Competitor Analysis', 'Intent Prediction', 'Positioning Engine', 'Campaign Generator', 'Channel Recommendation'],
-        confidence: overallGrowthScore,
-        evidenceReferences: { dataQuality: 'Limited - Business intelligence layer unavailable' }
+        evidenceReferences: { totalSources: 0, dataQuality: 'Limited - Business intelligence layer unavailable', confidence: 0 }
       };
     }
 
-    // [Business Intelligence] Generate action plan
+    // [Business Intelligence] Generate action plan (Enterprise BI 2.0)
     let growthActionPlan;
     if (synthesizedIntel) {
       growthActionPlan = generateActionPlan(synthesizedIntel);
       logStrategyGenerated({ channels: [], recommendations: [], timeline: '7-365 days' });
-      console.log('[Business Intelligence] Action plan generated with verified intelligence');
+      console.log('[Business Intelligence] Enterprise BI 2.0 action plan generated with verified intelligence');
     } else {
       growthActionPlan = {
-        immediate: [],
         day7: [],
         day30: [],
         day60: [],
@@ -702,16 +693,29 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       };
     }
 
-    // Add campaign-sourced actions if available
+    // Add campaign-sourced actions if available (normalize to day7/day30/day60)
     if (normalizedResults.campaign?.actionPlan) {
-      if (normalizedResults.campaign.actionPlan.sevenDay) {
-        growthActionPlan.day7.push(...normalizedResults.campaign.actionPlan.sevenDay);
+      if (normalizedResults.campaign.actionPlan.day7 || normalizedResults.campaign.actionPlan.sevenDay) {
+        const sevenDayActions = normalizedResults.campaign.actionPlan.day7 || normalizedResults.campaign.actionPlan.sevenDay || [];
+        growthActionPlan.day7.push(...sevenDayActions);
       }
-      if (normalizedResults.campaign.actionPlan.thirtyDay) {
-        growthActionPlan.day30.push(...normalizedResults.campaign.actionPlan.thirtyDay);
+      if (normalizedResults.campaign.actionPlan.day30 || normalizedResults.campaign.actionPlan.thirtyDay) {
+        const thirtyDayActions = normalizedResults.campaign.actionPlan.day30 || normalizedResults.campaign.actionPlan.thirtyDay || [];
+        growthActionPlan.day30.push(...thirtyDayActions);
       }
-      if (normalizedResults.campaign.actionPlan.sixtyDay) {
-        growthActionPlan.day60.push(...normalizedResults.campaign.actionPlan.sixtyDay);
+      if (normalizedResults.campaign.actionPlan.day60 || normalizedResults.campaign.actionPlan.sixtyDay) {
+        const sixtyDayActions = normalizedResults.campaign.actionPlan.day60 || normalizedResults.campaign.actionPlan.sixtyDay || [];
+        growthActionPlan.day60.push(...sixtyDayActions);
+      }
+      if (normalizedResults.campaign.actionPlan.day90 || normalizedResults.campaign.actionPlan.ninetyDay) {
+        const ninetyDayActions = normalizedResults.campaign.actionPlan.day90 || normalizedResults.campaign.actionPlan.ninetyDay || [];
+        growthActionPlan.day90.push(...ninetyDayActions);
+      }
+      if (normalizedResults.campaign.actionPlan.day180) {
+        growthActionPlan.day180.push(...normalizedResults.campaign.actionPlan.day180);
+      }
+      if (normalizedResults.campaign.actionPlan.day365) {
+        growthActionPlan.day365.push(...normalizedResults.campaign.actionPlan.day365);
       }
     }
 
@@ -1500,4 +1504,14 @@ function ensureArray(value) {
 function ensureNumber(value, fallback = 60) {
   const n = Number(value);
   return Number.isFinite(n) && n >= 0 && n <= 100 ? n : fallback;
+}
+
+function extractDomainSimple(url) {
+  if (!url) return '';
+  try {
+    const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`);
+    return urlObj.hostname.replace('www.', '');
+  } catch {
+    return url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+  }
 }

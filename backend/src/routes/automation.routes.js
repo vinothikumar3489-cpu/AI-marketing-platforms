@@ -8,6 +8,9 @@ import {
   updateAssetStatus,
   regenerateAsset,
   getAutomationLogs,
+  executeAllModules,
+  executeSingleModule,
+  getExecutionData,
 } from "../controllers/automation.controller.js";
 import { validate } from "../middleware/validate.js";
 
@@ -39,3 +42,8 @@ automationRouter.post("/assets/:assetId/regenerate", regenerateAsset);
 
 // GET /api/automation/:chatId/logs - Get automation log history
 automationRouter.get("/:chatId/logs", getAutomationLogs);
+
+// Phase 6 — Marketing Execution Platform
+automationRouter.post("/:chatId/execute", executeAllModules);
+automationRouter.post("/:chatId/execute/:module", executeSingleModule);
+automationRouter.get("/:chatId/execution", getExecutionData);
