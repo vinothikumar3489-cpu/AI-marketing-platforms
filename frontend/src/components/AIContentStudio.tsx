@@ -71,22 +71,26 @@ function IntegrationHealthPanel() {
   const { providers } = health;
   const items = (() => {
     const reasonMap: Record<string, string> = {
-      missing_api_key: 'Missing API key', missing_sender_email: 'Missing sender email',
-      init_failed: 'Init failed', no_providers_configured: 'None', only_replicate_configured: 'Replicate only',
-      only_huggingface_configured: 'HF only', both_configured: 'HF + Replicate',
-      missing_env_vars: 'Missing config', disabled_memory_limit: 'Disabled (memory)',
-      missing_binary: 'Missing binary', binary_not_found_at_path: 'Binary not found',
+      missing_api_key: 'Missing API key', missing_from_email: 'Missing from email',
+      init_failed: 'Init failed', missing_env_vars: 'Missing config',
+      pollinations_only: 'Pollinations only', pollinations_fal_configured: 'Pollinations + Fal',
+      shotstack_configured: 'Shotstack', creatomate_configured: 'Creatomate',
+      no_video_provider: 'No provider',
     };
-    const emailDesc = !providers.email.configured ? (reasonMap[providers.email.reason] || providers.email.reason || 'Not configured') : 'Brevo';
-    const imgDesc = `${providers.image.huggingface ? 'HF' : ''}${providers.image.huggingface && providers.image.replicate ? ' + ' : ''}${providers.image.replicate ? 'Replicate' : ''}${!providers.image.huggingface && !providers.image.replicate ? (reasonMap[providers.image.reason] || 'None') : ''}`;
-    const storageDesc = providers.storage.configured ? 'Cloudinary' : (reasonMap[providers.storage.reason] || 'Local fallback');
-    const videoDesc = providers.video.configured ? 'FFmpeg' : (reasonMap[providers.video.reason] || providers.video.provider || 'Not available');
+    const emailDesc = providers.email.configured ? 'Resend' : (reasonMap[providers.email.reason] || providers.email.reason || 'Not configured');
+    const imgPollinations = providers.image?.pollinations?.configured !== false;
+    const imgFal = providers.image?.fal?.configured === true;
+    const imgDesc = imgPollinations && imgFal ? 'Pollinations + Fal' : imgPollinations ? 'Pollinations' : imgFal ? 'Fal' : (reasonMap[providers.image.reason] || 'None');
+    const storageDesc = providers.storage.configured ? 'Cloudinary' : (reasonMap[providers.storage.reason] || 'Not configured');
+    const vidShotstack = providers.video?.shotstack?.configured === true;
+    const vidCreatomate = providers.video?.creatomate?.configured === true;
+    const videoDesc = vidShotstack ? 'Shotstack' : vidCreatomate ? 'Creatomate' : (reasonMap[providers.video.reason] || 'Not available');
     return [
       { label: 'Email', ok: providers.email.configured, detail: emailDesc, reason: providers.email.reason },
-      { label: 'Image', ok: providers.image.huggingface || providers.image.replicate, detail: imgDesc, reason: providers.image.reason },
+      { label: 'Image', ok: imgPollinations || imgFal, detail: imgDesc, reason: providers.image.reason },
       { label: 'Storage', ok: providers.storage.configured, detail: storageDesc, reason: providers.storage.reason },
-      { label: 'Video', ok: providers.video.configured, detail: videoDesc, reason: providers.video.reason },
-      { label: 'AI', ok: providers.ai.gemini || providers.ai.groq, detail: `${providers.ai.gemini ? 'Gemini' : ''}${providers.ai.gemini && providers.ai.groq ? ' + ' : ''}${providers.ai.groq ? 'Groq' : ''}${!providers.ai.gemini && !providers.ai.groq ? 'None' : ''}` },
+      { label: 'Video', ok: vidShotstack || vidCreatomate, detail: videoDesc, reason: providers.video.reason },
+      { label: 'AI', ok: providers.ai?.gemini || providers.ai?.groq, detail: `${providers.ai?.gemini ? 'Gemini' : ''}${providers.ai?.gemini && providers.ai?.groq ? ' + ' : ''}${providers.ai?.groq ? 'Groq' : ''}${!providers.ai?.gemini && !providers.ai?.groq ? 'None' : ''}` },
     ];
   })();
   return (

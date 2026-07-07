@@ -1599,22 +1599,26 @@ export default function AutomationCenterPage() {
             {(() => {
               const p = health.providers;
               const reasonMap: Record<string, string> = {
-                missing_api_key: 'Missing API key', missing_sender_email: 'Missing sender email',
-                init_failed: 'Init failed', no_providers_configured: 'None', only_replicate_configured: 'Replicate only',
-                only_huggingface_configured: 'HF only', both_configured: 'HF + Replicate',
-                missing_env_vars: 'Missing config', disabled_memory_limit: 'Disabled (memory)',
-                missing_binary: 'Missing binary', binary_not_found_at_path: 'Binary not found',
+                missing_api_key: 'Missing API key', missing_from_email: 'Missing from email',
+                init_failed: 'Init failed', missing_env_vars: 'Missing config',
+                pollinations_only: 'Pollinations only', pollinations_fal_configured: 'Pollinations + Fal',
+                shotstack_configured: 'Shotstack', creatomate_configured: 'Creatomate',
+                no_video_provider: 'No provider',
               };
-              const emailDesc = !p.email.configured ? (reasonMap[p.email.reason] || p.email.reason || 'Not configured') : 'Brevo';
-              const imgDesc = `${p.image.huggingface ? 'HF' : ''}${p.image.huggingface && p.image.replicate ? ' + ' : ''}${p.image.replicate ? 'Replicate' : ''}${!p.image.huggingface && !p.image.replicate ? (reasonMap[p.image.reason] || 'None') : ''}`;
-              const storageDesc = p.storage.configured ? 'Cloudinary' : (reasonMap[p.storage.reason] || 'Local fallback');
-              const videoDesc = p.video.configured ? 'FFmpeg' : (reasonMap[p.video.reason] || p.video.provider || 'Not available');
+              const emailDesc = p.email.configured ? 'Resend' : (reasonMap[p.email.reason] || p.email.reason || 'Not configured');
+              const imgPollinations = p.image?.pollinations?.configured !== false;
+              const imgFal = p.image?.fal?.configured === true;
+              const imgDesc = imgPollinations && imgFal ? 'Pollinations + Fal' : imgPollinations ? 'Pollinations' : imgFal ? 'Fal' : (reasonMap[p.image.reason] || 'None');
+              const storageDesc = p.storage.configured ? 'Cloudinary' : (reasonMap[p.storage.reason] || 'Not configured');
+              const vidShotstack = p.video?.shotstack?.configured === true;
+              const vidCreatomate = p.video?.creatomate?.configured === true;
+              const videoDesc = vidShotstack ? 'Shotstack' : vidCreatomate ? 'Creatomate' : (reasonMap[p.video.reason] || 'Not available');
               return [
                 { label: 'Email', ok: p.email.configured, detail: emailDesc, reason: p.email.reason },
-                { label: 'Image', ok: p.image.huggingface || p.image.replicate, detail: imgDesc, reason: p.image.reason },
+                { label: 'Image', ok: imgPollinations || imgFal, detail: imgDesc, reason: p.image.reason },
                 { label: 'Storage', ok: p.storage.configured, detail: storageDesc, reason: p.storage.reason },
-                { label: 'Video', ok: p.video.configured, detail: videoDesc, reason: p.video.reason },
-                { label: 'AI', ok: p.ai.gemini || p.ai.groq, detail: `${p.ai.gemini ? 'Gemini' : ''}${p.ai.gemini && p.ai.groq ? ' + ' : ''}${p.ai.groq ? 'Groq' : ''}${!p.ai.gemini && !p.ai.groq ? 'None' : ''}` },
+                { label: 'Video', ok: vidShotstack || vidCreatomate, detail: videoDesc, reason: p.video.reason },
+                { label: 'AI', ok: p.ai?.gemini || p.ai?.groq, detail: `${p.ai?.gemini ? 'Gemini' : ''}${p.ai?.gemini && p.ai?.groq ? ' + ' : ''}${p.ai?.groq ? 'Groq' : ''}${!p.ai?.gemini && !p.ai?.groq ? 'None' : ''}` },
               ];
             })().map(item => (
               <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '4px', background: item.ok ? 'rgba(16,225,139,0.08)' : 'rgba(255,179,71,0.08)', border: `1px solid ${item.ok ? 'rgba(16,225,139,0.2)' : 'rgba(255,179,71,0.2)'}` }}>

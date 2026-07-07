@@ -1,7 +1,7 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
 import { requireAuth } from "../middleware/auth.middleware.js";
-import { getHealth, sendEmail, generatePosterImage, renderVideoHandler, debugTestReplicate, debugTestHuggingFace, debugTestCloudinary, debugTestFFmpeg } from "../controllers/integrations.controller.js";
+import { getHealth, sendEmail, generatePosterImage, renderVideoHandler, getVideoStatusHandler, debugTestReplicate, debugTestHuggingFace, debugTestCloudinary, debugTestFFmpeg } from "../controllers/integrations.controller.js";
 
 export const integrationsRouter = express.Router();
 
@@ -45,6 +45,9 @@ integrationsRouter.post("/:chatId/studio/creative/generate-image", imageLimiter,
 
 // Video rendering — rate limited
 integrationsRouter.post("/:chatId/studio/video/render", videoLimiter, renderVideoHandler);
+
+// Video status polling
+integrationsRouter.get("/video/status/:provider/:renderId", getVideoStatusHandler);
 
 // Legacy SEO status (keep for backward compat)
 integrationsRouter.post("/seo/connect", (req, res) => {

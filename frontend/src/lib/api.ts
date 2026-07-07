@@ -166,6 +166,17 @@ export async function renderVideo(chatId: string, payload: {
   }>(`/integrations/${chatId}/studio/video/render`, payload);
 }
 
+export async function getVideoStatus(provider: string, renderId: string) {
+  return api.get<{
+    success: boolean;
+    provider?: string;
+    status?: string;
+    renderId?: string;
+    videoUrl?: string | null;
+    error?: string;
+  }>(`/integrations/video/status/${provider}/${renderId}`);
+}
+
 export async function downloadReport(chatId: string, type: 'executive' | 'growth' | 'seo', format: string): Promise<void> {
   const token = getToken();
   const url = `${API_BASE}/chats/${chatId}/report/${type}/${format}`;

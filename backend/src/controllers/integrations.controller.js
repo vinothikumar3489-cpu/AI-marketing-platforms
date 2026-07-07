@@ -1,23 +1,33 @@
-import { sendTestEmail, checkEmailProvider } from '../services/integrations/email.service.js';
+import { sendTestEmail, checkEmailProvider } from '../services/integrations/resendEmail.service.js';
 import { checkStorageProvider, testCloudinaryConnection } from '../services/integrations/storage.service.js';
-import { generateImage, checkImageProviders, testReplicateConnection, testHuggingFaceConnection } from '../services/integrations/image.service.js';
-import { renderVideo, checkVideoProvider, testFfmpegConnection } from '../services/integrations/video.service.js';
+import { generateImage } from '../services/integrations/imageExecution.service.js';
+import { renderVideo, getVideoStatus } from '../services/integrations/videoExecution.service.js';
+import { getProviderHealth } from '../services/integrations/providerConfig.service.js';
+import { checkImageProviders, testReplicateConnection, testHuggingFaceConnection } from '../services/integrations/image.service.js';
+import { checkVideoProvider, testFfmpegConnection } from '../services/integrations/video.service.js';
 import { prisma } from '../config/prisma.js';
 
 export async function getHealth(req, res) {
   try {
     const email = await checkEmailProvider();
-    const image = await checkImageProviders();
+    const config = getProviderHealth();
     const storage = await checkStorageProvider();
-    const video = await checkVideoProvider();
 
     res.json({
       success: true,
       providers: {
-        email: { configured: email.configured, provider: email.provider || null, reason: email.reason || null, senderConfigured: email.senderConfigured ?? null },
-        image: { huggingface: image.huggingface, replicate: image.replicate, reason: image.reason || null },
+        email: { configured: email.configured, provider: email.provider || null, reason: email.reason || null, fromConfigured: email.fromConfigured ?? null },
+        image: {
+          pollinations: { configured: true },
+          fal: { configured: config.image.fal.configured, model: config.image.fal.model },
+          reason: config.image.fal.configured ? 'pollinations_fal_configured' : 'pollinations_only',
+        },
         storage: { configured: storage.configured, provider: storage.provider || null, reason: storage.reason || null },
-        video: { configured: video.configured, provider: video.provider || null, reason: video.reason || null, videoEnabled: video.videoEnabled ?? null },
+        video: {
+          shotstack: { configured: config.video.shotstack.configured, stage: config.video.shotstack.stage },
+          creatomate: { configured: config.video.creatomate.configured },
+          reason: config.video.shotstack.configured ? 'shotstack_configured' : config.video.creatomate.configured ? 'creatomate_configured' : 'no_video_provider',
+        },
         ai: { gemini: !!process.env.GEMINI_API_KEY, groq: !!process.env.GROQ_API_KEY },
       },
     });
@@ -114,6 +124,16 @@ export async function renderVideoHandler(req, res) {
   } catch (error) {
     console.error('[Integrations] Render video error:', error.message);
     res.status(500).json({ success: false, error: 'Video rendering failed', details: 'Internal server error' });
+  }
+}
+
+export async function getVideoStatusHandler(req, res) {
+  try {
+    const { provider, renderId } = req.params;
+    const result = await getVideoStatus(provider, renderId);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get video status' });
   }
 }
 

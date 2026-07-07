@@ -3,6 +3,7 @@ import { Readable } from 'stream';
 import fs from 'fs';
 import path from 'path';
 
+const isProduction = process.env.NODE_ENV === 'production';
 let initialized = false;
 
 function initCloudinary() {
@@ -11,7 +12,11 @@ function initCloudinary() {
   const key = process.env.CLOUDINARY_API_KEY;
   const secret = process.env.CLOUDINARY_API_SECRET;
   if (!name || !key || !secret) {
-    console.warn('[StorageService] Cloudinary not configured (missing env vars). Using local fallback.');
+    if (isProduction) {
+      console.error('[StorageService] Cloudinary not configured in production.');
+    } else {
+      console.warn('[StorageService] Cloudinary not configured (missing env vars). Using local fallback.');
+    }
     return false;
   }
   try {
@@ -155,6 +160,13 @@ function tryReadFile(filePath) {
 }
 
 function localFallback(filename, folder, data) {
+  if (isProduction) {
+    return {
+      success: false,
+      error: 'Cloudinary is not configured. Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to environment variables.',
+      code: 'STORAGE_NOT_CONFIGURED',
+    };
+  }
   const localDir = path.join(process.cwd(), 'local-assets', folder);
   const filePath = path.join(localDir, filename);
   let bytes = 0;
