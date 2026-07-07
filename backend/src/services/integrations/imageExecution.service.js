@@ -1,13 +1,10 @@
 import axios from 'axios';
 import sharp from 'sharp';
 import { uploadBuffer } from './storage.service.js';
+import { buildPosterContent } from './posterContentBuilder.js';
 
 const POSTER_WIDTH = 1080;
 const POSTER_HEIGHT = 1080;
-
-const FALLBACK_HEADLINE = 'How to Create a Poster Using Figma';
-const FALLBACK_SUBHEADLINE = 'Learn simple design steps to create a clean and professional poster.';
-const FALLBACK_CTA = 'Start Designing';
 
 function escapeXml(str) {
   if (!str) return '';
@@ -15,9 +12,9 @@ function escapeXml(str) {
 }
 
 function buildVisualPrompt({ prompt, brandColors }) {
-  let cleanPrompt = prompt || 'Clean modern workspace with laptop showing design software, colorful poster design elements, creative UI/UX design theme, professional educational poster background';
+  let cleanPrompt = prompt || 'Clean modern workspace, creative professional background, abstract design elements, modern marketing theme';
   if (brandColors?.length) cleanPrompt += `, ${brandColors.join(' and ')} accents`;
-  cleanPrompt += ', no text, no letters, no words, no typography, no watermark, no labels, no UI text, no writing';
+  cleanPrompt += ', no text, no letters, no words, no typography, no watermark, no labels, no UI text, no writing, no logo';
   return cleanPrompt;
 }
 
@@ -79,12 +76,8 @@ function wrapLines(text, maxChars) {
 }
 
 async function overlayTextOnImage(imageBuffer, { headline, subheadline, cta }) {
-  const title = headline || FALLBACK_HEADLINE;
-  const sub = subheadline || FALLBACK_SUBHEADLINE;
-  const callToAction = cta || FALLBACK_CTA;
-
-  const titleLines = wrapLines(title, 28);
-  const subLines = wrapLines(sub, 42);
+  const titleLines = wrapLines(headline, 28);
+  const subLines = wrapLines(subheadline, 42);
 
   const titleSvgLineHeight = 76;
   const titleStartY = 260;
@@ -116,7 +109,7 @@ async function overlayTextOnImage(imageBuffer, { headline, subheadline, cta }) {
     <text x="540" y="${titleStartY}" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="60" font-weight="800" fill="white" filter="url(#shadow)" letter-spacing="-0.5">${titleTspans}</text>
     <text x="540" y="${subStartY}" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="rgba(255,255,255,0.92)" font-weight="400">${subTspans}</text>
     <rect x="${(POSTER_WIDTH - 340) / 2}" y="${ctaY}" width="340" height="68" rx="34" fill="white" opacity="0.95" filter="url(#shadow)"/>
-    <text x="540" y="${ctaY + 45}" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" fill="#1a1a2e">${escapeXml(callToAction)}</text>
+    <text x="540" y="${ctaY + 45}" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" fill="#1a1a2e">${escapeXml(cta)}</text>
   </svg>`);
 
   return sharp(imageBuffer)
@@ -129,22 +122,19 @@ async function overlayTextOnImage(imageBuffer, { headline, subheadline, cta }) {
 function generateSvgPoster({ headline, subheadline, cta, brandColors }) {
   const bgColor = brandColors?.[0] || '#2563eb';
   const accentColor = brandColors?.[1] || '#111827';
-  const safeTitle = escapeXml(headline || FALLBACK_HEADLINE);
-  const safeSub = escapeXml(subheadline || FALLBACK_SUBHEADLINE);
-  const safeCta = escapeXml(cta || FALLBACK_CTA);
 
-  const titleLines = wrapLines(safeTitle, 28);
-  const subLines = wrapLines(safeSub, 42);
+  const titleLines = wrapLines(headline, 28);
+  const subLines = wrapLines(subheadline, 42);
   const titleSvgLineHeight = 76;
   const subSvgLineHeight = 44;
   let titleY = 280;
   let subY = titleY + titleLines.length * titleSvgLineHeight + 60;
 
   let titleTspans = titleLines.map((line, i) =>
-    `<tspan x="540" dy="${i === 0 ? '0' : titleSvgLineHeight}">${line}</tspan>`
+    `<tspan x="540" dy="${i === 0 ? '0' : titleSvgLineHeight}">${escapeXml(line)}</tspan>`
   ).join('');
   let subTspans = subLines.map((line, i) =>
-    `<tspan x="540" dy="${i === 0 ? '0' : subSvgLineHeight}">${line}</tspan>`
+    `<tspan x="540" dy="${i === 0 ? '0' : subSvgLineHeight}">${escapeXml(line)}</tspan>`
   ).join('');
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${POSTER_WIDTH}" height="${POSTER_HEIGHT}" viewBox="0 0 ${POSTER_WIDTH} ${POSTER_HEIGHT}">
@@ -167,7 +157,7 @@ function generateSvgPoster({ headline, subheadline, cta, brandColors }) {
   <line x1="340" y1="${subY - 30}" x2="740" y2="${subY - 30}" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
   <text x="540" y="${subY}" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="rgba(255,255,255,0.9)" font-weight="400">${subTspans}</text>
   <rect x="${(POSTER_WIDTH - 340) / 2}" y="${subY + subLines.length * subSvgLineHeight + 60}" width="340" height="68" rx="34" fill="white" opacity="0.95" filter="url(#shadow)"/>
-  <text x="540" y="${subY + subLines.length * subSvgLineHeight + 105}" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" fill="${accentColor}">${safeCta}</text>
+  <text x="540" y="${subY + subLines.length * subSvgLineHeight + 105}" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" fill="${accentColor}">${escapeXml(cta)}</text>
 </svg>`;
 
   return Buffer.from(svg, 'utf-8');
@@ -182,23 +172,24 @@ export async function generateImage({ prompt, headline, cta, platform, dimension
     return { success: false, error: 'Prompt is required' };
   }
 
+  const content = buildPosterContent({ prompt, headline, cta, platform, dimensions, brandColors });
+  if (content.error) return { success: false, error: content.error };
+  const { headline: finalHeadline, subheadline: finalSubheadline, cta: finalCta, width, height } = content;
+
   const visualPrompt = buildVisualPrompt({ prompt, brandColors });
-  const { width, height } = getDimensions(dimensions);
   const warnings = [];
   const timestamp = Date.now();
-  const subheadline = 'Learn simple design steps to create a clean and professional poster.';
-  const finalHeadline = headline || FALLBACK_HEADLINE;
-  const finalCta = cta || FALLBACK_CTA;
 
   // Try Pollinations first — get background image only (no text)
   let pollResult = await generateWithPollinations(visualPrompt, width, height);
   if (pollResult.success && pollResult.buffer) {
     try {
-      const composed = await overlayTextOnImage(pollResult.buffer, { headline: finalHeadline, subheadline, cta: finalCta });
+      const composed = await overlayTextOnImage(pollResult.buffer, { headline: finalHeadline, subheadline: finalSubheadline, cta: finalCta });
       const storage = await uploadToCloudinary(composed, `poster-${timestamp}.png`, 'posters');
       return {
         success: true, provider: 'pollinations',
         imageUrl: storage.url, publicId: storage.publicId,
+        headline: finalHeadline, subheadline: finalSubheadline, cta: finalCta,
         prompt: visualPrompt, generatedAt: new Date().toISOString(), warnings,
       };
     } catch (composeErr) {
@@ -207,6 +198,7 @@ export async function generateImage({ prompt, headline, cta, platform, dimension
       return {
         success: true, provider: 'pollinations',
         imageUrl: storage.url, publicId: storage.publicId,
+        headline: finalHeadline, subheadline: finalSubheadline, cta: finalCta,
         prompt: visualPrompt, generatedAt: new Date().toISOString(), warnings,
       };
     }
@@ -220,11 +212,12 @@ export async function generateImage({ prompt, headline, cta, platform, dimension
       try {
         const imgResp = await axios.get(falResult.imageUrl, { responseType: 'arraybuffer', timeout: 30000 });
         const rawBuffer = Buffer.from(imgResp.data);
-        const composed = await overlayTextOnImage(rawBuffer, { headline: finalHeadline, subheadline, cta: finalCta });
+        const composed = await overlayTextOnImage(rawBuffer, { headline: finalHeadline, subheadline: finalSubheadline, cta: finalCta });
         const storage = await uploadToCloudinary(composed, `poster-${timestamp}.png`, 'posters');
         return {
           success: true, provider: 'fal.ai',
           imageUrl: storage.url, publicId: storage.publicId,
+          headline: finalHeadline, subheadline: finalSubheadline, cta: finalCta,
           prompt: visualPrompt, generatedAt: new Date().toISOString(), warnings,
         };
       } catch (uploadErr) {
@@ -232,6 +225,7 @@ export async function generateImage({ prompt, headline, cta, platform, dimension
         return {
           success: true, provider: 'fal.ai',
           imageUrl: falResult.imageUrl, publicId: null,
+          headline: finalHeadline, subheadline: finalSubheadline, cta: finalCta,
           prompt: visualPrompt, generatedAt: new Date().toISOString(), warnings,
         };
       }
@@ -241,12 +235,13 @@ export async function generateImage({ prompt, headline, cta, platform, dimension
 
   // SVG fallback — text is natively correct here
   warnings.push('AI image providers unavailable. SVG fallback generated.');
-  const svgBuffer = generateSvgPoster({ headline: finalHeadline, subheadline, cta: finalCta, brandColors });
+  const svgBuffer = generateSvgPoster({ headline: finalHeadline, subheadline: finalSubheadline, cta: finalCta, brandColors });
   const storage = await uploadToCloudinary(svgBuffer, `poster-${timestamp}.svg`, 'posters');
 
   return {
     success: true, provider: 'svg-fallback',
     imageUrl: storage.url, publicId: storage.publicId,
+    headline: finalHeadline, subheadline: finalSubheadline, cta: finalCta,
     prompt: visualPrompt, generatedAt: new Date().toISOString(), warnings,
   };
 }

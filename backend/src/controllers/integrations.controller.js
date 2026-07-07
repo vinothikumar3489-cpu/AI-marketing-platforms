@@ -105,9 +105,9 @@ export async function renderVideoHandler(req, res) {
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
     if (!chat) return res.status(404).json({ success: false, error: 'Chat not found' });
 
-    const { script, scenes, duration, platform, aspectRatio } = req.body;
+    const { script, scenes, duration, platform, aspectRatio, prompt } = req.body;
 
-    const result = await renderVideo({ script, scenes, duration, platform, aspectRatio });
+    const result = await renderVideo({ script, scenes, duration, platform, aspectRatio, prompt });
 
     if (result.success) {
       await prisma.automationLog.create({
