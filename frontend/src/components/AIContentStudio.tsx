@@ -69,13 +69,26 @@ function IntegrationHealthPanel() {
   if (loading) return <div style={{ fontSize: '11px', color: C.dim, padding: '8px 0' }}>Checking provider health...</div>;
   if (!health) return null;
   const { providers } = health;
-  const items = [
-    { label: 'Email', ok: providers.email.configured, detail: providers.email.provider || 'Not configured', reason: providers.email.reason },
-    { label: 'Image', ok: providers.image.huggingface || providers.image.replicate, detail: `${providers.image.huggingface ? 'HF' : ''}${providers.image.huggingface && providers.image.replicate ? ' + ' : ''}${providers.image.replicate ? 'Replicate' : ''}${!providers.image.huggingface && !providers.image.replicate ? 'None' : ''}`, reason: providers.image.reason },
-    { label: 'Storage', ok: providers.storage.cloudinary, detail: providers.storage.cloudinary ? 'Cloudinary' : 'Local fallback', reason: providers.storage.reason },
-    { label: 'Video', ok: providers.video.configured, detail: providers.video.provider || 'Not available', reason: providers.video.reason },
-    { label: 'AI', ok: providers.ai.gemini || providers.ai.groq, detail: `${providers.ai.gemini ? 'Gemini' : ''}${providers.ai.gemini && providers.ai.groq ? ' + ' : ''}${providers.ai.groq ? 'Groq' : ''}${!providers.ai.gemini && !providers.ai.groq ? 'None' : ''}` },
-  ];
+  const items = (() => {
+    const reasonMap: Record<string, string> = {
+      missing_api_key: 'Missing API key', missing_sender_email: 'Missing sender email',
+      init_failed: 'Init failed', no_providers_configured: 'None', only_replicate_configured: 'Replicate only',
+      only_huggingface_configured: 'HF only', both_configured: 'HF + Replicate',
+      missing_env_vars: 'Missing config', disabled_memory_limit: 'Disabled (memory)',
+      missing_binary: 'Missing binary', binary_not_found_at_path: 'Binary not found',
+    };
+    const emailDesc = !providers.email.configured ? (reasonMap[providers.email.reason] || providers.email.reason || 'Not configured') : 'Brevo';
+    const imgDesc = `${providers.image.huggingface ? 'HF' : ''}${providers.image.huggingface && providers.image.replicate ? ' + ' : ''}${providers.image.replicate ? 'Replicate' : ''}${!providers.image.huggingface && !providers.image.replicate ? (reasonMap[providers.image.reason] || 'None') : ''}`;
+    const storageDesc = providers.storage.configured ? 'Cloudinary' : (reasonMap[providers.storage.reason] || 'Local fallback');
+    const videoDesc = providers.video.configured ? 'FFmpeg' : (reasonMap[providers.video.reason] || providers.video.provider || 'Not available');
+    return [
+      { label: 'Email', ok: providers.email.configured, detail: emailDesc, reason: providers.email.reason },
+      { label: 'Image', ok: providers.image.huggingface || providers.image.replicate, detail: imgDesc, reason: providers.image.reason },
+      { label: 'Storage', ok: providers.storage.configured, detail: storageDesc, reason: providers.storage.reason },
+      { label: 'Video', ok: providers.video.configured, detail: videoDesc, reason: providers.video.reason },
+      { label: 'AI', ok: providers.ai.gemini || providers.ai.groq, detail: `${providers.ai.gemini ? 'Gemini' : ''}${providers.ai.gemini && providers.ai.groq ? ' + ' : ''}${providers.ai.groq ? 'Groq' : ''}${!providers.ai.gemini && !providers.ai.groq ? 'None' : ''}` },
+    ];
+  })();
   return (
     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', padding: '10px 14px', background: C.card, borderRadius: '8px', border: `1px solid ${C.border}`, marginBottom: '12px' }}>
       <div style={{ fontSize: '11px', fontWeight: 600, color: C.muted, display: 'flex', alignItems: 'center', gap: '4px' }}><Wifi size={12} /> Integration Status:</div>

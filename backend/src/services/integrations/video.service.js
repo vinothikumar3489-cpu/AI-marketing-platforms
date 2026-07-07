@@ -85,6 +85,18 @@ export async function renderVideo({ script, scenes, duration, platform, aspectRa
     return { success: false, error: 'At least one scene is required' };
   }
 
+  // Render 512MB memory guard — skip FFmpeg if video rendering is not explicitly enabled
+  if (process.env.ENABLE_VIDEO_RENDERING !== 'true') {
+    const storyboard = generateFallbackStoryboard(script, scenes);
+    return {
+      success: true, provider: 'storyboard-fallback', videoUrl: null,
+      storyboard, duration: duration || scenes.reduce((sum, s) => sum + (s.duration || 5), 0),
+      generatedAt: new Date().toISOString(),
+      warnings: ['Video rendering disabled due to server memory limit. Set ENABLE_VIDEO_RENDERING=true to enable.'],
+      reason: 'disabled_memory_limit',
+    };
+  }
+
   const warnings = [];
   const ratio = aspectRatio || '16:9';
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'video-slides-'));
@@ -182,12 +194,15 @@ export async function renderVideo({ script, scenes, duration, platform, aspectRa
 }
 
 export async function checkVideoProvider() {
+  const enabled = process.env.ENABLE_VIDEO_RENDERING === 'true';
+  if (!enabled) return { configured: false, provider: null, reason: 'disabled_memory_limit', videoEnabled: false };
   const fp = await getFfmpegPath();
   const available = !!(fp && fs.existsSync(fp));
   return {
     configured: available,
     provider: available ? 'ffmpeg' : null,
     reason: available ? 'available' : (fp ? 'binary_not_found_at_path' : 'missing_binary'),
+    videoEnabled: true,
   };
 }
 

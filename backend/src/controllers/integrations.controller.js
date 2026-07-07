@@ -14,10 +14,10 @@ export async function getHealth(req, res) {
     res.json({
       success: true,
       providers: {
-        email: { configured: email.configured, provider: email.provider || null, reason: email.reason || null },
+        email: { configured: email.configured, provider: email.provider || null, reason: email.reason || null, senderConfigured: email.senderConfigured ?? null },
         image: { huggingface: image.huggingface, replicate: image.replicate, reason: image.reason || null },
         storage: { configured: storage.configured, provider: storage.provider || null, reason: storage.reason || null },
-        video: { configured: video.configured, provider: video.provider || null, reason: video.reason || null },
+        video: { configured: video.configured, provider: video.provider || null, reason: video.reason || null, videoEnabled: video.videoEnabled ?? null },
         ai: { gemini: !!process.env.GEMINI_API_KEY, groq: !!process.env.GROQ_API_KEY },
       },
     });

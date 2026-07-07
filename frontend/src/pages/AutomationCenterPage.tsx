@@ -1596,13 +1596,27 @@ export default function AutomationCenterPage() {
         {showHealth && health && (
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', padding: '10px 14px', background: '#151d2b', borderRadius: '8px', border: '1px solid #293245' }}>
             <div style={{ fontSize: '11px', fontWeight: 600, color: '#9aa7bd', display: 'flex', alignItems: 'center', gap: '4px' }}><Wifi size={12} /> Integration Status:</div>
-            {[
-              { label: 'Email', ok: health.providers.email.configured, detail: health.providers.email.provider || 'Not configured', reason: health.providers.email.reason },
-              { label: 'Image', ok: health.providers.image.huggingface || health.providers.image.replicate, detail: `${health.providers.image.huggingface ? 'HF' : ''}${health.providers.image.huggingface && health.providers.image.replicate ? ' + ' : ''}${health.providers.image.replicate ? 'Replicate' : ''}${!health.providers.image.huggingface && !health.providers.image.replicate ? 'None' : ''}`, reason: health.providers.image.reason },
-              { label: 'Storage', ok: health.providers.storage.cloudinary, detail: health.providers.storage.cloudinary ? 'Cloudinary' : 'Local fallback', reason: health.providers.storage.reason },
-              { label: 'Video', ok: health.providers.video.configured, detail: health.providers.video.provider || 'Not available', reason: health.providers.video.reason },
-              { label: 'AI', ok: health.providers.ai.gemini || health.providers.ai.groq, detail: `${health.providers.ai.gemini ? 'Gemini' : ''}${health.providers.ai.gemini && health.providers.ai.groq ? ' + ' : ''}${health.providers.ai.groq ? 'Groq' : ''}${!health.providers.ai.gemini && !health.providers.ai.groq ? 'None' : ''}` },
-            ].map(item => (
+            {(() => {
+              const p = health.providers;
+              const reasonMap: Record<string, string> = {
+                missing_api_key: 'Missing API key', missing_sender_email: 'Missing sender email',
+                init_failed: 'Init failed', no_providers_configured: 'None', only_replicate_configured: 'Replicate only',
+                only_huggingface_configured: 'HF only', both_configured: 'HF + Replicate',
+                missing_env_vars: 'Missing config', disabled_memory_limit: 'Disabled (memory)',
+                missing_binary: 'Missing binary', binary_not_found_at_path: 'Binary not found',
+              };
+              const emailDesc = !p.email.configured ? (reasonMap[p.email.reason] || p.email.reason || 'Not configured') : 'Brevo';
+              const imgDesc = `${p.image.huggingface ? 'HF' : ''}${p.image.huggingface && p.image.replicate ? ' + ' : ''}${p.image.replicate ? 'Replicate' : ''}${!p.image.huggingface && !p.image.replicate ? (reasonMap[p.image.reason] || 'None') : ''}`;
+              const storageDesc = p.storage.configured ? 'Cloudinary' : (reasonMap[p.storage.reason] || 'Local fallback');
+              const videoDesc = p.video.configured ? 'FFmpeg' : (reasonMap[p.video.reason] || p.video.provider || 'Not available');
+              return [
+                { label: 'Email', ok: p.email.configured, detail: emailDesc, reason: p.email.reason },
+                { label: 'Image', ok: p.image.huggingface || p.image.replicate, detail: imgDesc, reason: p.image.reason },
+                { label: 'Storage', ok: p.storage.configured, detail: storageDesc, reason: p.storage.reason },
+                { label: 'Video', ok: p.video.configured, detail: videoDesc, reason: p.video.reason },
+                { label: 'AI', ok: p.ai.gemini || p.ai.groq, detail: `${p.ai.gemini ? 'Gemini' : ''}${p.ai.gemini && p.ai.groq ? ' + ' : ''}${p.ai.groq ? 'Groq' : ''}${!p.ai.gemini && !p.ai.groq ? 'None' : ''}` },
+              ];
+            })().map(item => (
               <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '4px', background: item.ok ? 'rgba(16,225,139,0.08)' : 'rgba(255,179,71,0.08)', border: `1px solid ${item.ok ? 'rgba(16,225,139,0.2)' : 'rgba(255,179,71,0.2)'}` }}>
                 <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: item.ok ? '#10e18b' : '#ffb347' }} />
                 <span style={{ fontSize: '10px', color: item.ok ? '#10e18b' : '#ffb347', fontWeight: 600 }}>{item.label}</span>
