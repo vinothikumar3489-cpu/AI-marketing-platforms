@@ -374,6 +374,7 @@ export default function SEOIntelligencePage() {
               ))}
             </div>
           </div>
+          <style>{`.dropdown:hover .dropdown-menu { display: block !important; }`}</style>
         </div>
         <Card>
           <SmartNavigation items={tabs.map(t => ({ id: t, label: t }))} activeId={activeTab} onNavigate={setActiveTab} />
