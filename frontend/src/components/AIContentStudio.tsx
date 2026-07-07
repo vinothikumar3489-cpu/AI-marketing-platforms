@@ -70,10 +70,10 @@ function IntegrationHealthPanel() {
   if (!health) return null;
   const { providers } = health;
   const items = [
-    { label: 'Email', ok: providers.email.configured, detail: providers.email.provider || 'Not configured' },
-    { label: 'Image', ok: providers.image.huggingface || providers.image.replicate, detail: `${providers.image.huggingface ? 'HF' : ''}${providers.image.huggingface && providers.image.replicate ? ' + ' : ''}${providers.image.replicate ? 'Replicate' : ''}${!providers.image.huggingface && !providers.image.replicate ? 'None' : ''}` },
-    { label: 'Storage', ok: providers.storage.cloudinary, detail: providers.storage.cloudinary ? 'Cloudinary' : 'Local fallback' },
-    { label: 'Video', ok: providers.video.configured, detail: providers.video.provider || 'Not available' },
+    { label: 'Email', ok: providers.email.configured, detail: providers.email.provider || 'Not configured', reason: providers.email.reason },
+    { label: 'Image', ok: providers.image.huggingface || providers.image.replicate, detail: `${providers.image.huggingface ? 'HF' : ''}${providers.image.huggingface && providers.image.replicate ? ' + ' : ''}${providers.image.replicate ? 'Replicate' : ''}${!providers.image.huggingface && !providers.image.replicate ? 'None' : ''}`, reason: providers.image.reason },
+    { label: 'Storage', ok: providers.storage.cloudinary, detail: providers.storage.cloudinary ? 'Cloudinary' : 'Local fallback', reason: providers.storage.reason },
+    { label: 'Video', ok: providers.video.configured, detail: providers.video.provider || 'Not available', reason: providers.video.reason },
     { label: 'AI', ok: providers.ai.gemini || providers.ai.groq, detail: `${providers.ai.gemini ? 'Gemini' : ''}${providers.ai.gemini && providers.ai.groq ? ' + ' : ''}${providers.ai.groq ? 'Groq' : ''}${!providers.ai.gemini && !providers.ai.groq ? 'None' : ''}` },
   ];
   return (
@@ -83,7 +83,7 @@ function IntegrationHealthPanel() {
         <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '4px', background: item.ok ? 'rgba(16,225,139,0.08)' : 'rgba(255,179,71,0.08)', border: `1px solid ${item.ok ? 'rgba(16,225,139,0.2)' : 'rgba(255,179,71,0.2)'}` }}>
           <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: item.ok ? C.excellent : C.needsImprovement }} />
           <span style={{ fontSize: '10px', color: item.ok ? C.excellent : C.needsImprovement, fontWeight: 600 }}>{item.label}</span>
-          <span style={{ fontSize: '9px', color: C.dim }}>{item.detail}</span>
+          <span style={{ fontSize: '9px', color: C.dim }}>{item.detail}{item.reason ? ` (${item.reason})` : ''}</span>
         </div>
       ))}
     </div>

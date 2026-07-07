@@ -1597,16 +1597,16 @@ export default function AutomationCenterPage() {
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', padding: '10px 14px', background: '#151d2b', borderRadius: '8px', border: '1px solid #293245' }}>
             <div style={{ fontSize: '11px', fontWeight: 600, color: '#9aa7bd', display: 'flex', alignItems: 'center', gap: '4px' }}><Wifi size={12} /> Integration Status:</div>
             {[
-              { label: 'Email', ok: health.providers.email.configured, detail: health.providers.email.provider || 'Not configured' },
-              { label: 'Image', ok: health.providers.image.huggingface || health.providers.image.replicate, detail: `${health.providers.image.huggingface ? 'HF' : ''}${health.providers.image.huggingface && health.providers.image.replicate ? ' + ' : ''}${health.providers.image.replicate ? 'Replicate' : ''}${!health.providers.image.huggingface && !health.providers.image.replicate ? 'None' : ''}` },
-              { label: 'Storage', ok: health.providers.storage.cloudinary, detail: health.providers.storage.cloudinary ? 'Cloudinary' : 'Local fallback' },
-              { label: 'Video', ok: health.providers.video.configured, detail: health.providers.video.provider || 'Not available' },
+              { label: 'Email', ok: health.providers.email.configured, detail: health.providers.email.provider || 'Not configured', reason: health.providers.email.reason },
+              { label: 'Image', ok: health.providers.image.huggingface || health.providers.image.replicate, detail: `${health.providers.image.huggingface ? 'HF' : ''}${health.providers.image.huggingface && health.providers.image.replicate ? ' + ' : ''}${health.providers.image.replicate ? 'Replicate' : ''}${!health.providers.image.huggingface && !health.providers.image.replicate ? 'None' : ''}`, reason: health.providers.image.reason },
+              { label: 'Storage', ok: health.providers.storage.cloudinary, detail: health.providers.storage.cloudinary ? 'Cloudinary' : 'Local fallback', reason: health.providers.storage.reason },
+              { label: 'Video', ok: health.providers.video.configured, detail: health.providers.video.provider || 'Not available', reason: health.providers.video.reason },
               { label: 'AI', ok: health.providers.ai.gemini || health.providers.ai.groq, detail: `${health.providers.ai.gemini ? 'Gemini' : ''}${health.providers.ai.gemini && health.providers.ai.groq ? ' + ' : ''}${health.providers.ai.groq ? 'Groq' : ''}${!health.providers.ai.gemini && !health.providers.ai.groq ? 'None' : ''}` },
             ].map(item => (
               <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '4px', background: item.ok ? 'rgba(16,225,139,0.08)' : 'rgba(255,179,71,0.08)', border: `1px solid ${item.ok ? 'rgba(16,225,139,0.2)' : 'rgba(255,179,71,0.2)'}` }}>
                 <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: item.ok ? '#10e18b' : '#ffb347' }} />
                 <span style={{ fontSize: '10px', color: item.ok ? '#10e18b' : '#ffb347', fontWeight: 600 }}>{item.label}</span>
-                <span style={{ fontSize: '9px', color: '#6b7280' }}>{item.detail}</span>
+                <span style={{ fontSize: '9px', color: '#6b7280' }}>{item.detail}{item.reason ? ` (${item.reason})` : ''}</span>
               </div>
             ))}
           </div>

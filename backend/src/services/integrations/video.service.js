@@ -12,17 +12,20 @@ async function getFfmpegPath() {
   ffmpegChecked = true;
   if (process.env.FFMPEG_PATH) {
     ffmpegPath = process.env.FFMPEG_PATH;
+    console.log('[VideoService] Using FFMPEG_PATH env:', ffmpegPath);
     return ffmpegPath;
   }
   try {
     const ffmpegStatic = (await import('ffmpeg-static'));
     ffmpegPath = ffmpegStatic.default || ffmpegStatic;
+    console.log('[VideoService] ffmpeg-static resolved:', ffmpegPath ? 'found' : 'not found');
   } catch {
     try {
       const { default: ffstatic } = await import('ffmpeg-static');
       ffmpegPath = ffstatic;
-    } catch {
-      console.warn('[VideoService] ffmpeg-static not available');
+      console.log('[VideoService] ffmpeg-static resolved (alt):', ffmpegPath ? 'found' : 'not found');
+    } catch (e) {
+      console.warn('[VideoService] ffmpeg-static not available:', e.message);
     }
   }
   return ffmpegPath;
@@ -94,6 +97,7 @@ export async function renderVideo({ script, scenes, duration, platform, aspectRa
         slideBuffers.push(buf);
       } catch (slideErr) {
         warnings.push(`Scene ${i + 1} slide generation failed, using blank`);
+        console.error('[VideoService] Slide generation error:', { scene: i, error: slideErr.message?.slice(0, 200) });
         const blankBuf = await sharp({
           create: { width: 1920, height: 1080, channels: 4, background: '#1a1a2e' }
         }).png().toBuffer();
@@ -151,12 +155,17 @@ export async function renderVideo({ script, scenes, duration, platform, aspectRa
           generatedAt: new Date().toISOString(), warnings,
         };
       } catch (ffmpegError) {
+        const diag = { ffmpegPath: fp, platform: process.platform, tempDir: tmpDir, error: ffmpegError.message?.slice(0, 300) };
+        console.error('[VideoService] FFmpeg rendering error:', diag);
         warnings.push('FFmpeg rendering failed: ' + ffmpegError.message);
       }
     } else {
+      const diag = { ffmpegPath: fp, ffmpegExists: fp ? fs.existsSync(fp) : false, platform: process.platform };
+      console.warn('[VideoService] FFmpeg not available:', diag);
       warnings.push('FFmpeg not available on this system');
     }
   } catch (err) {
+    console.error('[VideoService] Slide generation error:', { error: err.message?.slice(0, 300) });
     warnings.push('Slide generation failed: ' + err.message);
   }
 
@@ -174,5 +183,24 @@ export async function renderVideo({ script, scenes, duration, platform, aspectRa
 
 export async function checkVideoProvider() {
   const fp = await getFfmpegPath();
-  return { configured: !!(fp && fs.existsSync(fp)), provider: fp ? 'ffmpeg' : null };
+  const available = !!(fp && fs.existsSync(fp));
+  return {
+    configured: available,
+    provider: available ? 'ffmpeg' : null,
+    reason: available ? 'available' : (fp ? 'binary_not_found_at_path' : 'missing_binary'),
+  };
+}
+
+export async function testFfmpegConnection() {
+  const fp = await getFfmpegPath();
+  if (!fp || !fs.existsSync(fp)) {
+    return { success: false, reason: 'missing_binary', provider: 'ffmpeg', ffmpegPath: fp };
+  }
+  try {
+    const { execSync } = await import('child_process');
+    const version = execSync(`"${fp}" -version`, { encoding: 'utf8', timeout: 10000 }).split('\n')[0] || 'unknown';
+    return { success: true, reason: 'available', provider: 'ffmpeg', ffmpegPath: fp, version: version.slice(0, 100) };
+  } catch (err) {
+    return { success: false, reason: 'execution_failed', provider: 'ffmpeg', ffmpegPath: fp, error: err.message?.slice(0, 200) };
+  }
 }

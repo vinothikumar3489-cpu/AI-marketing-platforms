@@ -1,7 +1,7 @@
 import { sendTestEmail, checkEmailProvider } from '../services/integrations/email.service.js';
-import { checkStorageProvider } from '../services/integrations/storage.service.js';
-import { generateImage, checkImageProviders } from '../services/integrations/image.service.js';
-import { renderVideo, checkVideoProvider } from '../services/integrations/video.service.js';
+import { checkStorageProvider, testCloudinaryConnection } from '../services/integrations/storage.service.js';
+import { generateImage, checkImageProviders, testReplicateConnection, testHuggingFaceConnection } from '../services/integrations/image.service.js';
+import { renderVideo, checkVideoProvider, testFfmpegConnection } from '../services/integrations/video.service.js';
 import { prisma } from '../config/prisma.js';
 
 export async function getHealth(req, res) {
@@ -14,10 +14,10 @@ export async function getHealth(req, res) {
     res.json({
       success: true,
       providers: {
-        email: { configured: email.configured, provider: email.provider || null },
-        image: { huggingface: image.huggingface, replicate: image.replicate },
-        storage: { cloudinary: storage.configured },
-        video: { configured: video.configured, provider: video.provider || null },
+        email: { configured: email.configured, provider: email.provider || null, reason: email.reason || null },
+        image: { huggingface: image.huggingface, replicate: image.replicate, reason: image.reason || null },
+        storage: { configured: storage.configured, provider: storage.provider || null, reason: storage.reason || null },
+        video: { configured: video.configured, provider: video.provider || null, reason: video.reason || null },
         ai: { gemini: !!process.env.GEMINI_API_KEY, groq: !!process.env.GROQ_API_KEY },
       },
     });
@@ -115,4 +115,24 @@ export async function renderVideoHandler(req, res) {
     console.error('[Integrations] Render video error:', error.message);
     res.status(500).json({ success: false, error: 'Video rendering failed', details: 'Internal server error' });
   }
+}
+
+export async function debugTestReplicate(req, res) {
+  const result = await testReplicateConnection();
+  res.json(result);
+}
+
+export async function debugTestHuggingFace(req, res) {
+  const result = await testHuggingFaceConnection();
+  res.json(result);
+}
+
+export async function debugTestCloudinary(req, res) {
+  const result = await testCloudinaryConnection();
+  res.json(result);
+}
+
+export async function debugTestFFmpeg(req, res) {
+  const result = await testFfmpegConnection();
+  res.json(result);
 }

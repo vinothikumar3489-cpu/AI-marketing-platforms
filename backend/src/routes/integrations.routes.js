@@ -1,7 +1,7 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
 import { requireAuth } from "../middleware/auth.middleware.js";
-import { getHealth, sendEmail, generatePosterImage, renderVideoHandler } from "../controllers/integrations.controller.js";
+import { getHealth, sendEmail, generatePosterImage, renderVideoHandler, debugTestReplicate, debugTestHuggingFace, debugTestCloudinary, debugTestFFmpeg } from "../controllers/integrations.controller.js";
 
 export const integrationsRouter = express.Router();
 
@@ -59,3 +59,16 @@ integrationsRouter.get("/seo/status", (req, res) => {
   };
   return res.json({ status });
 });
+
+// Debug / diagnostics endpoints (guarded by env var)
+const debugGuard = (req, res, next) => {
+  if (process.env.DEBUG_INTEGRATIONS !== 'true') {
+    return res.status(403).json({ success: false, error: 'Debug endpoints are disabled. Set DEBUG_INTEGRATIONS=true to enable.' });
+  }
+  next();
+};
+
+integrationsRouter.get("/debug/replicate", debugGuard, debugTestReplicate);
+integrationsRouter.get("/debug/huggingface", debugGuard, debugTestHuggingFace);
+integrationsRouter.get("/debug/cloudinary", debugGuard, debugTestCloudinary);
+integrationsRouter.get("/debug/ffmpeg", debugGuard, debugTestFFmpeg);
