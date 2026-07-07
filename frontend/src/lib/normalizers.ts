@@ -618,13 +618,17 @@ export function normalizeSeo(data: any) {
   const tabTechnical = safeParse(seo.technicalAuditDetail || seo.technicalAudit || seo.technicalSeoAudit || {});
 
   // Keywords: JSON column = keywordOpportunities (exact service format), relation = keywordIntelligenceRecord
-  const tabKeywords = safeParse(
+  const tabKeywordsRaw = safeParse(
     seo.keywordOpportunities ||
     seo.keywordIntelligenceRecord ||
     seo.keywordIntelligence ||
     seo.keywords ||
     {}
   );
+  // Handle case where keywordOpportunities is a flat array (AI fallback) vs object with categories
+  const tabKeywords = Array.isArray(tabKeywordsRaw)
+    ? { primaryKeywords: tabKeywordsRaw, secondaryKeywords: [], longTailKeywords: [], questionKeywords: [], clusters: [], competitorKeywords: [], contentOpportunities: [], geoKeywords: [], metadata: { totalKeywords: tabKeywordsRaw.length } }
+    : tabKeywordsRaw;
 
   // Competitors: JSON column = competitorKeywords (exact raw format), relation = competitorSeoRecord (partial subset)
   const rawCompetitorJson = seo.competitorKeywords;

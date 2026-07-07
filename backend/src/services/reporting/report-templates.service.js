@@ -947,7 +947,7 @@ ${getReportStyles()}
   ${keywords.length > 0 ? dataTable(
     ['Keyword', 'Volume', 'Difficulty', 'Intent', 'Confidence'],
     keywords.slice(0, 35).map(k => [
-      safe(k.keyword || k),
+      safe(k.keyword || k.term || k.title || k.value || k.name || (typeof k === 'string' ? k : null)),
       k.volume || k.searchVolume ? `${k.volume || k.searchVolume}` : '<span class="na">—</span>',
       k.keywordDifficulty || k.difficulty ? `${k.keywordDifficulty || k.difficulty}/100` : '<span class="na">—</span>',
       safe(k.intent, 'Informational'),
@@ -980,7 +980,7 @@ ${getReportStyles()}
   ${gaps.length > 0 ? dataTable(
     ['Topic', 'Priority', 'Volume', 'Difficulty', 'Confidence'],
     gaps.slice(0, 20).map(g => [
-      safe(g.value || g.topic || g.title || g),
+      safe(g.value || g.topic || g.title || (typeof g === 'string' ? g : null)),
       priorityBadge(g.priority || g.severity || 'medium'),
       g.searchVolume || g.volume ? `${g.searchVolume || g.volume}` : '<span class="na">—</span>',
       g.keywordDifficulty || g.difficulty ? `${g.keywordDifficulty || g.difficulty}/100` : '<span class="na">—</span>',
@@ -1007,7 +1007,7 @@ ${getReportStyles()}
   ${blogs.length > 0 ? dataTable(
     ['Title', 'Target Keyword', 'Volume', 'Difficulty', 'Intent', 'Confidence'],
     blogs.slice(0, 18).map(b => [
-      safe(b.title || b.topic || b),
+      safe(b.title || b.topic || (typeof b === 'string' ? b : null)),
       safe(b.targetKeyword || b.keyword),
       b.searchVolume || b.volume ? `${b.searchVolume || b.volume}` : '<span class="na">—</span>',
       b.keywordDifficulty || b.difficulty ? `${b.keywordDifficulty || b.difficulty}/100` : '<span class="na">—</span>',
@@ -1041,7 +1041,7 @@ ${getReportStyles()}
       ${dataTable(
         ['Action', 'Priority', 'Impact', 'Confidence'],
         p.items.slice(0, 8).map(a => [
-          safe(a.title || a.action || a.task || a.recommendation || a),
+          safe(a.title || a.action || a.task || a.recommendation || (typeof a === 'string' ? a : null)),
           priorityBadge(a.priority || a.severity || 'medium'),
           safe(a.impact || a.area || a.reason, 'Metrics pending'),
           confidenceBadge(a.confidence)

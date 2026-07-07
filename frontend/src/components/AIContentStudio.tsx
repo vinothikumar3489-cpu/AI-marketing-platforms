@@ -1152,8 +1152,8 @@ export function VideoStudio({ evidence, onSave }: { evidence: EvidenceRef[]; onS
                       <source src={videoResult.videoUrl} type="video/mp4" />
                     </video>
                     <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
-                      <a href={videoResult.videoUrl} target="_blank" rel="noopener noreferrer" style={{ ...S.btn(C.good), textDecoration: 'none' }}><Download size={12} /> Download MP4</a>
-                      <button onClick={() => navigator.clipboard.writeText(videoResult.videoUrl)} style={S.btn(C.accent)}><Copy size={12} /> Copy URL</button>
+                      {videoResult.videoUrl && <a href={videoResult.videoUrl} target="_blank" rel="noopener noreferrer" style={{ ...S.btn(C.good), textDecoration: 'none' }}><Download size={12} /> Download MP4</a>}
+                      {videoResult.videoUrl && <button onClick={() => navigator.clipboard.writeText(videoResult.videoUrl)} style={S.btn(C.accent)}><Copy size={12} /> Copy URL</button>}
                       <button onClick={() => onSave({ id: generateId(), type: 'video', subType: 'rendered-video', title: `Video: ${topic || 'Rendered'}`, content: videoResult, confidence: 90, generatedAt: now(), approvalStatus: 'draft' })} style={S.btn(C.excellent)}><Save size={12} /> Save to Library</button>
                     </div>
                   </div>

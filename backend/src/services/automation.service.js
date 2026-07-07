@@ -62,7 +62,8 @@ export async function generateAutomationPlanWithAI(context) {
   const audienceData = productIntelligence?.audienceIntelligence || {};
   const campaignData = campaignIntelligence?.campaignGenerator || {};
   const channelData = campaignIntelligence?.channelRecommendation || {};
-  const seoKeywords = seoIntelligence?.keywordOpportunities || null;
+  const seoKeywordsRaw = seoIntelligence?.keywordOpportunities;
+  const seoKeywords = Array.isArray(seoKeywordsRaw) ? seoKeywordsRaw : null;
   const seoContentGaps = seoIntelligence?.contentGaps || null;
   const seoBlogIdeas = seoIntelligence?.blogIdeas || null;
   const seoCompetitorKeywords = seoIntelligence?.competitorKeywords || null;
@@ -98,9 +99,9 @@ ${industry ? `Industry: ${industry}` : ""}
 ${targetAudience ? `Target Audience: ${targetAudience}` : ""}
 ${channels.length > 0 ? `Channels: ${channels.map(c => c.channel).join(", ")}` : ""}
 ${seoScore !== null ? `SEO Score: ${seoScore}/100` : ""}
-${seoKeywords ? `SEO Keywords: ${JSON.stringify(seoKeywords.slice(0, 10))}` : ""}
-${seoContentGaps ? `Content Gaps: ${JSON.stringify(seoContentGaps.slice(0, 5))}` : ""}
-${seoBlogIdeas ? `Blog Ideas: ${JSON.stringify(seoBlogIdeas.slice(0, 5))}` : ""}
+${Array.isArray(seoKeywords) && seoKeywords.length > 0 ? `SEO Keywords: ${JSON.stringify(seoKeywords.slice(0, 10))}` : ""}
+${Array.isArray(seoContentGaps) && seoContentGaps.length > 0 ? `Content Gaps: ${JSON.stringify(seoContentGaps.slice(0, 5))}` : ""}
+${Array.isArray(seoBlogIdeas) && seoBlogIdeas.length > 0 ? `Blog Ideas: ${JSON.stringify(seoBlogIdeas.slice(0, 5))}` : ""}
 ${growthWorkspace ? `Growth Score: ${JSON.stringify(growthWorkspace.overallGrowthScore)}` : ""}
 ${executiveStory?.companyOverview?.name ? `Company Name: ${executiveStory.companyOverview.name}` : ""}
 
@@ -324,7 +325,7 @@ function generateEvidenceBasedPlan(context) {
       };
     });
   }
-  if (hasSeoData && seoInfo.keywordOpportunities?.length) {
+  if (hasSeoData && Array.isArray(seoInfo.keywordOpportunities) && seoInfo.keywordOpportunities.length > 0) {
     weeklyPlan['SEO Day 1'] = {
       title: 'Target top SEO keywords for content creation',
       evidence: 'seo_keyword_opportunities',
@@ -341,10 +342,10 @@ function generateEvidenceBasedPlan(context) {
 
   // === COLD EMAIL DRAFTS ===
   const coldEmails = [];
-  if (hasSeoData && seoInfo.keywordOpportunities?.length) {
+  if (hasSeoData && Array.isArray(seoInfo.keywordOpportunities) && seoInfo.keywordOpportunities.length > 0) {
     const keywords = seoInfo.keywordOpportunities.slice(0, 3);
     keywords.forEach((kw, i) => {
-      const kwText = typeof kw === 'string' ? kw : kw.keyword || kw.value || kw;
+      const kwText = typeof kw === 'string' ? kw : (kw?.keyword || kw?.term || kw?.value || '');
       coldEmails.push({
         subject: `Insights on ${kwText} for ${companyName || product}`,
         previewText: `How ${companyName || product} can leverage ${kwText} for growth`,
@@ -516,7 +517,7 @@ function generateEvidenceBasedPlan(context) {
 
   // === GOOGLE ADS ===
   const googleAds = [];
-  const keywordsTexts = seoInfo.keywordOpportunities?.slice(0, 5).map((k) => typeof k === 'string' ? k : k.keyword || k.value || k).filter(Boolean) || [];
+  const keywordsTexts = Array.isArray(seoInfo.keywordOpportunities) ? seoInfo.keywordOpportunities.slice(0, 5).map((k) => typeof k === 'string' ? k : (k?.keyword || k?.term || k?.value || '')).filter(Boolean) : [];
   if (keywordsTexts.length > 0) {
     const groupSize = Math.min(3, keywordsTexts.length);
     const adGroup1 = keywordsTexts.slice(0, groupSize);

@@ -1347,7 +1347,9 @@ function KeywordIntelligence({ data }: { data: any }) {
   // Filter out irrelevant brand/competitor keyword pollution
   const pollutedTerms = ['canva', 'semrush', 'wix', 'wordpress', 'shopify', 'squarespace', 'godaddy', 'weebly', 'joomla', 'magento', 'clickfunnels', 'unbounce', 'leadpages', 'instapage', 'landingi'];
   const isRelevantKeyword = (k: any) => {
-    const kw = (k.keyword || k || '').toLowerCase().trim();
+    const kwText = typeof k === 'string' ? k : (k?.keyword || k?.term || k?.title || k?.name || '');
+    const kw = String(kwText || '').toLowerCase().trim();
+    if (!kw) return true;
     return !pollutedTerms.some(t => kw === t || kw.startsWith(t + ' ') || kw.endsWith(' ' + t) || kw.includes(t + ' vs') || kw.includes(' vs ' + t));
   };
   

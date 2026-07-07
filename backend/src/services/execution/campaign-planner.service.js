@@ -28,10 +28,10 @@ REQUIRED OUTPUT FIELDS (return valid JSON):
   "campaignName": "Campaign name",
   "campaignGoal": "Primary campaign goal",
   "budget": {
-    "total": "Total budget (or 'To be determined')",
+    "total": "Total budget (or null if not provided)",
     "allocations": { "channel_or_activity": "amount or percentage" }
   },
-  "expectedROI": "Estimated ROI (or 'To be determined based on actual performance')",
+  "expectedROI": "Estimated ROI (or null if not determined)",
   "kpis": {
     "primary": [{ "metric": "metric name", "target": "target value", "measurementMethod": "how to measure" }],
     "secondary": [{ "metric": "metric name", "target": "target value" }]
@@ -53,7 +53,7 @@ REQUIRED OUTPUT FIELDS (return valid JSON):
 }
 
 RULES:
-1. Budget must be "To be determined" unless explicitly provided.
+1. Budget must be null unless explicitly provided.
 2. KPIs must be specific and measurable.
 3. Timeline phases must cover the full ${typeConfig.days} days.
 4. Risk assessment must be realistic.

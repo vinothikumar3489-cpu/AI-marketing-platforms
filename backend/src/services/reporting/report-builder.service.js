@@ -347,17 +347,26 @@ function normalizeSeoIntelligence(seoIntel) {
 
 function normalizeSeoKeywordArray(keywordRecord) {
   if (!keywordRecord) return [];
-  if (Array.isArray(keywordRecord)) return keywordRecord;
+  if (Array.isArray(keywordRecord)) {
+    return keywordRecord.map(k => {
+      if (typeof k === 'string') return k;
+      if (typeof k === 'object' && k !== null) return k.keyword || k.term || k.title || k.value || k.name || '';
+      return String(k);
+    }).filter(Boolean);
+  }
   if (typeof keywordRecord === 'object') {
     const result = [];
     ['primaryKeywords', 'secondaryKeywords', 'longTailKeywords', 'questionKeywords', 'competitorKeywords', 'contentOpportunities', 'geoKeywords', 'blogIdeas'].forEach(key => {
       if (Array.isArray(keywordRecord[key])) {
-        result.push(...keywordRecord[key]);
+        keywordRecord[key].forEach(k => {
+          if (typeof k === 'string') result.push(k);
+          else if (typeof k === 'object' && k !== null) result.push(k.keyword || k.term || k.title || k.value || k.name || '');
+        });
       } else if (typeof keywordRecord[key] === 'string') {
         result.push(keywordRecord[key]);
       }
     });
-    return result.length > 0 ? result : extractArray(keywordRecord);
+    return result.length > 0 ? result.filter(Boolean) : extractArray(keywordRecord);
   }
   return [];
 }

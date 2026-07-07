@@ -41,7 +41,7 @@ EVIDENCE REQUIREMENTS:
 - Meta description must be under 160 characters
 - SEO keywords must be comma-separated, max 10
 
-Return valid JSON with all required fields. Do NOT invent fake statistics, testimonials, or case study numbers. Use "To be determined" or "based on further research" for unverified data.`;
+Return valid JSON with all required fields. Do NOT invent fake statistics, testimonials, or case study numbers. If data is unavailable, use "Data unavailable" or leave null. Never use placeholder text like "To be determined".`;
 
   try {
     const result = await callAI(prompt);
