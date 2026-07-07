@@ -1,6 +1,12 @@
 import { uploadBuffer } from './storage.service.js';
 
-const REPLICATE_IMAGE_MODEL = process.env.REPLICATE_IMAGE_MODEL || 'black-forest-labs/flux-schnell';
+const PRIMARY_MODELS = [
+  process.env.REPLICATE_IMAGE_MODEL || 'black-forest-labs/flux-schnell',
+  'black-forest-labs/flux-schnell',
+  'stability-ai/sdxl',
+  'bytedance/sdxl-lightning-4step',
+].filter(Boolean);
+const REPLICATE_IMAGE_MODEL = PRIMARY_MODELS[0];
 const HUGGINGFACE_IMAGE_MODEL = process.env.HUGGINGFACE_IMAGE_MODEL || 'black-forest-labs/FLUX.1-schnell';
 
 function escapeXml(str) {
@@ -8,37 +14,98 @@ function escapeXml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
+function dimensionsToAspectRatio(width, height) {
+  if (!width || !height) return '1:1';
+  const ratios = [
+    { w: 1, h: 1, label: '1:1' },
+    { w: 4, h: 3, label: '4:3' },
+    { w: 3, h: 2, label: '3:2' },
+    { w: 16, h: 9, label: '16:9' },
+    { w: 9, h: 16, label: '9:16' },
+    { w: 3, h: 4, label: '3:4' },
+  ];
+  const ratio = width / height;
+  let best = ratios[0];
+  let bestDiff = Math.abs(ratio - best.w / best.h);
+  for (const r of ratios) {
+    const diff = Math.abs(ratio - r.w / r.h);
+    if (diff < bestDiff) { best = r; bestDiff = diff; }
+  }
+  return best.label;
+}
+
+function extractImageUrl(output) {
+  if (!output) return null;
+  if (typeof output === 'string') return output;
+  if (output instanceof URL) return output.href;
+  if (typeof output?.url === 'function') {
+    const u = output.url();
+    return u instanceof URL ? u.href : u;
+  }
+  if (typeof output?.toString === 'function') return output.toString();
+  if (Array.isArray(output)) return extractImageUrl(output[0]);
+  return null;
+}
+
 async function generateWithReplicate(prompt, width, height) {
   const hasToken = !!process.env.REPLICATE_API_TOKEN;
+  const startMs = Date.now();
   try {
     if (!hasToken) {
       console.error('[Replicate Image Error]', { configured: false, reason: 'missing_api_key' });
       return { success: false, error: 'Replicate API token not configured', diagnostic: { configured: false, reason: 'missing_api_key' } };
     }
     const Replicate = (await import('replicate')).default;
-    const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
-    const input = { prompt, num_outputs: 1, output_format: 'png' };
-    if (width && height) { input.width = width; input.height = height; }
+    const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN, useFileOutput: false });
+    const aspectRatio = dimensionsToAspectRatio(width, height);
+    const input = { prompt, num_outputs: 1, output_format: 'png', aspect_ratio: aspectRatio };
     const output = await replicate.run(REPLICATE_IMAGE_MODEL, { input });
-    const imageUrl = Array.isArray(output) ? output[0] : output;
-    return { success: true, provider: 'replicate', imageUrl };
+    const imageUrl = extractImageUrl(output);
+    if (!imageUrl) return { success: false, error: 'Empty output from Replicate', diagnostic: { provider: 'replicate', model: REPLICATE_IMAGE_MODEL, errorType: 'empty_output' } };
+    return { success: true, provider: 'replicate', imageUrl, latency: Date.now() - startMs };
   } catch (err) {
     const status = err?.response?.status || err?.status || 0;
-    const errType = err?.response?.data?.detail || err?.message || '';
-    const isModelNotFound = errType.includes('not found') || errType.includes('invalid version') || status === 404;
-    const isAuthError = status === 401 || status === 403;
-    const isQuotaError = status === 429 || errType.includes('quota') || errType.includes('rate limit') || errType.includes('billing');
+    const errData = err?.response?.data;
+    const errMsg = typeof errData === 'object' ? JSON.stringify(errData) : (errData || err?.message || '');
+    const isModelNotFound = errMsg.includes('not found') || errMsg.includes('invalid version') || status === 404;
+    const isAuthError = status === 401 || status === 403 || errMsg.includes('invalid token');
+    const isQuotaError = status === 429 || errMsg.toLowerCase().includes('quota') || errMsg.toLowerCase().includes('rate limit') || errMsg.toLowerCase().includes('billing') || errMsg.toLowerCase().includes('payment');
+    let errorType = 'api_error';
+    if (isModelNotFound) errorType = 'model_not_found';
+    else if (isAuthError) errorType = 'invalid_key';
+    else if (isQuotaError) errorType = 'quota_or_billing_issue';
+    else if (errMsg.includes('input') || errMsg.includes('schema') || errMsg.includes('validation')) errorType = 'invalid_payload';
+    else if (err.name === 'AbortError' || errMsg.includes('timeout')) errorType = 'timeout';
     const diagnostic = {
       provider: 'replicate',
       configured: hasToken,
       model: REPLICATE_IMAGE_MODEL,
       status,
-      errorType: isModelNotFound ? 'model_not_found' : isAuthError ? 'invalid_key' : isQuotaError ? 'quota_or_billing_issue' : 'api_error',
-      message: errType.slice(0, 200)
+      errorType,
+      message: (errMsg || err?.message || '').slice(0, 300),
     };
     console.error('[Replicate Image Error]', diagnostic);
-    return { success: false, error: errType, diagnostic };
+    return { success: false, error: errMsg, diagnostic, latency: Date.now() - startMs };
   }
+}
+
+async function generateWithReplicateFallback(prompt, width, height) {
+  let lastError = null;
+  for (const model of PRIMARY_MODELS) {
+    const Replicate = (await import('replicate')).default;
+    const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN, useFileOutput: false });
+    const aspectRatio = dimensionsToAspectRatio(width, height);
+    const input = { prompt, num_outputs: 1, output_format: 'png', aspect_ratio: aspectRatio };
+    try {
+      const output = await replicate.run(model, { input });
+      const imageUrl = extractImageUrl(output);
+      if (imageUrl) return { success: true, provider: 'replicate', imageUrl, model };
+    } catch (fallbackErr) {
+      lastError = fallbackErr;
+      console.warn(`[Replicate] Model ${model} failed, trying next:`, fallbackErr.message?.slice(0, 100));
+    }
+  }
+  return { success: false, error: lastError?.message || 'All Replicate models failed', diagnostic: { provider: 'replicate', configured: true, errorType: 'all_models_failed' } };
 }
 
 async function generateWithHuggingFace(prompt) {
@@ -49,29 +116,35 @@ async function generateWithHuggingFace(prompt) {
       return { success: false, error: 'HuggingFace API key not configured', diagnostic: { configured: false, reason: 'missing_api_key' } };
     }
     const fetch = (await import('node-fetch')).default;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
     const response = await fetch(
       `https://api-inference.huggingface.co/models/${HUGGINGFACE_IMAGE_MODEL}`,
       {
         headers: { Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}` },
         method: 'POST',
         body: JSON.stringify({ inputs: prompt }),
+        signal: controller.signal,
       }
     );
+    clearTimeout(timeout);
     if (!response.ok) {
       const status = response.status;
+      let body = '';
+      try { body = await response.text(); } catch {}
       let reason = 'api_error';
-      if (status === 401 || status === 403) reason = 'invalid_key_or_no_access';
+      if (status === 401 || status === 403) reason = body.includes('token') ? 'invalid_key' : 'no_access';
       else if (status === 404) reason = 'model_not_found';
       else if (status === 429) reason = 'rate_limit';
       else if (status === 503) reason = 'model_loading_or_unavailable';
-      const diagnostic = { provider: 'huggingface', configured: hasToken, model: HUGGINGFACE_IMAGE_MODEL, status, reason };
+      const diagnostic = { provider: 'huggingface', configured: hasToken, model: HUGGINGFACE_IMAGE_MODEL, status, reason, body: body.slice(0, 300) };
       console.error('[HuggingFace Image Error]', diagnostic);
-      return { success: false, error: `HuggingFace returned ${status}`, diagnostic };
+      return { success: false, error: `HuggingFace returned ${status}: ${body.slice(0, 200)}`, diagnostic };
     }
     const buffer = Buffer.from(await response.arrayBuffer());
     return { success: true, provider: 'huggingface', buffer };
   } catch (err) {
-    const diagnostic = { provider: 'huggingface', configured: hasToken, model: HUGGINGFACE_IMAGE_MODEL, error: err.message?.slice(0, 200) };
+    const diagnostic = { provider: 'huggingface', configured: hasToken, model: HUGGINGFACE_IMAGE_MODEL, error: err.message?.slice(0, 300) };
     console.error('[HuggingFace Image Error]', diagnostic);
     return { success: false, error: err.message, diagnostic };
   }
@@ -155,6 +228,9 @@ export async function generateImage({ prompt, headline, cta, platform, dimension
   // Try Replicate first
   if (process.env.REPLICATE_API_TOKEN) {
     result = await generateWithReplicate(finalPrompt, width, height);
+    if (!result.success && PRIMARY_MODELS.length > 1) {
+      result = await generateWithReplicateFallback(finalPrompt, width, height);
+    }
     if (result.success) {
       try {
         const fetch = (await import('node-fetch')).default;
@@ -177,7 +253,8 @@ export async function generateImage({ prompt, headline, cta, platform, dimension
       }
     }
     const diag = result.diagnostic || {};
-    warnings.push(`Replicate image generation failed: ${diag.reason || diag.errorType || 'unknown error'}`);
+    const reasonStr = diag.errorType || diag.reason || 'unknown_error';
+    warnings.push(`Replicate failed: ${reasonStr}${diag.status ? ` (HTTP ${diag.status})` : ''}${diag.model ? ` — model: ${diag.model}` : ''}`);
     warnings.push('Trying HuggingFace');
   }
 
@@ -193,7 +270,8 @@ export async function generateImage({ prompt, headline, cta, platform, dimension
       };
     }
     const diag = result.diagnostic || {};
-    warnings.push(`HuggingFace image generation failed: ${diag.reason || diag.errorType || 'unknown error'}`);
+    const hfReason = diag.reason || diag.errorType || 'unknown_error';
+    warnings.push(`HuggingFace failed: ${hfReason}${diag.status ? ` (HTTP ${diag.status})` : ''}${diag.body ? ` — ${String(diag.body).slice(0, 200)}` : ''}`);
     warnings.push('Using SVG fallback');
   }
 
@@ -223,21 +301,31 @@ export async function checkImageProviders() {
 export async function testReplicateConnection() {
   const hasToken = !!process.env.REPLICATE_API_TOKEN;
   if (!hasToken) return { success: false, reason: 'missing_api_key', provider: 'replicate' };
+  const startMs = Date.now();
   try {
     const Replicate = (await import('replicate')).default;
-    const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
-    const input = { prompt: 'simple modern marketing poster', num_outputs: 1, output_format: 'png', width: 512, height: 512 };
+    const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN, useFileOutput: false });
+    const input = { prompt: 'simple professional marketing poster', num_outputs: 1, output_format: 'png', aspect_ratio: '1:1' };
     const output = await replicate.run(REPLICATE_IMAGE_MODEL, { input });
-    if (output) return { success: true, reason: 'configured', provider: 'replicate', model: REPLICATE_IMAGE_MODEL };
-    return { success: false, reason: 'empty_response', provider: 'replicate' };
+    const imageUrl = extractImageUrl(output);
+    const latency = Date.now() - startMs;
+    return {
+      success: true, reason: 'configured', provider: 'replicate',
+      model: REPLICATE_IMAGE_MODEL, latency,
+      outputType: typeof output,
+      previewUrl: imageUrl?.slice(0, 100) || null,
+    };
   } catch (err) {
     const status = err?.response?.status || err?.status || 0;
-    const msg = err?.response?.data?.detail || err?.message || '';
+    const errData = err?.response?.data;
+    const msg = typeof errData === 'object' ? JSON.stringify(errData) : (errData || err?.message || '');
     let reason = 'unknown_error';
     if (msg.includes('not found') || msg.includes('invalid version') || status === 404) reason = 'model_not_found';
-    else if (status === 401 || status === 403) reason = 'invalid_key';
-    else if (status === 429 || msg.includes('quota') || msg.includes('rate limit') || msg.includes('billing')) reason = 'quota_or_billing_issue';
-    return { success: false, reason, provider: 'replicate', model: REPLICATE_IMAGE_MODEL, status, detail: msg.slice(0, 200) };
+    else if (status === 401 || status === 403 || msg.includes('invalid token')) reason = 'invalid_key';
+    else if (status === 429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('billing') || msg.toLowerCase().includes('payment')) reason = 'quota_or_billing_issue';
+    else if (msg.includes('input') || msg.includes('schema') || msg.includes('validation')) reason = 'invalid_payload';
+    const latency = Date.now() - startMs;
+    return { success: false, reason, provider: 'replicate', model: REPLICATE_IMAGE_MODEL, status, detail: msg.slice(0, 300), latency };
   }
 }
 
@@ -246,24 +334,30 @@ export async function testHuggingFaceConnection() {
   if (!hasToken) return { success: false, reason: 'missing_api_key', provider: 'huggingface' };
   try {
     const fetch = (await import('node-fetch')).default;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
     const response = await fetch(
       `https://api-inference.huggingface.co/models/${HUGGINGFACE_IMAGE_MODEL}`,
       {
         headers: { Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}` },
         method: 'POST',
         body: JSON.stringify({ inputs: 'simple test' }),
+        signal: controller.signal,
       }
     );
+    clearTimeout(timeout);
     if (response.ok) return { success: true, reason: 'configured', provider: 'huggingface', model: HUGGINGFACE_IMAGE_MODEL };
     const status = response.status;
+    let body = '';
+    try { body = await response.text(); } catch {}
     let reason = 'api_error';
-    if (status === 401 || status === 403) reason = 'invalid_key_or_no_access';
+    if (status === 401 || status === 403) reason = body.includes('token') ? 'invalid_key' : 'no_access';
     else if (status === 404) reason = 'model_not_found';
     else if (status === 429) reason = 'rate_limit';
     else if (status === 503) reason = 'model_loading_or_unavailable';
-    return { success: false, reason, provider: 'huggingface', model: HUGGINGFACE_IMAGE_MODEL, status };
+    return { success: false, reason, provider: 'huggingface', model: HUGGINGFACE_IMAGE_MODEL, status, body: body.slice(0, 300) };
   } catch (err) {
-    return { success: false, reason: 'unknown_error', provider: 'huggingface', model: HUGGINGFACE_IMAGE_MODEL, detail: err.message?.slice(0, 200) };
+    return { success: false, reason: 'unknown_error', provider: 'huggingface', model: HUGGINGFACE_IMAGE_MODEL, detail: err.message?.slice(0, 300) };
   }
 }
 
