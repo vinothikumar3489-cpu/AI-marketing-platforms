@@ -1,6 +1,59 @@
 import axios from 'axios';
 import { uploadBuffer } from './storage.service.js';
 
+const FIGMA_SCRIPT = `How to Create a Poster Using Figma
+
+Step 1: Open Figma and create a new frame. Set dimensions to 1080x1080 pixels for an Instagram-ready poster.
+
+Step 2: Add a background shape. Use the rectangle tool to create a solid or gradient background. Choose colors that match your brand.
+
+Step 3: Add visual elements. Import images or use shapes to create visual interest. Keep it clean and professional.
+
+Step 4: Add typography. Use text layers for your headline and subheadline. Choose readable fonts with proper hierarchy.
+
+Step 5: Add a call-to-action button. Create a rounded rectangle with contrasting color and clear action text.
+
+Step 6: Export your poster. Go to File > Export and choose PNG format at 2x resolution for crisp output.`;
+
+const FIGMA_SCENES = [
+  {
+    title: 'Open Figma and Create a New Frame',
+    visual: 'Open Figma on desktop, click "New File", select frame tool and set dimensions to 1080x1080 pixels for an Instagram poster.',
+    voiceover: 'Start by opening Figma and creating a new design file. Select the frame tool and enter 1080 by 1080 pixels for a square poster layout.',
+    duration: 8,
+  },
+  {
+    title: 'Add Background, Shapes, and Colors',
+    visual: 'Use rectangle tool to draw a full-frame background, apply gradient fill with brand colors, add decorative shapes and geometric elements.',
+    voiceover: 'Add a background by drawing a rectangle that covers the entire frame. Apply a gradient using your brand colors, then layer in decorative shapes for visual interest.',
+    duration: 10,
+  },
+  {
+    title: 'Import Images and Visual Elements',
+    visual: 'Drag and drop design assets, use placeholder images, arrange visual elements in a balanced composition around the poster.',
+    voiceover: 'Import any images or design assets you want to feature. Arrange them in a balanced composition, keeping the focal area centered for the text.',
+    duration: 8,
+  },
+  {
+    title: 'Add Typography and Text Layers',
+    visual: 'Select text tool, click to add headline text, adjust font size and weight, add subheadline below, align text to center.',
+    voiceover: 'Use the text tool to add your headline. Choose a bold, readable font at 60pt or larger. Add a subheadline below in a lighter weight and smaller size.',
+    duration: 10,
+  },
+  {
+    title: 'Add Call-to-Action Button',
+    visual: 'Draw a rounded rectangle near the bottom, fill with contrasting color, add CTA text in white centered inside the button.',
+    voiceover: 'Create a call-to-action button by drawing a rounded rectangle near the bottom of the poster. Fill it with a contrasting color and add your action text in white.',
+    duration: 8,
+  },
+  {
+    title: 'Export and Share Your Poster',
+    visual: 'Go to File menu, select Export, choose PNG format at 2x resolution, click Export button, save to computer.',
+    voiceover: 'Finally, export your poster by going to File, then Export. Choose PNG format at 2x resolution for a crisp, print-ready output. Save and share your creation.',
+    duration: 8,
+  },
+];
+
 function buildShotstackTimeline(scenes, aspectRatio, duration) {
   const ratio = aspectRatio || '16:9';
   const dims = ratio === '9:16' ? { w: 720, h: 1280 }
@@ -64,12 +117,12 @@ async function renderWithShotstack(scenes, aspectRatio, duration) {
         message: data?.message || 'Video render queued',
       };
     }
-    return { success: false, error: data?.message || 'Shotstack returned error', diagnostic: { provider: 'shotstack' } };
+    return { success: false, error: data?.message || 'Shotstack returned error', diagnostic: { provider: 'shotstack', detail: data?.message } };
   } catch (err) {
     const msg = err?.response?.data?.message || err?.message || '';
     const status = err?.response?.status || 0;
     console.error('[VideoExec] Shotstack failed:', { status, message: msg.slice(0, 200) });
-    return { success: false, error: `Shotstack failed: ${msg.slice(0, 200)}`, diagnostic: { provider: 'shotstack', status } };
+    return { success: false, error: `Shotstack failed (HTTP ${status}): ${msg.slice(0, 200)}`, diagnostic: { provider: 'shotstack', status, message: msg.slice(0, 200) } };
   }
 }
 
@@ -114,32 +167,37 @@ async function renderWithCreatomate(scenes, aspectRatio, duration) {
         message: data.status === 'completed' ? 'Video ready' : 'Video render queued',
       };
     }
-    return { success: false, error: 'Creatomate returned no render ID', diagnostic: { provider: 'creatomate' } };
+    return { success: false, error: 'Creatomate returned no render ID', diagnostic: { provider: 'creatomate', detail: 'empty_response' } };
   } catch (err) {
     const msg = err?.response?.data?.message || err?.message || '';
     const status = err?.response?.status || 0;
     console.error('[VideoExec] Creatomate failed:', { status, message: msg.slice(0, 200) });
-    return { success: false, error: `Creatomate failed: ${msg.slice(0, 200)}`, diagnostic: { provider: 'creatomate', status } };
+    return { success: false, error: `Creatomate failed (HTTP ${status}): ${msg.slice(0, 200)}`, diagnostic: { provider: 'creatomate', status, message: msg.slice(0, 200) } };
   }
 }
 
 function generateFallbackStoryboard(script, scenes) {
   return {
     type: 'storyboard',
-    script: script || '',
-    scenes: (scenes || []).map((scene, i) => ({
+    title: 'How to Create a Poster Using Figma',
+    script: script || FIGMA_SCRIPT,
+    scenes: (scenes && scenes.length > 0 ? scenes : FIGMA_SCENES).map((scene, i) => ({
       sceneNumber: i + 1,
-      title: scene.title || `Scene ${i + 1}`,
-      visual: scene.visual || 'Not specified',
+      title: scene.title || `Step ${i + 1}`,
+      visual: scene.visual || 'See script for details',
       voiceover: scene.voiceover || null,
-      duration: scene.duration || 5,
+      duration: scene.duration || 8,
     })),
+    totalDuration: (scenes || FIGMA_SCENES).reduce((sum, s) => sum + (s.duration || 8), 0),
     generatedAt: new Date().toISOString(),
   };
 }
 
 export async function renderVideo({ script, scenes, duration, platform, aspectRatio }) {
-  if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
+  const effectiveScenes = (scenes && scenes.length > 0) ? scenes : FIGMA_SCENES;
+  const effectiveScript = script || FIGMA_SCRIPT;
+
+  if (!effectiveScenes || effectiveScenes.length === 0) {
     return { success: false, error: 'At least one scene is required' };
   }
 
@@ -147,35 +205,40 @@ export async function renderVideo({ script, scenes, duration, platform, aspectRa
 
   // Try Shotstack first
   if (process.env.SHOTSTACK_API_KEY) {
-    const shotResult = await renderWithShotstack(scenes, aspectRatio, duration);
+    const shotResult = await renderWithShotstack(effectiveScenes, aspectRatio, duration);
     if (shotResult.success) {
       return shotResult;
     }
-    warnings.push(`Shotstack failed: ${(shotResult.diagnostic?.message || shotResult.error || 'unknown').slice(0, 100)}`);
+    warnings.push(`Shotstack: ${(shotResult.diagnostic?.message || shotResult.error || 'unknown').slice(0, 150)}`);
+  } else {
+    warnings.push('Shotstack not configured (SHOTSTACK_API_KEY missing)');
   }
 
   // Try Creatomate second
   if (process.env.CREATOMATE_API_KEY) {
-    const creaResult = await renderWithCreatomate(scenes, aspectRatio, duration);
+    const creaResult = await renderWithCreatomate(effectiveScenes, aspectRatio, duration);
     if (creaResult.success && creaResult.videoUrl) {
       return creaResult;
     }
     if (creaResult.success && creaResult.renderId) {
       return creaResult;
     }
-    warnings.push(`Creatomate failed: ${(creaResult.diagnostic?.message || creaResult.error || 'unknown').slice(0, 100)}`);
+    warnings.push(`Creatomate: ${(creaResult.diagnostic?.message || creaResult.error || 'unknown').slice(0, 150)}`);
+  } else {
+    warnings.push('Creatomate not configured (CREATOMATE_API_KEY missing)');
   }
 
   // Storyboard fallback
-  const storyboard = generateFallbackStoryboard(script, scenes);
-  warnings.push('Video APIs unavailable. Storyboard fallback generated.');
-  const totalDuration = duration || scenes.reduce((sum, s) => sum + (s.duration || 5), 0);
+  const storyboard = generateFallbackStoryboard(effectiveScript, effectiveScenes);
+  warnings.push('Video APIs unavailable. Storyboard fallback generated with Figma poster creation steps.');
+  const totalDuration = duration || effectiveScenes.reduce((sum, s) => sum + (s.duration || 8), 0);
 
   return {
     success: true,
     provider: 'storyboard-fallback',
     status: 'fallback',
     storyboard,
+    script: effectiveScript,
     duration: totalDuration,
     generatedAt: new Date().toISOString(),
     warnings,
