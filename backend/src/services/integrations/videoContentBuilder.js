@@ -19,17 +19,26 @@ function generateDynamicScenes(prompt) {
   const topicWords = getTopicWords(prompt);
   const topicName = topicWords.length > 0 ? topicWords.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : null;
 
-  if (cleaned.includes('movie') || cleaned.includes('film')) {
-    if (cleaned.includes('poster') || cleaned.includes('reveal')) {
-      return {
-        script: `${topic}\n\nScene 1: Dark cinema background with hidden poster silhouette.\nScene 2: Slow spotlight reveal over the main movie title.\nScene 3: Character and visual elements appear with dramatic motion.\nScene 4: Final poster reveal with release date and call to action.`,
-        scenes: [
-          { title: 'The Tease', visual: 'Dark cinema theater background, a large covered poster frame center stage, subtle spotlight edges, mysterious atmosphere.', voiceover: 'Every great story begins with a single image. Tonight, we unveil something extraordinary.', duration: 8 },
-          { title: 'The Reveal', visual: 'Spotlight slowly brightens over the movie title, dramatic shadows, typography emerges from darkness.', voiceover: 'As the light reveals our title, the world gets its first glimpse of the vision behind the film.', duration: 8 },
-          { title: 'Character Introduction', visual: 'Key character silhouettes appear around the title, visual elements fade in with motion blur effect.', voiceover: 'Meet the characters that will take you on this unforgettable journey.', duration: 8 },
-          { title: 'Final Poster', visual: 'Full poster composition revealed with all elements, release date, and CTA overlay.', voiceover: 'The complete poster. Ready for the world. Share it, save it, and be part of the story.', duration: 6 },
-        ],
-      };
+  if (cleaned.includes('movie') || cleaned.includes('film') || (cleaned.includes('poster') && cleaned.includes('figma'))) {
+    const isFigmaDesign = cleaned.includes('figma');
+    if (isFigmaDesign || cleaned.includes('poster') || cleaned.includes('reveal')) {
+      const script = isFigmaDesign
+        ? `"${topic}"\n\nScene 1: Open Figma and create a vertical poster frame (1080x1920).\nScene 2: Add a dramatic background image, character silhouette, and color overlay.\nScene 3: Place the movie title with bold readable typography and release date.\nScene 4: Add cinematic effects, adjust lighting, and export the final poster.`
+        : `${topic}\n\nScene 1: Dark cinema background with hidden poster silhouette.\nScene 2: Slow spotlight reveal over the main movie title.\nScene 3: Character and visual elements appear with dramatic motion.\nScene 4: Final poster reveal with release date and call to action.`;
+
+      const hook = isFigmaDesign ? 'Turn a blank Figma frame into a cinematic movie poster.' : 'Every great story begins with a single image.';
+      const scenes = isFigmaDesign ? [
+        { title: 'Setup Canvas', visual: 'Open Figma dashboard, create new file, select vertical poster dimensions 1080x1920, set up grid guides.', voiceover: 'Start by opening Figma and creating a new file. Choose vertical poster dimensions that match standard movie poster formats.', duration: 8 },
+        { title: 'Build the Visual', visual: 'Add dramatic background gradient, import character silhouette image, apply color overlay with blend modes, layer atmospheric effects.', voiceover: 'Build your visual foundation with a dramatic background and character silhouette. Use color overlays to create mood and depth.', duration: 10 },
+        { title: 'Design the Typography', visual: 'Add movie title with bold display font, position at optical center, add tagline below in lighter weight, include release date and credits.', voiceover: 'Place your movie title with bold typography that commands attention. Add supporting text hierarchy for maximum readability.', duration: 10 },
+        { title: 'Final Polish', visual: 'Fine-tune layer opacity, add film grain or light leak effects, adjust contrast, open export dialog, select PNG format.', voiceover: 'Polish every detail. Adjust lighting effects, fine-tune colors, and export your finished movie poster in high resolution.', duration: 6 },
+      ] : [
+        { title: 'The Tease', visual: 'Dark cinema theater background, a large covered poster frame center stage, subtle spotlight edges, mysterious atmosphere.', voiceover: hook, duration: 8 },
+        { title: 'The Reveal', visual: 'Spotlight slowly brightens over the movie title, dramatic shadows, typography emerges from darkness.', voiceover: 'As the light reveals our title, the world gets its first glimpse of the vision behind the film.', duration: 8 },
+        { title: 'Character Introduction', visual: 'Key character silhouettes appear around the title, visual elements fade in with motion blur effect.', voiceover: 'Meet the characters that will take you on this unforgettable journey.', duration: 8 },
+        { title: 'Final Poster', visual: 'Full poster composition revealed with all elements, release date, and CTA overlay.', voiceover: 'The complete poster. Ready for the world. Share it, save it, and be part of the story.', duration: 6 },
+      ];
+      return { script, scenes, hook };
     }
     return {
       script: `${topic}\n\nOpening scene setting the mood.\nCharacter introduction and conflict.\nKey moments and turning points.\nClimax and resolution.`,
@@ -46,12 +55,12 @@ function generateDynamicScenes(prompt) {
     const isFigma = cleaned.includes('figma');
     if (isFigma) {
       return {
-        script: `${topic}\n\nScene 1: Open Figma and create a new frame with the right dimensions.\nScene 2: Add layout elements, brand colors, and background imagery.\nScene 3: Incorporate typography, icons, and visual hierarchy.\nScene 4: Arrange final elements and export the finished poster.`,
+        script: `${topic}\n\nScene 1: Open Figma and create a vertical poster frame (1080x1920).\nScene 2: Add a dramatic background, character image, and color overlay.\nScene 3: Place the movie title with bold readable typography and release info.\nScene 4: Add cinematic effects, adjust lighting, and export final poster.`,
         scenes: [
-          { title: 'Create a New Frame', visual: 'Open Figma dashboard, click New File, select frame dimensions for poster size.', voiceover: 'Start by opening Figma and creating a new file. Choose frame dimensions that match your poster format.', duration: 8 },
-          { title: 'Build the Layout', visual: 'Add background color or image, place layout grids, arrange structural elements.', voiceover: 'Set up your background and layout structure. Use grids to maintain alignment and balance.', duration: 8 },
-          { title: 'Add Typography and Visuals', visual: 'Add text layers for headline and body, import icons or images, apply brand colors.', voiceover: 'Bring in your typography with clear hierarchy. Add visual elements that reinforce your message.', duration: 8 },
-          { title: 'Polish and Export', visual: 'Fine-tune spacing, align all layers, open export menu, select PNG format.', voiceover: 'Review your composition, make final adjustments, and export your poster in high resolution.', duration: 6 },
+          { title: 'Setup Canvas', visual: 'Open Figma dashboard, create new file, select vertical poster dimensions 1080x1920, set up grid guides.', voiceover: 'Start by opening Figma and creating a new file. Choose vertical poster dimensions that match standard poster formats.', duration: 8 },
+          { title: 'Build the Visual', visual: 'Add dramatic background gradient, import character silhouette image, apply color overlay with blend modes, layer atmospheric effects.', voiceover: 'Build your visual foundation with a dramatic background and central imagery. Use color overlays to create mood and depth.', duration: 10 },
+          { title: 'Design the Typography', visual: 'Add headline with bold display font, position at optical center, add supporting text below, include CTA or tagline.', voiceover: 'Place your headline with bold typography that commands attention. Add supporting text hierarchy for maximum readability.', duration: 10 },
+          { title: 'Final Polish', visual: 'Fine-tune layer opacity, adjust contrast, open export dialog, select PNG format, save to project.', voiceover: 'Polish every detail, fine-tune colors, and export your finished poster design in high resolution.', duration: 6 },
         ],
       };
     }

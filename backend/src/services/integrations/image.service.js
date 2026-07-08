@@ -60,11 +60,10 @@ function generateSvgPoster({ prompt, headline, cta, platform, brandColors }) {
 }
 
 function buildImagePrompt({ prompt, headline, cta, platform, brandColors }) {
-  let finalPrompt = prompt;
-  if (headline) finalPrompt += `, headline: "${headline}"`;
-  if (cta) finalPrompt += `, call to action: "${cta}"`;
-  if (platform) finalPrompt += `, optimized for ${platform}`;
-  if (brandColors?.length) finalPrompt += `, brand colors: ${brandColors.join(', ')}`;
+  let finalPrompt = prompt || '';
+  if (!finalPrompt) finalPrompt = 'Clean modern workspace, creative professional background';
+  finalPrompt += ', no text, no letters, no words, no typography, no watermark, no labels, no UI text, no writing, no logo';
+  if (brandColors?.length) finalPrompt += `, ${brandColors.join(' and ')} accents`;
   return finalPrompt;
 }
 

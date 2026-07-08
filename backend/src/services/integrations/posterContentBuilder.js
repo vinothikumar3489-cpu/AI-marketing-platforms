@@ -57,7 +57,7 @@ function deriveSubheadline(prompt) {
   if (lower.includes('poster')) return 'Design a stunning poster that captures attention and communicates your message.';
   if (lower.includes('figma') && lower.includes('poster')) return 'Master Figma tools to create professional posters with typography and layout.';
   if (lower.includes('figma')) return 'Design modern interfaces and graphics using Figma\'s powerful design tools.';
-  if (lower.includes('design')) return 'Create beautiful, impactful designs that resonate with your target audience.';
+  if (lower.includes('design')) return 'Create beautiful, impactful designs that communicate your message with clarity and visual appeal.';
   if (lower.includes('skincare') || lower.includes('beauty')) return 'Build trust with clean, natural skincare visuals that speak to health-conscious customers.';
   if (lower.includes('hospital') || lower.includes('appointment') || lower.includes('clinic')) return 'Streamline patient scheduling with an intelligent AI-powered booking system.';
   if (lower.includes('how to')) return `Learn step-by-step how to ${lower.replace(/^how\s*to\s*/i, '').replace(/\.$/, '')}.`;
@@ -66,7 +66,7 @@ function deriveSubheadline(prompt) {
   if (lower.includes('course') || lower.includes('learn') || lower.includes('coding')) return 'Empower yourself with interactive lessons and real-world projects.';
   if (lower.includes('launch') || lower.includes('product') || lower.includes('brand')) return 'Build brand awareness and drive customer engagement with a strategic launch.';
   if (lower.includes('app') || lower.includes('software') || lower.includes('saas')) return 'Boost productivity and streamline workflows with intuitive software solutions.';
-  if (lower.includes('market') || lower.includes('campaign') || lower.includes('social')) return 'Reach your target audience with data-driven marketing campaigns.';
+  if (lower.includes('market') || lower.includes('campaign') || lower.includes('social')) return 'Drive meaningful engagement with data-informed marketing strategies and compelling creative.';
   if (lower.includes('organic') || lower.includes('natural')) return 'Promote natural, organic products with authentic and earth-friendly visual design.';
 
   const words = cleaned.split(/\s+/).filter(w => w.length > 3).slice(0, 4);
@@ -79,7 +79,7 @@ function deriveSubheadline(prompt) {
 
 function containsPlaceholder(str) {
   if (!str) return true;
-  const placeholders = ['compelling headline here', 'untitled brief', 'general audience', 'to be determined', 'undefined', 'null', '[object object]', 'get started'];
+  const placeholders = ['compelling headline here', 'untitled brief', 'general audience', 'to be determined', 'undefined', 'null', '[object object]', 'get started', 'reach your target audience with data-driven marketing campaigns', 'designed for target audience', 'designed for '];
   const lower = str.toLowerCase().trim();
   return placeholders.some(p => lower.includes(p));
 }

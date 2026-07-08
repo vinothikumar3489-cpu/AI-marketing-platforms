@@ -99,7 +99,7 @@ export async function getIntegrationHealth() {
   return api.get<{
     success: boolean;
     providers: {
-      email: { configured: boolean; provider: string | null; smtpUserConfigured: boolean; smtpPassConfigured: boolean; from: string | null };
+      email: { configured: boolean; provider: string | null; smtpUserConfigured: boolean; smtpPassConfigured: boolean; smtpPassLength?: number; from: string | null; port587?: string; port465?: string };
       image: { pollinations: { configured: boolean }; fal: { configured: boolean; model: string }; reason: string };
       storage: { configured: boolean; provider: string | null };
       video: { shotstack: { configured: boolean; stage: string }; creatomate: { configured: boolean }; reason: string };

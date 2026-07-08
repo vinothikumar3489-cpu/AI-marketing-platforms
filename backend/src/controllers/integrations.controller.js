@@ -16,7 +16,7 @@ export async function getHealth(req, res) {
     res.json({
       success: true,
       providers: {
-        email: { configured: email.configured, provider: email.provider || null, smtpUserConfigured: email.smtpUserConfigured ?? false, smtpPassConfigured: email.smtpPassConfigured ?? false, from: email.from ?? null },
+        email: { configured: email.configured, provider: email.provider || null, smtpUserConfigured: email.smtpUserConfigured ?? false, smtpPassConfigured: email.smtpPassConfigured ?? false, smtpPassLength: email.smtpPassLength ?? 0, from: email.from ?? null, port587: email.port587 ?? 'unknown', port465: email.port465 ?? 'unknown' },
         image: {
           pollinations: { configured: true },
           fal: { configured: config.image.fal.configured, model: config.image.fal.model },
@@ -75,9 +75,9 @@ export async function generatePosterImage(req, res) {
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
     if (!chat) return res.status(404).json({ success: false, error: 'Chat not found' });
 
-    const { prompt, headline, cta, platform, dimensions, brandColors } = req.body;
+    const { prompt, headline, cta, platform, dimensions, brandColors, audience } = req.body;
 
-    const result = await generateImage({ prompt, headline, cta, platform, dimensions, brandColors });
+    const result = await generateImage({ prompt, headline, cta, platform, dimensions, brandColors, audience });
 
     if (result.success) {
       await prisma.automationLog.create({

@@ -357,7 +357,14 @@ function EmailSendSection() {
           <div style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '11px', display: 'flex', alignItems: 'flex-start', gap: '6px', background: result.success ? 'rgba(16,225,139,0.08)' : 'rgba(255,71,87,0.08)', border: `1px solid ${result.success ? 'rgba(16,225,139,0.2)' : 'rgba(255,71,87,0.2)'}` }}>
             {result.success ? <CheckCircle2 size={14} style={{ color: '#10e18b', flexShrink: 0, marginTop: '1px' }} /> : <AlertTriangle size={14} style={{ color: '#ff4757', flexShrink: 0, marginTop: '1px' }} />}
             <div>
-              {result.success ? <>Sent! ID: {result.messageId} | To: {result.maskedRecipient || result.recipient} | Via: {result.provider}</> : <>Failed: {result.error}{result.details ? ` — ${result.details}` : ''}</>}
+              {result.success
+                ? <>Sent! ID: {result.messageId} | To: {result.maskedRecipient || result.recipient} | Via: {result.provider}{result.port ? ` (port ${result.port})` : ''}</>
+                : <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span>Failed: {result.error}</span>
+                    {result.code === 'TIMEOUT' && <span style={{ color: '#ffb347', fontSize: '10px' }}>Gmail SMTP timed out from Render. Use port 465 or switch to Brevo/Resend/SendGrid which use HTTP APIs and do not require SMTP ports.</span>}
+                    {result.code === 'AUTH_FAILED' && <span style={{ color: '#ffb347', fontSize: '10px' }}>Use a Gmail App Password (16 characters) from https://myaccount.google.com/apppasswords</span>}
+                    {result.details ? <span style={{ color: '#9aa7bd', fontSize: '10px' }}>{result.details}</span> : null}
+                  </div>}
             </div>
           </div>
         )}
@@ -575,6 +582,22 @@ function PosterGenerateSection() {
                   <button onClick={() => navigator.clipboard.writeText(result.imageUrl)} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #818cf8', background: 'rgba(129,140,248,0.1)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: '#818cf8', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Copy size={12} /> Copy URL</button>
                   <button onClick={() => navigator.clipboard.writeText(result.prompt)} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #a855f7', background: 'rgba(168,85,247,0.1)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: '#a855f7', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Copy size={12} /> Copy Prompt</button>
                 </div>
+                {result.headline && (
+                  <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                    <div style={{ padding: '6px 8px', background: '#151d2b', borderRadius: '6px', fontSize: '10px' }}>
+                      <div style={{ color: '#9aa7bd', marginBottom: '2px' }}>Headline</div>
+                      <div style={{ color: '#e5e7eb', fontWeight: 600 }}>{result.headline}</div>
+                    </div>
+                    <div style={{ padding: '6px 8px', background: '#151d2b', borderRadius: '6px', fontSize: '10px' }}>
+                      <div style={{ color: '#9aa7bd', marginBottom: '2px' }}>Subheadline</div>
+                      <div style={{ color: '#e5e7eb' }}>{result.subheadline}</div>
+                    </div>
+                    <div style={{ padding: '6px 8px', background: '#151d2b', borderRadius: '6px', fontSize: '10px' }}>
+                      <div style={{ color: '#9aa7bd', marginBottom: '2px' }}>CTA</div>
+                      <div style={{ color: '#e5e7eb', fontWeight: 600 }}>{result.cta}</div>
+                    </div>
+                  </div>
+                )}
                 {result.warnings?.map((w: string, i: number) => (
                   <div key={i} style={{ marginTop: '6px', padding: '6px 8px', background: 'rgba(255,179,71,0.08)', borderRadius: '4px', fontSize: '10px', color: '#ffb347', display: 'flex', gap: '4px', alignItems: 'center' }}>
                     <AlertTriangle size={10} /> {w}
@@ -1605,7 +1628,8 @@ export default function AutomationCenterPage() {
                 shotstack_configured: 'Shotstack', creatomate_configured: 'Creatomate',
                 no_video_provider: 'No provider',
               };
-              const emailDesc = p.email.configured ? (p.email.provider === 'gmail' ? 'Gmail SMTP' : p.email.provider === 'resend' ? 'Resend' : p.email.provider || 'Configured') : (reasonMap[p.email.reason] || p.email.reason || 'Not configured');
+              const emailPortInfo = p.email.provider === 'gmail' ? ` (587:${p.email.port587 || '?'}, 465:${p.email.port465 || '?'})` : '';
+              const emailDesc = p.email.configured ? (p.email.provider === 'gmail' ? `Gmail SMTP${emailPortInfo}` : p.email.provider === 'resend' ? 'Resend' : p.email.provider || 'Configured') : (reasonMap[p.email.reason] || p.email.reason || 'Not configured');
               const imgPollinations = p.image?.pollinations?.configured !== false;
               const imgFal = p.image?.fal?.configured === true;
               const imgDesc = imgPollinations && imgFal ? 'Pollinations + Fal' : imgPollinations ? 'Pollinations' : imgFal ? 'Fal' : (reasonMap[p.image.reason] || 'None');

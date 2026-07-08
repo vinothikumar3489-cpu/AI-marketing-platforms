@@ -201,21 +201,25 @@ export function validateChannelRecommendation(data, input) {
 }
 
 /**
- * Known placeholder patterns that indicate AI failed to generate real content
+ * Known placeholder values that indicate AI failed to generate real content.
+ * Only match exact strings or strings that ARE these values (not substring matches).
  */
-const PLACEHOLDER_PATTERNS = [
-  /compelling headline here/i,
-  /untitled brief/i,
-  /general audience/i,
-  /target audience/i,
-  /get started/i,
-  /^to be determined$/i,
-  /^undefined$/i,
-  /^null$/i,
-  /\[object object\]/i,
-  /lorem ipsum/i,
-  /your (brand|company|product|business) here/i,
-  /enter (your|the) /i,
+const PLACEHOLDER_PHRASES = [
+  'compelling headline here',
+  'untitled brief',
+  'general audience',
+  'to be determined',
+  'lorem ipsum',
+  'your brand here',
+  'your company here',
+  'your product here',
+  'your business here',
+  'new analysis',
+  'growth analysis',
+  'problem introduction',
+  'solution presentation',
+  'proof and social proof',
+  'get started',
 ];
 
 /**
@@ -225,9 +229,14 @@ const PLACEHOLDER_PATTERNS = [
  */
 export function containsPlaceholder(str) {
   if (!str || typeof str !== 'string') return true;
-  const cleaned = str.trim();
+  const cleaned = str.trim().toLowerCase();
   if (cleaned.length === 0) return true;
-  return PLACEHOLDER_PATTERNS.some(pattern => pattern.test(cleaned));
+  return PLACEHOLDER_PHRASES.some(phrase => {
+    if (cleaned === phrase) return true;
+    if (cleaned.startsWith(phrase + ' ') || cleaned.startsWith(phrase + '.')) return true;
+    if (cleaned.endsWith(' ' + phrase) || cleaned.endsWith(' ' + phrase + '.')) return true;
+    return false;
+  });
 }
 
 /**
