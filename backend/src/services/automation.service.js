@@ -555,7 +555,7 @@ function generateEvidenceBasedPlan(context) {
         title: `${product || 'Brand'} - Secondary Keywords`,
         headline: `Advanced ${product || 'Solutions'} for ${industry || 'Professionals'}`,
         description: `Explore additional ways ${companyName || product} serves ${targetAudience || 'its customers'} with tailored solutions.`,
-        cta: 'Get Started',
+        cta: product ? `Explore ${product}` : 'Learn More',
         destinationUrl: website || 'https://example.com',
         budget: 'N/A',
         targeting: { keywords: adGroup2, audience: targetAudience || personaName },

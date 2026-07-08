@@ -200,6 +200,72 @@ export function validateChannelRecommendation(data, input) {
   };
 }
 
+/**
+ * Known placeholder patterns that indicate AI failed to generate real content
+ */
+const PLACEHOLDER_PATTERNS = [
+  /compelling headline here/i,
+  /untitled brief/i,
+  /general audience/i,
+  /target audience/i,
+  /get started/i,
+  /^to be determined$/i,
+  /^undefined$/i,
+  /^null$/i,
+  /\[object object\]/i,
+  /lorem ipsum/i,
+  /your (brand|company|product|business) here/i,
+  /enter (your|the) /i,
+];
+
+/**
+ * Check if a string contains placeholder content
+ * @param {string} str - String to check
+ * @returns {boolean} - True if contains placeholder
+ */
+export function containsPlaceholder(str) {
+  if (!str || typeof str !== 'string') return true;
+  const cleaned = str.trim();
+  if (cleaned.length === 0) return true;
+  return PLACEHOLDER_PATTERNS.some(pattern => pattern.test(cleaned));
+}
+
+/**
+ * Validate creative content (posters, videos, ads) for placeholder values
+ * @param {Object} content - Creative content object
+ * @returns {Object} - { valid: boolean, issues: string[] }
+ */
+export function validateCreativeContent(content) {
+  const issues = [];
+  if (!content || typeof content !== 'object') {
+    return { valid: false, issues: ['Content is null or not an object'] };
+  }
+
+  const fieldsToCheck = ['headline', 'subheadline', 'cta', 'title', 'description', 'prompt'];
+  for (const field of fieldsToCheck) {
+    if (content[field] !== undefined && containsPlaceholder(content[field])) {
+      issues.push(`${field} contains placeholder value: "${content[field]}"`);
+    }
+  }
+
+  if (content.scenes && Array.isArray(content.scenes)) {
+    content.scenes.forEach((scene, i) => {
+      if (scene.visual && containsPlaceholder(scene.visual)) {
+        issues.push(`scene[${i}].visual contains placeholder value`);
+      }
+      if (scene.voiceover && containsPlaceholder(scene.voiceover)) {
+        issues.push(`scene[${i}].voiceover contains placeholder value`);
+      }
+    });
+  }
+
+  if (content.audience && containsPlaceholder(content.audience)) {
+    issues.push('audience contains placeholder value');
+  }
+
+  return { valid: issues.length === 0, issues };
+}
+
 // ============================================
 // HELPER FUNCTIONS
 // ============================================

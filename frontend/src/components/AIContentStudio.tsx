@@ -77,7 +77,7 @@ function IntegrationHealthPanel() {
       shotstack_configured: 'Shotstack', creatomate_configured: 'Creatomate',
       no_video_provider: 'No provider',
     };
-    const emailDesc = providers.email.configured ? 'Resend' : (reasonMap[providers.email.reason] || providers.email.reason || 'Not configured');
+    const emailDesc = providers.email.configured ? (providers.email.provider === 'gmail' ? 'Gmail SMTP' : providers.email.provider === 'resend' ? 'Resend' : providers.email.provider || 'Configured') : (reasonMap[providers.email.reason] || providers.email.reason || 'Not configured');
     const imgPollinations = providers.image?.pollinations?.configured !== false;
     const imgFal = providers.image?.fal?.configured === true;
     const imgDesc = imgPollinations && imgFal ? 'Pollinations + Fal' : imgPollinations ? 'Pollinations' : imgFal ? 'Fal' : (reasonMap[providers.image.reason] || 'None');
@@ -289,19 +289,19 @@ function generateCreative(assetType: string, platform: string, headline: string,
   const brandColors = ['#1a1a2e', '#16213e', '#0f3460', '#e94560', '#53a7ff'];
   return {
     id: generateId(), type: 'creative', subType: assetType,
-    title: `${assetType}: ${headline || 'Untitled Brief'}`,
+    title: `${assetType}: ${headline || 'Creative Asset'}`,
     content: {
-      headline: headline || 'Compelling Headline Here',
-      subheadline: `Designed for ${audience || 'target audience'} to drive engagement`,
+      headline: headline || (audience ? `Campaign for ${audience}` : 'Featured Campaign'),
+      subheadline: audience ? `Tailored messaging for ${audience} to maximize engagement and impact` : 'Strategic messaging designed to drive engagement and conversions',
       visualDirection: `${platform === 'social' ? 'Bold typography with gradient background' : 'Clean product-focused layout with clear value proposition'}`,
       layoutDescription: `${assetType === 'poster' ? 'Full-bleed background with centered headline and CTA button at bottom' :
         assetType === 'banner' ? 'Horizontal layout with headline left, CTA right, subtle brand elements' :
         assetType === 'carousel' ? 'Multi-slide format with progressive storytelling, 4-6 slides' :
         'Clean grid layout with prominent visual element and supporting copy'}`,
       brandColors, typography: 'Inter (headlines), system-ui (body)',
-      imagePrompt: `${platform} creative for ${audience || 'general audience'} — professional, modern, ${brandColors[3]} accent, clean whitespace`,
-      cta: 'Get Started', dimensions: dimensions[assetType] || '1200x630',
-      platform, audience: audience || 'General',
+      imagePrompt: `${platform} creative for ${audience || 'target audience'} — professional, modern, ${brandColors[3]} accent, clean whitespace`,
+      cta: headline ? `Explore ${headline}` : 'Learn More', dimensions: dimensions[assetType] || '1200x630',
+      platform, audience: audience || 'Target Audience',
       campaignGoal: 'Brand awareness and engagement',
       evidenceRef: evidence.length > 0 ? evidence[0].source : undefined
     },
@@ -701,7 +701,7 @@ export function EmailStudio({ evidence, onSave }: { evidence: EvidenceRef[]; onS
                   {sendResult.success ? <CheckCircle2 size={14} style={{ color: C.excellent, flexShrink: 0, marginTop: '1px' }} /> : <AlertTriangle size={14} style={{ color: C.critical, flexShrink: 0, marginTop: '1px' }} />}
                   <div>
                     {sendResult.success ? (
-                      <><strong style={{ color: C.excellent }}>Sent!</strong> Message ID: {sendResult.messageId} | To: {sendResult.recipient} | Via: {sendResult.provider}</>
+                      <><strong style={{ color: C.excellent }}>Sent!</strong> Message ID: {sendResult.messageId} | To: {sendResult.maskedRecipient || sendResult.recipient} | Via: {sendResult.provider}</>
                     ) : (
                       <><strong style={{ color: C.critical }}>Failed:</strong> {sendResult.error}{sendResult.details ? ` — ${sendResult.details}` : ''}</>
                     )}
@@ -716,7 +716,7 @@ export function EmailStudio({ evidence, onSave }: { evidence: EvidenceRef[]; onS
       {!asset && !generating && (
         <div style={{ textAlign: 'center', padding: '40px', color: C.muted, fontSize: '13px', background: C.card, borderRadius: '12px', border: `1px solid ${C.border}` }}>
           <Mail size={32} style={{ opacity: 0.3, marginBottom: '12px' }} />
-          <div>Generate an email draft first, then send a test via Brevo.</div>
+          <div>Generate an email draft first, then send a test.</div>
         </div>
       )}
     </div>

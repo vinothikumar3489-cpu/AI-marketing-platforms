@@ -99,10 +99,10 @@ export async function getIntegrationHealth() {
   return api.get<{
     success: boolean;
     providers: {
-      email: { configured: boolean; provider: string | null };
-      image: { huggingface: boolean; replicate: boolean };
-      storage: { cloudinary: boolean };
-      video: { configured: boolean; provider: string | null };
+      email: { configured: boolean; provider: string | null; smtpUserConfigured: boolean; smtpPassConfigured: boolean; from: string | null };
+      image: { pollinations: { configured: boolean }; fal: { configured: boolean; model: string }; reason: string };
+      storage: { configured: boolean; provider: string | null };
+      video: { shotstack: { configured: boolean; stage: string }; creatomate: { configured: boolean }; reason: string };
       ai: { gemini: boolean; groq: boolean };
     };
   }>('/integrations/health');
@@ -120,10 +120,13 @@ export async function sendTestEmail(chatId: string, payload: {
     provider?: string;
     messageId?: string;
     sentAt?: string;
+    maskedRecipient?: string;
     recipient?: string;
+    status?: string;
     warnings?: string[];
     error?: string;
     details?: string;
+    code?: string;
   }>(`/integrations/${chatId}/studio/email/send-test`, payload);
 }
 

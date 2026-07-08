@@ -2,6 +2,7 @@ import axios from 'axios';
 import sharp from 'sharp';
 import { uploadBuffer } from './storage.service.js';
 import { buildPosterContent } from './posterContentBuilder.js';
+import { containsPlaceholder } from '../../utils/ai-response-validator.js';
 
 const POSTER_WIDTH = 1080;
 const POSTER_HEIGHT = 1080;
@@ -12,7 +13,8 @@ function escapeXml(str) {
 }
 
 function buildVisualPrompt({ prompt, brandColors }) {
-  let cleanPrompt = prompt || 'Clean modern workspace, creative professional background, abstract design elements, modern marketing theme';
+  let cleanPrompt = prompt?.replace(/['']/g, '').trim();
+  if (!cleanPrompt) cleanPrompt = 'Clean modern workspace, creative professional background, abstract design elements, modern marketing theme';
   if (brandColors?.length) cleanPrompt += `, ${brandColors.join(' and ')} accents`;
   cleanPrompt += ', no text, no letters, no words, no typography, no watermark, no labels, no UI text, no writing, no logo';
   return cleanPrompt;
@@ -175,6 +177,10 @@ export async function generateImage({ prompt, headline, cta, platform, dimension
   const content = buildPosterContent({ prompt, headline, cta, platform, dimensions, brandColors });
   if (content.error) return { success: false, error: content.error };
   const { headline: finalHeadline, subheadline: finalSubheadline, cta: finalCta, width, height } = content;
+  const placeholderCheck = [finalHeadline, finalSubheadline, finalCta].filter(v => containsPlaceholder(v));
+  if (placeholderCheck.length > 0) {
+    return { success: false, error: `Generated content contains placeholder values: ${placeholderCheck.join(', ')}` };
+  }
 
   const visualPrompt = buildVisualPrompt({ prompt, brandColors });
   const warnings = [];

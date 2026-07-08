@@ -33,6 +33,7 @@
     "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.0",
     "node-fetch": "^3.3.2",
+    "nodemailer": "^6.9.16",
     "pptxgenjs": "^4.0.1",
     "puppeteer-core": "^25.3.0",
     "resend": "^6.17.1",

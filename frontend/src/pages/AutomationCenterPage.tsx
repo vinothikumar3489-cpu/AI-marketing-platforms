@@ -340,7 +340,7 @@ function EmailSendSection() {
   return (
     <div style={{ padding: '14px', background: '#101622', borderRadius: '8px', border: '1px solid #293245' }}>
       <div style={{ fontSize: '12px', fontWeight: 600, color: '#e5e7eb', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <Send size={14} style={{ color: '#53a7ff' }} /> Send Test Email via Brevo
+        <Send size={14} style={{ color: '#53a7ff' }} /> Send Test Email
       </div>
       <div style={{ display: 'grid', gap: '10px' }}>
         <input value={recipientEmail} onChange={e => setRecipientEmail(e.target.value)} placeholder="Recipient email * (one only)" style={{ width: '100%', padding: '8px 12px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px', outline: 'none' }} />
@@ -357,7 +357,7 @@ function EmailSendSection() {
           <div style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '11px', display: 'flex', alignItems: 'flex-start', gap: '6px', background: result.success ? 'rgba(16,225,139,0.08)' : 'rgba(255,71,87,0.08)', border: `1px solid ${result.success ? 'rgba(16,225,139,0.2)' : 'rgba(255,71,87,0.2)'}` }}>
             {result.success ? <CheckCircle2 size={14} style={{ color: '#10e18b', flexShrink: 0, marginTop: '1px' }} /> : <AlertTriangle size={14} style={{ color: '#ff4757', flexShrink: 0, marginTop: '1px' }} />}
             <div>
-              {result.success ? <>Sent! ID: {result.messageId} | To: {result.recipient} | Via: {result.provider}</> : <>Failed: {result.error}{result.details ? ` — ${result.details}` : ''}</>}
+              {result.success ? <>Sent! ID: {result.messageId} | To: {result.maskedRecipient || result.recipient} | Via: {result.provider}</> : <>Failed: {result.error}{result.details ? ` — ${result.details}` : ''}</>}
             </div>
           </div>
         )}
@@ -1605,7 +1605,7 @@ export default function AutomationCenterPage() {
                 shotstack_configured: 'Shotstack', creatomate_configured: 'Creatomate',
                 no_video_provider: 'No provider',
               };
-              const emailDesc = p.email.configured ? 'Resend' : (reasonMap[p.email.reason] || p.email.reason || 'Not configured');
+              const emailDesc = p.email.configured ? (p.email.provider === 'gmail' ? 'Gmail SMTP' : p.email.provider === 'resend' ? 'Resend' : p.email.provider || 'Configured') : (reasonMap[p.email.reason] || p.email.reason || 'Not configured');
               const imgPollinations = p.image?.pollinations?.configured !== false;
               const imgFal = p.image?.fal?.configured === true;
               const imgDesc = imgPollinations && imgFal ? 'Pollinations + Fal' : imgPollinations ? 'Pollinations' : imgFal ? 'Fal' : (reasonMap[p.image.reason] || 'None');
