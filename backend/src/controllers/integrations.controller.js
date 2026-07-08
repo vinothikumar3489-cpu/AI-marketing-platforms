@@ -3,8 +3,8 @@ import { checkStorageProvider, testCloudinaryConnection } from '../services/inte
 import { generateImage } from '../services/integrations/imageExecution.service.js';
 import { renderVideo, getVideoStatus } from '../services/integrations/videoExecution.service.js';
 import { getProviderHealth } from '../services/integrations/providerConfig.service.js';
-import { checkImageProviders, testReplicateConnection, testHuggingFaceConnection } from '../services/integrations/image.service.js';
-import { checkVideoProvider, testFfmpegConnection } from '../services/integrations/video.service.js';
+import { checkImageProviders, testPollinationsConnection, testFalConnection } from '../services/integrations/image.service.js';
+import { checkVideoProvider, testShotstackConnection, testCreatomateConnection } from '../services/integrations/video.service.js';
 import { prisma } from '../config/prisma.js';
 
 export async function getHealth(req, res) {
@@ -137,13 +137,13 @@ export async function getVideoStatusHandler(req, res) {
   }
 }
 
-export async function debugTestReplicate(req, res) {
-  const result = await testReplicateConnection();
+export async function debugTestPollinations(req, res) {
+  const result = await testPollinationsConnection();
   res.json(result);
 }
 
-export async function debugTestHuggingFace(req, res) {
-  const result = await testHuggingFaceConnection();
+export async function debugTestFal(req, res) {
+  const result = await testFalConnection();
   res.json(result);
 }
 
@@ -152,7 +152,12 @@ export async function debugTestCloudinary(req, res) {
   res.json(result);
 }
 
-export async function debugTestFFmpeg(req, res) {
-  const result = await testFfmpegConnection();
+export async function debugTestShotstack(req, res) {
+  const result = await testShotstackConnection();
+  res.json(result);
+}
+
+export async function debugTestCreatomate(req, res) {
+  const result = await testCreatomateConnection();
   res.json(result);
 }

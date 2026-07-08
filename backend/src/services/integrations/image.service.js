@@ -1,153 +1,9 @@
+import axios from 'axios';
 import { uploadBuffer } from './storage.service.js';
-
-const PRIMARY_MODELS = [
-  process.env.REPLICATE_IMAGE_MODEL || 'black-forest-labs/flux-schnell',
-  'black-forest-labs/flux-schnell',
-  'stability-ai/sdxl',
-  'bytedance/sdxl-lightning-4step',
-].filter(Boolean);
-const REPLICATE_IMAGE_MODEL = PRIMARY_MODELS[0];
-const HUGGINGFACE_IMAGE_MODEL = process.env.HUGGINGFACE_IMAGE_MODEL || 'black-forest-labs/FLUX.1-schnell';
 
 function escapeXml(str) {
   if (!str) return '';
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-}
-
-function dimensionsToAspectRatio(width, height) {
-  if (!width || !height) return '1:1';
-  const ratios = [
-    { w: 1, h: 1, label: '1:1' },
-    { w: 4, h: 3, label: '4:3' },
-    { w: 3, h: 2, label: '3:2' },
-    { w: 16, h: 9, label: '16:9' },
-    { w: 9, h: 16, label: '9:16' },
-    { w: 3, h: 4, label: '3:4' },
-  ];
-  const ratio = width / height;
-  let best = ratios[0];
-  let bestDiff = Math.abs(ratio - best.w / best.h);
-  for (const r of ratios) {
-    const diff = Math.abs(ratio - r.w / r.h);
-    if (diff < bestDiff) { best = r; bestDiff = diff; }
-  }
-  return best.label;
-}
-
-function extractImageUrl(output) {
-  if (!output) return null;
-  if (typeof output === 'string') return output;
-  if (output instanceof URL) return output.href;
-  if (typeof output?.url === 'function') {
-    const u = output.url();
-    return u instanceof URL ? u.href : u;
-  }
-  if (typeof output?.toString === 'function') return output.toString();
-  if (Array.isArray(output)) return extractImageUrl(output[0]);
-  return null;
-}
-
-async function generateWithReplicate(prompt, width, height) {
-  const hasToken = !!process.env.REPLICATE_API_TOKEN;
-  const startMs = Date.now();
-  try {
-    if (!hasToken) {
-      console.error('[Replicate Image Error]', { configured: false, reason: 'missing_api_key' });
-      return { success: false, error: 'Replicate API token not configured', diagnostic: { configured: false, reason: 'missing_api_key' } };
-    }
-    const Replicate = (await import('replicate')).default;
-    const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN, useFileOutput: false });
-    const aspectRatio = dimensionsToAspectRatio(width, height);
-    const input = { prompt, num_outputs: 1, output_format: 'png', aspect_ratio: aspectRatio };
-    const output = await replicate.run(REPLICATE_IMAGE_MODEL, { input });
-    const imageUrl = extractImageUrl(output);
-    if (!imageUrl) return { success: false, error: 'Empty output from Replicate', diagnostic: { provider: 'replicate', model: REPLICATE_IMAGE_MODEL, errorType: 'empty_output' } };
-    return { success: true, provider: 'replicate', imageUrl, latency: Date.now() - startMs };
-  } catch (err) {
-    const status = err?.response?.status || err?.status || 0;
-    const errData = err?.response?.data;
-    const errMsg = typeof errData === 'object' ? JSON.stringify(errData) : (errData || err?.message || '');
-    const isModelNotFound = errMsg.includes('not found') || errMsg.includes('invalid version') || status === 404;
-    const isAuthError = status === 401 || status === 403 || errMsg.includes('invalid token');
-    const isQuotaError = status === 429 || errMsg.toLowerCase().includes('quota') || errMsg.toLowerCase().includes('rate limit') || errMsg.toLowerCase().includes('billing') || errMsg.toLowerCase().includes('payment');
-    let errorType = 'api_error';
-    if (isModelNotFound) errorType = 'model_not_found';
-    else if (isAuthError) errorType = 'invalid_key';
-    else if (isQuotaError) errorType = 'quota_or_billing_issue';
-    else if (errMsg.includes('input') || errMsg.includes('schema') || errMsg.includes('validation')) errorType = 'invalid_payload';
-    else if (err.name === 'AbortError' || errMsg.includes('timeout')) errorType = 'timeout';
-    const diagnostic = {
-      provider: 'replicate',
-      configured: hasToken,
-      model: REPLICATE_IMAGE_MODEL,
-      status,
-      errorType,
-      message: (errMsg || err?.message || '').slice(0, 300),
-    };
-    console.error('[Replicate Image Error]', diagnostic);
-    return { success: false, error: errMsg, diagnostic, latency: Date.now() - startMs };
-  }
-}
-
-async function generateWithReplicateFallback(prompt, width, height) {
-  let lastError = null;
-  for (const model of PRIMARY_MODELS) {
-    const Replicate = (await import('replicate')).default;
-    const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN, useFileOutput: false });
-    const aspectRatio = dimensionsToAspectRatio(width, height);
-    const input = { prompt, num_outputs: 1, output_format: 'png', aspect_ratio: aspectRatio };
-    try {
-      const output = await replicate.run(model, { input });
-      const imageUrl = extractImageUrl(output);
-      if (imageUrl) return { success: true, provider: 'replicate', imageUrl, model };
-    } catch (fallbackErr) {
-      lastError = fallbackErr;
-      console.warn(`[Replicate] Model ${model} failed, trying next:`, fallbackErr.message?.slice(0, 100));
-    }
-  }
-  return { success: false, error: lastError?.message || 'All Replicate models failed', diagnostic: { provider: 'replicate', configured: true, errorType: 'all_models_failed' } };
-}
-
-async function generateWithHuggingFace(prompt) {
-  const hasToken = !!process.env.HUGGINGFACE_API_KEY;
-  try {
-    if (!hasToken) {
-      console.error('[HuggingFace Image Error]', { configured: false, reason: 'missing_api_key' });
-      return { success: false, error: 'HuggingFace API key not configured', diagnostic: { configured: false, reason: 'missing_api_key' } };
-    }
-    const fetch = (await import('node-fetch')).default;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
-    const response = await fetch(
-      `https://api-inference.huggingface.co/models/${HUGGINGFACE_IMAGE_MODEL}`,
-      {
-        headers: { Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}` },
-        method: 'POST',
-        body: JSON.stringify({ inputs: prompt }),
-        signal: controller.signal,
-      }
-    );
-    clearTimeout(timeout);
-    if (!response.ok) {
-      const status = response.status;
-      let body = '';
-      try { body = await response.text(); } catch {}
-      let reason = 'api_error';
-      if (status === 401 || status === 403) reason = body.includes('token') ? 'invalid_key' : 'no_access';
-      else if (status === 404) reason = 'model_not_found';
-      else if (status === 429) reason = 'rate_limit';
-      else if (status === 503) reason = 'model_loading_or_unavailable';
-      const diagnostic = { provider: 'huggingface', configured: hasToken, model: HUGGINGFACE_IMAGE_MODEL, status, reason, body: body.slice(0, 300) };
-      console.error('[HuggingFace Image Error]', diagnostic);
-      return { success: false, error: `HuggingFace returned ${status}: ${body.slice(0, 200)}`, diagnostic };
-    }
-    const buffer = Buffer.from(await response.arrayBuffer());
-    return { success: true, provider: 'huggingface', buffer };
-  } catch (err) {
-    const diagnostic = { provider: 'huggingface', configured: hasToken, model: HUGGINGFACE_IMAGE_MODEL, error: err.message?.slice(0, 300) };
-    console.error('[HuggingFace Image Error]', diagnostic);
-    return { success: false, error: err.message, diagnostic };
-  }
 }
 
 function generateSvgPoster({ prompt, headline, cta, platform, brandColors }) {
@@ -158,7 +14,7 @@ function generateSvgPoster({ prompt, headline, cta, platform, brandColors }) {
   const safePlatform = escapeXml(platform || 'Digital');
   const safePrompt = escapeXml(prompt ? (prompt.slice(0, 120) + (prompt.length > 120 ? '...' : '')) : '');
 
-  const wrapText = (text, maxChars, fontSize) => {
+  const wrapText = (text, maxChars) => {
     if (!text || text.length <= maxChars) return text;
     const words = text.split(' ');
     let line = '';
@@ -172,8 +28,8 @@ function generateSvgPoster({ prompt, headline, cta, platform, brandColors }) {
     return lines.slice(0, 3).join('&#10;') + (lines.length > 3 ? '...' : '');
   };
 
-  const wrappedTitle = wrapText(safeTitle, 30, 56);
-  const wrappedPrompt = wrapText(safePrompt, 45, 28);
+  const wrappedTitle = wrapText(safeTitle, 30);
+  const wrappedPrompt = wrapText(safePrompt, 45);
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
   <defs>
@@ -209,8 +65,11 @@ function buildImagePrompt({ prompt, headline, cta, platform, brandColors }) {
   if (cta) finalPrompt += `, call to action: "${cta}"`;
   if (platform) finalPrompt += `, optimized for ${platform}`;
   if (brandColors?.length) finalPrompt += `, brand colors: ${brandColors.join(', ')}`;
-  finalPrompt += ', professional marketing poster design, clean modern style, high quality';
   return finalPrompt;
+}
+
+async function uploadToCloudinary(buffer, filename, folder) {
+  return uploadBuffer(buffer, filename, folder, 'image');
 }
 
 export async function generateImage({ prompt, headline, cta, platform, dimensions, brandColors }) {
@@ -223,62 +82,62 @@ export async function generateImage({ prompt, headline, cta, platform, dimension
   const width = dims[0] || 1080;
   const height = dims[1] || 1080;
   const warnings = [];
-  let result;
+  const timestamp = Date.now();
 
-  // Try Replicate first
-  if (process.env.REPLICATE_API_TOKEN) {
-    result = await generateWithReplicate(finalPrompt, width, height);
-    if (!result.success && PRIMARY_MODELS.length > 1) {
-      result = await generateWithReplicateFallback(finalPrompt, width, height);
-    }
-    if (result.success) {
-      try {
-        const fetch = (await import('node-fetch')).default;
-        const imgResp = await fetch(result.imageUrl);
-        const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
-        const storage = await uploadBuffer(imgBuffer, `poster-${Date.now()}.png`, 'posters', 'image');
-        return {
-          success: true, provider: 'replicate',
-          imageUrl: storage.url, cloudinaryPublicId: storage.publicId,
-          prompt: finalPrompt, generatedAt: new Date().toISOString(), warnings,
-        };
-      } catch (err) {
-        warnings.push('Image generated but upload failed');
-        console.error('[ImageService] Replicate upload failed:', { message: err.message?.slice(0, 200) });
-        return {
-          success: true, provider: 'replicate',
-          imageUrl: result.imageUrl, cloudinaryPublicId: null,
-          prompt: finalPrompt, generatedAt: new Date().toISOString(), warnings,
-        };
-      }
-    }
-    const diag = result.diagnostic || {};
-    const reasonStr = diag.errorType || diag.reason || 'unknown_error';
-    warnings.push(`Replicate failed: ${reasonStr}${diag.status ? ` (HTTP ${diag.status})` : ''}${diag.model ? ` — model: ${diag.model}` : ''}`);
-    warnings.push('Trying HuggingFace');
-  }
-
-  // Try HuggingFace second
-  if (process.env.HUGGINGFACE_API_KEY) {
-    result = await generateWithHuggingFace(finalPrompt);
-    if (result.success && result.buffer) {
-      const storage = await uploadBuffer(result.buffer, `poster-${Date.now()}.png`, 'posters', 'image');
+  // Try Pollinations first
+  const encoded = encodeURIComponent(finalPrompt);
+  const pollUrl = `https://image.pollinations.ai/prompt/${encoded}?width=${width}&height=${height}&nologo=true&enhance=true`;
+  try {
+    const response = await axios.get(pollUrl, { responseType: 'arraybuffer', timeout: 60000 });
+    const buffer = Buffer.from(response.data);
+    if (buffer.length >= 100) {
+      const storage = await uploadToCloudinary(buffer, `poster-${timestamp}.png`, 'posters');
       return {
-        success: true, provider: 'huggingface',
+        success: true, provider: 'pollinations',
         imageUrl: storage.url, cloudinaryPublicId: storage.publicId,
         prompt: finalPrompt, generatedAt: new Date().toISOString(), warnings,
       };
     }
-    const diag = result.diagnostic || {};
-    const hfReason = diag.reason || diag.errorType || 'unknown_error';
-    warnings.push(`HuggingFace failed: ${hfReason}${diag.status ? ` (HTTP ${diag.status})` : ''}${diag.body ? ` — ${String(diag.body).slice(0, 200)}` : ''}`);
-    warnings.push('Using SVG fallback');
+    warnings.push('Pollinations returned empty response');
+  } catch (err) {
+    const msg = err.message || '';
+    const status = err?.response?.status || 0;
+    warnings.push(`Pollinations failed${status ? ` (HTTP ${status})` : ''}: ${msg.slice(0, 100)}`);
   }
 
-  // Local SVG fallback
+  // Try fal.ai second
+  if (process.env.FAL_KEY) {
+    try {
+      const { fal } = await import('@fal-ai/client');
+      fal.config({ credentials: process.env.FAL_KEY });
+      const model = process.env.FAL_IMAGE_MODEL || 'fal-ai/flux/dev';
+      const result = await fal.subscribe(model, {
+        input: { prompt: finalPrompt, num_images: 1, output_format: 'png' },
+        logs: true,
+        onQueueUpdate: () => {},
+      });
+      const imageUrl = result?.data?.images?.[0]?.url || result?.data?.image?.url;
+      if (imageUrl) {
+        const imgResp = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 30000 });
+        const buffer = Buffer.from(imgResp.data);
+        const storage = await uploadToCloudinary(buffer, `poster-${timestamp}.png`, 'posters');
+        return {
+          success: true, provider: 'fal.ai',
+          imageUrl: storage.url, publicId: storage.publicId,
+          prompt: finalPrompt, generatedAt: new Date().toISOString(), warnings,
+        };
+      }
+      warnings.push('Fal returned no image URL');
+    } catch (err) {
+      const msg = err?.message || err?.body?.message || '';
+      warnings.push(`Fal failed: ${msg.slice(0, 100)}`);
+    }
+  }
+
+  // SVG fallback
   warnings.push('AI image providers unavailable. SVG fallback generated successfully.');
   const svgBuffer = generateSvgPoster({ prompt: finalPrompt, headline, cta, platform, brandColors });
-  const storage = await uploadBuffer(svgBuffer, `poster-${Date.now()}.svg`, 'posters', 'image');
+  const storage = await uploadToCloudinary(svgBuffer, `poster-${timestamp}.svg`, 'posters');
 
   return {
     success: true, provider: 'svg-fallback',
@@ -288,77 +147,56 @@ export async function generateImage({ prompt, headline, cta, platform, dimension
 }
 
 export async function checkImageProviders() {
-  const hf = !!process.env.HUGGINGFACE_API_KEY;
-  const rep = !!process.env.REPLICATE_API_TOKEN;
+  const pollinations = true;
+  const fal = !!process.env.FAL_KEY;
   let reason = null;
-  if (!hf && !rep) reason = 'no_providers_configured';
-  else if (!hf) reason = 'only_replicate_configured';
-  else if (!rep) reason = 'only_huggingface_configured';
-  else reason = 'both_configured';
-  return { huggingface: hf, replicate: rep, reason };
+  if (!fal) reason = 'pollinations_only';
+  else reason = 'pollinations_fal_configured';
+  return { pollinations, fal, reason };
 }
 
-export async function testReplicateConnection() {
-  const hasToken = !!process.env.REPLICATE_API_TOKEN;
-  if (!hasToken) return { success: false, reason: 'missing_api_key', provider: 'replicate' };
-  const startMs = Date.now();
+export async function testPollinationsConnection() {
   try {
-    const Replicate = (await import('replicate')).default;
-    const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN, useFileOutput: false });
-    const input = { prompt: 'simple professional marketing poster', num_outputs: 1, output_format: 'png', aspect_ratio: '1:1' };
-    const output = await replicate.run(REPLICATE_IMAGE_MODEL, { input });
-    const imageUrl = extractImageUrl(output);
-    const latency = Date.now() - startMs;
+    const response = await axios.get(
+      'https://image.pollinations.ai/prompt/test?width=256&height=256&nologo=true',
+      { responseType: 'arraybuffer', timeout: 30000 }
+    );
+    const buffer = Buffer.from(response.data);
     return {
-      success: true, reason: 'configured', provider: 'replicate',
-      model: REPLICATE_IMAGE_MODEL, latency,
-      outputType: typeof output,
-      previewUrl: imageUrl?.slice(0, 100) || null,
+      success: buffer.length >= 100,
+      reason: buffer.length >= 100 ? 'configured' : 'empty_response',
+      provider: 'pollinations',
+      latency: 0,
     };
   } catch (err) {
-    const status = err?.response?.status || err?.status || 0;
-    const errData = err?.response?.data;
-    const msg = typeof errData === 'object' ? JSON.stringify(errData) : (errData || err?.message || '');
-    let reason = 'unknown_error';
-    if (msg.includes('not found') || msg.includes('invalid version') || status === 404) reason = 'model_not_found';
-    else if (status === 401 || status === 403 || msg.includes('invalid token')) reason = 'invalid_key';
-    else if (status === 429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('billing') || msg.toLowerCase().includes('payment')) reason = 'quota_or_billing_issue';
-    else if (msg.includes('input') || msg.includes('schema') || msg.includes('validation')) reason = 'invalid_payload';
-    const latency = Date.now() - startMs;
-    return { success: false, reason, provider: 'replicate', model: REPLICATE_IMAGE_MODEL, status, detail: msg.slice(0, 300), latency };
+    const status = err?.response?.status || 0;
+    const msg = err?.message || '';
+    return { success: false, reason: `HTTP ${status}: ${msg.slice(0, 100)}`, provider: 'pollinations' };
   }
 }
 
-export async function testHuggingFaceConnection() {
-  const hasToken = !!process.env.HUGGINGFACE_API_KEY;
-  if (!hasToken) return { success: false, reason: 'missing_api_key', provider: 'huggingface' };
+export async function testFalConnection() {
+  if (!process.env.FAL_KEY) return { success: false, reason: 'missing_api_key', provider: 'fal' };
   try {
-    const fetch = (await import('node-fetch')).default;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
-    const response = await fetch(
-      `https://api-inference.huggingface.co/models/${HUGGINGFACE_IMAGE_MODEL}`,
-      {
-        headers: { Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}` },
-        method: 'POST',
-        body: JSON.stringify({ inputs: 'simple test' }),
-        signal: controller.signal,
-      }
-    );
-    clearTimeout(timeout);
-    if (response.ok) return { success: true, reason: 'configured', provider: 'huggingface', model: HUGGINGFACE_IMAGE_MODEL };
-    const status = response.status;
-    let body = '';
-    try { body = await response.text(); } catch {}
-    let reason = 'api_error';
-    if (status === 401 || status === 403) reason = body.includes('token') ? 'invalid_key' : 'no_access';
-    else if (status === 404) reason = 'model_not_found';
-    else if (status === 429) reason = 'rate_limit';
-    else if (status === 503) reason = 'model_loading_or_unavailable';
-    return { success: false, reason, provider: 'huggingface', model: HUGGINGFACE_IMAGE_MODEL, status, body: body.slice(0, 300) };
+    const { fal } = await import('@fal-ai/client');
+    fal.config({ credentials: process.env.FAL_KEY });
+    const result = await fal.subscribe('fal-ai/flux/schnell', {
+      input: { prompt: 'simple test', num_images: 1, output_format: 'png' },
+      logs: true,
+      onQueueUpdate: () => {},
+    });
+    const imageUrl = result?.data?.images?.[0]?.url || result?.data?.image?.url;
+    return {
+      success: !!imageUrl,
+      reason: imageUrl ? 'configured' : 'empty_response',
+      provider: 'fal',
+    };
   } catch (err) {
-    return { success: false, reason: 'unknown_error', provider: 'huggingface', model: HUGGINGFACE_IMAGE_MODEL, detail: err.message?.slice(0, 300) };
+    const msg = err?.message || err?.body?.message || '';
+    const status = err?.status || 0;
+    let reason = 'api_error';
+    if (status === 401 || status === 403 || msg.includes('unauthorized') || msg.includes('invalid')) reason = 'invalid_key';
+    else if (status === 429 || msg.includes('quota') || msg.includes('rate')) reason = 'quota_exceeded';
+    return { success: false, reason, provider: 'fal', status, detail: msg.slice(0, 200) };
   }
 }
-
-export { REPLICATE_IMAGE_MODEL, HUGGINGFACE_IMAGE_MODEL };

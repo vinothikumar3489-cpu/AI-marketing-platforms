@@ -1,7 +1,7 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
 import { requireAuth } from "../middleware/auth.middleware.js";
-import { getHealth, sendEmail, generatePosterImage, renderVideoHandler, getVideoStatusHandler, debugTestReplicate, debugTestHuggingFace, debugTestCloudinary, debugTestFFmpeg } from "../controllers/integrations.controller.js";
+import { getHealth, sendEmail, generatePosterImage, renderVideoHandler, getVideoStatusHandler, debugTestPollinations, debugTestFal, debugTestCloudinary, debugTestShotstack, debugTestCreatomate } from "../controllers/integrations.controller.js";
 
 export const integrationsRouter = express.Router();
 
@@ -71,7 +71,8 @@ const debugGuard = (req, res, next) => {
   next();
 };
 
-integrationsRouter.get("/debug/replicate", debugGuard, debugTestReplicate);
-integrationsRouter.get("/debug/huggingface", debugGuard, debugTestHuggingFace);
+integrationsRouter.get("/debug/pollinations", debugGuard, debugTestPollinations);
+integrationsRouter.get("/debug/fal", debugGuard, debugTestFal);
 integrationsRouter.get("/debug/cloudinary", debugGuard, debugTestCloudinary);
-integrationsRouter.get("/debug/ffmpeg", debugGuard, debugTestFFmpeg);
+integrationsRouter.get("/debug/shotstack", debugGuard, debugTestShotstack);
+integrationsRouter.get("/debug/creatomate", debugGuard, debugTestCreatomate);

@@ -1,34 +1,29 @@
-import { uploadBuffer } from './storage.service.js';
+import axios from 'axios';
 import sharp from 'sharp';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
+import { uploadBuffer } from './storage.service.js';
 
-let ffmpegPath = null;
-let ffmpegChecked = false;
+function escapeXml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
 
-async function getFfmpegPath() {
-  if (ffmpegChecked) return ffmpegPath;
-  ffmpegChecked = true;
-  if (process.env.FFMPEG_PATH) {
-    ffmpegPath = process.env.FFMPEG_PATH;
-    console.log('[VideoService] Using FFMPEG_PATH env:', ffmpegPath);
-    return ffmpegPath;
-  }
-  try {
-    const ffmpegStatic = (await import('ffmpeg-static'));
-    ffmpegPath = ffmpegStatic.default || ffmpegStatic;
-    console.log('[VideoService] ffmpeg-static resolved:', ffmpegPath ? 'found' : 'not found');
-  } catch {
-    try {
-      const { default: ffstatic } = await import('ffmpeg-static');
-      ffmpegPath = ffstatic;
-      console.log('[VideoService] ffmpeg-static resolved (alt):', ffmpegPath ? 'found' : 'not found');
-    } catch (e) {
-      console.warn('[VideoService] ffmpeg-static not available:', e.message);
-    }
-  }
-  return ffmpegPath;
+function generateFallbackStoryboard(script, scenes) {
+  const storyboard = `# Video Storyboard (Fallback)
+
+${script ? `## Script\n\n${script}\n\n` : ''}
+
+## Storyboard Scenes
+
+${(scenes || []).map((scene, i) => `### Scene ${i + 1}: ${scene.title || 'Untitled'}
+- **Visual:** ${scene.visual || 'Not specified'}
+- **Voiceover:** ${scene.voiceover || 'None'}
+- **Duration:** ${scene.duration || 5}s
+`).join('\n')}
+
+---
+*Generated at ${new Date().toISOString()} | MP4 rendering not available*
+`;
+  return storyboard;
 }
 
 async function generateSlideImage(scene, index, aspectRatio) {
@@ -56,136 +51,68 @@ async function generateSlideImage(scene, index, aspectRatio) {
   return sharp(Buffer.from(svg)).png().toBuffer();
 }
 
-function escapeXml(str) {
-  if (!str) return '';
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function generateFallbackStoryboard(script, scenes) {
-  const storyboard = `# Video Storyboard (Fallback)
-
-${script ? `## Script\n\n${script}\n\n` : ''}
-
-## Storyboard Scenes
-
-${(scenes || []).map((scene, i) => `### Scene ${i + 1}: ${scene.title || 'Untitled'}
-- **Visual:** ${scene.visual || 'Not specified'}
-- **Voiceover:** ${scene.voiceover || 'None'}
-- **Duration:** ${scene.duration || 5}s
-`).join('\n')}
-
----
-*Generated at ${new Date().toISOString()} | MP4 rendering not available*
-`;
-  return storyboard;
-}
-
 export async function renderVideo({ script, scenes, duration, platform, aspectRatio }) {
   if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
     return { success: false, error: 'At least one scene is required' };
   }
 
-  // Render 512MB memory guard — skip FFmpeg if video rendering is not explicitly enabled
-  if (process.env.ENABLE_VIDEO_RENDERING !== 'true') {
-    const storyboard = generateFallbackStoryboard(script, scenes);
-    return {
-      success: true, provider: 'storyboard-fallback', videoUrl: null,
-      storyboard, duration: duration || scenes.reduce((sum, s) => sum + (s.duration || 5), 0),
-      generatedAt: new Date().toISOString(),
-      warnings: ['Video rendering disabled due to server memory limit. Set ENABLE_VIDEO_RENDERING=true to enable.'],
-      reason: 'disabled_memory_limit',
-    };
-  }
-
   const warnings = [];
   const ratio = aspectRatio || '16:9';
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'video-slides-'));
 
+  // Try Shotstack first
+  if (process.env.SHOTSTACK_API_KEY) {
+    try {
+      const shotResult = await renderWithShotstack(scenes, ratio, duration);
+      if (shotResult.success) {
+        return shotResult;
+      }
+      warnings.push(`Shotstack: ${(shotResult.error || 'unknown').slice(0, 150)}`);
+    } catch (err) {
+      warnings.push(`Shotstack error: ${err.message?.slice(0, 100)}`);
+    }
+  }
+
+  // Try Creatomate second
+  if (process.env.CREATOMATE_API_KEY) {
+    try {
+      const creaResult = await renderWithCreatomate(scenes, ratio, duration);
+      if (creaResult.success) {
+        return creaResult;
+      }
+      warnings.push(`Creatomate: ${(creaResult.error || 'unknown').slice(0, 150)}`);
+    } catch (err) {
+      warnings.push(`Creatomate error: ${err.message?.slice(0, 100)}`);
+    }
+  }
+
+  // Cloudinary video assembly fallback
   try {
     const slideBuffers = [];
     for (let i = 0; i < scenes.length; i++) {
-      try {
-        const buf = await generateSlideImage(scenes[i], i, ratio);
-        slideBuffers.push(buf);
-      } catch (slideErr) {
-        warnings.push(`Scene ${i + 1} slide generation failed, using blank`);
-        console.error('[VideoService] Slide generation error:', { scene: i, error: slideErr.message?.slice(0, 200) });
-        const blankBuf = await sharp({
-          create: { width: 1920, height: 1080, channels: 4, background: '#1a1a2e' }
-        }).png().toBuffer();
-        slideBuffers.push(blankBuf);
-      }
+      const buf = await generateSlideImage(scenes[i], i, ratio);
+      slideBuffers.push(buf);
     }
-
-    if (slideBuffers.length === 0) {
-      throw new Error('No slides could be generated');
-    }
-
-    const fp = await getFfmpegPath();
-    if (fp && fs.existsSync(fp)) {
-      try {
-        const ffmpeg = (await import('fluent-ffmpeg')).default;
-        ffmpeg.setFfmpegPath(fp);
-        const slidePaths = [];
-
-        for (let i = 0; i < slideBuffers.length; i++) {
-          const slidePath = path.join(tmpDir, `slide-${String(i).padStart(3, '0')}.png`);
-          fs.writeFileSync(slidePath, slideBuffers[i]);
-          slidePaths.push(slidePath);
-        }
-
-        const totalDuration = duration || scenes.reduce((sum, s) => sum + (s.duration || 5), 0);
-        const perSlideDuration = Math.max(2, totalDuration / scenes.length);
-        const outputPath = path.join(tmpDir, 'output.mp4');
-
-        await new Promise((resolve, reject) => {
-          const slideList = slidePaths.map((p, i) => {
-            const line = `file '${p.replace(/\\/g, '/')}'`;
-            return i < slidePaths.length - 1 ? `${line}\nduration ${perSlideDuration}` : line;
-          }).join('\n');
-          const listPath = path.join(tmpDir, 'list.txt');
-          fs.writeFileSync(listPath, slideList);
-
-          ffmpeg()
-            .input(listPath)
-            .inputOptions(['-f', 'concat', '-safe', '0'])
-            .outputOptions(['-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-r', '24'])
-            .output(outputPath)
-            .on('end', resolve)
-            .on('error', reject)
-            .run();
-        });
-
-        const videoBuffer = fs.readFileSync(outputPath);
-        const storage = await uploadBuffer(videoBuffer, `video-${Date.now()}.mp4`, 'videos', 'video');
-
-        try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-
+    if (slideBuffers.length > 0) {
+      const totalSlides = slideBuffers.length;
+      const perSlideMs = Math.max(2000, ((duration || totalSlides * 5) * 1000) / totalSlides);
+      const cloudResult = await renderCloudinarySlideshow(slideBuffers, perSlideMs, ratio);
+      if (cloudResult.success) {
         return {
-          success: true, provider: 'ffmpeg', videoUrl: storage.url,
-          cloudinaryPublicId: storage.publicId, duration: totalDuration,
+          success: true, provider: 'cloudinary-slideshow',
+          videoUrl: cloudResult.url, cloudinaryPublicId: cloudResult.publicId,
+          duration: duration || totalSlides * 5,
           generatedAt: new Date().toISOString(), warnings,
         };
-      } catch (ffmpegError) {
-        const diag = { ffmpegPath: fp, platform: process.platform, tempDir: tmpDir, error: ffmpegError.message?.slice(0, 300) };
-        console.error('[VideoService] FFmpeg rendering error:', diag);
-        warnings.push('FFmpeg rendering failed: ' + ffmpegError.message);
       }
-    } else {
-      const diag = { ffmpegPath: fp, ffmpegExists: fp ? fs.existsSync(fp) : false, platform: process.platform };
-      console.warn('[VideoService] FFmpeg not available:', diag);
-      warnings.push('FFmpeg not available on this system');
+      warnings.push(`Cloudinary slideshow: ${cloudResult.error}`);
     }
   } catch (err) {
-    console.error('[VideoService] Slide generation error:', { error: err.message?.slice(0, 300) });
-    warnings.push('Slide generation failed: ' + err.message);
+    warnings.push(`Slide generation error: ${err.message?.slice(0, 100)}`);
   }
 
-  try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-
-  warnings.push('Using storyboard fallback — MP4 rendering unavailable');
+  // Storyboard fallback
+  warnings.push('Video APIs unavailable. Storyboard fallback generated.');
   const storyboard = generateFallbackStoryboard(script, scenes);
-
   return {
     success: true, provider: 'storyboard-fallback', videoUrl: null,
     storyboard, duration: duration || scenes.reduce((sum, s) => sum + (s.duration || 5), 0),
@@ -193,29 +120,178 @@ export async function renderVideo({ script, scenes, duration, platform, aspectRa
   };
 }
 
-export async function checkVideoProvider() {
-  const enabled = process.env.ENABLE_VIDEO_RENDERING === 'true';
-  if (!enabled) return { configured: false, provider: null, reason: 'disabled_memory_limit', videoEnabled: false };
-  const fp = await getFfmpegPath();
-  const available = !!(fp && fs.existsSync(fp));
-  return {
-    configured: available,
-    provider: available ? 'ffmpeg' : null,
-    reason: available ? 'available' : (fp ? 'binary_not_found_at_path' : 'missing_binary'),
-    videoEnabled: true,
+async function renderWithShotstack(scenes, aspectRatio, duration) {
+  const apiKey = process.env.SHOTSTACK_API_KEY;
+  const stage = process.env.SHOTSTACK_STAGE || 'stage';
+  const dims = aspectRatio === '9:16' ? { w: 720, h: 1280 }
+    : aspectRatio === '1:1' ? { w: 1080, h: 1080 }
+    : { w: 1920, h: 1080 };
+  const totalDuration = duration || scenes.reduce((sum, s) => sum + (s.duration || 5), 0);
+  const perSlide = Math.max(2, totalDuration / scenes.length);
+
+  const clips = scenes.map((scene, i) => ({
+    asset: {
+      type: 'title',
+      text: scene.title || `Scene ${i + 1}`,
+      style: 'default',
+      size: { w: dims.w, h: dims.h },
+    },
+    start: i * perSlide,
+    length: perSlide,
+    transition: { in: 'fade', out: 'fade' },
+  }));
+
+  const timeline = {
+    timeline: {
+      soundtrack: null,
+      background: '#1a1a2e',
+      tracks: [{ clips }],
+      cache: false,
+    },
+    output: {
+      format: 'mp4',
+      resolution: aspectRatio === '9:16' ? 'portrait' : aspectRatio === '1:1' ? 'square' : 'landscape',
+      aspectRatio: aspectRatio,
+    },
   };
+
+  const response = await axios.post(
+    `https://api.shotstack.io/edit/${stage}/render`,
+    timeline,
+    {
+      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      timeout: 30000,
+    }
+  );
+  const data = response.data;
+  if (data?.success) {
+    return {
+      success: true, provider: 'shotstack',
+      status: 'queued', renderId: data?.response?.id,
+    };
+  }
+  return { success: false, error: data?.message || 'Shotstack returned error' };
 }
 
-export async function testFfmpegConnection() {
-  const fp = await getFfmpegPath();
-  if (!fp || !fs.existsSync(fp)) {
-    return { success: false, reason: 'missing_binary', provider: 'ffmpeg', ffmpegPath: fp };
+async function renderWithCreatomate(scenes, aspectRatio, duration) {
+  const apiKey = process.env.CREATOMATE_API_KEY;
+  const totalDuration = duration || scenes.reduce((sum, s) => sum + (s.duration || 5), 0);
+
+  const response = await axios.post(
+    'https://api.creatomate.com/v1/renders',
+    {
+      templateName: 'Marketing Video',
+      modifications: {
+        scenes: scenes.map((scene, i) => ({
+          title: scene.title || `Scene ${i + 1}`,
+          text: scene.visual || '',
+          voiceover: scene.voiceover || '',
+          duration: scene.duration || Math.ceil(totalDuration / scenes.length),
+        })),
+        aspect_ratio: aspectRatio || '16:9',
+      },
+    },
+    {
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      timeout: 30000,
+    }
+  );
+  const data = Array.isArray(response.data) ? response.data[0] : response.data;
+  if (data?.id) {
+    return {
+      success: true, provider: 'creatomate',
+      status: data.status === 'completed' ? 'completed' : 'queued',
+      renderId: data.id, videoUrl: data.url || null,
+    };
   }
+  return { success: false, error: 'Creatomate returned no render ID' };
+}
+
+async function renderCloudinarySlideshow(slideBuffers, slideDurationMs, aspectRatio) {
+  const dims = aspectRatio === '9:16' ? { w: 720, h: 1280 }
+    : aspectRatio === '1:1' ? { w: 1080, h: 1080 }
+    : { w: 1920, h: 1080 };
+
   try {
-    const { execSync } = await import('child_process');
-    const version = execSync(`"${fp}" -version`, { encoding: 'utf8', timeout: 10000 }).split('\n')[0] || 'unknown';
-    return { success: true, reason: 'available', provider: 'ffmpeg', ffmpegPath: fp, version: version.slice(0, 100) };
+    const { v2: cloudinary } = await import('cloudinary');
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+
+    const uploadPromises = slideBuffers.map((buf, i) => {
+      return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: 'ai-marketing/video-slides', public_id: `slide-${Date.now()}-${i}`, resource_type: 'image' },
+          (err, result) => {
+            if (err) reject(err);
+            else resolve(result);
+          }
+        );
+        stream.end(buf);
+      });
+    });
+
+    const uploadResults = await Promise.all(uploadPromises);
+    const publicIds = uploadResults.map(r => r.public_id);
+
+    const slideDurationSec = Math.max(1, slideDurationMs / 1000);
+    const multiUrl = cloudinary.url('ai-marketing/video-slides', {
+      resource_type: 'video',
+      transformation: [
+        { width: dims.w, height: dims.h, crop: 'pad', background: '#1a1a2e' },
+        { duration: slideDurationSec * slideBuffers.length, flags: 'streaming_attachment' },
+        { overlay: { public_id: publicIds[0] }, duration: slideDurationSec },
+        ...publicIds.slice(1).flatMap(id => [
+          { overlay: { public_id: id }, duration: slideDurationSec }
+        ]),
+      ],
+    });
+
+    return { success: true, url: multiUrl, publicId: `ai-marketing/video-slides` };
   } catch (err) {
-    return { success: false, reason: 'execution_failed', provider: 'ffmpeg', ffmpegPath: fp, error: err.message?.slice(0, 200) };
+    return { success: false, error: err.message?.slice(0, 200) };
+  }
+}
+
+export async function checkVideoProvider() {
+  const shotstack = !!process.env.SHOTSTACK_API_KEY;
+  const creatomate = !!process.env.CREATOMATE_API_KEY;
+  const provider = shotstack ? 'shotstack' : creatomate ? 'creatomate' : null;
+  const reason = shotstack ? 'shotstack_configured' : creatomate ? 'creatomate_configured' : 'no_video_provider';
+  return { configured: shotstack || creatomate, provider, reason, shotstackConfigured: shotstack, creatomateConfigured: creatomate };
+}
+
+export async function testShotstackConnection() {
+  if (!process.env.SHOTSTACK_API_KEY) return { success: false, reason: 'missing_api_key', provider: 'shotstack' };
+  try {
+    const stage = process.env.SHOTSTACK_STAGE || 'stage';
+    const response = await axios.get(`https://api.shotstack.io/edit/${stage}/status`, {
+      headers: { 'x-api-key': process.env.SHOTSTACK_API_KEY },
+      timeout: 10000,
+    });
+    return { success: response.status === 200, reason: 'configured', provider: 'shotstack', status: response.status };
+  } catch (err) {
+    const status = err?.response?.status || 0;
+    let reason = 'api_error';
+    if (status === 401 || status === 403) reason = 'invalid_key';
+    return { success: false, reason, provider: 'shotstack', status, detail: err.message?.slice(0, 200) };
+  }
+}
+
+export async function testCreatomateConnection() {
+  if (!process.env.CREATOMATE_API_KEY) return { success: false, reason: 'missing_api_key', provider: 'creatomate' };
+  try {
+    const response = await axios.get('https://api.creatomate.com/v1/templates', {
+      headers: { Authorization: `Bearer ${process.env.CREATOMATE_API_KEY}` },
+      timeout: 10000,
+    });
+    return { success: Array.isArray(response.data), reason: 'configured', provider: 'creatomate', count: Array.isArray(response.data) ? response.data.length : 0 };
+  } catch (err) {
+    const status = err?.response?.status || 0;
+    let reason = 'api_error';
+    if (status === 401 || status === 403) reason = 'invalid_key';
+    return { success: false, reason, provider: 'creatomate', status, detail: err.message?.slice(0, 200) };
   }
 }
