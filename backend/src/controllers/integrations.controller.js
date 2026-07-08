@@ -1,4 +1,4 @@
-import { sendTestEmail, checkEmailProvider } from '../services/integrations/resendEmail.service.js';
+import { sendTestEmail, checkEmailProvider } from '../services/integrations/email.service.js';
 import { checkStorageProvider, testCloudinaryConnection } from '../services/integrations/storage.service.js';
 import { generateImage } from '../services/integrations/imageExecution.service.js';
 import { renderVideo, getVideoStatus } from '../services/integrations/videoExecution.service.js';
@@ -16,7 +16,7 @@ export async function getHealth(req, res) {
     res.json({
       success: true,
       providers: {
-        email: { configured: email.configured, provider: email.provider || null, reason: email.reason || null, fromConfigured: email.fromConfigured ?? null },
+        email: { configured: email.configured, provider: email.provider || null, smtpUserConfigured: email.smtpUserConfigured ?? false, smtpPassConfigured: email.smtpPassConfigured ?? false, from: email.from ?? null },
         image: {
           pollinations: { configured: true },
           fal: { configured: config.image.fal.configured, model: config.image.fal.model },
@@ -54,8 +54,8 @@ export async function sendEmail(req, res) {
         data: {
           userId, chatId,
           action: 'email_sent',
-          message: `Test email sent via ${result.provider} to ${result.recipient}`,
-          metadata: { provider: result.provider, messageId: result.messageId, recipient: result.recipient },
+          message: `Test email sent via ${result.provider} to ${result.maskedRecipient || result.recipient}`,
+          metadata: { provider: result.provider, messageId: result.messageId, recipient: result.maskedRecipient || result.recipient },
         },
       });
     }
