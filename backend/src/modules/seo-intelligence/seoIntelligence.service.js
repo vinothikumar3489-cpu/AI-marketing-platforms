@@ -20,6 +20,18 @@ const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
 
 // ============================================
+// SAFE SCORE HELPER
+// Evidence-based SEO returns null when a metric is unavailable.
+// Never fabricate scores, never convert null/undefined to 0.
+// Returns a rounded integer for finite numbers, otherwise null.
+// ============================================
+const toNullableScore = (value) => {
+  if (value === undefined || value === null) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n) : null;
+};
+
+// ============================================
 // MAIN SEO ANALYSIS FUNCTION
 // ============================================
 
@@ -360,11 +372,11 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     const sb = scoreBreakdown || {};
     const seoScoresAvailable = evidenceSEOData?.pageSpeed?.performance != null;
     const safeSeoScores = {
-      overall: seoScoresAvailable ? Number(sb.overall ?? sb.overallScore ?? 0) : null,
-      technical: seoScoresAvailable ? Number(sb.technical ?? sb.technicalScore ?? 0) : null,
-      onPage: seoScoresAvailable ? Number(sb.onPage ?? sb.onPageScore ?? 0) : null,
-      content: seoScoresAvailable ? Number(sb.content ?? sb.contentScore ?? 0) : null,
-      authority: seoScoresAvailable ? Number(sb.authority ?? sb.authorityScore ?? 0) : null,
+      overall: seoScoresAvailable ? toNullableScore(sb.overall ?? sb.overallScore) : null,
+      technical: seoScoresAvailable ? toNullableScore(sb.technical ?? sb.technicalScore) : null,
+      onPage: seoScoresAvailable ? toNullableScore(sb.onPage ?? sb.onPageScore) : null,
+      content: seoScoresAvailable ? toNullableScore(sb.content ?? sb.contentScore) : null,
+      authority: seoScoresAvailable ? toNullableScore(sb.authority ?? sb.authorityScore) : null,
       aiVisibility: null,
       localSeo: null
     };
@@ -527,13 +539,13 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
       create: {
         seoIntelligence: { connect: { id: savedId } },
         auditData: technicalAudit,
-        overallScore: safeTechnicalScores.overall ?? 0,
-        titleScore: safeTechnicalScores.title ?? 0,
-        metaScore: safeTechnicalScores.meta ?? 0,
-        securityScore: safeTechnicalScores.security ?? 0,
-        mobileScore: safeTechnicalScores.mobile ?? 0,
-        headingScore: safeTechnicalScores.headings ?? 0,
-        schemaScore: safeTechnicalScores.schema ?? 0,
+        overallScore: toNullableScore(safeTechnicalScores.overall),
+        titleScore: toNullableScore(safeTechnicalScores.title),
+        metaScore: toNullableScore(safeTechnicalScores.meta),
+        securityScore: toNullableScore(safeTechnicalScores.security),
+        mobileScore: toNullableScore(safeTechnicalScores.mobile),
+        headingScore: toNullableScore(safeTechnicalScores.headings),
+        schemaScore: toNullableScore(safeTechnicalScores.schema),
         criticalIssues: safeTechnicalIssues.critical ?? [],
         highIssues: safeTechnicalIssues.high ?? [],
         mediumIssues: safeTechnicalIssues.medium ?? [],
@@ -542,13 +554,13 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
       },
       update: {
         auditData: technicalAudit,
-        overallScore: safeTechnicalScores.overall ?? 0,
-        titleScore: safeTechnicalScores.title ?? 0,
-        metaScore: safeTechnicalScores.meta ?? 0,
-        securityScore: safeTechnicalScores.security ?? 0,
-        mobileScore: safeTechnicalScores.mobile ?? 0,
-        headingScore: safeTechnicalScores.headings ?? 0,
-        schemaScore: safeTechnicalScores.schema ?? 0,
+        overallScore: toNullableScore(safeTechnicalScores.overall),
+        titleScore: toNullableScore(safeTechnicalScores.title),
+        metaScore: toNullableScore(safeTechnicalScores.meta),
+        securityScore: toNullableScore(safeTechnicalScores.security),
+        mobileScore: toNullableScore(safeTechnicalScores.mobile),
+        headingScore: toNullableScore(safeTechnicalScores.headings),
+        schemaScore: toNullableScore(safeTechnicalScores.schema),
         criticalIssues: safeTechnicalIssues.critical ?? [],
         highIssues: safeTechnicalIssues.high ?? [],
         mediumIssues: safeTechnicalIssues.medium ?? [],
@@ -558,33 +570,28 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
       }
     });
 
-    // Save score breakdown
+    // Save score breakdown (null-safe — never fabricate scores)
+    const scoreBreakdownData = {
+      technicalScore: toNullableScore(safeSeoScores.technical),
+      onPageScore: toNullableScore(safeSeoScores.onPage),
+      contentScore: toNullableScore(safeSeoScores.content),
+      authorityScore: toNullableScore(safeSeoScores.authority),
+      aiVisibilityScore: toNullableScore(safeSeoScores.aiVisibility),
+      localSeoScore: toNullableScore(safeSeoScores.localSeo),
+      overallScore: toNullableScore(safeSeoScores.overall),
+      scoreHistory: JSON.stringify([{
+        date: new Date().toISOString(),
+        scores: safeSeoScores
+      }]),
+      lastCalculated: new Date()
+    };
     await tx.seoScoreBreakdown.upsert({
       where: { seoIntelligenceId: savedId },
       create: {
         seoIntelligence: { connect: { id: savedId } },
-        technicalScore: safeSeoScores.technical,
-        onPageScore: safeSeoScores.onPage,
-        contentScore: safeSeoScores.content,
-        authorityScore: safeSeoScores.authority,
-        aiVisibilityScore: safeSeoScores.aiVisibility,
-        localSeoScore: safeSeoScores.localSeo,
-        overallScore: safeSeoScores.overall,
-        scoreHistory: JSON.stringify([{
-          date: new Date().toISOString(),
-          scores: safeSeoScores
-        }])
+        ...scoreBreakdownData
       },
-      update: {
-        technicalScore: safeSeoScores.technical,
-        onPageScore: safeSeoScores.onPage,
-        contentScore: safeSeoScores.content,
-        authorityScore: safeSeoScores.authority,
-        aiVisibilityScore: safeSeoScores.aiVisibility,
-        localSeoScore: safeSeoScores.localSeo,
-        overallScore: safeSeoScores.overall,
-        lastCalculated: new Date()
-      }
+      update: scoreBreakdownData
     });
 
     // Save keyword intelligence
@@ -600,9 +607,9 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
         competitorKeywords: parsedKeywordIntelligence.competitorKeywords || [],
         contentOpportunities: parsedKeywordIntelligence.contentOpportunities || [],
         geoKeywords: parsedKeywordIntelligence.geoKeywords || [],
-        totalKeywords: parsedKeywordIntelligence.metadata.totalKeywords || 0,
-        clustersCount: parsedKeywordIntelligence.metadata.clustersCount || 0,
-        opportunitiesCount: parsedKeywordIntelligence.metadata.opportunitiesCount || 0
+        totalKeywords: toNullableScore(parsedKeywordIntelligence.metadata?.totalKeywords),
+        clustersCount: toNullableScore(parsedKeywordIntelligence.metadata?.clustersCount),
+        opportunitiesCount: toNullableScore(parsedKeywordIntelligence.metadata?.opportunitiesCount)
       },
       update: {
         primaryKeywords: parsedKeywordIntelligence.primaryKeywords || [],
@@ -613,56 +620,42 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
         competitorKeywords: parsedKeywordIntelligence.competitorKeywords || [],
         contentOpportunities: parsedKeywordIntelligence.contentOpportunities || [],
         geoKeywords: parsedKeywordIntelligence.geoKeywords || [],
-        totalKeywords: parsedKeywordIntelligence.metadata.totalKeywords || 0,
-        clustersCount: parsedKeywordIntelligence.metadata.clustersCount || 0,
-        opportunitiesCount: parsedKeywordIntelligence.metadata.opportunitiesCount || 0,
+        totalKeywords: toNullableScore(parsedKeywordIntelligence.metadata?.totalKeywords),
+        clustersCount: toNullableScore(parsedKeywordIntelligence.metadata?.clustersCount),
+        opportunitiesCount: toNullableScore(parsedKeywordIntelligence.metadata?.opportunitiesCount),
         updatedAt: new Date()
       }
     });
 
-    // Save GEO intelligence
+    // Save GEO intelligence (null-safe scores — never fabricate)
+    const geoRecordData = {
+      aiVisibilityScore: toNullableScore(parsedGeoIntelligence.aiVisibilityScore),
+      chatGptScore: toNullableScore(parsedGeoIntelligence.chatGptScore),
+      geminiScore: toNullableScore(parsedGeoIntelligence.geminiScore),
+      claudeScore: toNullableScore(parsedGeoIntelligence.claudeScore),
+      perplexityScore: toNullableScore(parsedGeoIntelligence.perplexityScore),
+      googleAiOverviewScore: toNullableScore(parsedGeoIntelligence.googleAiOverviewScore),
+      entityCoverageScore: toNullableScore(parsedGeoIntelligence.entityCoverageScore),
+      knowledgeGraphReadinessScore: toNullableScore(parsedGeoIntelligence.knowledgeGraphReadinessScore),
+      citationReadinessScore: toNullableScore(parsedGeoIntelligence.citationReadinessScore),
+      answerabilityScore: toNullableScore(parsedGeoIntelligence.answerabilityScore),
+      topicalAuthorityScore: toNullableScore(parsedGeoIntelligence.topicalAuthorityScore),
+      entities: parsedGeoIntelligence.entities || [],
+      knowledgeGraphEntities: parsedGeoIntelligence.knowledgeGraphEntities || [],
+      citationOpportunities: parsedGeoIntelligence.citationOpportunities || [],
+      faqOpportunities: parsedGeoIntelligence.faqOpportunities || [],
+      aiContentOpportunities: parsedGeoIntelligence.aiContentOpportunities || [],
+      trustSignals: parsedGeoIntelligence.trustSignals || {},
+      recommendations: parsedGeoIntelligence.recommendations || {}
+    };
     await tx.geoIntelligenceRecord.upsert({
       where: { seoIntelligenceId: savedId },
       create: {
         seoIntelligence: { connect: { id: savedId } },
-        aiVisibilityScore: parsedGeoIntelligence.aiVisibilityScore,
-        chatGptScore: parsedGeoIntelligence.chatGptScore,
-        geminiScore: parsedGeoIntelligence.geminiScore,
-        claudeScore: parsedGeoIntelligence.claudeScore,
-        perplexityScore: parsedGeoIntelligence.perplexityScore,
-        googleAiOverviewScore: parsedGeoIntelligence.googleAiOverviewScore,
-        entityCoverageScore: parsedGeoIntelligence.entityCoverageScore,
-        knowledgeGraphReadinessScore: parsedGeoIntelligence.knowledgeGraphReadinessScore,
-        citationReadinessScore: parsedGeoIntelligence.citationReadinessScore,
-        answerabilityScore: parsedGeoIntelligence.answerabilityScore,
-        topicalAuthorityScore: parsedGeoIntelligence.topicalAuthorityScore,
-        entities: parsedGeoIntelligence.entities || [],
-        knowledgeGraphEntities: parsedGeoIntelligence.knowledgeGraphEntities || [],
-        citationOpportunities: parsedGeoIntelligence.citationOpportunities || [],
-        faqOpportunities: parsedGeoIntelligence.faqOpportunities || [],
-        aiContentOpportunities: parsedGeoIntelligence.aiContentOpportunities || [],
-        trustSignals: parsedGeoIntelligence.trustSignals || {},
-        recommendations: parsedGeoIntelligence.recommendations || {}
+        ...geoRecordData
       },
       update: {
-        aiVisibilityScore: parsedGeoIntelligence.aiVisibilityScore,
-        chatGptScore: parsedGeoIntelligence.chatGptScore,
-        geminiScore: parsedGeoIntelligence.geminiScore,
-        claudeScore: parsedGeoIntelligence.claudeScore,
-        perplexityScore: parsedGeoIntelligence.perplexityScore,
-        googleAiOverviewScore: parsedGeoIntelligence.googleAiOverviewScore,
-        entityCoverageScore: parsedGeoIntelligence.entityCoverageScore,
-        knowledgeGraphReadinessScore: parsedGeoIntelligence.knowledgeGraphReadinessScore,
-        citationReadinessScore: parsedGeoIntelligence.citationReadinessScore,
-        answerabilityScore: parsedGeoIntelligence.answerabilityScore,
-        topicalAuthorityScore: parsedGeoIntelligence.topicalAuthorityScore,
-        entities: parsedGeoIntelligence.entities || [],
-        knowledgeGraphEntities: parsedGeoIntelligence.knowledgeGraphEntities || [],
-        citationOpportunities: parsedGeoIntelligence.citationOpportunities || [],
-        faqOpportunities: parsedGeoIntelligence.faqOpportunities || [],
-        aiContentOpportunities: parsedGeoIntelligence.aiContentOpportunities || [],
-        trustSignals: parsedGeoIntelligence.trustSignals || {},
-        recommendations: parsedGeoIntelligence.recommendations || {},
+        ...geoRecordData,
         updatedAt: new Date()
       }
     });
@@ -776,6 +769,36 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     throw new Error('SEO analysis completed but SeoIntelligence was not saved (record not found after transaction).');
   }
   console.log('[SEO] Saved SeoIntelligence', { chatId, userId, seoIntelligenceId: savedId, status: verifyMain.status });
+
+  // ==== POST-SAVE VERIFICATION (runs in all environments) ====
+  const verify = await prisma.seoIntelligence.findFirst({
+    where: { chatId, userId },
+    orderBy: { updatedAt: 'desc' },
+    include: {
+      scoreBreakdown: true,
+      technicalAuditDetail: true,
+      keywordIntelligence: true,
+      geoIntelligence: true,
+      competitorSeoRecord: true,
+      contentGapRecord: true,
+      blogIntelligenceRecord: true,
+      executiveDashboard: true
+    }
+  });
+
+  if (!verify) {
+    throw new Error('SEO Intelligence save verification failed.');
+  }
+
+  console.log('[SEO] Save verified', {
+    chatId,
+    userId,
+    seoIntelligenceId: verify.id,
+    hasScoreBreakdown: !!verify.scoreBreakdown,
+    hasTechnicalAudit: !!verify.technicalAuditDetail,
+    hasKeywordIntelligence: !!verify.keywordIntelligence,
+    hasExecutiveDashboard: !!verify.executiveDashboard
+  });
 
   // ==== DB VERIFICATION: Read back and verify every relation (AFTER transaction commits) ====
   let verifySaved = null;

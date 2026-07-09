@@ -652,6 +652,30 @@ function ExecutiveDashboard({ data }: { data: any }) {
         <div>{kpiItems.length > 0 && <KPIDashboard items={kpiItems} columns={2} />}</div>
       </div>
 
+      {/* Null-safe notice: scores unavailable but analysis still succeeded */}
+      {kpiItems.length === 0 && (
+        <Card style={{ background: 'rgba(83,167,255,0.06)', borderColor: '#293245' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+            {[
+              { label: 'Overall SEO Score', value: overallSeoScore },
+              { label: 'Technical Score', value: technicalHealth },
+              { label: 'Content Authority', value: contentAuthority },
+              { label: 'AI Visibility (GEO)', value: aiVisibility },
+            ].map((item, i) => (
+              <div key={i} style={{ padding: '12px', border: '1px solid #293245', borderRadius: '8px', background: '#0f1729' }}>
+                <div style={{ fontSize: '11px', color: '#9aa7bd', marginBottom: '4px' }}>{item.label}</div>
+                <strong style={{ fontSize: '18px', color: item.value != null ? '#e5edff' : '#9aa7bd' }}>
+                  {item.value != null ? `${Math.round(item.value)}/100` : `${item.label.split(' ')[0]} score not measured`}
+                </strong>
+              </div>
+            ))}
+          </div>
+          <p style={{ margin: '12px 0 0 0', fontSize: '12px', color: '#9aa7bd' }}>
+            Some scores could not be measured for this website (e.g. PageSpeed metrics unavailable). The analysis still completed — review the technical evidence, keyword ideas, and content sections below.
+          </p>
+        </Card>
+      )}
+
       {/* Existing: Radar + Priorities */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         <Card style={{ height: 'auto', minHeight: '350px' }}>

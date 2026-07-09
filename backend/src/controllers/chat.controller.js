@@ -559,6 +559,8 @@ export const getFullResults = async (req, res) => {
     hasCompetitorIntelligence: !!competitorIntelligence,
     hasCampaignIntelligence: !!campaignIntelligence,
     hasSeoIntelligence: !!normalizedSeoIntelligence,
+    hasSeoScoreBreakdown: !!seoIntelligence?.scoreBreakdown,
+    hasTechnicalAudit: !!seoIntelligence?.technicalAuditDetail,
     agentRunsCount: agentRuns.length,
     hasAutomationPlan: !!automationPlan,
   });

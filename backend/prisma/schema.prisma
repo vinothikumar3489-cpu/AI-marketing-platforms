@@ -414,14 +414,14 @@ model TechnicalSeoAudit {
   // Full audit data structure
   auditData Json
 
-  // Individual scores for quick access
-  overallScore  Int
-  titleScore    Int
-  metaScore     Int
-  securityScore Int
-  mobileScore   Int
-  headingScore  Int
-  schemaScore   Int
+  // Individual scores for quick access (null if evidence not available)
+  overallScore  Int?
+  titleScore    Int?
+  metaScore     Int?
+  securityScore Int?
+  mobileScore   Int?
+  headingScore  Int?
+  schemaScore   Int?
 
   // Issues by priority
   criticalIssues Json
@@ -444,14 +444,14 @@ model SeoScoreBreakdown {
   seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
   seoIntelligenceId String          @unique
 
-  // Dimensional scores
-  technicalScore    Int
-  onPageScore       Int
-  contentScore      Int
-  authorityScore    Int
-  aiVisibilityScore Int
-  localSeoScore     Int
-  overallScore      Int
+  // Dimensional scores (null if evidence not available)
+  technicalScore    Int?
+  onPageScore       Int?
+  contentScore      Int?
+  authorityScore    Int?
+  aiVisibilityScore Int?
+  localSeoScore     Int?
+  overallScore      Int?
 
   // Score history for trend tracking
   scoreHistory Json?
@@ -487,9 +487,9 @@ model KeywordIntelligenceRecord {
   geoKeywords Json // [{ question, platform, answerOpportunity, contentSuggestion, intent }]
 
   // Metadata
-  totalKeywords      Int @default(0)
-  clustersCount      Int @default(0)
-  opportunitiesCount Int @default(0)
+  totalKeywords      Int? @default(0)
+  clustersCount      Int? @default(0)
+  opportunitiesCount Int? @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -557,22 +557,22 @@ model GeoIntelligenceRecord {
   seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
   seoIntelligenceId String          @unique
 
-  // Overall AI Visibility Score
-  aiVisibilityScore Int
+  // Overall AI Visibility Score (null if not measured)
+  aiVisibilityScore Int?
 
-  // Individual Platform Scores
-  chatGptScore          Int
-  geminiScore           Int
-  claudeScore           Int
-  perplexityScore       Int
-  googleAiOverviewScore Int
+  // Individual Platform Scores (null if not measured)
+  chatGptScore          Int?
+  geminiScore           Int?
+  claudeScore           Int?
+  perplexityScore       Int?
+  googleAiOverviewScore Int?
 
-  // Component Scores
-  entityCoverageScore          Int
-  knowledgeGraphReadinessScore Int
-  citationReadinessScore       Int
-  answerabilityScore           Int
-  topicalAuthorityScore        Int
+  // Component Scores (null if not measured)
+  entityCoverageScore          Int?
+  knowledgeGraphReadinessScore Int?
+  citationReadinessScore       Int?
+  answerabilityScore           Int?
+  topicalAuthorityScore        Int?
 
   // Detailed Analysis Data (JSON)
   entities               Json // [{ entity, type, confidenceScore, context }]
@@ -601,7 +601,7 @@ model ContentGap {
   type             String // missing-topic, missing-page, missing-blog, missing-use-case, missing-faq
   title            String
   reason           String  @db.Text
-  opportunityScore Int
+  opportunityScore Int?
   priority         String // critical, high, medium, low
   competitors      Json // which competitors have this
   suggestedPage    String? @db.Text
