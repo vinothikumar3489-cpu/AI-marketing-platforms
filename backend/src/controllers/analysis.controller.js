@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 import { generateAnalysis } from "../services/analysis.service.js";
 import { scrapeWebsite } from "../services/scraper.service.js";
+import { collectEvidence } from "../modules/evidence/evidence.service.js";
 
 const analysisSchema = z.object({
   chatId: z.string().optional(),
@@ -24,6 +25,7 @@ export const analyzeProduct = async (req, res) => {
     const { chatId, productName, productDescription, targetAudience, companyName, industry, websiteUrl, followUpQuestion } = parseResult.data;
 
     let scrapedData = {};
+    let evidenceContext = "";
     if (websiteUrl) {
       try {
         const scrapeResult = await scrapeWebsite({ websiteUrl, productName, companyName: companyName || productName });
@@ -41,6 +43,16 @@ export const analyzeProduct = async (req, res) => {
       } catch (scrapeErr) {
         console.warn(`[Controller] Website scrape failed (non-fatal):`, scrapeErr.message);
       }
+
+      // Collect evidence (non-fatal)
+      try {
+        const evidenceResult = await collectEvidence(websiteUrl, { companyName });
+        if (evidenceResult.success) {
+          evidenceContext = evidenceResult.contextString;
+        }
+      } catch (evidenceErr) {
+        console.warn(`[Controller] Evidence collection failed (non-fatal):`, evidenceErr.message);
+      }
     }
 
     let chat = null;
@@ -51,7 +63,7 @@ export const analyzeProduct = async (req, res) => {
       }
     }
 
-    const analysisResult = await generateAnalysis({ manualData: { productName, productDescription, targetAudience, companyName, industry, followUpQuestion }, scrapedData });
+    const analysisResult = await generateAnalysis({ manualData: { productName, productDescription, targetAudience, companyName, industry, followUpQuestion }, scrapedData, evidenceContext });
 
     if (!chat) {
       chat = await prisma.chat.create({

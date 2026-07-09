@@ -19,21 +19,30 @@ export async function generateEmailCampaign(campaignType, context) {
   const typeConfig = CAMPAIGN_TYPES[campaignType];
   if (!typeConfig) throw new Error(`Unknown campaign type: ${campaignType}`);
 
-  const { productName, companyName, targetAudience, industry, senderName } = context;
+  const { productName, companyName, targetAudience, industry, senderName, productUsp, evidence } = context;
+
+  const evidenceLines = [];
+  if (productUsp) evidenceLines.push(`Product USP: ${productUsp}`);
+  if (evidence?.website?.ctaTexts?.length) evidenceLines.push(`Actual Website CTAs: ${evidence.website.ctaTexts.join('; ')}`);
+  if (evidence?.website?.heroText) evidenceLines.push(`Website Hero Text: ${evidence.website.heroText}`);
+  if (evidence?.audience?.painPoints?.length) evidenceLines.push(`Audience Pain Points: ${evidence.audience.painPoints.slice(0, 3).join('; ')}`);
+  if (evidence?.competitors?.list?.length) evidenceLines.push(`Competitors: ${evidence.competitors.list.slice(0, 3).map(c => c.name || c.url).filter(Boolean).join(', ')}`);
+  if (evidence?.sourceSummary?.sourcesCollected?.length) evidenceLines.push(`Evidence Sources: ${evidence.sourceSummary.sourcesCollected.join(', ')}`);
 
   const prompt = `Generate a ${typeConfig.label} email draft for marketing execution. Use ONLY the verified data below.
 
 CONTEXT:
 Product/Company: ${productName || 'N/A'}${companyName ? `\nCompany: ${companyName}` : ''}${targetAudience ? `\nTarget Audience: ${targetAudience}` : ''}${industry ? `\nIndustry: ${industry}` : ''}${senderName ? `\nSender: ${senderName}` : ''}
+${evidenceLines.join('\n')}
 
 CAMPAIGN TYPE: ${typeConfig.label}
 
 REQUIRED OUTPUT FIELDS (return valid JSON):
 {
-  "subject": "Email subject line (max 60 chars, engaging)",
+  "subject": "Email subject line (max 60 chars, specific to product/industry - no generic phrases like boost your business)",
   "previewText": "Preview text (max 100 chars)",
-  "body": "Full email body with personalization variables like {{firstName}}, {{companyName}}",
-  "cta": "Clear call to action",
+  "body": "Full email body with specific product value, evidence-backed pain point, personalization variables like {{firstName}}, {{companyName}}",
+  "cta": "Clear call to action using actual product CTA if available",
   "personalizationVariables": ["list of variables used"],
   "spamScore": "Likely spam score estimation: Low / Medium / High",
   "readingTime": "Estimated reading time in minutes",
@@ -50,12 +59,13 @@ REQUIRED OUTPUT FIELDS (return valid JSON):
 
 RULES:
 1. Use {{firstName}} and {{companyName}} for personalization.
-2. Keep subject under 60 characters.
-3. Body must be professional, direct, and value-focused.
-4. Include unsubscribe reminder at the bottom.
-5. Do NOT invent fake credentials, case studies, or statistics.
-6. Score spam check realistically (Low is best).
-7. Return ONLY valid JSON. No markdown code fences.`;
+2. Keep subject under 60 characters and SPECIFIC to the product/company above.
+3. Body must include specific product value and evidence-backed pain points.
+4. Do NOT use generic copy like "boost your business" or "drive growth".
+5. Include unsubscribe reminder at the bottom.
+6. Do NOT invent fake credentials, case studies, or statistics.
+7. Score spam check realistically (Low is best).
+8. Return ONLY valid JSON. No markdown code fences.`;
 
   try {
     const result = await callAI(prompt);

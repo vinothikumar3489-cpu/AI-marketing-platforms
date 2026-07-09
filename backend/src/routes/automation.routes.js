@@ -11,6 +11,7 @@ import {
   executeAllModules,
   executeSingleModule,
   getExecutionData,
+  getEvidenceContext,
 } from "../controllers/automation.controller.js";
 import { validate } from "../middleware/validate.js";
 
@@ -47,3 +48,4 @@ automationRouter.get("/:chatId/logs", getAutomationLogs);
 automationRouter.post("/:chatId/execute", executeAllModules);
 automationRouter.post("/:chatId/execute/:module", executeSingleModule);
 automationRouter.get("/:chatId/execution", getExecutionData);
+automationRouter.get("/:chatId/evidence-context", getEvidenceContext);

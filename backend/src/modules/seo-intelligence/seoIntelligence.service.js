@@ -12,6 +12,8 @@ import { generateExecutiveDashboard } from '../../services/seo/executive-dashboa
 import { deriveWebsiteIdentity } from '../../utils/seo-identity.util.js';
 import { collectResearchData } from '../../services/intelligence/research-orchestrator.service.js';
 import { asArray } from '../../utils/text.util.js';
+import { getLatestEvidenceSnapshot } from '../evidence/evidence.service.js';
+import { buildSEOEvidenceData } from '../evidence/evidence.normalizer.js';
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
@@ -71,6 +73,27 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
         competitorsCount: researchData.competitors.length,
         keywordsCount: researchData.keywords.length
       });
+    }
+
+    // Step 1b: Load Evidence Snapshot
+    let evidenceSEOData = null;
+    try {
+      const evidenceSnapshot = await getLatestEvidenceSnapshot(prisma, userId, chatId);
+      if (evidenceSnapshot?.evidence) {
+        evidenceSEOData = buildSEOEvidenceData(evidenceSnapshot.evidence);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('✅ [SEO Intelligence] Evidence snapshot loaded:', {
+            hasPageSpeed: !!evidenceSEOData?.pageSpeed,
+            hasSitemap: !!evidenceSEOData?.sitemap,
+            hasSchemas: !!evidenceSEOData?.schemas,
+            technicalIssues: evidenceSEOData?.technicalIssues?.length || 0,
+          });
+        }
+      }
+    } catch (evErr) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('⚠️ [SEO Intelligence] Evidence snapshot load failed:', evErr.message);
+      }
     }
 
     // Step 2: Scrape website if not already done by orchestrator
@@ -335,14 +358,15 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
 
     // Safe score mapping to prevent undefined property access
     const sb = scoreBreakdown || {};
+    const seoScoresAvailable = evidenceSEOData?.pageSpeed?.performance != null;
     const safeSeoScores = {
-      overall: Number(sb.overall ?? sb.overallScore ?? 0),
-      technical: Number(sb.technical ?? sb.technicalScore ?? 0),
-      onPage: Number(sb.onPage ?? sb.onPageScore ?? 0),
-      content: Number(sb.content ?? sb.contentScore ?? 0),
-      authority: Number(sb.authority ?? sb.authorityScore ?? 0),
-      aiVisibility: Number(sb.aiVisibility ?? sb.aiVisibilityScore ?? 0),
-      localSeo: Number(sb.localSeo ?? sb.localSeoScore ?? 0)
+      overall: seoScoresAvailable ? Number(sb.overall ?? sb.overallScore ?? 0) : null,
+      technical: seoScoresAvailable ? Number(sb.technical ?? sb.technicalScore ?? 0) : null,
+      onPage: seoScoresAvailable ? Number(sb.onPage ?? sb.onPageScore ?? 0) : null,
+      content: seoScoresAvailable ? Number(sb.content ?? sb.contentScore ?? 0) : null,
+      authority: seoScoresAvailable ? Number(sb.authority ?? sb.authorityScore ?? 0) : null,
+      aiVisibility: null,
+      localSeo: null
     };
     if (process.env.NODE_ENV !== 'production') {
       console.log('[SEO Save] safeSeoScores after fix:', safeSeoScores);
@@ -863,13 +887,19 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
 
   // Step 7: Add message to chat (non-blocking)
   try {
+    const scoreMessage = safeSeoScores.overall != null
+      ? `Overall Score: ${safeSeoScores.overall}/100`
+      : 'Score: Not yet available (run evidence collection first)';
+    const summaryText = researchData?.overview || researchData?.seoOverview
+      || `SEO analysis for ${websiteUrl} — ${safeSeoScores.overall != null ? `Overall: ${safeSeoScores.overall}/100` : 'Score pending evidence collection'}`;
+
     await prisma.message.create({
       data: {
         chatId,
         role: 'assistant',
-        content: `SEO Intelligence analysis complete for ${websiteUrl}. Overall Score: ${safeSeoScores.overall}/100`,
+        content: `SEO Intelligence analysis complete for ${websiteUrl}. ${scoreMessage}`,
         analysisData: {
-          summary: researchData?.overview || researchData?.seoOverview || `SEO analysis for ${websiteUrl} — Overall: ${safeSeoScores.overall}/100`,
+          summary: summaryText,
           scores: safeSeoScores,
           provider: 'orchestrator'
         }
@@ -1109,8 +1139,8 @@ Generate a complete SEO intelligence report in valid JSON format:
     "recommendations": ["rec1", "rec2"]
   },
   "keywordOpportunities": [
-    { "keyword": "keyword1", "intent": "commercial", "difficulty": "medium", "opportunity": "high", "reason": "why" },
-    { "keyword": "keyword2", "intent": "informational", "difficulty": "low", "opportunity": "high", "reason": "why" }
+    { "keyword": "keyword1", "intent": "commercial", "difficulty": null, "opportunity": null, "reason": "Topic idea based on product category" },
+    { "keyword": "keyword2", "intent": "informational", "difficulty": null, "opportunity": null, "reason": "Topic idea based on product category" }
   ],
   "competitorIntelligence": {
     "directCompetitors": ["comp1", "comp2"],
@@ -1125,10 +1155,11 @@ Generate a complete SEO intelligence report in valid JSON format:
     "educationalContent": ["guide1", "guide2"]
   },
   "aiVisibility": {
-    "aiVisibilityScore": <0-100>,
-    "chatgptOptimization": ["tip1", "tip2"],
-    "geminiOptimization": ["tip1", "tip2"],
-    "perplexityOptimization": ["tip1", "tip2"]
+    "aiVisibilityScore": null,
+    "note": "AI visibility score requires DataForSEO API; not currently available",
+    "chatgptOptimization": [],
+    "geminiOptimization": [],
+    "perplexityOptimization": []
   },
   "landingPageOptimization": {
     "headlineSuggestions": ["headline1", "headline2", "headline3"],
@@ -1137,13 +1168,13 @@ Generate a complete SEO intelligence report in valid JSON format:
     "conversionTips": ["tip1", "tip2"]
   },
   "blogOpportunities": [
-    { "title": "Blog Title 1", "keyword": "target keyword", "intent": "informational", "difficulty": "easy" },
-    { "title": "Blog Title 2", "keyword": "target keyword", "intent": "commercial", "difficulty": "medium" }
+    { "title": "Blog Title 1", "keyword": "target keyword", "intent": "informational", "difficulty": null },
+    { "title": "Blog Title 2", "keyword": "target keyword", "intent": "commercial", "difficulty": null }
   ],
   "actionPlan": {
-    "day30": ["action1", "action2", "action3"],
-    "day60": ["action1", "action2", "action3"],
-    "day90": ["action1", "action2", "action3"]
+    "day30": [{ "action": "Action description", "reason": "Why this action matters", "evidence": "Source of recommendation", "effort": "low|medium|high", "impact": "Expected outcome" }],
+    "day60": [{ "action": "Action description", "reason": "Why this action matters", "evidence": "Source of recommendation", "effort": "low|medium|high", "impact": "Expected outcome" }],
+    "day90": [{ "action": "Action description", "reason": "Why this action matters", "evidence": "Source of recommendation", "effort": "low|medium|high", "impact": "Expected outcome" }]
   }
 }
 
@@ -1318,69 +1349,40 @@ function generateRuleBasedAnalysis(websiteData, technicalAudit, researchData, pr
       ]
     },
     aiVisibility: {
-      aiVisibilityScore: 45,
-      chatgptOptimization: [
-        'Create FAQ sections for common queries',
-        'Write clear, structured content',
-        'Add specific facts and figures'
-      ],
-      geminiOptimization: [
-        'Optimize for conversational queries',
-        'Include comparison data',
-        'Add product specifications'
-      ],
-      perplexityOptimization: [
-        'Cite sources and data',
-        'Create detailed technical content',
-        'Build authority pages'
-      ]
+      aiVisibilityScore: null,
+      note: 'AI visibility score requires DataForSEO API; not currently available',
+      chatgptOptimization: [],
+      geminiOptimization: [],
+      perplexityOptimization: []
     },
     landingPageOptimization: {
-      headlineSuggestions: [
-        `Transform Your [Problem] with ${productName}`,
-        `The Smart Way to [Benefit]`,
-        `${productName}: [Unique Value Proposition]`
-      ],
-      ctaSuggestions: [
-        'Start Free Trial',
-        'See How It Works',
-        'Get Started in 60 Seconds'
-      ],
-      trustSignals: [
-        'Add customer testimonials',
-        'Display security badges',
-        'Show client logos',
-        'Include social proof numbers'
-      ],
-      conversionTips: [
-        'Place CTA above the fold',
-        'Reduce form fields to 3 or less',
-        'Add urgency indicators',
-        'Include money-back guarantee'
-      ]
+      headlineSuggestions: [],
+      ctaSuggestions: [],
+      trustSignals: [],
+      conversionTips: []
     },
     blogOpportunities: generateBlogOpportunities(productName),
     actionPlan: {
       day30: [
-        'Fix critical technical SEO issues (title, meta, headings)',
-        'Create 3-5 core product pages with optimized content',
-        'Set up Google Search Console and Analytics',
-        'Research and document target keywords',
-        'Write first 2 blog posts targeting long-tail keywords'
+        { action: 'Fix critical technical SEO issues (title, meta, headings)', reason: 'Technical audit identified missing or suboptimal elements', evidence: 'Technical SEO Analysis', effort: 'medium', impact: 'SEO Rankings' },
+        { action: 'Create 3-5 core product pages with optimized content', reason: 'Product pages are primary conversion drivers', evidence: 'Website Content Audit', effort: 'medium', impact: 'Organic Traffic, Conversions' },
+        { action: 'Set up Google Search Console and Analytics', reason: 'Required for monitoring search performance', evidence: 'Industry Best Practice', effort: 'low', impact: 'Analytics, Monitoring' },
+        { action: 'Research and document target keywords', reason: 'Keyword research is foundation of SEO strategy', evidence: 'SEO Methodology', effort: 'medium', impact: 'Traffic, Rankings' },
+        { action: 'Write first 2 blog posts targeting long-tail keywords', reason: 'Blog content captures informational search traffic', evidence: 'Content Strategy', effort: 'medium', impact: 'Organic Traffic, Authority' }
       ],
       day60: [
-        'Publish 4-6 more SEO-optimized blog posts',
-        'Create 2-3 comparison pages',
-        'Build internal linking structure',
-        'Start link building campaign',
-        'Optimize images and page speed'
+        { action: 'Publish 4-6 more SEO-optimized blog posts', reason: 'Consistent publishing builds topical authority', evidence: 'Content Strategy', effort: 'medium', impact: 'Traffic, Authority' },
+        { action: 'Create 2-3 comparison pages', reason: 'Comparison pages capture commercial intent traffic', evidence: 'Keyword Research', effort: 'medium', impact: 'Conversion Traffic' },
+        { action: 'Build internal linking structure', reason: 'Internal links distribute page authority and improve crawlability', evidence: 'SEO Best Practice', effort: 'low', impact: 'SEO Rankings, Crawlability' },
+        { action: 'Start link building campaign', reason: 'Backlinks are a top ranking factor', evidence: 'SEO Methodology', effort: 'high', impact: 'Domain Authority, Rankings' },
+        { action: 'Optimize images and page speed', reason: 'Page speed impacts user experience and rankings', evidence: 'Core Web Vitals', effort: 'medium', impact: 'User Experience, SEO' }
       ],
       day90: [
-        'Publish 6-8 additional blog posts',
-        'Create comprehensive guides and resources',
-        'Launch content promotion campaign',
-        'Monitor rankings and adjust strategy',
-        'Analyze competitors and fill content gaps'
+        { action: 'Publish 6-8 additional blog posts', reason: 'Build content library for long-tail keyword coverage', evidence: 'Content Strategy', effort: 'medium', impact: 'Organic Traffic' },
+        { action: 'Create comprehensive guides and resources', reason: 'In-depth content earns links and authority', evidence: 'Content Marketing', effort: 'high', impact: 'Authority, Links' },
+        { action: 'Launch content promotion campaign', reason: 'Content without promotion has limited reach', evidence: 'Digital Marketing', effort: 'medium', impact: 'Traffic, Links' },
+        { action: 'Monitor rankings and adjust strategy', reason: 'SEO requires ongoing monitoring and iteration', evidence: 'SEO Methodology', effort: 'medium', impact: 'Continuous Improvement' },
+        { action: 'Analyze competitors and fill content gaps', reason: 'Competitor analysis reveals untapped opportunities', evidence: 'Competitive Analysis', effort: 'medium', impact: 'Market Position' }
       ]
     },
     metadata: {
@@ -1401,41 +1403,43 @@ function generateRuleBasedAnalysis(websiteData, technicalAudit, researchData, pr
 }
 
 function generateKeywordOpportunities(productName, researchData) {
-  return [
-    { keyword: `${productName} tutorial`, intent: 'informational', difficulty: 'easy', opportunity: 'high', reason: 'Low competition, high search volume' },
-    { keyword: `best ${productName} alternative`, intent: 'commercial', difficulty: 'medium', opportunity: 'high', reason: 'Captures competitor traffic' },
-    { keyword: `${productName} pricing`, intent: 'commercial', difficulty: 'easy', opportunity: 'high', reason: 'High purchase intent' },
-    { keyword: `how to use ${productName}`, intent: 'informational', difficulty: 'easy', opportunity: 'medium', reason: 'Existing user searches' },
-    { keyword: `${productName} vs [competitor]`, intent: 'commercial', difficulty: 'medium', opportunity: 'high', reason: 'Comparison searches' },
-    { keyword: `${productName} review`, intent: 'commercial', difficulty: 'medium', opportunity: 'medium', reason: 'Research phase traffic' },
-    { keyword: `${productName} features`, intent: 'informational', difficulty: 'easy', opportunity: 'medium', reason: 'Product research' },
-    { keyword: `${productName} for small business`, intent: 'commercial', difficulty: 'medium', opportunity: 'high', reason: 'Niche targeting' }
+  const topics = [
+    { keyword: `${productName} tutorial`, intent: 'informational', reason: 'Topic idea based on product category' },
+    { keyword: `best ${productName} alternative`, intent: 'commercial', reason: 'Topic idea based on product category' },
+    { keyword: `${productName} pricing`, intent: 'commercial', reason: 'Topic idea based on product category' },
+    { keyword: `how to use ${productName}`, intent: 'informational', reason: 'Topic idea based on product category' },
+    { keyword: `${productName} vs [competitor]`, intent: 'commercial', reason: 'Topic idea based on product category' },
+    { keyword: `${productName} review`, intent: 'commercial', reason: 'Topic idea based on product category' },
+    { keyword: `${productName} features`, intent: 'informational', reason: 'Topic idea based on product category' },
+    { keyword: `${productName} for small business`, intent: 'commercial', reason: 'Topic idea based on product category' }
   ];
+  return topics.map(t => ({ ...t, difficulty: null, opportunity: null }));
 }
 
 function generateBlogOpportunities(productName) {
-  return [
-    { title: `The Complete ${productName} Guide for Beginners`, keyword: `${productName} guide`, intent: 'informational', difficulty: 'easy' },
-    { title: `10 Ways to Get More Value from ${productName}`, keyword: `${productName} tips`, intent: 'informational', difficulty: 'easy' },
-    { title: `${productName} vs Top 5 Alternatives: Detailed Comparison`, keyword: `${productName} alternatives`, intent: 'commercial', difficulty: 'medium' },
-    { title: `How [Company] Achieved [Result] Using ${productName}`, keyword: `${productName} case study`, intent: 'commercial', difficulty: 'easy' },
-    { title: `${productName} Pricing Guide: Which Plan is Right for You?`, keyword: `${productName} pricing`, intent: 'commercial', difficulty: 'easy' },
-    { title: `Common ${productName} Mistakes and How to Avoid Them`, keyword: `${productName} mistakes`, intent: 'informational', difficulty: 'easy' },
-    { title: `${productName} Integration Guide: Connect Your Favorite Tools`, keyword: `${productName} integrations`, intent: 'informational', difficulty: 'easy' },
-    { title: `Advanced ${productName} Techniques for Power Users`, keyword: `${productName} advanced`, intent: 'informational', difficulty: 'medium' },
-    { title: `${productName} ROI Calculator: Measure Your Returns`, keyword: `${productName} roi`, intent: 'commercial', difficulty: 'medium' },
-    { title: `Why Teams are Switching from [Competitor] to ${productName}`, keyword: `switch to ${productName}`, intent: 'commercial', difficulty: 'medium' },
-    { title: `${productName} Security and Compliance: Everything You Need to Know`, keyword: `${productName} security`, intent: 'informational', difficulty: 'easy' },
-    { title: `${productName} Mobile App: Features and Benefits`, keyword: `${productName} mobile`, intent: 'informational', difficulty: 'easy' },
-    { title: `How to Migrate from [Competitor] to ${productName} in 5 Steps`, keyword: `migrate to ${productName}`, intent: 'commercial', difficulty: 'medium' },
-    { title: `${productName} Keyboard Shortcuts to Boost Your Productivity`, keyword: `${productName} shortcuts`, intent: 'informational', difficulty: 'easy' },
-    { title: `${productName} Updates: What's New in the Latest Release`, keyword: `${productName} updates`, intent: 'informational', difficulty: 'easy' },
-    { title: `Building a Workflow with ${productName}: Step-by-Step Tutorial`, keyword: `${productName} workflow`, intent: 'informational', difficulty: 'easy' },
-    { title: `${productName} for Remote Teams: Best Practices`, keyword: `${productName} remote work`, intent: 'informational', difficulty: 'easy' },
-    { title: `${productName} API Documentation and Examples`, keyword: `${productName} api`, intent: 'informational', difficulty: 'medium' },
-    { title: `${productName} Customer Success Stories and Results`, keyword: `${productName} success stories`, intent: 'commercial', difficulty: 'easy' },
-    { title: `The Ultimate ${productName} Checklist for Getting Started`, keyword: `${productName} checklist`, intent: 'informational', difficulty: 'easy' }
+  const blogs = [
+    { title: `The Complete ${productName} Guide for Beginners`, keyword: `${productName} guide`, intent: 'informational' },
+    { title: `10 Ways to Get More Value from ${productName}`, keyword: `${productName} tips`, intent: 'informational' },
+    { title: `${productName} vs Top 5 Alternatives: Detailed Comparison`, keyword: `${productName} alternatives`, intent: 'commercial' },
+    { title: `How [Company] Achieved [Result] Using ${productName}`, keyword: `${productName} case study`, intent: 'commercial' },
+    { title: `${productName} Pricing Guide: Which Plan is Right for You?`, keyword: `${productName} pricing`, intent: 'commercial' },
+    { title: `Common ${productName} Mistakes and How to Avoid Them`, keyword: `${productName} mistakes`, intent: 'informational' },
+    { title: `${productName} Integration Guide: Connect Your Favorite Tools`, keyword: `${productName} integrations`, intent: 'informational' },
+    { title: `Advanced ${productName} Techniques for Power Users`, keyword: `${productName} advanced`, intent: 'informational' },
+    { title: `${productName} ROI Calculator: Measure Your Returns`, keyword: `${productName} roi`, intent: 'commercial' },
+    { title: `Why Teams are Switching from [Competitor] to ${productName}`, keyword: `switch to ${productName}`, intent: 'commercial' },
+    { title: `${productName} Security and Compliance: Everything You Need to Know`, keyword: `${productName} security`, intent: 'informational' },
+    { title: `${productName} Mobile App: Features and Benefits`, keyword: `${productName} mobile`, intent: 'informational' },
+    { title: `How to Migrate from [Competitor] to ${productName} in 5 Steps`, keyword: `migrate to ${productName}`, intent: 'commercial' },
+    { title: `${productName} Keyboard Shortcuts to Boost Your Productivity`, keyword: `${productName} shortcuts`, intent: 'informational' },
+    { title: `${productName} Updates: What's New in the Latest Release`, keyword: `${productName} updates`, intent: 'informational' },
+    { title: `Building a Workflow with ${productName}: Step-by-Step Tutorial`, keyword: `${productName} workflow`, intent: 'informational' },
+    { title: `${productName} for Remote Teams: Best Practices`, keyword: `${productName} remote work`, intent: 'informational' },
+    { title: `${productName} API Documentation and Examples`, keyword: `${productName} api`, intent: 'informational' },
+    { title: `${productName} Customer Success Stories and Results`, keyword: `${productName} success stories`, intent: 'commercial' },
+    { title: `The Ultimate ${productName} Checklist for Getting Started`, keyword: `${productName} checklist`, intent: 'informational' }
   ];
+  return blogs.map(b => ({ ...b, difficulty: null }));
 }
 
 function generateFallbackAnalysis(websiteUrl, productName) {

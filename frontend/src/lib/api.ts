@@ -241,3 +241,32 @@ export async function downloadReport(chatId: string, type: 'executive' | 'growth
     throw err;
   }
 }
+
+// ============================================
+// PHASE A — Evidence Context & Content Generation
+// ============================================
+
+export async function getEvidenceContext(chatId: string) {
+  return api.get<{
+    success: boolean;
+    data: {
+      company: any;
+      product: any;
+      website: any;
+      audience: any;
+      competitors: any;
+      seo: any;
+      channels: any[];
+      growth: any;
+      sourceSummary: any;
+    };
+  }>(`/automation/${chatId}/evidence-context`);
+}
+
+export async function generateExecutionModule(chatId: string, module: string) {
+  return api.post<{ success: boolean; data: any }>(`/automation/${chatId}/execute/${module}`);
+}
+
+export async function getExecutionData(chatId: string) {
+  return api.get<{ success: boolean; exists: boolean; data: any }>(`/automation/${chatId}/execution`);
+}

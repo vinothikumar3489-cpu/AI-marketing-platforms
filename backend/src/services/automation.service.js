@@ -41,7 +41,10 @@ export async function generateAutomationPlanWithAI(context) {
     growthWorkspace,
     executiveStory,
     actionPlan,
+    evidenceContext,
   } = context;
+
+  const ec = evidenceContext || {};
 
   // Check for sufficient verified data
   const hasProductData = !!productIntelligence?.productAnalysis;
@@ -50,9 +53,10 @@ export async function generateAutomationPlanWithAI(context) {
   const hasCompetitorData = !!competitorIntelligence?.competitorAnalysis;
   const hasCampaignData = !!campaignIntelligence?.campaignGenerator;
   const hasChannelData = !!campaignIntelligence?.channelRecommendation;
-  const hasSeoData = !!seoIntelligence?.seoScore;
+  const hasSeoData = !!seoIntelligence?.seoScore || (ec.seo?.issues?.length > 0);
+  const hasEvidenceSnapshot = ec.sourceSummary?.hasEvidenceSnapshot || false;
 
-  if (!hasProductData && !hasCampaignData && !hasSeoData && !hasCompetitorData) {
+  if (!hasProductData && !hasCampaignData && !hasSeoData && !hasCompetitorData && !hasEvidenceSnapshot) {
     return { _noData: true };
   }
 
@@ -73,10 +77,10 @@ export async function generateAutomationPlanWithAI(context) {
   const seoScore = seoIntelligence?.seoScore ?? null;
 
   // Determine product info from verified data only
-  const product = productName || chatTitle || "Project";
-  const targetAudience = productData.targetAudience || audienceData.primaryAudience || null;
-  const industry = productData.industry || null;
-  const website = productData.websiteUrl || "";
+  const product = productName || chatTitle || ec.company?.productName || "Project";
+  const targetAudience = productData.targetAudience || audienceData.primaryAudience || ec.product?.targetAudience || null;
+  const industry = productData.industry || ec.product?.industry || null;
+  const website = productData.websiteUrl || ec.company?.websiteUrl || "";
 
   // Determine channels from verified data only
   let channels = [];
@@ -91,6 +95,21 @@ export async function generateAutomationPlanWithAI(context) {
 
   // Try AI generation first
   try {
+    // Build evidence context lines
+    const evidenceLines = [];
+    if (ec.website?.featuresText?.length) evidenceLines.push(`Product Features from Website: ${ec.website.featuresText.slice(0, 5).join(", ")}`);
+    if (ec.website?.ctaTexts?.length) evidenceLines.push(`Website CTAs: ${ec.website.ctaTexts.join(", ")}`);
+    if (ec.website?.heroText) evidenceLines.push(`Website Hero Text: ${ec.website.heroText}`);
+    if (ec.audience?.painPoints?.length) evidenceLines.push(`Audience Pain Points: ${ec.audience.painPoints.slice(0, 5).join(", ")}`);
+    if (ec.audience?.personas?.length) evidenceLines.push(`Buyer Personas: ${ec.audience.personas.slice(0, 3).map(p => p.name || p.title).filter(Boolean).join(", ")}`);
+    if (ec.competitors?.list?.length) evidenceLines.push(`Competitors: ${ec.competitors.list.slice(0, 5).map(c => c.name || c.url).filter(Boolean).join(", ")}`);
+    if (ec.competitors?.keywordGaps?.length) evidenceLines.push(`Keyword Gaps: ${ec.competitors.keywordGaps.slice(0, 5).join(", ")}`);
+    if (ec.seo?.issues?.length) evidenceLines.push(`SEO Technical Issues: ${ec.seo.issues.slice(0, 5).map(i => i.action).join("; ")}`);
+    if (ec.seo?.contentOpportunities?.length) evidenceLines.push(`SEO Content Opportunities: ${ec.seo.contentOpportunities.slice(0, 5).map(o => o.opportunity).join("; ")}`);
+    if (ec.seo?.pageSpeed?.performance != null) evidenceLines.push(`PageSpeed Performance: ${ec.seo.pageSpeed.performance}/100`);
+    if (ec.seo?.sitemap?.urlCount != null) evidenceLines.push(`Sitemap URLs: ${ec.seo.sitemap.urlCount}`);
+    if (ec.sourceSummary?.sourcesCollected?.length) evidenceLines.push(`Evidence Sources Available: ${ec.sourceSummary.sourcesCollected.join(", ")}`);
+
     const prompt = `Generate a marketing automation plan using ONLY the verified data below.
 
 VERIFIED DATA:
@@ -104,12 +123,14 @@ ${Array.isArray(seoContentGaps) && seoContentGaps.length > 0 ? `Content Gaps: ${
 ${Array.isArray(seoBlogIdeas) && seoBlogIdeas.length > 0 ? `Blog Ideas: ${JSON.stringify(seoBlogIdeas.slice(0, 5))}` : ""}
 ${growthWorkspace ? `Growth Score: ${JSON.stringify(growthWorkspace.overallGrowthScore)}` : ""}
 ${executiveStory?.companyOverview?.name ? `Company Name: ${executiveStory.companyOverview.name}` : ""}
+${evidenceLines.join("\n")}
 
 RULES:
 1. Use ONLY the verified data shown above. Do NOT invent any data.
 2. For any section with no verified data, set it to an empty array [] or null.
 3. Do NOT generate sample leads, fake discounts, fake case studies, placeholder hashtags, or fabricated campaign names.
 4. Every item in any array MUST include evidence fields: trigger, condition, action, tool, owner, evidence, confidence, dataSource.
+5. Every automation recommendation must include: action, reason, evidence, priority, effort, expected impact category.
 
 Return valid JSON with these keys (set to [] or null if no data):
 {
@@ -183,6 +204,7 @@ CRITICAL: Return valid JSON. Empty arrays for sections with no data. No fabricat
     growthWorkspace,
     executiveStory,
     actionPlan,
+    evidenceContext: ec,
   });
 }
 
@@ -196,8 +218,10 @@ function generateEvidenceBasedPlan(context) {
     hasCampaignData, hasChannelData, hasSeoData,
     productIntelligence, competitorIntelligence, campaignIntelligence, seoIntelligence,
     growthWorkspace, executiveStory, actionPlan,
+    evidenceContext,
   } = context;
 
+  const ec = evidenceContext || {};
   const productAnalysis = productIntelligence?.productAnalysis || {};
   const audienceData = productIntelligence?.audienceIntelligence || {};
   const campaignData = campaignIntelligence?.campaignGenerator || {};

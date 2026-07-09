@@ -49,11 +49,14 @@ export async function buildReportData(chatId, userId) {
   const seo = seoIntel ? normalizeSeoIntelligence(seoIntel) : null;
 
   const scores = {
-    overallGrowthScore: campaign?.growthSummary?.overallGrowthScore || 0,
-    marketOpportunityScore: campaign?.growthSummary?.marketOpportunityScore || 0,
-    audienceClarityScore: campaign?.growthSummary?.audienceClarityScore || 0,
-    competitiveDefensibilityScore: campaign?.growthSummary?.competitiveDefensibilityScore || 0,
-    campaignReadinessScore: campaign?.growthSummary?.campaignReadinessScore || 0
+    overallGrowthScore: campaign?.growthSummary?.overallGrowthScore || campaign?.growthSummary?.dataCompletenessScore || null,
+    dataCompletenessScore: campaign?.growthSummary?.dataCompletenessScore || null,
+    evidenceBased: campaign?.growthSummary?.evidenceBased || false,
+    evidenceSourcesCount: campaign?.growthSummary?.evidenceSourcesCount || 0,
+    marketOpportunityScore: campaign?.growthSummary?.evidenceBased ? campaign?.growthSummary?.overallGrowthScore : null,
+    audienceClarityScore: null,
+    competitiveDefensibilityScore: null,
+    campaignReadinessScore: null
   };
 
   const company = executiveStory?.companyOverview || {
@@ -97,13 +100,11 @@ export async function buildReportData(chatId, userId) {
   };
 
   const marketData = {
-    tam: market?.tam || 'Unknown',
-    sam: market?.sam || 'Unknown',
-    som: market?.som || 'Unknown',
-    growthRate: market?.cagr || 'Unknown',
     trends: extractArray(market?.marketTrends || market?.trends),
     opportunities: extractArray(market?.growthOpportunities || market?.opportunities),
-    risks: extractArray(market?.marketRisks || market?.risks)
+    risks: extractArray(market?.marketRisks || market?.risks),
+    growthSignals: extractArray(market?.growthSignals),
+    dataNote: 'Market size data (TAM/SAM/SOM) not available without paid API sources'
   };
 
   const positioningData = {

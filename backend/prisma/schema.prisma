@@ -28,6 +28,7 @@ model User {
   notifications          Notification[]
   automationPlans        AutomationPlan[]
   automationLogs         AutomationLog[]
+  evidenceSnapshots      EvidenceSnapshot[]
 
   // Growth Execution Layer relations
   growthSprints GrowthSprint[]
@@ -61,6 +62,7 @@ model Chat {
   // Growth Execution Layer relations
   growthSprints GrowthSprint[]
   growthTasks   GrowthTask[]
+  evidenceSnapshots EvidenceSnapshot[]
 
   @@index([userId])
 }
@@ -90,6 +92,7 @@ model Analysis {
   competitorInsights  Json?
   campaignSuggestions Json?
   roiSuggestions      Json?
+  evidenceSnapshots   EvidenceSnapshot[]
   createdAt           DateTime @default(now())
 
   @@index([chatId])
@@ -847,8 +850,41 @@ model AutomationPlan {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
 
-  @@index([userId, chatId])
+// ============================================
+// EVIDENCE SNAPSHOT (Phase 1 — Evidence Engine)
+// ============================================
+
+model EvidenceSnapshot {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId    String
+  analysis  Analysis? @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  analysisId String?
+
+  websiteUrl    String
+  companyName   String?
+  sourceSummary Json? // { sourcesCollected: [...], missingSources: [...] }
+
+  // Evidence collections (all nullable — never fake)
+  websiteEvidence      Json? // title, meta, headings, hero, CTA, features, page detection
+  technicalSeoEvidence Json? // pagespeed scores, robots, sitemap
+  contentEvidence      Json? // opengraph, schema, technology detection
+  competitorEvidence   Json? // reserved for later
+  githubEvidence       Json? // repo stats if github link found
+
+  // Raw collection for debugging
+  rawEvidence Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([chatId])
+  @@index([userId])
+  @@index([analysisId])
 }
 
 model AutomationAsset {

@@ -26,82 +26,49 @@ export async function collectAudienceIntelligence({ company, competitors, market
   const lower = text.toLowerCase();
   const industry = company.industry || 'Technology';
   const b2bOrB2C = company.b2bOrB2C || 'Unknown';
-  const targetMarket = company.targetMarket || 'Unknown';
   const now = new Date().toISOString();
 
-  // Build ICPs from evidence only
+  // Build personas from evidence only
   const icpPatterns = {
     'Technology': {
       b2b: [
         {
           icpName: 'Technical Decision Maker',
           role: 'CTO / VP of Engineering',
-          companySize: '50-500 employees',
-          industry: ['Technology', 'SaaS', 'Software'],
-          techMaturity: 'High',
           painPoints: ['Technical scalability limitations', 'Engineering velocity bottlenecks', 'Technology debt accumulation'],
           goals: ['Accelerate product development cycles', 'Improve system reliability and uptime', 'Reduce operational overhead'],
-          buyingTriggers: ['System downtime events', 'Competitive feature releases', 'New budget cycle for tooling'],
           objections: ['Integration complexity with existing stack', 'Security and compliance concerns', 'Vendor lock-in risk'],
-          budget: '$50k-$500k annually',
-          decisionAuthority: 'Final decision maker for technical purchases',
-          buyingCommittee: ['CTO', 'VP Engineering', 'Engineering Manager', 'Head of Product'],
-          lifetimeValue: '$150k-$1.5M over 3 years',
-          intent: 'High - actively researching solutions to technical scalability challenges',
-          evidence: { source: 'Industry evidence pattern', confidence: 80, collectedAt: now }
+          preferredContent: ['Technical documentation', 'Case studies', 'Architecture guides'],
+          evidence: { source: 'industry_evidence_pattern', confidence: 70, collectedAt: now }
         },
         {
           icpName: 'Product Leader',
           role: 'VP of Product / Product Manager',
-          companySize: '50-500 employees',
-          industry: ['Technology', 'SaaS', 'Software'],
-          techMaturity: 'Medium-High',
           painPoints: ['Feature prioritization challenges', 'User feedback management gaps', 'Cross-team coordination friction'],
           goals: ['Ship products faster with higher quality', 'Improve product-market fit', 'Increase user engagement and retention'],
-          buyingTriggers: ['New competitor feature releases', 'Customer churn rate increase', 'Product roadmap gaps identified'],
           objections: ['ROI uncertainty for new tools', 'Implementation timeline concerns', 'Team training and adoption requirements'],
-          budget: '$20k-$200k annually',
-          decisionAuthority: 'Influencer - recommends with budget approval needed',
-          buyingCommittee: ['VP Product', 'Product Managers', 'Engineering Lead', 'Head of Design'],
-          lifetimeValue: '$60k-$600k over 3 years',
-          intent: 'Medium-High - evaluating solutions for product development efficiency',
-          evidence: { source: 'Industry evidence pattern', confidence: 75, collectedAt: now }
+          preferredContent: ['Product comparison guides', 'Roadmap planning resources', 'User research insights'],
+          evidence: { source: 'industry_evidence_pattern', confidence: 65, collectedAt: now }
         },
         {
           icpName: 'Growth Executive',
           role: 'VP of Growth / CRO',
-          companySize: '100-1000 employees',
-          industry: ['Technology', 'SaaS', 'Marketplace'],
-          techMaturity: 'Medium',
           painPoints: ['Customer acquisition cost optimization', 'Revenue growth stagnation', 'Marketing ROI measurement'],
           goals: ['Scale revenue predictably', 'Improve conversion rates', 'Expand into new market segments'],
-          buyingTriggers: ['Missed quarterly revenue targets', 'New funding round requiring growth', 'Competitive pressure on pricing'],
           objections: ['Data accuracy and attribution concerns', 'Integration with existing martech stack', 'Learning curve for team'],
-          budget: '$30k-$300k annually',
-          decisionAuthority: 'High - budget owner for growth technology',
-          buyingCommittee: ['VP Growth', 'CRO', 'Marketing Director', 'Data Analytics Lead'],
-          lifetimeValue: '$90k-$900k over 3 years',
-          intent: 'High - actively seeking growth acceleration tools',
-          evidence: { source: 'Industry evidence pattern', confidence: 75, collectedAt: now }
+          preferredContent: ['Growth strategy frameworks', 'Benchmark reports', 'Revenue optimization guides'],
+          evidence: { source: 'industry_evidence_pattern', confidence: 65, collectedAt: now }
         }
       ],
       b2c: [
         {
           icpName: 'Tech-Savvy Consumer',
           role: 'Individual User',
-          companySize: 'N/A (Individual)',
-          industry: ['Technology', 'Consumer Software'],
-          techMaturity: 'High',
           painPoints: ['Productivity inefficiency', 'Outdated tools', 'Poor user experience'],
           goals: ['Simplify daily workflows', 'Access premium features', 'Stay current with technology'],
-          buyingTriggers: ['Positive reviews and recommendations', 'Free trial conversion', 'Feature gap with current solution'],
           objections: ['Price sensitivity', 'Privacy concerns', 'Learning curve for new tools'],
-          budget: '$10-$100 monthly',
-          decisionAuthority: 'Self-serve / Individual',
-          buyingCommittee: ['Self'],
-          lifetimeValue: '$360-$3,600 over 3 years',
-          intent: 'Medium - evaluates based on reviews and pricing',
-          evidence: { source: 'Industry evidence pattern', confidence: 65, collectedAt: now }
+          preferredContent: ['Product reviews', 'Tutorial videos', 'Feature comparisons'],
+          evidence: { source: 'industry_evidence_pattern', confidence: 55, collectedAt: now }
         }
       ]
     },
@@ -110,19 +77,11 @@ export async function collectAudienceIntelligence({ company, competitors, market
         {
           icpName: 'Marketing Executive',
           role: 'CMO / VP of Marketing',
-          companySize: '100-1000 employees',
-          industry: ['Marketing', 'B2B SaaS', 'Professional Services'],
-          techMaturity: 'Medium-High',
           painPoints: ['Marketing attribution accuracy', 'Multi-channel optimization', 'Budget allocation efficiency'],
           goals: ['Increase qualified lead generation', 'Improve marketing ROI measurability', 'Scale demand generation programs'],
-          buyingTriggers: ['Missed pipeline targets', 'New product launch requiring GTM', 'Competitive marketing threat'],
           objections: ['Data accuracy concerns', 'Integration with existing marketing stack', 'Learning curve for marketing team'],
-          budget: '$50k-$500k annually',
-          decisionAuthority: 'High - budget owner for marketing technology',
-          buyingCommittee: ['CMO', 'VP Marketing', 'Marketing Operations', 'Demand Gen Director'],
-          lifetimeValue: '$150k-$1.5M over 3 years',
-          intent: 'High - actively researching marketing technology solutions',
-          evidence: { source: 'Industry evidence pattern', confidence: 80, collectedAt: now }
+          preferredContent: ['Marketing ROI guides', 'Channel optimization playbooks', 'Attribution frameworks'],
+          evidence: { source: 'industry_evidence_pattern', confidence: 70, collectedAt: now }
         }
       ],
       b2c: []
@@ -133,19 +92,11 @@ export async function collectAudienceIntelligence({ company, competitors, market
         {
           icpName: 'Online Shopper',
           role: 'Consumer',
-          companySize: 'N/A',
-          industry: ['E-commerce', 'Retail'],
-          techMaturity: 'Medium',
           painPoints: ['Product discovery difficulty', 'Checkout friction', 'Shipping costs and timing'],
           goals: ['Find products quickly', 'Secure best prices', 'Fast and reliable delivery'],
-          buyingTriggers: ['Seasonal promotions', 'Product availability alerts', 'Free shipping offers'],
           objections: ['Price comparison concerns', 'Return policy uncertainty', 'Payment security worries'],
-          budget: '$50-$500 per transaction',
-          decisionAuthority: 'Self-serve',
-          buyingCommittee: ['Self', 'Family members'],
-          lifetimeValue: '$500-$5,000 over 3 years',
-          intent: 'Medium - triggered by need and promotions',
-          evidence: { source: 'Industry evidence pattern', confidence: 65, collectedAt: now }
+          preferredContent: ['Product comparisons', 'Buying guides', 'Customer reviews'],
+          evidence: { source: 'industry_evidence_pattern', confidence: 55, collectedAt: now }
         }
       ]
     }
@@ -165,7 +116,6 @@ export async function collectAudienceIntelligence({ company, competitors, market
     }
   }
 
-  // Default to Technology B2B patterns if no match
   if (matchedPatterns.length === 0) {
     if (b2bOrB2C === 'B2B' || b2bOrB2C === 'Unknown') {
       matchedPatterns = icpPatterns['Technology'].b2b;
@@ -174,91 +124,70 @@ export async function collectAudienceIntelligence({ company, competitors, market
     }
   }
 
-  // Populate audience fields from matched patterns
   if (matchedPatterns.length > 0) {
     audience.icp = matchedPatterns.map(p => ({
       name: p.icpName,
       role: p.role,
-      companySize: p.companySize,
-      industry: p.industry,
-      techMaturity: p.techMaturity,
       painPoints: p.painPoints,
       goals: p.goals,
-      buyingTriggers: p.buyingTriggers,
       objections: p.objections,
-      budget: p.budget,
-      decisionAuthority: p.decisionAuthority,
-      buyingCommittee: p.buyingCommittee,
-      lifetimeValue: p.lifetimeValue,
-      intent: p.intent,
+      preferredContent: p.preferredContent,
       evidence: p.evidence
     }));
 
     audience.personas = matchedPatterns.map(p => ({
       name: p.icpName,
       role: p.role,
-      demographics: `${p.role} at ${p.companySize} companies`,
       painPoints: p.painPoints,
       goals: p.goals,
-      source: 'industry_evidence_pattern'
+      objections: p.objections,
+      preferredContent: p.preferredContent,
+      source: 'industry_evidence_pattern',
+      evidence: p.evidence
     }));
 
     audience.decisionMakers = [...new Set(matchedPatterns.map(p => p.role))].map(role => ({
       title: role,
-      confidence: 80,
-      evidence: { source: 'Industry evidence pattern', confidence: 80, collectedAt: now }
-    }));
-
-    audience.buyingCommittee = [...new Set(matchedPatterns.flatMap(p => p.buyingCommittee))].map(role => ({
-      title: role,
-      influence: 'Medium-High',
-      evidence: { source: 'Industry evidence pattern', confidence: 75, collectedAt: now }
-    }));
-
-    audience.objections = [...new Set(matchedPatterns.flatMap(p => p.objections))].map(obj => ({
-      value: obj,
-      confidence: 80,
-      impact: 'High',
-      evidence: { source: 'Industry evidence pattern', confidence: 80, collectedAt: now }
-    }));
-
-    audience.painPoints = [...new Set(matchedPatterns.flatMap(p => p.painPoints))].map(pp => ({
-      value: pp,
-      confidence: 80,
-      impact: 'High',
-      evidence: { source: 'Industry evidence pattern', confidence: 80, collectedAt: now }
-    }));
-
-    audience.buyingTriggers = [...new Set(matchedPatterns.flatMap(p => p.buyingTriggers))].map(bt => ({
-      value: bt,
-      confidence: 75,
-      impact: 'High',
-      evidence: { source: 'Industry evidence pattern', confidence: 75, collectedAt: now }
-    }));
-
-    audience.budget = matchedPatterns[0]?.budget || 'Unknown';
-
-    audience.intent = matchedPatterns.map(p => ({
-      segment: p.icpName,
-      intentLevel: p.intent,
       confidence: 70,
       evidence: { source: 'Industry evidence pattern', confidence: 70, collectedAt: now }
     }));
 
-    audience.companySize = matchedPatterns[0]?.companySize || 'Unknown';
+    audience.buyingCommittee = [...new Set(matchedPatterns.flatMap(p => [p.role]))].map(role => ({
+      title: role,
+      influence: 'Unknown - Insufficient evidence',
+      evidence: { source: 'Industry evidence pattern', confidence: 60, collectedAt: now }
+    }));
 
-    audience.techMaturity = matchedPatterns[0]?.techMaturity || 'Unknown';
+    audience.objections = [...new Set(matchedPatterns.flatMap(p => p.objections))].map(obj => ({
+      value: obj,
+      confidence: 70,
+      impact: 'Unknown - Insufficient evidence',
+      evidence: { source: 'Industry evidence pattern', confidence: 70, collectedAt: now }
+    }));
 
-    audience.lifetimeValue = {
-      estimatedRange: matchedPatterns[0]?.lifetimeValue || 'Unknown',
+    audience.painPoints = [...new Set(matchedPatterns.flatMap(p => p.painPoints))].map(pp => ({
+      value: pp,
+      confidence: 70,
+      impact: 'Unknown - Insufficient evidence',
+      evidence: { source: 'Industry evidence pattern', confidence: 70, collectedAt: now }
+    }));
+
+    audience.buyingTriggers = [...new Set(matchedPatterns.flatMap(p => p.preferredContent || []))].map(bt => ({
+      value: bt,
       confidence: 60,
-      evidence: { source: 'Industry benchmark estimates', confidence: 60, collectedAt: now }
-    };
+      impact: 'Unknown - Insufficient evidence',
+      evidence: { source: 'Industry evidence pattern', confidence: 60, collectedAt: now }
+    }));
+
+    audience.budget = null;
+    audience.intent = null;
+    audience.companySize = null;
+    audience.techMaturity = null;
+    audience.lifetimeValue = null;
 
     audience.sources.push({ type: 'personas', source: 'industry_evidence', count: matchedPatterns.length });
   }
 
-  // Default fallbacks if no patterns matched
   if (audience.decisionMakers.length === 0) {
     audience.decisionMakers.push({ title: 'Unknown - Insufficient evidence', confidence: 0 });
   }

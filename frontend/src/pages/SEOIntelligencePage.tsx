@@ -487,7 +487,7 @@ function ExecutiveDashboard({ data }: { data: any }) {
     { subject: 'Content', A: asNumber(contentAuthority, null), fullMark: 100 },
     { subject: 'Authority', A: asNumber(contentAuthority, null), fullMark: 100 },
     { subject: 'AI Visibility', A: asNumber(aiVisibility, null), fullMark: 100 },
-    { subject: 'Local SEO', A: asNumber(50, null), fullMark: 100 },
+    { subject: 'Local SEO', A: null, fullMark: 100 },
   ];
   
   // Fallback to scoreBreakdown if radar has no data
@@ -498,7 +498,6 @@ function ExecutiveDashboard({ data }: { data: any }) {
     radarData[2].A = asNumber(sb.content || sb.contentScore, null);
     radarData[3].A = asNumber(sb.authority || sb.domainAuthority, null);
     radarData[4].A = asNumber(sb.aiVisibility || sb.geoScore, null);
-    radarData[5].A = asNumber(sb.localSeo || sb.localScore, null);
   }
 
   // Extract priority actions from multiple sources
@@ -579,7 +578,7 @@ function ExecutiveDashboard({ data }: { data: any }) {
     description: typeof p === 'string' ? '' : p.why || p.rationale || '',
     group: i < 2 ? 'Critical' as const : i < 4 ? 'High ROI' as const : i < 6 ? 'Quick Wins' as const : 'Long-Term' as const,
     priority: i < 2 ? 'Critical' as const : i < 4 ? 'High' as const : i < 6 ? 'Medium' as const : 'Low' as const,
-    difficulty: Math.round(30 + Math.random() * 40),
+    difficulty: null,
     roi: '150-300%',
     timeline: i < 2 ? '7 days' : i < 4 ? '30 days' : '60 days',
     owner: 'SEO Team',
@@ -653,7 +652,7 @@ function ExecutiveDashboard({ data }: { data: any }) {
             <>
               <MiniRadarLegend items={radarData.filter(d => d.A !== null).map(d => ({ label: d.subject, value: d.A ?? 0 }))} />
               <ResponsiveContainer width="100%" height={260}>
-                <RadarChart cx="50%" cy="50%" outerRadius="65%" data={radarData}>
+                <RadarChart cx="50%" cy="50%" outerRadius="65%" data={radarData.filter(d => d.A !== null)}>
                   <PolarGrid stroke="#293245" />
                   <PolarAngleAxis dataKey="subject" tick={{ fill: '#9aa7bd', fontSize: 12 }} />
                   <Tooltip cursor={{ fill: '#1a2335' }} contentStyle={{ background: '#101622', border: '1px solid #293245', borderRadius: '8px' }} />
@@ -754,7 +753,7 @@ function ExecutiveStory({ data }: { data: any }) {
     topKeywords: (data.keywordIntelligence?.primaryKeywords || []).slice(0, 5).map((k: any) => ({
       keyword: k.keyword || k,
       searchVolume: k.searchVolume || k.volume || 0,
-      difficulty: k.difficulty || k.kd || 0
+      difficulty: k.difficulty ?? k.kd ?? null
     }))
   };
   const competitors = story.competitorFindings || {
@@ -1735,14 +1734,20 @@ function GeoIntelligence({ data }: { data: any }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         <Card style={{ height: '380px' }}>
           <h3><Cpu size={18} /> AI Engine Visibility</h3>
-          <ResponsiveContainer width="100%" height="90%">
-            <BarChart data={chartData} margin={{ top: 20, right: 10, left: -20, bottom: 20 }}>
-              <XAxis dataKey="name" tick={{ fill: '#9aa7bd', fontSize: 12 }} />
-              <YAxis domain={[0, 100]} tick={{ fill: '#9aa7bd', fontSize: 12 }} />
-              <Tooltip cursor={{ fill: '#1a2335' }} contentStyle={{ background: '#101622', border: '1px solid #293245', borderRadius: '8px' }} />
-              <Bar dataKey="score" fill="#a855f7" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="90%">
+              <BarChart data={chartData} margin={{ top: 20, right: 10, left: -20, bottom: 20 }}>
+                <XAxis dataKey="name" tick={{ fill: '#9aa7bd', fontSize: 12 }} />
+                <YAxis domain={[0, 100]} tick={{ fill: '#9aa7bd', fontSize: 12 }} />
+                <Tooltip cursor={{ fill: '#1a2335' }} contentStyle={{ background: '#101622', border: '1px solid #293245', borderRadius: '8px' }} />
+                <Bar dataKey="score" fill="#a855f7" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '90%', color: '#9aa7bd', fontSize: '14px' }}>
+              AI visibility scores require DataForSEO API; not currently available
+            </div>
+          )}
         </Card>
         <Card>
           <h3><Globe size={18} /> Entity & Knowledge Graph</h3>
@@ -1752,7 +1757,7 @@ function GeoIntelligence({ data }: { data: any }) {
                 <b style={{ display: 'block', fontSize: '14px' }}>Entity Coverage</b>
                 <span style={{ fontSize: '12px', color: '#9aa7bd' }}>Brand presence in LLM training data</span>
               </div>
-              <strong style={{ fontSize: '20px', color: '#10e18b' }}>{asNumber(entityCoverageScore, 60)}/100</strong>
+              <strong style={{ fontSize: '20px', color: entityCoverageScore != null ? '#10e18b' : '#9aa7bd' }}>{entityCoverageScore != null ? `${Math.round(entityCoverageScore)}/100` : 'Not measured'}</strong>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0b1220', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #ff4757' }}>
@@ -1760,7 +1765,7 @@ function GeoIntelligence({ data }: { data: any }) {
                 <b style={{ display: 'block', fontSize: '14px' }}>Citation Readiness</b>
                 <span style={{ fontSize: '12px', color: '#9aa7bd' }}>Probability of being cited as source</span>
               </div>
-              <strong style={{ fontSize: '20px', color: '#ff4757' }}>{asNumber(citationReadinessScore, 40)}/100</strong>
+              <strong style={{ fontSize: '20px', color: citationReadinessScore != null ? '#ff4757' : '#9aa7bd' }}>{citationReadinessScore != null ? `${Math.round(citationReadinessScore)}/100` : 'Not measured'}</strong>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0b1220', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #53a7ff' }}>
@@ -1768,7 +1773,7 @@ function GeoIntelligence({ data }: { data: any }) {
                 <b style={{ display: 'block', fontSize: '14px' }}>Answerability</b>
                 <span style={{ fontSize: '12px', color: '#9aa7bd' }}>How well content resolves user queries</span>
               </div>
-              <strong style={{ fontSize: '20px', color: '#53a7ff' }}>{asNumber(answerabilityScore, 55)}/100</strong>
+              <strong style={{ fontSize: '20px', color: answerabilityScore != null ? '#53a7ff' : '#9aa7bd' }}>{answerabilityScore != null ? `${Math.round(answerabilityScore)}/100` : 'Not measured'}</strong>
             </div>
           </div>
         </Card>
@@ -2051,9 +2056,24 @@ function ActionPlan({ data }: { data: any }) {
                     <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#9aa7bd', lineHeight: '1.5' }}>
                       {asText(item?.reason || item?.description || item?.impact || item?.detail)}
                     </p>
+                    {item.evidence && (
+                      <div style={{ marginTop: '10px', fontSize: '11px', color: '#10e18b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Zap size={12} /> Evidence: {asText(item?.evidence)}
+                      </div>
+                    )}
+                    {item.effort && (
+                      <div style={{ marginTop: '6px', fontSize: '11px', color: '#ffa502', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Sliders size={12} /> Effort: {asText(item?.effort)}
+                      </div>
+                    )}
+                    {item.impact && (
+                      <div style={{ marginTop: '6px', fontSize: '11px', color: '#53a7ff', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Target size={12} /> Impact: {asText(item?.impact)}
+                      </div>
+                    )}
                     {item.assignedTo && (
                       <div style={{ marginTop: '10px', fontSize: '11px', color: '#53a7ff', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Target size={12} /> Asssigned to: {asText(item?.assignedTo)}
+                        <Target size={12} /> Assigned to: {asText(item?.assignedTo)}
                       </div>
                     )}
                   </div>

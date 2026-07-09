@@ -20,7 +20,7 @@ export async function generateContent(assetType, context) {
   const typeConfig = CONTENT_TYPES[assetType];
   if (!typeConfig) throw new Error(`Unknown content type: ${assetType}`);
 
-  const { productName, companyName, targetAudience, industry, seoKeywords, tone, productUsp, seoData, growthData, campaignGoal, platforms } = context;
+  const { productName, companyName, targetAudience, industry, seoKeywords, tone, productUsp, seoData, growthData, campaignGoal, platforms, evidence } = context;
   const toneGuide = tone || 'professional';
 
   const evidenceSections = [];
@@ -35,7 +35,32 @@ export async function generateContent(assetType, context) {
   if (seoKeywords) evidenceSections.push(`SEO Keywords: ${Array.isArray(seoKeywords) ? seoKeywords.slice(0, 10).join(', ') : seoKeywords}`);
   if (platforms && platforms.length > 0) evidenceSections.push(`Marketing Platforms: ${platforms.join(', ')}`);
 
-  const prompt = `Generate a complete ${typeConfig.label} for marketing execution. Use the verified company/product data below.
+  // Evidence context from EvidenceSnapshot
+  if (evidence?.website) {
+    const w = evidence.website;
+    if (w.heroText) evidenceSections.push(`Website Hero: ${w.heroText}`);
+    if (w.ctaTexts?.length) evidenceSections.push(`Website CTAs: ${w.ctaTexts.join('; ')}`);
+    if (w.featuresText?.length) evidenceSections.push(`Website Features Mentioned: ${w.featuresText.slice(0, 5).join('; ')}`);
+    if (w.technologyHints?.length) evidenceSections.push(`Detected Technologies: ${w.technologyHints.join(', ')}`);
+    if (w.metaDescription) evidenceSections.push(`Meta Description: ${w.metaDescription}`);
+  }
+  if (evidence?.audience?.painPoints?.length) {
+    evidenceSections.push(`Audience Pain Points: ${evidence.audience.painPoints.slice(0, 5).join('; ')}`);
+  }
+  if (evidence?.audience?.personas?.length) {
+    evidenceSections.push(`Buyer Personas: ${evidence.audience.personas.slice(0, 3).map(p => p.name || p.title).filter(Boolean).join('; ')}`);
+  }
+  if (evidence?.seo?.contentOpportunities?.length) {
+    evidenceSections.push(`SEO Content Opportunities: ${evidence.seo.contentOpportunities.slice(0, 5).map(o => o.opportunity).join('; ')}`);
+  }
+  if (evidence?.competitors?.list?.length) {
+    evidenceSections.push(`Competitors: ${evidence.competitors.list.slice(0, 5).map(c => c.name || c.url).filter(Boolean).join(', ')}`);
+  }
+  if (evidence?.sourceSummary) {
+    evidenceSections.push(`Evidence Sources: ${evidence.sourceSummary.sourcesCollected?.join(', ') || 'None'}`);
+  }
+
+  const prompt = `Generate a complete ${typeConfig.label} for marketing execution. Use the verified company/product data below. CRITICAL: Every claim about the product, company, audience, or market must reference the evidence provided. Do NOT invent statistics, testimonials, or case study numbers.
 
 COMPANY/PRODUCT DATA:
 ${evidenceSections.join('\n')}
@@ -47,13 +72,12 @@ ${typeConfig.outputFields.map(f => `- ${f}`).join('\n')}
 
 EVIDENCE REQUIREMENTS:
 - For any factual claim, include evidence: { source, confidence, dataSource }
-- Internal links must be contextual and natural
-- Schema suggestions must be valid JSON-LD types
-- CTA must be specific and actionable
+- CTA must use actual product CTAs if available, otherwise be specific
 - Meta description must be under 160 characters
 - SEO keywords must be comma-separated, max 10
+- If no product USPs or features available, set them to null
 
-Return valid JSON with all required fields. Do NOT invent fake statistics, testimonials, or case study numbers. If data is unavailable, use "Data unavailable" or leave null. Never use placeholder text like "To be determined".`;
+Return valid JSON with all required fields. Do NOT invent fake data. If data is unavailable, use "Data unavailable" or leave null. Never use placeholder text like "To be determined".`;
 
   try {
     const result = await callAI(prompt);

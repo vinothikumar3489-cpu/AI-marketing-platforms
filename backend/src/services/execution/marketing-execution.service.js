@@ -5,11 +5,41 @@ import { generateVideoStudioPlan } from './video-studio.service.js';
 import { generateCampaignPlannerPlan } from './campaign-planner.service.js';
 import { generateSocialCalendarPlan } from './social-calendar.service.js';
 
+function buildExecutionContext(context) {
+  const ec = context.evidenceContext || {};
+  return {
+    productName: context.productName || ec.product?.name || 'N/A',
+    companyName: context.companyName || ec.company?.name || null,
+    targetAudience: context.targetAudience || ec.product?.targetAudience || ec.audience?.primary || null,
+    industry: context.industry || ec.product?.industry || null,
+    productUsp: context.productUsp || ec.product?.usp || null,
+    seoData: context.seoData || (ec.seo ? JSON.stringify({ issues: ec.seo.issues?.length || 0, opportunities: ec.seo.contentOpportunities?.length || 0 }) : null),
+    growthData: context.growthData || (ec.growth ? JSON.stringify({ score: ec.growth.overallScore }) : null),
+    campaignGoal: context.campaignGoal || null,
+    tone: context.tone || 'professional',
+    seoKeywords: context.seoKeywords || (ec.seo?.contentOpportunities?.slice(0, 5).map(o => o.opportunity) || []),
+    platforms: context.platforms || [],
+    brandColors: context.brandColors || null,
+    senderName: context.senderName || null,
+    totalBudget: context.totalBudget || null,
+    evidence: {
+      website: ec.website || null,
+      audience: ec.audience || null,
+      competitors: ec.competitors || null,
+      seo: ec.seo || null,
+      channels: ec.channels || [],
+      growth: ec.growth || null,
+      sourceSummary: ec.sourceSummary || null,
+    },
+  };
+}
+
 export async function generateAllExecutionModules(context) {
+  const execCtx = buildExecutionContext(context);
   const results = {};
 
   try {
-    results.contentStudio = await generateContentStudioPlan(context);
+    results.contentStudio = await generateContentStudioPlan(execCtx);
     console.log('[MarketingExecution] Content Studio:',
       results.contentStudio?.totalGenerated || 0, 'assets generated');
   } catch (e) {
@@ -18,7 +48,7 @@ export async function generateAllExecutionModules(context) {
   }
 
   try {
-    results.emailCampaigns = await generateEmailCampaignPlan(context);
+    results.emailCampaigns = await generateEmailCampaignPlan(execCtx);
     console.log('[MarketingExecution] Email Campaign Studio:',
       results.emailCampaigns?.totalGenerated || 0, 'campaigns generated');
   } catch (e) {
@@ -27,7 +57,7 @@ export async function generateAllExecutionModules(context) {
   }
 
   try {
-    results.creativeStudio = await generateCreativeStudioPlan(context);
+    results.creativeStudio = await generateCreativeStudioPlan(execCtx);
     console.log('[MarketingExecution] Creative Studio:',
       results.creativeStudio?.totalGenerated || 0, 'briefs generated');
   } catch (e) {
@@ -36,7 +66,7 @@ export async function generateAllExecutionModules(context) {
   }
 
   try {
-    results.videoStudio = await generateVideoStudioPlan(context);
+    results.videoStudio = await generateVideoStudioPlan(execCtx);
     console.log('[MarketingExecution] Video Studio:',
       results.videoStudio?.totalGenerated || 0, 'scripts generated');
   } catch (e) {
@@ -45,7 +75,7 @@ export async function generateAllExecutionModules(context) {
   }
 
   try {
-    results.campaignPlans = await generateCampaignPlannerPlan(context);
+    results.campaignPlans = await generateCampaignPlannerPlan(execCtx);
     console.log('[MarketingExecution] Campaign Planner:',
       results.campaignPlans?.totalGenerated || 0, 'plans generated');
   } catch (e) {
@@ -54,7 +84,7 @@ export async function generateAllExecutionModules(context) {
   }
 
   try {
-    results.socialCalendars = await generateSocialCalendarPlan(context);
+    results.socialCalendars = await generateSocialCalendarPlan(execCtx);
     console.log('[MarketingExecution] Social Calendar:',
       results.socialCalendars?.totalGenerated || 0, 'calendars generated');
   } catch (e) {
@@ -76,13 +106,14 @@ export async function generateAllExecutionModules(context) {
 }
 
 export async function generateSingleModule(type, context) {
+  const execCtx = buildExecutionContext(context);
   switch (type) {
-    case 'content-studio': return { module: type, data: await generateContentStudioPlan(context) };
-    case 'email-campaigns': return { module: type, data: await generateEmailCampaignPlan(context) };
-    case 'creative-studio': return { module: type, data: await generateCreativeStudioPlan(context) };
-    case 'video-studio': return { module: type, data: await generateVideoStudioPlan(context) };
-    case 'campaign-plans': return { module: type, data: await generateCampaignPlannerPlan(context) };
-    case 'social-calendars': return { module: type, data: await generateSocialCalendarPlan(context) };
+    case 'content-studio': return { module: type, data: await generateContentStudioPlan(execCtx) };
+    case 'email-campaigns': return { module: type, data: await generateEmailCampaignPlan(execCtx) };
+    case 'creative-studio': return { module: type, data: await generateCreativeStudioPlan(execCtx) };
+    case 'video-studio': return { module: type, data: await generateVideoStudioPlan(execCtx) };
+    case 'campaign-plans': return { module: type, data: await generateCampaignPlannerPlan(execCtx) };
+    case 'social-calendars': return { module: type, data: await generateSocialCalendarPlan(execCtx) };
     default: throw new Error(`Unknown execution module: ${type}`);
   }
 }

@@ -2,6 +2,7 @@ import { prisma } from "../config/prisma.js";
 import { generateAutomationPlanWithAI, sanitizeAutomationPlanData } from "../services/automation.service.js";
 import { callAI } from "../ai/services/aiRouter.service.js";
 import { generateAllExecutionModules, generateSingleModule } from "../services/execution/marketing-execution.service.js";
+import { buildEvidenceContext } from "../services/execution/evidence-context-builder.service.js";
 
 /**
  * GET /api/automation/:chatId/demo
@@ -85,36 +86,31 @@ export const generateAutomationDemo = async (req, res) => {
     }
 
     // Fetch existing analysis data (scoped by userId)
-    const productIntelligence = await prisma.productIntelligence.findFirst({
-      where: { chatId, userId }
-    });
-    const competitorIntelligence = await prisma.competitorIntelligence.findFirst({
-      where: { chatId, userId }
-    });
-    const campaignIntelligence = await prisma.campaignIntelligence.findFirst({
-      where: { chatId, userId }
-    });
-    const seoIntelligence = await prisma.seoIntelligence.findFirst({
-      where: { chatId, userId },
-      include: { scoreBreakdown: true }
-    });
+    const evidenceContext = await buildEvidenceContext(prisma, userId, chatId);
 
-    // Calculate readiness score
+    const { _raw } = evidenceContext;
+    const productIntelligence = _raw.productIntel;
+    const competitorIntelligence = _raw.competitorIntel;
+    const campaignIntelligence = _raw.campaignIntel;
+    const seoIntelligence = _raw.seoIntel;
+
+    // Calculate readiness score from evidence context
     const readinessModules = {
+      evidenceSnapshot: evidenceContext.sourceSummary.hasEvidenceSnapshot,
       productAnalysis: !!productIntelligence?.productAnalysis,
       marketDiscovery: !!productIntelligence?.marketDiscovery,
       audienceIntelligence: !!productIntelligence?.audienceIntelligence,
       competitorAnalysis: !!competitorIntelligence?.competitorAnalysis,
       campaignGenerator: !!campaignIntelligence?.campaignGenerator,
       channelRecommendation: !!campaignIntelligence?.channelRecommendation,
-      contentStudio: !!campaignIntelligence?.contentStudio,
-      seoAnalysis: !!seoIntelligence?.seoScore,
+      seoAnalysis: !!seoIntelligence?.seoScore || evidenceContext.seo?.issues?.length > 0,
     };
 
+    const totalModules = Object.keys(readinessModules).length;
     const completedModules = Object.values(readinessModules).filter(Boolean).length;
-    const readinessScore = Math.round((completedModules / 8) * 100);
+    const readinessScore = Math.round((completedModules / totalModules) * 100);
 
-    console.log('[Automation] Readiness:', { completedModules, readinessScore });
+    console.log('[Automation] Readiness:', { completedModules, totalModules, readinessScore });
 
     // Generate automation plan using AI or evidence-based fallback
     const automationData = await generateAutomationPlanWithAI({
@@ -127,6 +123,7 @@ export const generateAutomationDemo = async (req, res) => {
       growthWorkspace: campaignIntelligence?.campaignGenerator?.growthSummary || null,
       executiveStory: campaignIntelligence?.executiveStory || campaignIntelligence?.campaignGenerator?.executiveStory || null,
       actionPlan: campaignIntelligence?.actionPlan || campaignIntelligence?.campaignGenerator?.actionPlan || null,
+      evidenceContext,
     });
 
     // Check for insufficient data
@@ -641,11 +638,12 @@ export const executeSingleModule = async (req, res) => {
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
     if (!chat) return res.status(404).json({ success: false, error: "Chat not found" });
 
-    const [productIntelligence, seoIntelligence, campaignIntelligence, plan] = await Promise.all([
+    const [productIntelligence, seoIntelligence, campaignIntelligence, plan, evidenceContext] = await Promise.all([
       prisma.productIntelligence.findFirst({ where: { chatId, userId } }),
       prisma.seoIntelligence.findFirst({ where: { chatId, userId } }),
       prisma.campaignIntelligence.findFirst({ where: { chatId, userId } }),
       prisma.automationPlan.findFirst({ where: { chatId, userId } }),
+      buildEvidenceContext(prisma, userId, chatId),
     ]);
 
     const context = {
@@ -658,6 +656,7 @@ export const executeSingleModule = async (req, res) => {
       totalBudget: plan?.budgetSplit ? 'Configured in plan' : null,
       brandColors: plan?.designStyles?.colors?.join(', '),
       campaignGoal: plan?.campaignObjective,
+      evidenceContext,
     };
 
     const result = await generateSingleModule(moduleType, context);
@@ -725,5 +724,39 @@ export const getExecutionData = async (req, res) => {
   } catch (error) {
     console.error('❌ [MarketingExecution] Error fetching:', error);
     return res.status(500).json({ success: false, error: error.message || 'Failed to fetch execution data' });
+  }
+};
+
+/**
+ * GET /api/automation/:chatId/evidence-context
+ * Get evidence context for the content studio (lightweight, no DB writes)
+ */
+export const getEvidenceContext = async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
+    if (!chat) return res.status(404).json({ success: false, error: "Chat not found" });
+
+    const evidenceContext = await buildEvidenceContext(prisma, userId, chatId);
+
+    return res.json({
+      success: true,
+      data: {
+        company: evidenceContext.company,
+        product: evidenceContext.product,
+        website: evidenceContext.website,
+        audience: evidenceContext.audience,
+        competitors: evidenceContext.competitors,
+        seo: evidenceContext.seo,
+        channels: evidenceContext.channels,
+        growth: evidenceContext.growth,
+        sourceSummary: evidenceContext.sourceSummary,
+      },
+    });
+  } catch (error) {
+    console.error('❌ [EvidenceContext] Error:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Failed to fetch evidence context' });
   }
 };

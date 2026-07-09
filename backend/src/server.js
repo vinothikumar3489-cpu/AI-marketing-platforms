@@ -28,6 +28,7 @@ import { growthWorkspaceRouter } from "./modules/growth-workspace/growthWorkspac
 import productAnalysisRouter from "./routes/productAnalysis.routes.js";
 import { automationRouter } from "./routes/automation.routes.js";
 import { reportRouter } from "./services/reporting/report.routes.js";
+import { evidenceRouter } from "./modules/evidence/evidence.routes.js";
 
 dotenv.config();
 
@@ -307,6 +308,7 @@ app.use("/api/chats", growthWorkspaceRouter);
 app.use("/api/product-analysis", productAnalysisRouter);
 app.use("/api/automation", automationLimiter, automationRouter);
 app.use("/api/chats", reportRouter);
+app.use("/api/chats", evidenceRouter);
 
 // Serve local fallback assets for Cloudinary-free operation
 const localAssetsDir = path.join(process.cwd(), 'local-assets');

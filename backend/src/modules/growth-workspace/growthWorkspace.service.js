@@ -32,6 +32,8 @@ import {
   logCompetitorsCollected, logMarketCollected, logAudienceCollected,
   logStrategyGenerated, logReportGenerated
 } from '../../services/intelligence/business-intelligence-logger.js';
+import { getLatestEvidenceSnapshot, saveEvidenceSnapshot } from '../evidence/evidence.service.js';
+import { buildGrowthWorkspaceDataFromEvidence, buildEvidenceContext } from '../evidence/evidence.normalizer.js';
 
 
 
@@ -121,6 +123,34 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
   // This prevents data loss if analysis fails mid-way
   // Old approach (REMOVED): await prisma.productIntelligence.deleteMany({ where: { chatId: validChatId } });
   console.log('💾 [Growth Workspace] Using transactional upsert approach (old data preserved until success)');
+
+  // Phase 1: Load latest EvidenceSnapshot as primary data source
+  let evidenceSnapshot = null;
+  let evidenceGrowthData = null;
+  let evidenceContext = '';
+  try {
+    evidenceSnapshot = await getLatestEvidenceSnapshot({ chatId: validChatId, userId });
+    if (evidenceSnapshot) {
+      const parsedEvidence = {
+        website: evidenceSnapshot.websiteEvidence,
+        openGraph: evidenceSnapshot.contentEvidence?.openGraph || null,
+        schemas: evidenceSnapshot.contentEvidence?.schemas || null,
+        robots: evidenceSnapshot.technicalSeoEvidence?.robots || null,
+        sitemap: evidenceSnapshot.technicalSeoEvidence?.sitemap || null,
+        pageSpeed: evidenceSnapshot.technicalSeoEvidence?.pageSpeed || null,
+        github: evidenceSnapshot.githubEvidence || null,
+        technology: evidenceSnapshot.contentEvidence?.technology || null,
+      };
+      evidenceGrowthData = buildGrowthWorkspaceDataFromEvidence(parsedEvidence);
+      evidenceContext = buildEvidenceContext(parsedEvidence);
+      console.log('[Growth Workspace] Evidence snapshot loaded:', {
+        sourcesCollected: evidenceSnapshot.sourceSummary?.sourcesCollected?.length || 0,
+        completenessScore: evidenceGrowthData?.sourceSummary?.completenessScore || 0,
+      });
+    }
+  } catch (evErr) {
+    console.log('[Growth Workspace] Evidence load skipped:', evErr.message);
+  }
 
   const steps = [
     { key: 'product', label: 'Product Analysis', status: 'pending' },
@@ -264,11 +294,11 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       biWarnings.push(`Business Intelligence collection error: ${biError.message}`);
     }
 
-    // Step 1: Product Analysis
+    // Step 1: Product Analysis (evidence-backed)
     console.log('✨ [Growth Workspace] Running Product Analysis...');
     steps[0].status = 'running';
     try {
-      const rawResult = await runProductAnalysis(input, websiteData);
+      const rawResult = await runProductAnalysis(input, websiteData, evidenceGrowthData);
       results.product = validateProductAnalysis(rawResult, input);
       steps[0].status = 'completed';
       steps[0].provider = results.product.provider || 'groq';
@@ -467,7 +497,12 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     console.log('🔄 [Growth Workspace] Results normalized');
     console.log('[Growth Normalize] normalizedResults keys', Object.keys(normalizedResults || {}));
 
-    // Calculate growth scores from actual module outputs
+    // Calculate growth scores from evidence completeness, not AI guesses
+    function calculateEvidenceBasedScore(evidenceGrowthData) {
+      if (!evidenceGrowthData?.sourceSummary) return null;
+      return evidenceGrowthData.sourceSummary.completenessScore || null;
+    }
+
     function calculateGrowthScore(results) {
       const modules = [
         results?.product,
@@ -482,99 +517,105 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
       if (!modules.length) return null;
 
-      // Use actual module outputs instead of generic confidence scores
-      const scores = {
-        productFit: calculateProductFitScore(results?.product),
-        marketOpportunity: calculateMarketOpportunityScore(results?.market),
-        audienceClarity: calculateAudienceClarityScore(results?.audience),
-        competitiveDefensibility: calculateCompetitiveDefensibilityScore(results?.competitor),
-        campaignReadiness: calculateCampaignReadinessScore(results?.campaign, results?.channel)
-      };
-
-      const validScores = Object.values(scores).filter(s => s !== null && s > 0);
-      
-      if (validScores.length) {
-        return Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length);
+      // Use evidence completeness as basis, or null if no evidence
+      if (evidenceGrowthData?.sourceSummary?.completenessScore != null) {
+        return evidenceGrowthData.sourceSummary.completenessScore;
       }
 
-      return Math.round((modules.length / 8) * 100);
+      return null;
     }
 
     function calculateProductFitScore(product) {
       if (!product) return null;
-      // Score based on product maturity, value propositions, and differentiators
-      const maturityScore = product.productMaturity === 'Growth' ? 80 : product.productMaturity === 'Mature' ? 90 : 60;
-      const valuePropScore = (product.valuePropositions?.length || 0) * 10;
-      const differentiatorScore = (product.keyDifferentiators?.length || 0) * 8;
-      return Math.min(100, Math.round((maturityScore + valuePropScore + differentiatorScore) / 3));
+      // Only score based on real features from evidence
+      if (evidenceGrowthData?.productIntelligence?.features?.length) {
+        return Math.min(100, Math.round(evidenceGrowthData.productIntelligence.features.length * 20));
+      }
+      return null;
     }
 
     function calculateMarketOpportunityScore(market) {
       if (!market) return null;
-      // Score based on market size, growth rate, and demand
-      const demandScore = market.demandScore || 0;
-      const growthRateScore = (market.marketGrowthRate || 0) * 10;
-      const opportunityScore = (market.growthOpportunities?.length || 0) * 12;
-      return Math.min(100, Math.round((demandScore + growthRateScore + opportunityScore) / 3));
+      // Only if we have real growth signals
+      if (market.growthSignals?.length) {
+        return Math.min(100, Math.round(market.growthSignals.length * 15));
+      }
+      return null;
     }
 
     function calculateAudienceClarityScore(audience) {
       if (!audience) return null;
-      // Score based on buyer personas, segments, and clarity
-      const personaScore = (audience.buyerPersonas?.length || 0) * 15;
-      const segmentScore = (audience.audienceSegments?.length || 0) * 12;
-      const clarityScore = audience.audienceClarity === 'High' ? 90 : audience.audienceClarity === 'Medium' ? 70 : 50;
-      return Math.min(100, Math.round((personaScore + segmentScore + clarityScore) / 3));
+      // Only if personas have substance
+      const realPersonas = (audience.buyerPersonas || []).filter(p => p.name && p.name !== 'Target Persona' && p.name !== 'Persona Name');
+      if (realPersonas.length) {
+        return Math.min(100, Math.round(realPersonas.length * 20 + (audience.buyingTriggers?.length || 0) * 10));
+      }
+      return null;
     }
 
     function calculateCompetitiveDefensibilityScore(competitor) {
       if (!competitor) return null;
-      // Score based on differentiation opportunities and market gaps
-      const differentiationScore = (competitor.differentiationOpportunities?.length || 0) * 15;
-      const gapScore = (competitor.marketGaps?.length || 0) * 12;
-      const weaknessScore = (competitor.competitorWeaknesses?.length || 0) * 10;
-      return Math.min(100, Math.round((differentiationScore + gapScore + weaknessScore) / 3));
+      // Only if we have real competitor data
+      const realCompetitors = (competitor.directCompetitors || []).filter(c => c.name && !c.name.includes('Competitor') && !c.name.includes('competitor'));
+      if (realCompetitors.length) {
+        return Math.min(100, Math.round(realCompetitors.length * 15 + (competitor.marketGaps?.length || 0) * 10));
+      }
+      return null;
     }
 
     function calculateCampaignReadinessScore(campaign, channel) {
       if (!campaign && !channel) return null;
-      // Score based on campaign angles, hooks, and channel fit
-      const angleScore = (campaign?.creativeAngles?.length || 0) * 12;
-      const hookScore = (campaign?.copyHooks?.length || 0) * 10;
-      const channelScore = (channel?.recommendedChannels?.length || 0) * 15;
-      return Math.min(100, Math.round((angleScore + hookScore + channelScore) / 3));
+      // Only if we have evidence-backed campaign data
+      const angles = (campaign?.creativeAngles || []).filter(a => a.value && !a.value.includes('Angle'));
+      const channels = (channel?.recommendedChannels || []).filter(c => c.channel && !c.channel.includes('Channel'));
+      if (angles.length || channels.length) {
+        return Math.min(100, Math.round(angles.length * 15 + channels.length * 15));
+      }
+      return null;
     }
 
-    // Generate product-specific top recommendation
+    // Generate product-specific top recommendation from evidence
     function generateTopRecommendation(results, input) {
       const productName = input.companyName || input.productName || 'the product';
-      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0] || 'content marketing';
-      const topPersona = results.audience?.buyerPersonas?.[0]?.name || 'target audience';
-      const topAngle = results.campaign?.creativeAngles?.[0]?.value || results.campaign?.copyHooks?.[0]?.value || 'compelling messaging';
-      const topOpportunity = results.market?.growthOpportunities?.[0]?.value || results.market?.opportunities?.[0]?.value || 'market growth';
+      const signals = evidenceGrowthData?.growthSignals || [];
+      const features = (evidenceGrowthData?.productIntelligence?.features || []).map(f => f.value);
       
-      return `Focus on ${primaryChannel} to reach ${topPersona} with ${topAngle}, leveraging ${topOpportunity} for ${productName}.`;
-    }
-
-    // Generate product-specific primary risk
-    function generatePrimaryRisk(results, input) {
-      const topRisk = results.market?.risks?.[0]?.value || results.competitor?.competitorWeaknesses?.[0]?.value;
-      const topCompetitor = results.competitor?.directCompetitors?.[0]?.name || 'competitors';
-      const productName = input.companyName || input.productName || 'the product';
-      
-      if (topRisk) {
-        return `${topRisk} affecting ${productName}.`;
+      if (signals.length > 0) {
+        return `Based on evidence: ${signals[0]?.signal || ''}. Leverage this opportunity for ${productName}.`;
       }
-      return `Competitive pressure from ${topCompetitor} in the market.`;
+      if (features.length > 0) {
+        return `Prioritize marketing the key features found: ${features.slice(0, 3).join(', ')} for ${productName}.`;
+      }
+      
+      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel || 'digital channels';
+      const topPersona = results.audience?.buyerPersonas?.[0]?.name || 'target audience';
+      return `Focus on ${primaryChannel} to reach ${topPersona} for ${productName}.`;
     }
 
-    // Generate product-specific immediate action
-    function generateImmediateAction(results, input) {
-      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0] || 'marketing';
-      const topPersona = results.audience?.buyerPersonas?.[0]?.name || 'target audience';
+    function generatePrimaryRisk(results, input) {
+      const topCompetitor = results.competitor?.directCompetitors?.[0]?.name;
       const productName = input.companyName || input.productName || 'the product';
       
-      return `Launch ${primaryChannel} campaign targeting ${topPersona} to validate ${productName} positioning.`;
+      if (topCompetitor) {
+        return `Competitive pressure from ${topCompetitor} in the market.`;
+      }
+      return `Data insufficient to identify primary risk for ${productName}.`;
+    }
+
+    function generateImmediateAction(results, input) {
+      const features = (evidenceGrowthData?.productIntelligence?.features || []).map(f => f.value);
+      const ctas = evidenceGrowthData?.productIntelligence?.ctaTexts || [];
+      const productName = input.companyName || input.productName || 'the product';
+      
+      if (ctas.length > 0) {
+        return `Test and optimize existing CTAs from website: "${ctas[0]}" to improve conversion for ${productName}.`;
+      }
+      if (features.length > 0) {
+        return `Build landing pages highlighting top features: ${features.slice(0, 2).join(', ')} for ${productName}.`;
+      }
+      
+      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel || 'marketing';
+      return `Launch ${primaryChannel} campaign to validate ${productName} positioning.`;
     }
 
     const overallGrowthScore = calculateGrowthScore(normalizedResults);
@@ -717,6 +758,26 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       if (normalizedResults.campaign.actionPlan.day365) {
         growthActionPlan.day365.push(...normalizedResults.campaign.actionPlan.day365);
       }
+    }
+
+    // Add evidence-backed data to results
+    if (evidenceGrowthData) {
+      normalizedResults.evidence = {
+        companyOverview: evidenceGrowthData.companyOverview,
+        productIntelligence: evidenceGrowthData.productIntelligence,
+        technicalSeo: evidenceGrowthData.technicalSeo,
+        growthSignals: evidenceGrowthData.growthSignals,
+        sourceSummary: evidenceGrowthData.sourceSummary,
+        githubRepos: evidenceGrowthData.githubRepos || null,
+      };
+      // Add data completeness score to summary
+      growthSummary.dataCompletenessScore = evidenceGrowthData.sourceSummary.completenessScore || null;
+      growthSummary.evidenceSourcesCount = evidenceGrowthData.sourceSummary.sourcesCollected || 0;
+      growthSummary.evidenceBased = true;
+    } else {
+      growthSummary.dataCompletenessScore = null;
+      growthSummary.evidenceSourcesCount = 0;
+      growthSummary.evidenceBased = false;
     }
 
     console.log('[Growth Save] executiveStory exists', !!growthExecutiveStory);
@@ -876,8 +937,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 // MODULE SERVICES
 // ============================================
 
-async function runProductAnalysis(input, websiteData) {
-  // Build context from scraped website if available
+async function runProductAnalysis(input, websiteData, evidenceGrowthData) {
   let websiteContext = '';
   if (websiteData) {
     websiteContext = `\n\nScraped Website Data:
@@ -888,20 +948,44 @@ AI Extracted Data: ${websiteData.extract ? JSON.stringify(websiteData.extract) :
 Key Features Found: ${websiteData.content?.headings?.slice(0, 5).map(h => h.text).join(', ') || 'N/A'}`;
   }
 
+  let evidenceContextStr = '';
+  if (evidenceGrowthData) {
+    const pi = evidenceGrowthData.productIntelligence || {};
+    const co = evidenceGrowthData.companyOverview || {};
+    const features = pi.features || [];
+    const ctas = pi.ctaTexts || [];
+    const techs = pi.technologiesDetected || [];
+    evidenceContextStr = `\n\n[EVIDENCE - REAL DATA FROM WEBSITE SCAN]
+Features detected: ${features.map(f => f.value).join(', ') || 'None'}
+CTAs found: ${ctas.join(', ') || 'None'}
+Technologies detected: ${techs.join(', ') || 'None'}
+Schema types: ${(pi.schemaTypes || []).join(', ') || 'None'}
+Has Product schema: ${pi.hasProduct || false}
+Has Reviews/Ratings: ${pi.hasReview || pi.hasAggregateRating || false}
+Has FAQ: ${pi.hasFAQPage || false}
+Has Organization: ${pi.hasOrganization || false}
+Sitemap URLs: ${evidenceGrowthData.technicalSeo?.sitemapUrlCount || 'Unknown'}
+Has blog: ${co.hasBlog ? 'Yes' : 'Not detected'}
+Has pricing page: ${co.hasPricingPage ? 'Yes' : 'Not detected'}
+Has contact page: ${co.hasContactPage ? 'Yes' : 'Not detected'}
+PageSpeed score: ${evidenceGrowthData.technicalSeo?.performanceScore != null ? evidenceGrowthData.technicalSeo.performanceScore + '/100' : 'Not available'}
+Growth signals: ${(evidenceGrowthData.growthSignals || []).map(s => s.signal).join(' | ') || 'None'}`;
+  }
+
   const prompt = `Analyze this product comprehensively:
 
 Product: ${input.productName}
 Company: ${input.companyName}
 Website: ${input.websiteUrl}
 Description: ${input.description}
-Industry: ${input.industry}${websiteContext}
+Industry: ${input.industry}${websiteContext}${evidenceContextStr}
 
-Based on the above information, provide a detailed product analysis. Use the actual website content to extract REAL features, benefits, and USPs.
+Based on the above information, provide a detailed product analysis. Use the EVIDENCE data as primary source (it was collected from real website scanning). Only use AI reasoning for areas where evidence is missing.
 
 Provide a JSON response with:
 {
-  "usp": "Actual Unique Selling Proposition",
-  "summary": "comprehensive 2-3 sentence summary based on real website content",
+  "usp": "Actual Unique Selling Proposition from website evidence",
+  "summary": "comprehensive 2-3 sentence summary based on evidence",
   "keyFeatures": [{"value": "Feature 1", "confidence": 90, "impact": "High"}],
   "coreBenefits": [{"value": "Benefit 1", "confidence": 90, "impact": "High"}],
   "painPointsSolved": [{"value": "Pain Point", "confidence": 90, "impact": "High"}],
@@ -911,7 +995,7 @@ Provide a JSON response with:
   "confidenceScore": 85
 }
 
-CRITICAL INSTRUCTION: Extract REAL information from the website content. NEVER use generic placeholders. Analyze the actual product, its features, target audience, and competitive positioning based on the website data provided. Return only valid JSON.`;
+CRITICAL INSTRUCTION: Extract REAL information from the evidence and website content. NEVER use generic placeholders. Return only valid JSON.`;
 
   const fallbackData = generateProductFallback(input, websiteData);
   const aiResult = await callBestAI(prompt, 1200, 'Product Analysis', fallbackData);
@@ -919,7 +1003,7 @@ CRITICAL INSTRUCTION: Extract REAL information from the website content. NEVER u
   return {
     ...aiResult,
     provider: aiResult.provider || 'fallback',
-    confidenceScore: aiResult.confidenceScore ?? (websiteData ? 85 : 70)
+    confidenceScore: aiResult.confidenceScore ?? (websiteData || evidenceGrowthData ? 85 : 70)
   };
 }
 
@@ -933,21 +1017,20 @@ Business Stage: ${input.businessStage}
 
 Context: ${productData.productSummary}
 
+IMPORTANT: Do NOT invent market size numbers (TAM/SAM/SOM). If you don't have verified data, use "Growth Signals" instead.
+
 Provide JSON response:
 {
-  "demandScore": 75,
-  "confidence": 80,
-  "tam": {"value": "$X Billion", "source": "API/Industry Report", "confidence": 60, "method": "Top-down market sizing"},
-  "sam": {"value": "$Y Billion", "source": "API/Industry Report", "confidence": 55, "method": "Serviceable market subset"},
-  "som": {"value": "$Z Million", "source": "API/Industry Report", "confidence": 45, "method": "Achievable market estimation"},
-  "cagr": "XX%",
-  "marketTrends": [{"value": "Trend description", "confidence": 80, "impact": "High"}],
+  "demandScore": null,
+  "confidence": null,
+  "marketTrends": [{"value": "Trend description based on industry knowledge", "confidence": 60, "impact": "Medium"}],
   "opportunities": [{"value": "Opportunity description", "confidence": 75, "impact": "High"}],
-  "risks": [{"value": "Risk description", "confidence": 85, "impact": "High"}],
+  "risks": [{"value": "Risk description", "confidence": 70, "impact": "Medium"}],
+  "growthSignals": [{"signal": "Observable market signal from product positioning", "source": "AI-inferred", "confidence": 60}],
   "entryStrategy": "Detailed description of entry strategy"
 }
 
-CRITICAL INSTRUCTION: NEVER use generic placeholders like "$X Billion". Use realistic market size estimates for the ${input.industry || 'this'} industry. TAM/SAM/SOM must include value, source, confidence, and method fields. Return only valid JSON.`;
+CRITICAL INSTRUCTION: Do NOT fabricate market sizing numbers. Use growthSignals instead of TAM/SAM/SOM. Return only valid JSON.`;
 
   const fallbackData = generateMarketFallback(input, productData);
   const aiResult = await callBestAI(prompt, 1200, 'Market Discovery', fallbackData);
@@ -1126,15 +1209,15 @@ Provide JSON response:
   "socialPostIdeas": [{"value": "Post Idea", "confidence": 85, "impact": "High"}],
   "videoIdeas": [{"value": "Video Idea", "confidence": 85, "impact": "High"}],
   "actionPlan": {
-    "sevenDay": [{"title": "Task", "problem": "What problem this solves", "evidence": "Data evidence", "researchSource": "Source module", "businessImpact": "Business impact", "expectedGain": "Expected gain", "difficulty": "Low/Medium/High", "priority": "High", "estimatedTimeline": "1 week", "owner": "Role"}],
-    "thirtyDay": [{"title": "Task", "problem": "What problem this solves", "evidence": "Data evidence", "researchSource": "Source module", "businessImpact": "Business impact", "expectedGain": "Expected gain", "difficulty": "Low/Medium/High", "priority": "High", "estimatedTimeline": "2-4 weeks", "owner": "Role"}],
-    "sixtyDay": [{"title": "Task", "problem": "What problem this solves", "evidence": "Data evidence", "researchSource": "Source module", "businessImpact": "Business impact", "expectedGain": "Expected gain", "difficulty": "Low/Medium/High", "priority": "High", "estimatedTimeline": "1-2 months", "owner": "Role"}],
-    "ninetyDay": [{"title": "Task", "problem": "What problem this solves", "evidence": "Data evidence", "researchSource": "Source module", "businessImpact": "Business impact", "expectedGain": "Expected gain", "difficulty": "Low/Medium/High", "priority": "High", "estimatedTimeline": "3 months", "owner": "Role"}]
+    "sevenDay": [{"title": "Task", "problem": "What problem this solves", "evidence": "Data evidence", "researchSource": "Source module", "businessImpact": "Business impact", "difficulty": "Low/Medium/High", "priority": "High", "estimatedTimeline": "1 week", "owner": "Role"}],
+    "thirtyDay": [{"title": "Task", "problem": "What problem this solves", "evidence": "Data evidence", "researchSource": "Source module", "businessImpact": "Business impact", "difficulty": "Low/Medium/High", "priority": "High", "estimatedTimeline": "2-4 weeks", "owner": "Role"}],
+    "sixtyDay": [{"title": "Task", "problem": "What problem this solves", "evidence": "Data evidence", "researchSource": "Source module", "businessImpact": "Business impact", "difficulty": "Low/Medium/High", "priority": "High", "estimatedTimeline": "1-2 months", "owner": "Role"}],
+    "ninetyDay": [{"title": "Task", "problem": "What problem this solves", "evidence": "Data evidence", "researchSource": "Source module", "businessImpact": "Business impact", "difficulty": "Low/Medium/High", "priority": "High", "estimatedTimeline": "3 months", "owner": "Role"}]
   },
-  "confidenceScore": 75
+  "confidenceScore": null
 }
 
-CRITICAL INSTRUCTION: Return ONLY valid JSON. Provide realistic CTR and CPA. Action plan MUST use 'sevenDay', 'thirtyDay', 'sixtyDay', 'ninetyDay' timelines. Every task MUST explain WHY it exists using the problem, evidence, and researchSource fields. Do not use generic placeholders.`;
+CRITICAL INSTRUCTION: Do NOT invent ROI, CTR, CPA, or conversion numbers. Action plan MUST use 'sevenDay', 'thirtyDay', 'sixtyDay', 'ninetyDay' timelines. Every task MUST explain WHY it exists using the problem, evidence, and researchSource fields. Do not use generic placeholders.`;
 
   const fallbackData = generateCampaignFallback(input, allResults.product, allResults);
   const aiResult = await callBestAI(prompt, 1200, 'Campaign Generator', fallbackData);
@@ -1152,24 +1235,25 @@ async function runChannelRecommendation(input, audienceData, campaignData) {
 Product: ${input.productName}
 Target Audience: ${input.targetAudience}
   Preferred: ${input.preferredChannel}
-Budget: ${input.budgetRange}
+Budget info: ${input.budgetRange}
 Campaign Goal: ${input.campaignGoal}
 
 Best Channels from Audience Analysis: ${audienceData.bestChannels?.join(', ')}
 
+IMPORTANT: Do NOT invent budget allocations or ROI numbers. Use channel fit reasoning instead.
+
 Provide JSON response:
 {
   "recommendedChannels": [
-    {"channel": "Channel Name (replace with actual channel)", "budgetAllocation": 0, "expectedRoi": 0}
+    {"channel": "Channel Name", "fit": "Why this channel fits the product/audience", "reasoning": "Channel fit reasoning"}
   ],
-  "budgetSplit": [{"value": "Split Details", "confidence": 85, "impact": "High"}],
-  "channelFitScores": [{"value": "Score Details", "confidence": 85, "impact": "High"}],
-  "postingFrequency": [{"value": "Frequency Details", "confidence": 85, "impact": "High"}],
-  "contentTypes": [{"value": "Content Type", "confidence": 85, "impact": "High"}],
-  "confidenceScore": 75
+  "channelFitScores": [{"value": "Channel fit reasoning based on evidence", "confidence": 75, "impact": "High"}],
+  "postingFrequency": [{"value": "Recommended frequency", "confidence": 70, "impact": "Medium"}],
+  "contentTypes": [{"value": "Content Type", "confidence": 75, "impact": "High"}],
+  "confidenceScore": null
 }
 
-CRITICAL INSTRUCTION: Return ONLY valid JSON. Budget allocations must sum to 100.`;
+CRITICAL INSTRUCTION: Do NOT invent budget allocations or ROI percentages. Return only valid JSON.`;
 
   const fallbackData = generateChannelFallback(input, audienceData, campaignData);
   const aiResult = await callBestAI(prompt, 1000, 'Channel Recommendation', fallbackData);
@@ -1206,10 +1290,14 @@ async function callBestAI(prompt, maxTokens = 2000, moduleName = 'unknown', fall
 
 export async function getGrowthWorkspaceResults({ chatId, userId }) {
   try {
-    const [productIntel, competitorIntel, campaignIntel] = await Promise.all([
+    const [productIntel, competitorIntel, campaignIntel, evidenceSnapshot] = await Promise.all([
       prisma.productIntelligence.findUnique({ where: { chatId } }),
       prisma.competitorIntelligence.findUnique({ where: { chatId } }),
-      prisma.campaignIntelligence.findUnique({ where: { chatId } })
+      prisma.campaignIntelligence.findUnique({ where: { chatId } }),
+      prisma.evidenceSnapshot.findFirst({
+        where: { chatId, userId },
+        orderBy: { createdAt: 'desc' },
+      }),
     ]);
 
     if (!productIntel || productIntel.userId !== userId) {
@@ -1232,6 +1320,31 @@ export async function getGrowthWorkspaceResults({ chatId, userId }) {
     const results = normalizeGrowthResults(rawResults, productIntel.inputJson || {});
     console.log('🔄 [Growth Workspace] Loaded results normalized');
 
+    // Add evidence data if available
+    if (evidenceSnapshot) {
+      const parsedEvidence = {
+        website: evidenceSnapshot.websiteEvidence,
+        openGraph: evidenceSnapshot.contentEvidence?.openGraph || null,
+        schemas: evidenceSnapshot.contentEvidence?.schemas || null,
+        robots: evidenceSnapshot.technicalSeoEvidence?.robots || null,
+        sitemap: evidenceSnapshot.technicalSeoEvidence?.sitemap || null,
+        pageSpeed: evidenceSnapshot.technicalSeoEvidence?.pageSpeed || null,
+        github: evidenceSnapshot.githubEvidence || null,
+        technology: evidenceSnapshot.contentEvidence?.technology || null,
+      };
+      const evGrowthData = buildGrowthWorkspaceDataFromEvidence(parsedEvidence);
+      if (evGrowthData) {
+        results.evidence = {
+          companyOverview: evGrowthData.companyOverview,
+          productIntelligence: evGrowthData.productIntelligence,
+          technicalSeo: evGrowthData.technicalSeo,
+          growthSignals: evGrowthData.growthSignals,
+          sourceSummary: evGrowthData.sourceSummary,
+          githubRepos: evGrowthData.githubRepos || null,
+        };
+      }
+    }
+
     const steps = [
       { key: 'product', label: 'Product Analysis', status: results.product ? 'completed' : 'pending', provider: results.product?.provider, confidenceScore: results.product?.confidenceScore },
       { key: 'market', label: 'Market Discovery', status: results.market ? 'completed' : 'pending', provider: results.market?.provider, confidenceScore: results.market?.confidenceScore },
@@ -1243,10 +1356,9 @@ export async function getGrowthWorkspaceResults({ chatId, userId }) {
       { key: 'channel', label: 'Channel Recommendation', status: results.channel ? 'completed' : 'pending', provider: results.channel?.provider, confidenceScore: results.channel?.confidenceScore }
     ];
 
-    // Calculate summary
     const completedSteps = steps.filter(s => s.status === 'completed').length;
-    const avgConfidence = completedSteps > 0 ? 
-      Math.round(Object.values(results).reduce((sum, r) => sum + (r?.confidenceScore ?? 0), 0) / completedSteps) : 0;
+    const evidenceScore = results.evidence?.sourceSummary?.completenessScore || null;
+    const overallGrowthScore = evidenceScore || null;
 
     return {
       success: true,
@@ -1254,17 +1366,18 @@ export async function getGrowthWorkspaceResults({ chatId, userId }) {
       results,
       steps,
       input: productIntel.inputJson,
+      evidenceSnapshot: evidenceSnapshot ? {
+        sourcesCollected: evidenceSnapshot.sourceSummary?.sourcesCollected || [],
+        collectedAt: evidenceSnapshot.createdAt,
+      } : null,
       summary: {
-        overallGrowthScore: avgConfidence,
-        growthPotential: Math.min(100, Math.round(((results.market?.demandScore || 50) + avgConfidence) / 2)),
-        marketReadiness: Math.min(100, Math.round((results.market?.demandScore || 50) * 0.95)),
-        competitiveStrength: Math.min(100, Math.round(50 + ((results.competitor?.directCompetitors?.length || 0) * 5))),
-        customerDemand: results.market?.demandScore || 50,
-        brandPosition: Math.min(100, Math.round(avgConfidence * 0.9)),
+        overallGrowthScore,
+        dataCompletenessScore: evidenceScore,
+        evidenceBased: !!evidenceScore,
         bestChannel: results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel || results.channel?.recommendedChannels?.[0]?.name || 'Unknown',
-        topOpportunity: results.market?.growthOpportunities?.[0] || 'Unknown',
-        topRisk: results.market?.marketRisks?.[0] || 'Unknown',
-        nextAction: results.campaign?.nextActions?.[0] || results.campaign?.campaignIdeas?.[0] || 'Unknown',
+        topOpportunity: results.market?.growthOpportunities?.[0] || null,
+        topRisk: results.market?.marketRisks?.[0] || null,
+        nextAction: results.campaign?.nextActions?.[0] || results.campaign?.campaignIdeas?.[0] || null,
         completedSteps,
         progress: Math.round((completedSteps / 8) * 100)
       }
@@ -1288,18 +1401,19 @@ function enforceGrowthQualityFilters(results) {
 
   const market = results.market;
   if (market) {
-    ['tam', 'sam', 'som'].forEach(field => {
-      const val = market[field];
-      if (val && typeof val === 'object') {
-        if (!val.source && !val.method && !val.evidence) {
-          market[field] = 'Unknown';
-        }
-      } else if (val && typeof val === 'string') {
-        if (val.includes('$') || val.match(/\d+/)) {
-          market[field] = 'Unknown';
-        }
-      }
-    });
+    // Remove TAM/SAM/SOM fields entirely - they are always invented
+    delete market.tam;
+    delete market.sam;
+    delete market.som;
+    delete market.cagr;
+    // If demandScore exists and looks made up, null it
+    if (market.demandScore != null && (market.demandScore < 0 || market.demandScore > 100)) {
+      market.demandScore = null;
+    }
+    // If no growthSignals, set empty array
+    if (!market.growthSignals) {
+      market.growthSignals = [];
+    }
   }
 
   const audience = results.audience;
@@ -1316,16 +1430,34 @@ function enforceGrowthQualityFilters(results) {
     const data = results[area];
     if (!data) return;
     if (data.recommendedChannels && Array.isArray(data.recommendedChannels)) {
-      data.recommendedChannels = data.recommendedChannels.filter(ch => {
-        const name = (ch.channel || ch.name || '').toLowerCase();
-        if (name === 'google ads') return false;
-        return true;
+      data.recommendedChannels = data.recommendedChannels.map(ch => {
+        // Remove invented budget/ROI fields
+        const clean = { ...ch };
+        delete clean.budgetAllocation;
+        delete clean.expectedRoi;
+        delete clean.roi;
+        delete clean.budgetSplit;
+        return clean;
       });
     }
     if (data.primaryChannel && data.primaryChannel.toLowerCase() === 'google ads') {
       data.primaryChannel = data.recommendedChannels?.[0]?.channel || data.recommendedChannels?.[0]?.name || null;
     }
   });
+
+  // Remove invented percentages from campaign items
+  if (results.campaign?.actionPlan) {
+    ['day7', 'day30', 'day60', 'day90', 'day180', 'day365', 'sevenDay', 'thirtyDay', 'sixtyDay', 'ninetyDay'].forEach(key => {
+      if (results.campaign.actionPlan[key]) {
+        results.campaign.actionPlan[key] = results.campaign.actionPlan[key].map(item => {
+          if (item.roi) delete item.roi;
+          if (item.expectedGain) delete item.expectedGain;
+          if (item.expectedKPI && item.expectedKPI.includes('%')) delete item.expectedKPI;
+          return item;
+        });
+      }
+    });
+  }
 
   return results;
 }
@@ -1356,20 +1488,17 @@ function normalizeGrowthResults(results, input) {
     };
   }
   
-  // Normalize Market Discovery
+  // Normalize Market Discovery (no TAM/SAM/SOM - always invented)
   if (results.market || results.marketDiscovery) {
     const data = results.market || results.marketDiscovery;
     normalized.market = {
-      tam: ensureString(data.tam, 'Unknown'),
-      sam: ensureString(data.sam, 'Unknown'),
-      som: ensureString(data.som, 'Unknown'),
-      cagr: ensureString(data.cagr, 'Unknown'),
       marketTrends: ensureArray(data.marketTrends),
       opportunities: ensureArray(data.opportunities || data.growthOpportunities),
       risks: ensureArray(data.risks || data.marketRisks),
-      entryStrategy: ensureString(data.entryStrategy, 'Insufficient Data'),
-      demandScore: ensureNumber(data.demandScore, 0),
-      confidenceScore: ensureNumber(data.confidenceScore, 0),
+      growthSignals: ensureArray(data.growthSignals),
+      entryStrategy: ensureString(data.entryStrategy, null),
+      demandScore: null,
+      confidenceScore: null,
       provider: ensureString(data.provider, 'unknown')
     };
   }

@@ -52,8 +52,8 @@ export default function GrowthWorkspacePage() {
     const hasGrowthData = fullResults.hasGrowthWorkspace === true ||
       hasRealContent(r.product) || hasRealContent(r.market) || hasRealContent(r.audience) ||
       hasRealContent(r.competitor) || hasRealContent(r.intent) || hasRealContent(r.positioning) ||
-      hasRealContent(r.campaign) || hasRealContent(r.channel) || hasRealContent(r.executiveStory) ||
-      hasRealContent(r.actionPlan);
+  hasRealContent(r.campaign) || hasRealContent(r.channel) || hasRealContent(r.executiveStory) ||
+  hasRealContent(r.actionPlan) || hasRealContent(r.evidence);
 
     if (!cancelled) {
       if (hasGrowthData) {
@@ -125,7 +125,7 @@ export default function GrowthWorkspacePage() {
     hasContent(results.product) || hasContent(results.market) || hasContent(results.audience) ||
     hasContent(results.competitor) || hasContent(results.intent) || hasContent(results.positioning) ||
     hasContent(results.campaign) || hasContent(results.channel) || hasContent(results.executiveStory) ||
-    hasContent(results.actionPlan);
+    hasContent(results.actionPlan) || hasContent(results.evidence);
 
   const [step, setStep] = useState(1);
 
@@ -610,6 +610,52 @@ function ExecutiveSnapshot({ results }: { results: any }) {
       {/* Phase 6C: Executive Summary AI Cards */}
       <ExecutiveSummaryCards data={execSummaryData} />
 
+      {/* Evidence Data Quality */}
+      {results.evidence?.sourceSummary && (
+        <Card>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Shield size={18} style={{ color: '#10e18b' }} /> Evidence-Backed Data</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginTop: '10px' }}>
+            <div style={{ padding: '10px', background: '#151d2b', borderRadius: '6px' }}>
+              <div style={{ fontSize: '11px', color: '#6b7280' }}>Data Completeness</div>
+              <div style={{ fontSize: '18px', fontWeight: 'bold', color: results.evidence.sourceSummary.completenessScore >= 70 ? '#10e18b' : results.evidence.sourceSummary.completenessScore >= 40 ? '#ffb347' : '#ff4757' }}>
+                {results.evidence.sourceSummary.completenessScore != null ? `${results.evidence.sourceSummary.completenessScore}%` : 'N/A'}
+              </div>
+            </div>
+            <div style={{ padding: '10px', background: '#151d2b', borderRadius: '6px' }}>
+              <div style={{ fontSize: '11px', color: '#6b7280' }}>Evidence Sources</div>
+              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#53a7ff' }}>
+                {results.evidence.sourceSummary.sourcesCollected != null ? `${results.evidence.sourceSummary.sourcesCollected}/${results.evidence.sourceSummary.totalSources || '?'}` : 'N/A'}
+              </div>
+            </div>
+            <div style={{ padding: '10px', background: '#151d2b', borderRadius: '6px' }}>
+              <div style={{ fontSize: '11px', color: '#6b7280' }}>Growth Signals</div>
+              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#a855f7' }}>
+                {results.evidence.growthSignals?.length || 0}
+              </div>
+            </div>
+            <div style={{ padding: '10px', background: '#151d2b', borderRadius: '6px' }}>
+              <div style={{ fontSize: '11px', color: '#6b7280' }}>Features Extracted</div>
+              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#ffb347' }}>
+                {results.evidence.productIntelligence?.features?.length || 0}
+              </div>
+            </div>
+          </div>
+          {results.evidence.growthSignals?.length > 0 && (
+            <div style={{ marginTop: '12px' }}>
+              <h4 style={{ fontSize: '13px', color: '#a855f7', marginBottom: '8px' }}>Growth Signals from Evidence</h4>
+              <div style={{ display: 'grid', gap: '6px' }}>
+                {results.evidence.growthSignals.map((s: any, i: number) => (
+                  <div key={i} style={{ padding: '8px 10px', background: '#0b1220', borderRadius: '6px', borderLeft: '3px solid #a855f7', fontSize: '12px', color: '#e5e7eb' }}>
+                    <div>{s.signal}</div>
+                    <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>Source: {s.source}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
       {/* Phase 6C: Productivity Bar */}
       <ProductivityBar items={productivityItems} />
 
@@ -952,66 +998,76 @@ function MarketIntelligence({ data }: { data: any }) {
   const market = data || {};
   if (!market || Object.keys(market).length === 0) return <EmptyState title="No Market Data" />;
 
-  const tamValue = market.tam || market.tam?.value || 'Unknown';
-  const samValue = market.sam || market.sam?.value || 'Unknown';
-  const somValue = market.som || market.som?.value || 'Unknown';
+  const growthSignals = market.growthSignals || [];
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
-      <div className="score-grid">
-        <ScoreCard label="TAM (Total Addressable)" value={tamValue === 'Unknown' ? 'Verified data unavailable' : tamValue} tone="purple" />
-        <ScoreCard label="SAM (Serviceable)" value={samValue === 'Unknown' ? 'Verified data unavailable' : samValue} tone="blue" />
-        <ScoreCard label="SOM (Obtainable)" value={somValue === 'Unknown' ? 'Verified data unavailable' : somValue} tone="green" />
-        <ScoreCard label="Growth Rate" value={market.growthRate && market.growthRate !== 'Unknown' ? market.growthRate : 'Verified data unavailable'} tone="pink" />
-      </div>
+      <Card style={{ background: '#151d2b', border: '1px solid #ffb347' }}>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ffb347', margin: '0 0 10px 0' }}><TrendingUp size={18} /> Market Data Notice</h3>
+        <p style={{ fontSize: '13px', color: '#9aa7bd', margin: 0 }}>
+          Market size data (TAM/SAM/SOM) is not available without paid API sources. Growth Signals below are based on evidence collected from the website.
+        </p>
+      </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+      {growthSignals.length > 0 && (
         <Card>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Building size={18} style={{ color: '#2aa3ff' }} /> Industry Size</h3>
-          <div style={{ fontSize: '15px', color: market.industrySize && market.industrySize !== 'Unknown' ? '#e5e7eb' : '#6b7280', fontStyle: market.industrySize === 'Unknown' ? 'italic' : 'normal' }}>
-            {market.industrySize && market.industrySize !== 'Unknown' ? renderSafeValue(market.industrySize) : 'Verified data unavailable'}
-          </div>
-          {market.evidence && <div style={{ marginTop: '8px' }}><EvidenceBadge evidence={market.evidence} size="sm" /></div>}
-        </Card>
-        <Card>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><TrendingUp size={18} style={{ color: '#10e18b' }} /> Investment Trends</h3>
-          <div style={{ display: 'grid', gap: '6px' }}>
-            {market.investmentTrends?.length > 0 ? market.investmentTrends.map((t: any, i: number) => (
-              <div key={i} style={{ fontSize: '13px', color: '#9aa7bd', padding: '6px 8px', background: '#151d2b', borderRadius: '4px' }}>
-                {renderSafeValue(t.trend || t.value || t)}
-                {t.evidence && <div style={{ marginTop: '4px' }}><EvidenceBadge evidence={t.evidence} size="sm" /></div>}
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Zap size={18} style={{ color: '#a855f7' }} /> Growth Signals</h3>
+          <div style={{ display: 'grid', gap: '8px', marginTop: '10px' }}>
+            {growthSignals.map((s: any, i: number) => (
+              <div key={i} style={{ padding: '10px 12px', background: '#0b1220', borderRadius: '6px', borderLeft: '3px solid #a855f7' }}>
+                <div style={{ fontSize: '13px', color: '#e5e7eb' }}>{s.signal || s.value || ''}</div>
+                {s.source && <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>Source: {s.source}</div>}
+                {s.evidence && <div style={{ fontSize: '11px', color: '#6b7280' }}>Evidence: {s.evidence}</div>}
               </div>
-            )) : <span style={{ fontStyle: 'italic', color: '#6b7280', fontSize: '13px' }}>Verified data unavailable</span>}
+            ))}
           </div>
         </Card>
-        {market.regulations?.length > 0 && (
-          <Card>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Shield size={18} style={{ color: '#ff4757' }} /> Regulations</h3>
-            <div style={{ display: 'grid', gap: '6px' }}>
-              {market.regulations.map((r: any, i: number) => (
-                <div key={i} style={{ fontSize: '13px', color: '#9aa7bd', padding: '6px 8px', background: '#151d2b', borderRadius: '4px' }}>{renderSafeValue(r.value || r)}</div>
-              ))}
-            </div>
-          </Card>
-        )}
-        {market.seasonality?.length > 0 && (
-          <Card>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Clock size={18} style={{ color: '#ffb347' }} /> Seasonality</h3>
-            <div style={{ display: 'grid', gap: '6px' }}>
-              {market.seasonality.map((s: any, i: number) => (
-                <div key={i} style={{ fontSize: '13px', color: '#9aa7bd', padding: '6px 8px', background: '#151d2b', borderRadius: '4px' }}>{renderSafeValue(s.value || s)}</div>
-              ))}
-            </div>
-          </Card>
-        )}
-      </div>
+      )}
 
-      <SectionTitle title="Market Trends" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px' }}>
-        {market.trends?.length > 0 ? market.trends.map((t: any, i: number) => (
-          <InsightCard key={i} insight={asInsight(t, `Trend ${i+1}`)} icon={TrendingUp} />
-        )) : <p style={{ fontStyle: 'italic', color: '#6b7280' }}>Verified data unavailable</p>}
-      </div>
+      {/* Market Trends (AI-inferred, labeled as such) */}
+      {market.marketTrends?.length > 0 && (
+        <div>
+          <SectionTitle title="Market Trends (AI-Inferred)" subtitle="Based on industry knowledge, not verified against external sources." />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px' }}>
+            {market.marketTrends.map((t: any, i: number) => (
+              <InsightCard key={i} insight={asInsight(t, `Trend ${i+1}`)} icon={TrendingUp} />
+            ))}
+          </div>
+          <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '8px', fontStyle: 'italic' }}>
+            AI-inferred — low evidence. Verify through industry reports.
+          </div>
+        </div>
+      )}
+
+      {market.opportunities?.length > 0 && (
+        <div>
+          <SectionTitle title="Growth Opportunities" subtitle="Potential areas identified from analysis." />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px' }}>
+            {market.opportunities.map((o: any, i: number) => (
+              <InsightCard key={i} insight={asInsight(o, `Opportunity ${i+1}`)} icon={Target} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {market.risks?.length > 0 && (
+        <div>
+          <SectionTitle title="Risks" subtitle="Potential challenges identified." />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px' }}>
+            {market.risks.map((r: any, i: number) => (
+              <InsightCard key={i} insight={asInsight(r, `Risk ${i+1}`)} icon={AlertTriangle} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!market.marketTrends?.length && !market.growthSignals?.length && !market.opportunities?.length && (
+        <Card>
+          <p style={{ fontStyle: 'italic', color: '#6b7280', fontSize: '13px', margin: 0 }}>
+            No verified market data available. Market intelligence requires website evidence or paid API sources.
+          </p>
+        </Card>
+      )}
     </div>
   );
 }
@@ -1388,32 +1444,14 @@ function ChannelStrategy({ data }: { data: any }) {
       (item.channelName || item.channel || item.name || '').toLowerCase() === channelName
     ) === index;
   });
-  
-  const chartData = uniqueChannels.map((c:any) => {
-    const budgetStr = (c.budgetAllocation || c.budget || '20%').toString();
-    const budgetNum = asNumber(budgetStr.replace('%', ''));
-    const roiStr = (c.expectedRoi || c.roi || '150%').toString();
-    const roiNum = asNumber(roiStr.replace('%', '').replace('x', ''));
-    return {
-      name: asText(c.channelName || c.channel || c.name || c),
-      budget: budgetNum,
-      roi: roiNum
-    };
-  });
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
-      <Card style={{ height: '350px' }}>
-        <h3>Budget Allocation & Expected ROI</h3>
-        <ResponsiveContainer width="100%" height="90%">
-          <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <XAxis dataKey="name" tick={{ fill: '#9aa7bd', fontSize: 12 }} />
-            <YAxis tick={{ fill: '#9aa7bd', fontSize: 12 }} />
-            <Tooltip cursor={{ fill: '#1a2335' }} contentStyle={{ background: '#101622', border: '1px solid #293245' }} />
-            <Bar dataKey="budget" fill="#53a7ff" name="Budget %" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="roi" fill="#10e18b" name="Expected ROI %" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+      <Card style={{ background: '#151d2b', border: '1px solid #10e18b' }}>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10e18b', margin: '0 0 10px 0' }}><Info size={18} /> Channel Budget Note</h3>
+        <p style={{ fontSize: '13px', color: '#9aa7bd', margin: 0 }}>
+          Budget allocation and ROI percentages are not shown because they require verified advertising data. Channel fit reasoning is provided instead.
+        </p>
       </Card>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px' }}>
@@ -1581,9 +1619,9 @@ function ReportView({ data, chatId }: { data: any, chatId?: string }) {
   const totalPages = Math.max(1, Math.round(includedSections.length * 2.5));
 
   const reportSections = [
-    { name: 'Executive Snapshot', content: `Overall Growth Score: ${data.summary?.overallGrowthScore || 'N/A'}%\nMarket Opportunity: ${data.summary?.marketOpportunityScore || 'N/A'}%\nCampaign Viability: ${data.summary?.campaignViabilityScore || 'N/A'}%` },
+    { name: 'Executive Snapshot', content: `Data Completeness: ${data.evidence?.sourceSummary?.completenessScore || 'N/A'}%\nGrowth Signals: ${data.evidence?.growthSignals?.length || 0}\nEvidence Sources: ${data.evidence?.sourceSummary?.sourcesCollected || 0}/${data.evidence?.sourceSummary?.totalSources || '?'}` },
     { name: 'Executive Story', content: data.executiveStory?.executiveSummary?.title || 'Enterprise Business Intelligence Report' },
-    { name: 'Market Intelligence', content: `TAM: ${data.market?.tam || 'N/A'}\nSAM: ${data.market?.sam || 'N/A'}\nSOM: ${data.market?.som || 'N/A'}` },
+    { name: 'Market Intelligence', content: `Market size data (TAM/SAM/SOM) not available without paid API sources. Growth Signals: ${data.evidence?.growthSignals?.length || data.market?.growthSignals?.length || 0}` },
   ];
 
   return (

@@ -19,8 +19,10 @@ const extractJsonFromText = (content) => {
   }
 };
 
-const buildProductPrompt = ({ productName, manualDescription, targetAudience, industry, websiteTitle, websiteMeta, cleanedWebsiteText, researchSummary = "", websiteUrl = "", companyName = "", headings = [], features = [], benefits = [] }) => {
-  return `You are a senior SaaS product marketing strategist. Analyze the product using manual details, scraped website data, and real-time research. Do not copy raw website text. Convert information into clean business insights. Always infer pain points, buyer personas, USP, benefits, and marketing angles. Return valid JSON only.
+const buildProductPrompt = ({ productName, manualDescription, targetAudience, industry, websiteTitle, websiteMeta, cleanedWebsiteText, researchSummary = "", websiteUrl = "", companyName = "", headings = [], features = [], benefits = [], evidenceContext = "" }) => {
+  const evidenceSection = evidenceContext ? `\n\nEVIDENCE COLLECTED (real data from live scanning — use as factual context):\n${evidenceContext}` : "";
+
+  return `You are a senior SaaS product marketing strategist. Analyze the product using manual details, scraped website data, and real-time research. Do not copy raw website text. Convert information into clean business insights. Always infer pain points, buyer personas, USP, benefits, and marketing angles. Return valid JSON only.${evidenceSection}
 
 Product Name: ${productName}
 Company Name: ${companyName || "N/A"}
@@ -99,7 +101,7 @@ const safeJsonParse = (value) => {
   }
 };
 
-export const generateAnalysis = async ({ manualData = {}, scrapedData = {} } = {}) => {
+export const generateAnalysis = async ({ manualData = {}, scrapedData = {}, evidenceContext = "" } = {}) => {
   const openAiKey = process.env.OPENAI_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
   const tavilyKey = process.env.TAVILY_API_KEY;
@@ -144,6 +146,7 @@ export const generateAnalysis = async ({ manualData = {}, scrapedData = {} } = {
     researchSummary,
     websiteUrl: scrapedData?.websiteUrl || "",
     companyName: manualData.companyName || "",
+    evidenceContext,
     headings: scrapedData?.headings || [],
     features: scrapedData?.features || [],
     benefits: scrapedData?.benefits || [],

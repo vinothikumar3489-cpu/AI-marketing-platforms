@@ -17,49 +17,60 @@ export async function generateVideoScript(videoType, context) {
   const typeConfig = VIDEO_TYPES[videoType];
   if (!typeConfig) throw new Error(`Unknown video type: ${videoType}`);
 
-  const { productName, companyName, targetAudience, industry, productUsp } = context;
+  const { productName, companyName, targetAudience, industry, productUsp, evidence } = context;
 
-  const prompt = `Generate a ${typeConfig.label} (${typeConfig.duration}) video script for marketing execution.
+  const evidenceLines = [];
+  if (productUsp) evidenceLines.push(`Product USP: ${productUsp}`);
+  if (evidence?.website?.heroText) evidenceLines.push(`Website Hero: ${evidence.website.heroText}`);
+  if (evidence?.website?.featuresText?.length) evidenceLines.push(`Product Features from Website: ${evidence.website.featuresText.slice(0, 5).join('; ')}`);
+  if (evidence?.website?.ctaTexts?.length) evidenceLines.push(`Product CTAs: ${evidence.website.ctaTexts.join('; ')}`);
+  if (evidence?.audience?.painPoints?.length) evidenceLines.push(`Audience Pain Points: ${evidence.audience.painPoints.slice(0, 3).join('; ')}`);
+  if (evidence?.competitors?.weaknesses?.length) evidenceLines.push(`Competitor Weaknesses: ${evidence.competitors.weaknesses.slice(0, 3).join('; ')}`);
+  if (evidence?.sourceSummary?.sourcesCollected?.length) evidenceLines.push(`Evidence Sources: ${evidence.sourceSummary.sourcesCollected.join(', ')}`);
+
+  const prompt = `Generate a ${typeConfig.label} (${typeConfig.duration}) video script for marketing execution. Use the verified company/product data below. CRITICAL: Every storyboard scene must reference actual product features, audience problems, and evidence-backed benefits. No generic filler scenes.
 
 CONTEXT:
-Product/Company: ${productName || 'N/A'}${companyName ? `\nCompany: ${companyName}` : ''}${targetAudience ? `\nTarget Audience: ${targetAudience}` : ''}${industry ? `\nIndustry: ${industry}` : ''}${productUsp ? `\nProduct USP: ${productUsp}` : ''}
+Product/Company: ${productName || 'N/A'}${companyName ? `\nCompany: ${companyName}` : ''}${targetAudience ? `\nTarget Audience: ${targetAudience}` : ''}${industry ? `\nIndustry: ${industry}` : ''}
+${evidenceLines.join('\n')}
 
 VIDEO TYPE: ${typeConfig.label}
 DURATION: ${typeConfig.duration}
 
 REQUIRED OUTPUT FIELDS (return valid JSON):
 {
-  "title": "Video title",
-  "hook": "Opening hook (first 3 seconds)",
-  "script": "Full script with timing cues",
+  "title": "Video title including product name",
+  "hook": "Opening hook (first 3 seconds) referencing audience problem",
+  "script": "Full script with timing cues, product-specific solution scenes",
   "storyboard": [
     {
       "scene": 1,
       "duration": "time in seconds",
-      "visual": "Visual description",
-      "audio": "Voiceover / sound description",
+      "visual": "Visual description showing audience problem or product use case",
+      "audio": "Voiceover / sound description referencing evidence-backed benefit",
       "camera": "Camera direction (close-up, wide shot, etc.)",
       "transitions": "Transition to next scene"
     }
   ],
-  "scenes": "Array of scene objects with descriptions",
+  "scenes": "Array of scene objects with descriptions, all product-specific",
   "voiceover": "Voiceover direction (tone, speed, style)",
   "camera": "Overall camera direction",
   "music": "Music style and mood recommendations",
   "transitions": "Transition style between scenes",
-  "cta": "Call to action text and visual",
+  "cta": "Call to action text and visual using actual product CTA",
   "duration": "${typeConfig.duration}",
   "format": "Aspect ratio and format recommendation",
   "evidence": { "source": "video_studio", "confidence": null, "dataSource": "ai_generation" }
 }
 
 RULES:
-1. Hook must capture attention in first 3 seconds.
+1. Hook must capture attention in first 3 seconds referencing audience problem.
 2. Script must fit within ${typeConfig.duration}.
-3. Storyboard scenes must be specific and producible.
+3. Every storyboard scene must be product-specific — no generic filler scenes.
 4. Do NOT invent fake statistics or testimonials.
 5. Use "Based on analysis" for claims without verified data.
-6. Return ONLY valid JSON. No markdown code fences.`;
+6. CTA must be specific to the product.
+7. Return ONLY valid JSON. No markdown code fences.`;
 
   try {
     const result = await callAI(prompt);

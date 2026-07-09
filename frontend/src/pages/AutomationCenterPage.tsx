@@ -79,7 +79,7 @@ function renderValue(v: any): React.ReactNode {
 }
 
 function PlanTabContent({ data }: { data: any }) {
-  if (!data || Object.keys(data).length === 0) return <EnterpriseEmptyState title="No automation plan" message="Click Generate Automation Plan to create one." icon={Zap} />;
+  if (!data || Object.keys(data).length === 0) return <EnterpriseEmptyState title="No automation plan" message="Run product analysis with website URL first, then generate an automation plan." icon={Zap} />;
 
   const sections: { title: string; content: React.ReactNode }[] = [];
 
@@ -152,7 +152,7 @@ function PlanTabContent({ data }: { data: any }) {
   }
 
   const hasAnyContent = sections.length > 0 || kpiItems.length > 0 || crossModuleItems.length > 0;
-  if (!hasAnyContent) return <EnterpriseEmptyState title="No automation plan data" message="Click Generate Automation Plan to create one." icon={Zap} />;
+  if (!hasAnyContent) return <EnterpriseEmptyState title="No automation plan data" message="Run product analysis with website URL first, then generate an automation plan." icon={Zap} />;
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
@@ -981,7 +981,7 @@ function renderLogsTab(data: any) {
 
 function renderContentStudioTab(data: any) {
   const cs = data?.contentStudio;
-  if (!cs?.assets || Object.keys(cs.assets).length === 0) return <EnterpriseEmptyState title="Content Studio" message="Generate marketing execution plan to create content assets." icon={FileText} />;
+  if (!cs?.assets || Object.keys(cs.assets).length === 0) return <EnterpriseEmptyState title="Content Studio" message="Run product analysis with website URL first, then generate marketing execution plan." icon={FileText} />;
   return (
     <div style={{ display: 'grid', gap: '16px' }}>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>

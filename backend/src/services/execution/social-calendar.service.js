@@ -12,14 +12,23 @@ export async function generateSocialCalendar(calendarType, context) {
   const typeConfig = CALENDAR_TYPES[calendarType];
   if (!typeConfig) throw new Error(`Unknown calendar type: ${calendarType}`);
 
-  const { productName, companyName, targetAudience, industry, platforms } = context;
+  const { productName, companyName, targetAudience, industry, platforms, productUsp, evidence } = context;
   const platformList = platforms || ['linkedin', 'instagram', 'twitter', 'facebook'];
 
-  const prompt = `Generate a ${typeConfig.label} (${typeConfig.days} days) social media content calendar.
+  const evidenceLines = [];
+  if (productUsp) evidenceLines.push(`Product USP: ${productUsp}`);
+  if (evidence?.website?.featuresText?.length) evidenceLines.push(`Product Features: ${evidence.website.featuresText.slice(0, 5).join('; ')}`);
+  if (evidence?.website?.heroText) evidenceLines.push(`Website Hero: ${evidence.website.heroText}`);
+  if (evidence?.audience?.painPoints?.length) evidenceLines.push(`Audience Pain Points: ${evidence.audience.painPoints.slice(0, 3).join('; ')}`);
+  if (evidence?.seo?.contentOpportunities?.length) evidenceLines.push(`SEO Content Topics: ${evidence.seo.contentOpportunities.slice(0, 5).map(o => o.opportunity).join('; ')}`);
+  if (evidence?.sourceSummary?.sourcesCollected?.length) evidenceLines.push(`Evidence Sources: ${evidence.sourceSummary.sourcesCollected.join(', ')}`);
+
+  const prompt = `Generate a ${typeConfig.label} (${typeConfig.days} days) social media content calendar. Use ONLY the verified product/company data below. Every post topic must reference actual product features, audience pain points, or evidence-backed content opportunities.
 
 CONTEXT:
 Product/Company: ${productName || 'N/A'}${companyName ? `\nCompany: ${companyName}` : ''}${targetAudience ? `\nTarget Audience: ${targetAudience}` : ''}${industry ? `\nIndustry: ${industry}` : ''}
 Platforms: ${platformList.join(', ')}
+${evidenceLines.join('\n')}
 
 CALENDAR DURATION: ${typeConfig.label} (${typeConfig.days} days)
 
@@ -31,12 +40,12 @@ REQUIRED OUTPUT FIELDS (return valid JSON):
       "date": "relative date (Day 1, Day 2, etc.)",
       "platform": "platform name",
       "contentType": "post / story / video / article",
-      "topic": "Content topic",
-      "caption": "Post caption or description",
+      "topic": "Content topic based on actual product features or SEO opportunities",
+      "caption": "Post caption referencing specific product value",
       "hashtags": ["tag1", "tag2", "tag3"],
       "bestPostingTime": "Recommended time",
       "contentTheme": "Theme category",
-      "cta": "Call to action",
+      "cta": "Call to action using actual product CTA if available",
       "visualNotes": "Visual direction for this post"
     }
   ],
@@ -63,11 +72,12 @@ REQUIRED OUTPUT FIELDS (return valid JSON):
 
 RULES:
 1. Generate ${typeConfig.days} entries, one per day, rotating through platforms.
-2. Best posting times should be platform-appropriate.
-3. Hashtags should be relevant and not generic.
-4. Content mix should be roughly 60% educational/value, 20% promotional, 20% engagement.
-5. Do NOT invent fake engagement metrics.
-6. Return ONLY valid JSON. No markdown code fences.`;
+2. Every topic must reference actual product features or evidence-backed content.
+3. Best posting times should be platform-appropriate.
+4. Hashtags must be relevant to the specific product/industry — not generic.
+5. Content mix should be roughly 60% educational/value, 20% promotional, 20% engagement.
+6. Do NOT invent fake engagement metrics.
+7. Return ONLY valid JSON. No markdown code fences.`;
 
   try {
     const result = await callAI(prompt);
