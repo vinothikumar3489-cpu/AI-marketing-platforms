@@ -401,9 +401,9 @@ function ExecutiveSnapshot({ results }: { results: any }) {
   const execRecommendation = execStory?.executiveRecommendation || null;
   
   const hasScores = sum && (
-    sum.overallGrowthScore !== null ||
-    sum.marketOpportunityScore !== null ||
-    sum.campaignViabilityScore !== null
+    sum.overallGrowthScore != null ||
+    sum.marketOpportunityScore != null ||
+    sum.campaignViabilityScore != null
   );
   
   const radarData = hasScores ? [
@@ -418,7 +418,7 @@ function ExecutiveSnapshot({ results }: { results: any }) {
   const execSummaryData = useMemo(() => {
     const findings = (keyFindings || []).slice(0, 5).map((f: any, i: number) => ({
       text: f.finding || f.value || f.description || f || '',
-      confidence: f.confidence || 85,
+      confidence: f.confidence ?? null,
       impact: f.impact || 'Medium'
     }));
 
@@ -434,12 +434,12 @@ function ExecutiveSnapshot({ results }: { results: any }) {
       effort: 'Medium'
     }));
 
+    const gs = sum?.overallGrowthScore != null ? asNumber(sum?.overallGrowthScore) : null;
+    const ms = sum?.marketOpportunityScore != null ? asNumber(sum?.marketOpportunityScore) : null;
+    const cs = sum?.campaignViabilityScore != null ? asNumber(sum?.campaignViabilityScore) : null;
+    const validScores = [gs, ms, cs].filter(s => s != null);
     const overall = {
-      score: Math.round((
-        asNumber(sum?.overallGrowthScore || 70) +
-        asNumber(sum?.marketOpportunityScore || 60) +
-        asNumber(sum?.campaignViabilityScore || 65)
-      ) / 3),
+      score: validScores.length > 0 ? Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length) : null,
       label: '',
       color: '#53a7ff'
     };
@@ -461,32 +461,39 @@ function ExecutiveSnapshot({ results }: { results: any }) {
 
   // Phase 6C: Build health score data
   const healthScoreData = useMemo(() => ({
-    overall: asNumber(sum?.overallGrowthScore || 72),
+    overall: sum?.overallGrowthScore != null ? asNumber(sum?.overallGrowthScore) : null,
     components: [
-      { label: 'Growth', value: asNumber(sum?.overallGrowthScore || 70), color: '#10e18b' },
-      { label: 'Market Opportunity', value: asNumber(sum?.marketOpportunityScore || 65), color: '#53a7ff' },
-      { label: 'Audience Clarity', value: asNumber(sum?.audienceClarityScore || 60), color: '#a855f7' },
-      { label: 'Competitive Defense', value: asNumber(sum?.competitiveDefensibilityScore || 55), color: '#ff6b35' },
-      { label: 'Campaign Readiness', value: asNumber(sum?.campaignReadinessScore || 70), color: '#ffb347' },
-      { label: 'Data Confidence', value: asNumber(sum?.dataConfidenceScore || 75), color: '#818cf8' },
+      { label: 'Growth', value: sum?.overallGrowthScore != null ? asNumber(sum?.overallGrowthScore) : null, color: '#10e18b' },
+      { label: 'Market Opportunity', value: sum?.marketOpportunityScore != null ? asNumber(sum?.marketOpportunityScore) : null, color: '#53a7ff' },
+      { label: 'Audience Clarity', value: sum?.audienceClarityScore != null ? asNumber(sum?.audienceClarityScore) : null, color: '#a855f7' },
+      { label: 'Competitive Defense', value: sum?.competitiveDefensibilityScore != null ? asNumber(sum?.competitiveDefensibilityScore) : null, color: '#ff6b35' },
+      { label: 'Campaign Readiness', value: sum?.campaignReadinessScore != null ? asNumber(sum?.campaignReadinessScore) : null, color: '#ffb347' },
+      { label: 'Data Confidence', value: sum?.dataConfidenceScore != null ? asNumber(sum?.dataConfidenceScore) : null, color: '#818cf8' },
     ]
   }), [sum]);
 
   // Phase 6C: Build decision items
   const decisions = useMemo(() => {
     const items: any[] = [];
-    const growth = asNumber(sum?.overallGrowthScore || 70);
-    const market = asNumber(sum?.marketOpportunityScore || 65);
-    if (growth >= 70) items.push({ label: 'Should Invest?', question: 'Should the company invest more?', answer: 'Yes' as const, reasoning: `Growth score of ${growth}% indicates strong potential for additional investment.`, confidence: growth });
-    else if (growth >= 50) items.push({ label: 'Should Invest?', question: 'Should the company invest more?', answer: 'Likely' as const, reasoning: `Growth score of ${growth}% suggests cautious investment.`, confidence: growth });
-    else items.push({ label: 'Should Invest?', question: 'Should the company invest more?', answer: 'Unlikely' as const, reasoning: `Growth score of ${growth}% is below threshold. Focus on fundamentals first.`, confidence: growth });
-    if (market >= 60) items.push({ label: 'Should Scale?', question: 'Should operations be scaled?', answer: 'Likely' as const, reasoning: `Market opportunity score of ${market}% supports scaling efforts.`, confidence: market });
-    else items.push({ label: 'Should Scale?', question: 'Should operations be scaled?', answer: 'Unlikely' as const, reasoning: `Market opportunity score of ${market}% is below scaling threshold.`, confidence: market });
-    const competition = asNumber(sum?.competitiveDefensibilityScore || 50);
-    if (competition < 50) items.push({ label: 'Should Pivot?', question: 'Should the strategy pivot?', answer: 'Likely' as const, reasoning: `Competitive defensibility of ${competition}% suggests considering a pivot.`, confidence: competition });
-    else items.push({ label: 'Should Pivot?', question: 'Should the strategy pivot?', answer: 'No' as const, reasoning: `Competitive defensibility of ${competition}% is adequate.`, confidence: competition });
+    const growth = sum?.overallGrowthScore != null ? asNumber(sum?.overallGrowthScore) : null;
+    const market = sum?.marketOpportunityScore != null ? asNumber(sum?.marketOpportunityScore) : null;
+    const competition = sum?.competitiveDefensibilityScore != null ? asNumber(sum?.competitiveDefensibilityScore) : null;
+    const campaignReadiness = sum?.campaignReadinessScore != null ? asNumber(sum?.campaignReadinessScore) : null;
+    if (growth != null) {
+      if (growth >= 70) items.push({ label: 'Should Invest?', question: 'Should the company invest more?', answer: 'Yes' as const, reasoning: `Growth score of ${growth}% indicates strong potential for additional investment.`, confidence: growth });
+      else if (growth >= 50) items.push({ label: 'Should Invest?', question: 'Should the company invest more?', answer: 'Likely' as const, reasoning: `Growth score of ${growth}% suggests cautious investment.`, confidence: growth });
+      else items.push({ label: 'Should Invest?', question: 'Should the company invest more?', answer: 'Unlikely' as const, reasoning: `Growth score of ${growth}% is below threshold. Focus on fundamentals first.`, confidence: growth });
+    }
+    if (market != null) {
+      if (market >= 60) items.push({ label: 'Should Scale?', question: 'Should operations be scaled?', answer: 'Likely' as const, reasoning: `Market opportunity score of ${market}% supports scaling efforts.`, confidence: market });
+      else items.push({ label: 'Should Scale?', question: 'Should operations be scaled?', answer: 'Unlikely' as const, reasoning: `Market opportunity score of ${market}% is below scaling threshold.`, confidence: market });
+    }
+    if (competition != null) {
+      if (competition < 50) items.push({ label: 'Should Pivot?', question: 'Should the strategy pivot?', answer: 'Likely' as const, reasoning: `Competitive defensibility of ${competition}% suggests considering a pivot.`, confidence: competition });
+      else items.push({ label: 'Should Pivot?', question: 'Should the strategy pivot?', answer: 'No' as const, reasoning: `Competitive defensibility of ${competition}% is adequate.`, confidence: competition });
+    }
     items.push({ label: 'Should Improve SEO?', question: 'Should SEO be prioritized?', answer: 'Yes' as const, reasoning: 'SEO is a high-ROI channel with compounding returns over time.', confidence: 85 });
-    items.push({ label: 'Should Launch Campaign?', question: 'Should a campaign be launched?', answer: 'Yes' as const, reasoning: `Campaign readiness of ${asNumber(sum?.campaignReadinessScore || 70)}% supports launching immediately.`, confidence: asNumber(sum?.campaignReadinessScore || 70) });
+    if (campaignReadiness != null) items.push({ label: 'Should Launch Campaign?', question: 'Should a campaign be launched?', answer: 'Yes' as const, reasoning: `Campaign readiness of ${campaignReadiness}% supports launching immediately.`, confidence: campaignReadiness });
     return items;
   }, [sum]);
 
@@ -517,7 +524,7 @@ function ExecutiveSnapshot({ results }: { results: any }) {
       roi: p.roi || '150%',
       timeline: p.timeline || '30 days',
       owner: p.owner || 'Marketing Team',
-      confidence: p.confidence || 80
+      confidence: p.confidence ?? null
     }));
   }, [topPriorities]);
 
@@ -525,21 +532,21 @@ function ExecutiveSnapshot({ results }: { results: any }) {
   const riskItems = useMemo(() => {
     const items: any[] = [];
     (swot?.weaknesses || []).slice(0, 3).forEach((w: any) => {
-      items.push({ title: w.value || w.finding || w || '', category: 'Business' as const, probability: w.confidence || 60, impact: 'high' as const, mitigation: 'Address through strategic planning and resource allocation.', owner: 'Executive Team' });
+      items.push({ title: w.value || w.finding || w || '', category: 'Business' as const, probability: w.confidence ?? null, impact: 'high' as const, mitigation: 'Address through strategic planning and resource allocation.', owner: 'Executive Team' });
     });
     (swot?.threats || []).slice(0, 3).forEach((t: any) => {
-      items.push({ title: t.value || t.finding || t || '', category: 'Competition' as const, probability: t.confidence || 55, impact: 'medium' as const, mitigation: 'Monitor and develop counter-strategies.', owner: 'Competitive Intelligence' });
+      items.push({ title: t.value || t.finding || t || '', category: 'Competition' as const, probability: t.confidence ?? null, impact: 'medium' as const, mitigation: 'Monitor and develop counter-strategies.', owner: 'Competitive Intelligence' });
     });
     return items;
   }, [swot]);
 
   // Phase 6C: Confidence data
   const confidenceData = useMemo(() => [
-    { section: 'Growth Analysis', confidence: asNumber(sum?.overallGrowthScore || 70), evidenceStrength: 75, sourceCount: results.evidence?.sources?.length || 3, dataFreshness: 'Today' },
-    { section: 'Market Intelligence', confidence: asNumber(sum?.marketOpportunityScore || 65), evidenceStrength: 70, sourceCount: results.market?.sources?.length || 4, dataFreshness: 'Today' },
-    { section: 'Audience Intelligence', confidence: asNumber(sum?.audienceClarityScore || 60), evidenceStrength: 65, sourceCount: results.audience?.sources?.length || 3, dataFreshness: 'Today' },
-    { section: 'Competitor Intelligence', confidence: asNumber(sum?.competitiveDefensibilityScore || 55), evidenceStrength: 60, sourceCount: results.competitor?.sources?.length || 5, dataFreshness: 'Today' },
-  ], [sum, results]);
+    sum?.overallGrowthScore != null ? { section: 'Growth Analysis', confidence: asNumber(sum?.overallGrowthScore), evidenceStrength: null, sourceCount: results.evidence?.sources?.length || 0, dataFreshness: 'Today' } : null,
+    sum?.marketOpportunityScore != null ? { section: 'Market Intelligence', confidence: asNumber(sum?.marketOpportunityScore), evidenceStrength: null, sourceCount: results.market?.sources?.length || 0, dataFreshness: 'Today' } : null,
+    sum?.audienceClarityScore != null ? { section: 'Audience Intelligence', confidence: asNumber(sum?.audienceClarityScore), evidenceStrength: null, sourceCount: results.audience?.sources?.length || 0, dataFreshness: 'Today' } : null,
+    sum?.competitiveDefensibilityScore != null ? { section: 'Competitor Intelligence', confidence: asNumber(sum?.competitiveDefensibilityScore), evidenceStrength: null, sourceCount: results.competitor?.sources?.length || 0, dataFreshness: 'Today' } : null,
+  ].filter(Boolean), [sum, results]);
 
   const filterOptions = [
     { key: 'confidence', label: 'Confidence', values: ['High (70%+)', 'Medium (40-70%)', 'Low (<40%)'] },
@@ -576,11 +583,11 @@ function ExecutiveSnapshot({ results }: { results: any }) {
   }
 
   const kpiItems = [
-    { label: 'Growth Index', value: `${asNumber(sum.overallGrowthScore || results.product?.confidenceScore)}%`, icon: TrendingUp, color: '#10e18b' },
-    { label: 'Market Opportunity', value: `${asNumber(sum.marketOpportunityScore || results.market?.demandScore)}%`, icon: Target, color: '#53a7ff' },
-    { label: 'Campaign Viability', value: `${asNumber(sum.campaignViabilityScore || results.campaign?.confidenceScore)}%`, icon: Zap, color: '#ffb347' },
-    { label: 'Data Confidence', value: `${asNumber(sum.dataConfidenceScore || 75)}%`, icon: Shield, color: '#a855f7' },
-  ];
+    sum.overallGrowthScore != null ? { label: 'Growth Index', value: `${asNumber(sum.overallGrowthScore)}%`, icon: TrendingUp, color: '#10e18b' } : null,
+    sum.marketOpportunityScore != null ? { label: 'Market Opportunity', value: `${asNumber(sum.marketOpportunityScore)}%`, icon: Target, color: '#53a7ff' } : null,
+    sum.campaignViabilityScore != null ? { label: 'Campaign Viability', value: `${asNumber(sum.campaignViabilityScore)}%`, icon: Zap, color: '#ffb347' } : null,
+    sum.dataConfidenceScore != null ? { label: 'Data Confidence', value: `${asNumber(sum.dataConfidenceScore)}%`, icon: Shield, color: '#a855f7' } : null,
+  ].filter(Boolean);
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
@@ -636,21 +643,21 @@ function ExecutiveSnapshot({ results }: { results: any }) {
             title: 'Top Recommendation',
             description: asText(sum.topRecommendation?.value || sum.topRecommendation || ''),
             severity: 'positive',
-            confidence: sum.topRecommendation?.confidence || 85,
+            confidence: sum.topRecommendation?.confidence ?? null,
             whyItMatters: 'This recommendation is based on the highest-impact opportunity identified across all intelligence modules.'
           }} />
           <EnterpriseInsightCard insight={{
             title: 'Primary Risk',
             description: asText(sum.primaryRisk?.value || sum.primaryRisk || ''),
             severity: 'critical',
-            confidence: sum.primaryRisk?.confidence || 75,
+            confidence: sum.primaryRisk?.confidence ?? null,
             whyItMatters: 'Addressing this risk is critical before executing growth strategies to avoid resource waste.'
           }} />
           <EnterpriseInsightCard insight={{
             title: 'Immediate Action',
             description: asText(sum.immediateAction?.value || sum.immediateAction || ''),
             severity: 'warning',
-            confidence: sum.immediateAction?.confidence || 80,
+            confidence: sum.immediateAction?.confidence ?? null,
             whyItMatters: 'This action should be prioritized in the first 7 days to establish momentum.'
           }} />
         </div>
@@ -676,10 +683,10 @@ function ExecutiveSnapshot({ results }: { results: any }) {
 
       {/* Phase 6C: Compare Results (placeholder) */}
       <CompareResults metrics={[
-        { label: 'Growth Score', current: asNumber(sum?.overallGrowthScore || 72), previous: asNumber(sum?.previousGrowthScore || 68) },
-        { label: 'Market Opportunity', current: asNumber(sum?.marketOpportunityScore || 65), previous: asNumber(sum?.previousMarketScore || 60) },
-        { label: 'Audience Clarity', current: asNumber(sum?.audienceClarityScore || 60), previous: asNumber(sum?.previousAudienceScore || 55) },
-      ]} />
+        sum?.overallGrowthScore != null ? { label: 'Growth Score', current: asNumber(sum?.overallGrowthScore), previous: asNumber(sum?.previousGrowthScore || 0) } : null,
+        sum?.marketOpportunityScore != null ? { label: 'Market Opportunity', current: asNumber(sum?.marketOpportunityScore), previous: asNumber(sum?.previousMarketScore || 0) } : null,
+        sum?.audienceClarityScore != null ? { label: 'Audience Clarity', current: asNumber(sum?.audienceClarityScore), previous: asNumber(sum?.previousAudienceScore || 0) } : null,
+      ].filter(Boolean)} />
 
       {/* Phase 6C: Confidence Visualization */}
       <ConfidenceVisualization items={confidenceData} />
@@ -1180,7 +1187,7 @@ function CompetitorIntelligence({ data }: { data: any }) {
           <EnterpriseCompetitorCard key={i} competitor={{
             name: c.name || c.company || '',
             domain: c.domain || c.website || '',
-            threatScore: c.threatScore || c.threatLevel || 50,
+            threatScore: c.threatScore ?? c.threatLevel ?? null,
             trafficEstimate: c.traffic || '',
             employeeCount: c.employees || '',
             funding: c.funding || '',
@@ -1200,10 +1207,10 @@ function CompetitorIntelligence({ data }: { data: any }) {
         <h3>Market Gaps & Exploitable Weaknesses</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px', marginTop: '15px' }}>
            {asArray(competitor.marketGaps || competitor.gaps).map((g: any, i) => (
-            <EnterpriseInsightCard key={`g${i}`} insight={{ title: `Market Gap ${i+1}`, description: asText(g.value || g), severity: 'warning', confidence: g.confidence || 70 }} />
+             <EnterpriseInsightCard key={`g${i}`} insight={{ title: `Market Gap ${i+1}`, description: asText(g.value || g), severity: 'warning', confidence: g.confidence ?? null }} />
           ))}
            {asArray(competitor.competitorWeaknesses || competitor.weaknesses).map((w: any, i) => (
-            <EnterpriseInsightCard key={`w${i}`} insight={{ title: `Weakness ${i+1}`, description: asText(w.value || w), severity: 'critical', confidence: w.confidence || 70 }} />
+             <EnterpriseInsightCard key={`w${i}`} insight={{ title: `Weakness ${i+1}`, description: asText(w.value || w), severity: 'critical', confidence: w.confidence ?? null }} />
           ))}
         </div>
       </Card>

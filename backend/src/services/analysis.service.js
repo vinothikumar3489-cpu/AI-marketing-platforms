@@ -19,15 +19,20 @@ const extractJsonFromText = (content) => {
   }
 };
 
-const buildProductPrompt = ({ productName, manualDescription, targetAudience, industry, websiteTitle, websiteMeta, cleanedWebsiteText, researchSummary = "" }) => {
+const buildProductPrompt = ({ productName, manualDescription, targetAudience, industry, websiteTitle, websiteMeta, cleanedWebsiteText, researchSummary = "", websiteUrl = "", companyName = "", headings = [], features = [], benefits = [] }) => {
   return `You are a senior SaaS product marketing strategist. Analyze the product using manual details, scraped website data, and real-time research. Do not copy raw website text. Convert information into clean business insights. Always infer pain points, buyer personas, USP, benefits, and marketing angles. Return valid JSON only.
 
 Product Name: ${productName}
+Company Name: ${companyName || "N/A"}
+Website URL: ${websiteUrl || "N/A"}
 Industry: ${industry || "General SaaS"}
 Target Audience: ${targetAudience || "Professionals"}
 Manual Description: ${manualDescription || "N/A"}
 Website Title: ${websiteTitle || "N/A"}
 Website Meta Description: ${websiteMeta || "N/A"}
+Website Headings: ${headings.length > 0 ? headings.slice(0, 10).join(" | ") : "N/A"}
+Extracted Features: ${features.length > 0 ? features.join(" | ") : "N/A"}
+Extracted Benefits: ${benefits.length > 0 ? benefits.join(" | ") : "N/A"}
 
 Research Evidence (summarize external research, competitor signals, market cues):
 ${researchSummary || "None"}
@@ -35,12 +40,12 @@ ${researchSummary || "None"}
 Cleaned Website Content (use as evidence only, do not copy):
 ${cleanedWebsiteText || "N/A"}
 
-Return JSON only with the exact keys below:
+Return JSON only with the exact keys below. Use null for missing values, never invent non-empty values:
 {
   "productSummary":"",
   "category":"",
-  "confidenceScore":0,
-  "usp":"",
+  "confidenceScore":null,
+  "usp":null,
   "features":[],
   "benefits":[],
   "painPoints":[],
@@ -48,17 +53,33 @@ Return JSON only with the exact keys below:
   "buyerPersonas":[],
   "competitorTypes":[],
   "competitors":[],
-  "pricingPosition":"",
-  "marketMaturity":"",
+  "pricingPosition":null,
+  "marketMaturity":null,
   "marketingAngles":[],
   "seoOpportunities":[],
   "campaignIdeas":[],
   "recommendedModules":[],
   "dataSourcesUsed":[],
-  "warnings":[]
+  "warnings":[],
+  "tam":null,
+  "sam":null,
+  "som":null,
+  "cagr":null,
+  "growthRate":null,
+  "marketTrends":[],
+  "growthOpportunities":[],
+  "marketGaps":[],
+  "competitorWeaknesses":[],
+  "differentiationOpportunities":[],
+  "bestChannels":[],
+  "channelReasoning":null,
+  "channelPriority":null,
+  "channelExpectedOutcome":null,
+  "executiveStory":null,
+  "actionPlan":null
 }
 
-Pain points and buyerPersonas must never be empty. If the product is a CRM/Marketing platform, follow the provided pain point and buyer persona rules. Use professional marketing language and do not output markdown or explanatory text — only valid JSON.`;
+Use professional marketing language. Output valid JSON only — no markdown, no explanation, no commentary.`.trim();
 };
 
 const parseOpenAIResponse = async (response) => {
@@ -121,36 +142,52 @@ export const generateAnalysis = async ({ manualData = {}, scrapedData = {} } = {
     websiteMeta: scrapedData?.metaDescription || "",
     cleanedWebsiteText: scrapedData?.cleanedText || "",
     researchSummary,
+    websiteUrl: scrapedData?.websiteUrl || "",
+    companyName: manualData.companyName || "",
+    headings: scrapedData?.headings || [],
+    features: scrapedData?.features || [],
+    benefits: scrapedData?.benefits || [],
   });
 
   // If no OpenAI API key, provide heuristic fallback
   if (!openAiKey) {
     providerStatus.openai = "missing_key";
     const fallback = {
-      productSummary: `Professional business intelligence for ${manualData.productName || "this product"}.`,
-      category: manualData.industry || "General SaaS",
-      confidenceScore: 55,
-      usp: `A modern solution designed to improve business outcomes for ${manualData.targetAudience || "target users"}.`,
+      productSummary: manualData.productName || "Analysis not available",
+      category: manualData.industry || null,
+      confidenceScore: null,
+      usp: null,
       features: scrapedData?.features || [],
       benefits: scrapedData?.benefits || [],
-      painPoints: [
-        "Unclear product differentiation",
-        "Lack of concise buyer personas",
-        "Difficulty measuring pricing value",
-        "Insufficient marketing messaging",
-      ],
+      painPoints: [],
       buyerPersonas: [],
       targetUsers: (manualData.targetAudience || "").split(/,|;|\s+and\s+/).map((v) => v.trim()).filter(Boolean),
       competitorTypes: [],
       competitors: [],
       marketingAngles: [],
-      pricingPosition: manualData.pricing || "Competitive market pricing",
-      marketMaturity: "Emerging",
+      pricingPosition: null,
+      marketMaturity: null,
       seoOpportunities: [],
       campaignIdeas: [],
       recommendedModules: [],
       dataSourcesUsed: [],
-      warnings: ["AI key not configured. Using heuristic analysis."],
+      warnings: ["AI key not configured. No analysis generated."],
+      tam: null,
+      sam: null,
+      som: null,
+      cagr: null,
+      growthRate: null,
+      marketTrends: [],
+      growthOpportunities: [],
+      marketGaps: [],
+      competitorWeaknesses: [],
+      differentiationOpportunities: [],
+      bestChannels: [],
+      channelReasoning: null,
+      channelPriority: null,
+      channelExpectedOutcome: null,
+      executiveStory: null,
+      actionPlan: null,
     };
 
     return { message: "heuristic", structured: fallback, providerStatus, warnings };
@@ -170,7 +207,7 @@ export const generateAnalysis = async ({ manualData = {}, scrapedData = {} } = {
           { role: "system", content: "You are a senior SaaS product marketing strategist. Analyze products and return JSON only." },
           { role: "user", content: prompt },
         ],
-        max_tokens: 1600,
+        max_tokens: 2400,
         temperature: 0.3,
       }),
     });
@@ -223,27 +260,43 @@ export const generateAnalysis = async ({ manualData = {}, scrapedData = {} } = {
     providerStatus.gemini = "missing_key";
   }
 
-  // If all AI failed, return a heuristic structured result but include warnings and providerStatus
+  // If all AI failed, return structured result with warnings
   const fallbackStructured = {
-    productSummary: `Professional business intelligence for ${manualData.productName || "this product"}.`,
-    category: manualData.industry || "General SaaS",
-    confidenceScore: 50,
-    usp: `A modern solution designed to improve business outcomes for ${manualData.targetAudience || "target users"}.`,
+    productSummary: manualData.productName || "Analysis not available",
+    category: manualData.industry || null,
+    confidenceScore: null,
+    usp: null,
     features: scrapedData?.features || [],
     benefits: scrapedData?.benefits || [],
-    painPoints: ["Unable to run AI analysis; returning heuristic insights."],
+    painPoints: [],
     buyerPersonas: [],
     targetUsers: (manualData.targetAudience || "").split(/,|;|\s+and\s+/).map((v) => v.trim()).filter(Boolean),
     competitorTypes: [],
     competitors: [],
     marketingAngles: [],
-    pricingPosition: manualData.pricing || "Competitive market pricing",
-    marketMaturity: "Unknown",
+    pricingPosition: null,
+    marketMaturity: null,
     seoOpportunities: [],
     campaignIdeas: [],
     recommendedModules: [],
     dataSourcesUsed: [],
     warnings,
+    tam: null,
+    sam: null,
+    som: null,
+    cagr: null,
+    growthRate: null,
+    marketTrends: [],
+    growthOpportunities: [],
+    marketGaps: [],
+    competitorWeaknesses: [],
+    differentiationOpportunities: [],
+    bestChannels: [],
+    channelReasoning: null,
+    channelPriority: null,
+    channelExpectedOutcome: null,
+    executiveStory: null,
+    actionPlan: null,
   };
 
   return { message: "fallback", structured: fallbackStructured, providerStatus, warnings };

@@ -50,7 +50,7 @@ REQUIRED OUTPUT FIELDS (return valid JSON):
   "cta": "Call to action text and visual",
   "duration": "${typeConfig.duration}",
   "format": "Aspect ratio and format recommendation",
-  "evidence": { "source": "video_studio", "confidence": 85, "dataSource": "ai_generation" }
+  "evidence": { "source": "video_studio", "confidence": null, "dataSource": "ai_generation" }
 }
 
 RULES:

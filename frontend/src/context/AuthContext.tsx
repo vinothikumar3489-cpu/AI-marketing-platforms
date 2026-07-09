@@ -30,12 +30,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then((res: any) => {
         if (!active) return;
         const u = res.user || res.data || res;
-        setUser(u);
-        localStorage.setItem('auth_user', JSON.stringify(u));
+        if (u && u.id) {
+          setUser(u);
+          localStorage.setItem('auth_user', JSON.stringify(u));
+        } else {
+          clearAuth();
+          setUser(null);
+        }
       })
       .catch((err) => {
         console.warn('Auth failed, starting in unauthenticated state', err);
-        if (active) setUser(null);
+        if (active) {
+          clearAuth();
+          setUser(null);
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -47,22 +55,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function login(email: string, password: string) {
     const res: any = await api.post('/auth/login', { email, password });
     const token = res.token || res.accessToken || res.data?.token;
-    const u = res.user || res.data?.user || { email };
+    const u = res.user || res.data?.user || null;
     if (token) setToken(token);
-    setUser(u);
-    localStorage.setItem('auth_user', JSON.stringify(u));
+    if (u && u.id) {
+      setUser(u);
+      localStorage.setItem('auth_user', JSON.stringify(u));
+    }
   }
 
   async function register(name: string, email: string, password: string) {
     const res: any = await api.post('/auth/register', { name, email, password });
     const token = res.token || res.accessToken || res.data?.token;
-    const u = res.user || res.data?.user || { name, email };
+    const u = res.user || res.data?.user || null;
     if (token) setToken(token);
-    setUser(u);
-    localStorage.setItem('auth_user', JSON.stringify(u));
+    if (u && u.id) {
+      setUser(u);
+      localStorage.setItem('auth_user', JSON.stringify(u));
+    }
   }
 
   function logout() {
+    api.post('/auth/logout').catch(() => {});
     clearAuth();
     setUser(null);
     window.location.href = '/login';

@@ -220,10 +220,12 @@ function buildCompetitorWarRoom(growthCompetitors, seoCompetitors, you) {
   const labels = ['Authority', 'Keywords', 'Traffic', 'AI Visibility', 'Content', 'Trust', 'Market Position'];
 
   const competitors = [];
-  for (let i = 0; i < 3; i++) {
+  const maxCompetitors = Math.max(growthCompetitors.length, seoCompetitors.length);
+  for (let i = 0; i < Math.min(maxCompetitors, 5); i++) {
     const gc = growthCompetitors[i];
     const sc = seoCompetitors[i];
-    const name = asText(gc?.name || sc?.name, `Competitor ${i + 1}`);
+    const name = gc?.name || sc?.name;
+    if (!name) continue;
     competitors.push({
       name,
       authority: asNum(sc?.authorityStrength || gc?.seoVisibility, 0),
@@ -387,8 +389,9 @@ function buildRoadmap(chat, opportunities) {
     day180: [],
   };
 
-  opportunities.slice(0, 2).forEach(o => {
-    phases.immediate.push({
+  opportunities.slice(0, 4).forEach(o => {
+    const phase = o.priority === 'high' || o.priority === 'critical' ? 'immediate' : 'day30';
+    phases[phase].push({
       task: o.title,
       expectedResult: o.recommendation,
       estimatedImpact: o.impact,
@@ -405,6 +408,16 @@ function buildRoadmap(chat, opportunities) {
       difficulty: 'medium',
     });
   });
+
+  const pi = chat.productIntelligence || {};
+  const camp = chat.campaignIntelligence || {};
+  const hasRealData = asArray(pi.marketDiscovery?.growthOpportunities).length > 0 ||
+    asArray(seo.keywordIntelligence?.contentOpportunities).length > 0 ||
+    asArray(camp.campaignGenerator?.nextActions).length > 0;
+
+  if (!hasRealData) {
+    return phases;
+  }
 
   phases.day7.push({
     task: 'Audit top 5 landing pages for conversion',
@@ -452,18 +465,18 @@ function buildSeoV2(seo) {
     internalLinkOpportunities: asArray(kw.internalLinkOpportunities).slice(0, 5),
     entityOptimization: asArray(geo.entityRecommendations || geo.entities).slice(0, 5),
     knowledgeGraphReadiness: {
-      score: asNum(geo.knowledgeGraphReadinessScore, 50),
+      score: geo.knowledgeGraphReadinessScore != null ? asNum(geo.knowledgeGraphReadinessScore) : null,
       recommendations: asArray(geo.kgRecommendations).slice(0, 3),
     },
     brandMentionAnalysis: asArray(geo.brandMentions || seo.brandMentions).slice(0, 5),
     aiVisibilityMatrix: {
       platforms: ['ChatGPT', 'Gemini', 'Claude', 'Perplexity', 'AI Overview'],
       scores: [
-        asNum(geo.chatGptScore, 50),
-        asNum(geo.geminiScore, 50),
-        asNum(geo.claudeScore, 50),
-        asNum(geo.perplexityScore, 50),
-        asNum(geo.googleAiOverviewScore, 50),
+        geo.chatGptScore != null ? asNum(geo.chatGptScore) : null,
+        geo.geminiScore != null ? asNum(geo.geminiScore) : null,
+        geo.claudeScore != null ? asNum(geo.claudeScore) : null,
+        geo.perplexityScore != null ? asNum(geo.perplexityScore) : null,
+        geo.googleAiOverviewScore != null ? asNum(geo.googleAiOverviewScore) : null,
       ],
     },
   };
@@ -472,6 +485,8 @@ function buildSeoV2(seo) {
 function buildGrowthV2(chat, scores) {
   const pi = chat.productIntelligence || {};
   const camp = chat.campaignIntelligence || {};
+  const hasRealGrowthData = asArray(pi.marketDiscovery?.growthOpportunities).length > 0 ||
+    scores.demandScore > 0 || scores.growthScore > 0;
 
   return {
     customerJourney: [
@@ -480,13 +495,13 @@ function buildGrowthV2(chat, scores) {
       { stage: 'Decision', score: scores.conversionPotential, actions: ['Free trial', 'Demo calls'] },
       { stage: 'Retention', score: Math.round(scores.growthScore * 0.8), actions: ['Email nurture', 'Upsell'] },
     ],
-    acquisitionFunnel: [
+    acquisitionFunnel: hasRealGrowthData ? [
       { stage: 'Visitors', value: 10000, conversion: 100 },
       { stage: 'Leads', value: 2500, conversion: 25 },
       { stage: 'MQLs', value: 750, conversion: 30 },
       { stage: 'SQLs', value: 225, conversion: 30 },
       { stage: 'Customers', value: 68, conversion: 30 },
-    ],
+    ] : [],
     revenueOpportunity: {
       estimate: `$${Math.round(scores.conversionPotential * 1200)}`,
       confidence: scores.conversionPotential >= 70 ? 'high' : 'medium',

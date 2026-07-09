@@ -84,18 +84,18 @@ export const generateAutomationDemo = async (req, res) => {
       });
     }
 
-    // Fetch existing analysis data
-    const productIntelligence = await prisma.productIntelligence.findUnique({
-      where: { chatId }
+    // Fetch existing analysis data (scoped by userId)
+    const productIntelligence = await prisma.productIntelligence.findFirst({
+      where: { chatId, userId }
     });
-    const competitorIntelligence = await prisma.competitorIntelligence.findUnique({
-      where: { chatId }
+    const competitorIntelligence = await prisma.competitorIntelligence.findFirst({
+      where: { chatId, userId }
     });
-    const campaignIntelligence = await prisma.campaignIntelligence.findUnique({
-      where: { chatId }
+    const campaignIntelligence = await prisma.campaignIntelligence.findFirst({
+      where: { chatId, userId }
     });
-    const seoIntelligence = await prisma.seoIntelligence.findUnique({
-      where: { chatId },
+    const seoIntelligence = await prisma.seoIntelligence.findFirst({
+      where: { chatId, userId },
       include: { scoreBreakdown: true }
     });
 
@@ -561,11 +561,11 @@ export const executeAllModules = async (req, res) => {
     if (!chat) return res.status(404).json({ success: false, error: "Chat not found" });
 
     const [productIntelligence, competitorIntelligence, campaignIntelligence, seoIntelligence, plan] = await Promise.all([
-      prisma.productIntelligence.findUnique({ where: { chatId } }),
-      prisma.competitorIntelligence.findUnique({ where: { chatId } }),
-      prisma.campaignIntelligence.findUnique({ where: { chatId } }),
-      prisma.seoIntelligence.findUnique({ where: { chatId } }),
-      prisma.automationPlan.findUnique({ where: { chatId } }),
+      prisma.productIntelligence.findFirst({ where: { chatId, userId } }),
+      prisma.competitorIntelligence.findFirst({ where: { chatId, userId } }),
+      prisma.campaignIntelligence.findFirst({ where: { chatId, userId } }),
+      prisma.seoIntelligence.findFirst({ where: { chatId, userId } }),
+      prisma.automationPlan.findFirst({ where: { chatId, userId } }),
     ]);
 
     const context = {
@@ -642,10 +642,10 @@ export const executeSingleModule = async (req, res) => {
     if (!chat) return res.status(404).json({ success: false, error: "Chat not found" });
 
     const [productIntelligence, seoIntelligence, campaignIntelligence, plan] = await Promise.all([
-      prisma.productIntelligence.findUnique({ where: { chatId } }),
-      prisma.seoIntelligence.findUnique({ where: { chatId } }),
-      prisma.campaignIntelligence.findUnique({ where: { chatId } }),
-      prisma.automationPlan.findUnique({ where: { chatId } }),
+      prisma.productIntelligence.findFirst({ where: { chatId, userId } }),
+      prisma.seoIntelligence.findFirst({ where: { chatId, userId } }),
+      prisma.campaignIntelligence.findFirst({ where: { chatId, userId } }),
+      prisma.automationPlan.findFirst({ where: { chatId, userId } }),
     ]);
 
     const context = {
@@ -702,14 +702,12 @@ export const getExecutionData = async (req, res) => {
   try {
     let plan = null;
     try {
-      plan = await prisma.automationPlan.findUnique({ where: { chatId } });
+      plan = await prisma.automationPlan.findFirst({ where: { chatId, userId } });
     } catch (dbErr) {
       console.warn('[getExecutionData] DB query failed, schema may be out of sync:', dbErr.message);
       return res.json({ success: true, exists: false, data: null });
     }
     if (!plan) return res.json({ success: true, exists: false, data: null });
-
-    if (plan.userId !== userId) return res.status(403).json({ success: false, error: "Unauthorized" });
 
     return res.json({
       success: true,

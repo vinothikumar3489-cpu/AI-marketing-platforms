@@ -40,7 +40,7 @@ REQUIRED OUTPUT FIELDS (return valid JSON):
   "dimensions": "width x height in pixels",
   "format": "File format recommendation (PNG, JPG, etc.)",
   "additionalNotes": "Any additional design notes",
-  "evidence": { "source": "creative_studio", "confidence": 85, "dataSource": "ai_generation" }
+  "evidence": { "source": "creative_studio", "confidence": null, "dataSource": "ai_generation" }
 }
 
 RULES:

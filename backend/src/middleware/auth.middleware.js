@@ -10,6 +10,20 @@ if (secret && (secret.length < 32 || /^\d+$/.test(secret))) {
   );
 }
 
+const lastActiveCache = new Map();
+const ACTIVE_THROTTLE_MS = 5 * 60 * 1000;
+
+async function updateLastActive(userId) {
+  const now = Date.now();
+  const last = lastActiveCache.get(userId);
+  if (last && now - last < ACTIVE_THROTTLE_MS) return;
+  lastActiveCache.set(userId, now);
+  try {
+    await prisma.user.update({ where: { id: userId }, data: { lastActiveAt: new Date() } });
+  } catch {
+  }
+}
+
 export const requireAuth = async (req, res, next) => {
   if (!process.env.JWT_SECRET) {
     return res.status(500).json({ error: "JWT_SECRET is not configured" });
@@ -27,7 +41,7 @@ export const requireAuth = async (req, res, next) => {
     if (!user) {
       return res.status(401).json({ error: "Invalid token" });
     }
-    await prisma.user.update({ where: { id: user.id }, data: { lastActiveAt: new Date() } });
+    updateLastActive(user.id);
     req.user = { ...user, lastActiveAt: new Date() };
     next();
   } catch (error) {

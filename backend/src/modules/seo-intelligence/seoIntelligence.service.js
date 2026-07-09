@@ -454,9 +454,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
           competitorKeywords: competitorIntelligence,
           contentGaps: contentGapIntelligence,
           aiVisibility: geoIntelligence,
-          landingPageSuggestions: executiveDashboard?.landingPageOptimization || {},
           blogIdeas: blogIntelligence,
-          actionPlan: executiveDashboard?.actionPlan || null,
           providers: researchData.sources,
           warnings: researchData.warnings,
           status: 'completed'
@@ -472,9 +470,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
           competitorKeywords: competitorIntelligence,
         contentGaps: contentGapIntelligence,
         aiVisibility: geoIntelligence,
-        landingPageSuggestions: executiveDashboard?.landingPageOptimization || {},
         blogIdeas: blogIntelligence,
-        actionPlan: executiveDashboard?.actionPlan || null,
         providers: researchData.sources,
         warnings: researchData.warnings,
         status: 'completed',
@@ -849,6 +845,21 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
   }
 
   // saved is now the seoRecord returned from the transaction
+
+  // Update SeoIntelligence record with landingPageSuggestions and actionPlan from generated data
+  if (executiveDashboard) {
+    try {
+      await prisma.seoIntelligence.update({
+        where: { id: saved.id },
+        data: {
+          landingPageSuggestions: contentGapIntelligence?.landingPageIdeas || executiveDashboard?.landingPageOptimization || [],
+          actionPlan: executiveDashboard?.executiveActionPlan || executiveDashboard?.actionPlan || null,
+        }
+      });
+    } catch (updateErr) {
+      console.warn('⚠️ [SEO Intelligence] Failed to update SeoIntelligence with dashboard data:', updateErr.message);
+    }
+  }
 
   // Step 7: Add message to chat (non-blocking)
   try {

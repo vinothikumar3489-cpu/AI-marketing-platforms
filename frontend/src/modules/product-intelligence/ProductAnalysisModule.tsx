@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { toast } from 'sonner';
 import { CheckCircle2, FileText, Sparkles, Target, Layers, Brain, AlertCircle } from "lucide-react";
 import { Section, ScoreBar } from "@/components/ui-kit";
-import { getActiveProject } from "@/lib/project-store";
 import { api } from "@/lib/api";
+import { useProject } from "@/context/ProjectContext";
 
 const emptyForm = {
   productName: "",
@@ -21,8 +21,8 @@ export function ProductAnalysisModule() {
   const [analysis, setAnalysis] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const project = typeof window !== "undefined" ? getActiveProject() : null;
-  const chatId = project?.id || "";
+  const { selectedChatId } = useProject();
+  const chatId = selectedChatId || "";
 
   useEffect(() => {
     if (!chatId) return;

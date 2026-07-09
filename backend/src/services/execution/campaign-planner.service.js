@@ -49,7 +49,7 @@ REQUIRED OUTPUT FIELDS (return valid JSON):
     "risks": [{ "risk": "description", "mitigation": "mitigation strategy", "likelihood": "High/Medium/Low", "impact": "High/Medium/Low" }]
   },
   "businessJustification": "Clear business justification for this campaign",
-  "evidence": { "source": "campaign_planner", "confidence": 85, "dataSource": "ai_generation" }
+  "evidence": { "source": "campaign_planner", "confidence": null, "dataSource": "ai_generation" }
 }
 
 RULES:

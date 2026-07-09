@@ -25,6 +25,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [fullResults, setFullResults] = useState<any>({ growth: null, seo: null, executive: null, profile: null, chat: null });
   const [loading, setLoading] = useState(false);
   const mountedRef = useRef(true);
+  const abortRef = useRef<AbortController | null>(null);
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
   async function refreshChats() {
@@ -75,20 +76,27 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       return { growth: null, seo: null, executive: null, profile: null, chat: null };
     }
     
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    abortRef.current = new AbortController();
+    const signal = abortRef.current.signal;
+    
     setLoading(true);
     
     try {
       await new Promise(resolve => setTimeout(resolve, 100));
-      if (!mountedRef.current) return { growth: null, seo: null, executive: null, profile: null, chat: null };
+      if (!mountedRef.current || signal.aborted) return { growth: null, seo: null, executive: null, profile: null, chat: null };
       
-      const res: any = await api.get(`/chats/${id}/full-results`);
-      if (!mountedRef.current) return { growth: null, seo: null, executive: null, profile: null, chat: null };
+      const res: any = await api.get(`/chats/${id}/full-results`, signal);
+      if (!mountedRef.current || signal.aborted) return { growth: null, seo: null, executive: null, profile: null, chat: null };
       
       const normalized = normalizeFullResults(res);
 
       setFullResults(normalized);
       return normalized;
     } catch (error: any) {
+      if (error.name === 'AbortError') return { growth: null, seo: null, executive: null, profile: null, chat: null };
       console.error('Failed to load full results:', error.message || error);
       
       const emptyResults = { growth: null, seo: null, executive: null, profile: null, chat: null };
@@ -179,7 +187,15 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  useEffect(() => { if (user) refreshChats(); }, [user]);
+  useEffect(() => {
+    if (!user) {
+      setChats([]);
+      setSelectedChatId('');
+      setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null });
+      return;
+    }
+    refreshChats();
+  }, [user]);
   useEffect(() => { if (user && selectedChatId) loadFullResults(selectedChatId).catch((e) => console.warn('Initial full results load failed:', e)); }, [user, selectedChatId]);
 
   const value = useMemo(() => ({ chats, selectedChatId, fullResults, loading, refreshChats, selectChat, clearSelection, loadFullResults, createChat, deleteChat, clearHistory }), [chats, selectedChatId, fullResults, loading]);

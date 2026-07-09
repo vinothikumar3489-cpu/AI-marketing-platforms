@@ -15,7 +15,8 @@ export const addMessage = async (req, res) => {
       return res.status(400).json({ success: false, error: parseResult.error.errors[0].message });
     }
 
-    const chat = await prisma.chat.findFirst({ where: { id: chatId, userId: req.user.id }, include: { analysis: true } });
+    const userId = req.user.id;
+    const chat = await prisma.chat.findFirst({ where: { id: chatId, userId }, include: { analysis: { orderBy: { createdAt: "desc" }, take: 1 } } });
     if (!chat) {
       return res.status(404).json({ success: false, error: "Chat not found" });
     }
@@ -30,19 +31,259 @@ export const addMessage = async (req, res) => {
       data: { chatId, role, content },
     });
 
+    const latestAnalysis = chat.analysis?.[0];
     const analysis = await generateAnalysis({
-      productName: chat.productName || "Product Analysis",
-      productDescription: chat.analysis?.[0]?.productDescription || content,
-      targetAudience: chat.analysis?.[0]?.targetAudience || "Entrepreneurs and marketers",
-      followUpQuestion: content,
+      manualData: {
+        productName: chat.productName || "Product Analysis",
+        productDescription: latestAnalysis?.productDescription || content,
+        targetAudience: latestAnalysis?.targetAudience || "Not specified",
+        followUpQuestion: content,
+      },
     });
+
+    const structured = analysis.structured || {};
 
     const assistantMessage = await prisma.message.create({
       data: {
         chatId,
         role: "assistant",
         content: analysis.message,
-        analysisData: analysis.structured,
+        analysisData: structured,
+      },
+    });
+
+    const buildStructuredCompetitors = (raw) => {
+      if (!Array.isArray(raw) || raw.length === 0) return [];
+      return raw.map(c => {
+        if (typeof c === "string") {
+          return { name: c, domain: "", strengths: [], weaknesses: [], positioning: "", differentiationOpportunity: "" };
+        }
+        if (typeof c === "object" && c !== null) {
+          return {
+            name: c.name || "",
+            domain: c.domain || "",
+            strengths: Array.isArray(c.strengths) ? c.strengths : [],
+            weaknesses: Array.isArray(c.weaknesses) ? c.weaknesses : [],
+            positioning: c.positioning || "",
+            differentiationOpportunity: c.differentiationOpportunity || "",
+          };
+        }
+        return { name: String(c), domain: "", strengths: [], weaknesses: [], positioning: "", differentiationOpportunity: "" };
+      });
+    };
+
+    await prisma.analysis.create({
+      data: {
+        chatId,
+        userId,
+        productName: chat.productName || "Product Analysis",
+        productDescription: latestAnalysis?.productDescription || content,
+        targetAudience: latestAnalysis?.targetAudience || "Not specified",
+        marketInsights: structured,
+        competitorInsights: structured.competitors ? { competitors: structured.competitors } : null,
+        campaignSuggestions: structured.campaignIdeas ? { campaignIdeas: structured.campaignIdeas } : null,
+        roiSuggestions: structured.roiSuggestions ?? null,
+      },
+    });
+
+    await prisma.productIntelligence.upsert({
+      where: { chatId },
+      create: {
+        chatId, userId,
+        productAnalysis: {
+          productSummary: structured.productSummary || "",
+          category: structured.category || "",
+          confidenceScore: structured.confidenceScore || null,
+          usp: structured.usp || "",
+          features: structured.features || [],
+          benefits: structured.benefits || [],
+          painPoints: structured.painPoints || [],
+          targetUsers: structured.targetUsers || [],
+          buyerPersonas: structured.buyerPersonas || [],
+          marketingAngles: structured.marketingAngles || [],
+          recommendedModules: structured.recommendedModules || [],
+          dataSourcesUsed: structured.dataSourcesUsed || [],
+          warnings: structured.warnings || [],
+        },
+        marketDiscovery: {
+          productName: chat.productName || "Product Analysis",
+          productDescription: latestAnalysis?.productDescription || content,
+          targetAudience: latestAnalysis?.targetAudience || "Not specified",
+          industry: structured.category || "",
+          pricingPosition: structured.pricingPosition || null,
+          marketMaturity: structured.marketMaturity || null,
+          tam: structured.tam || null,
+          sam: structured.sam || null,
+          som: structured.som || null,
+          marketTrends: structured.marketTrends || [],
+          growthOpportunities: structured.growthOpportunities || [],
+          growthRate: structured.growthRate || null,
+          cagr: structured.cagr || null,
+        },
+        audienceIntelligence: {
+          targetAudience: latestAnalysis?.targetAudience || "Not specified",
+          targetUsers: structured.targetUsers || [],
+          buyerPersonas: structured.buyerPersonas || [],
+          painPoints: structured.painPoints || [],
+        },
+        status: "completed",
+      },
+      update: {
+        productAnalysis: {
+          productSummary: structured.productSummary || "",
+          category: structured.category || "",
+          confidenceScore: structured.confidenceScore || null,
+          usp: structured.usp || "",
+          features: structured.features || [],
+          benefits: structured.benefits || [],
+          painPoints: structured.painPoints || [],
+          targetUsers: structured.targetUsers || [],
+          buyerPersonas: structured.buyerPersonas || [],
+          marketingAngles: structured.marketingAngles || [],
+          recommendedModules: structured.recommendedModules || [],
+          dataSourcesUsed: structured.dataSourcesUsed || [],
+          warnings: structured.warnings || [],
+        },
+        marketDiscovery: {
+          productName: chat.productName || "Product Analysis",
+          productDescription: latestAnalysis?.productDescription || content,
+          targetAudience: latestAnalysis?.targetAudience || "Not specified",
+          industry: structured.category || "",
+          pricingPosition: structured.pricingPosition || null,
+          marketMaturity: structured.marketMaturity || null,
+          tam: structured.tam || null,
+          sam: structured.sam || null,
+          som: structured.som || null,
+          marketTrends: structured.marketTrends || [],
+          growthOpportunities: structured.growthOpportunities || [],
+          growthRate: structured.growthRate || null,
+          cagr: structured.cagr || null,
+        },
+        audienceIntelligence: {
+          targetAudience: latestAnalysis?.targetAudience || "Not specified",
+          targetUsers: structured.targetUsers || [],
+          buyerPersonas: structured.buyerPersonas || [],
+          painPoints: structured.painPoints || [],
+        },
+        status: "completed",
+      },
+    });
+
+    const intentPrediction = {
+      hotSegments: structured.buyerPersonas?.length ? structured.buyerPersonas.map(p => ({
+        segment: typeof p === "string" ? p : p.name || p.segment || "",
+        intent: "evaluate",
+        confidence: null,
+      })) : [],
+      buyingSignals: structured.painPoints?.length ? structured.painPoints.map(pp => ({
+        signal: typeof pp === "string" ? pp : pp.value || pp.signal || "",
+        source: "product_analysis",
+        confidence: null,
+      })) : [],
+      intentClusters: [],
+      confidenceScore: null,
+    };
+
+    const positioningEngine = {
+      positioningStatement: structured.usp || null,
+      messagingPillars: structured.marketingAngles?.length ? structured.marketingAngles.map(a => ({
+        pillar: typeof a === "string" ? a : a.value || a.pillar || "",
+        focus: "differentiation",
+        confidence: null,
+      })) : [],
+      differentiation: structured.differentiationOpportunities?.length ? structured.differentiationOpportunities.map(d => ({
+        opportunity: typeof d === "string" ? d : d.value || d.opportunity || "",
+        source: "competitor_analysis",
+        confidence: null,
+      })) : [],
+      confidenceScore: null,
+    };
+
+    await prisma.competitorIntelligence.upsert({
+      where: { chatId },
+      create: {
+        chatId, userId,
+        competitorAnalysis: {
+          competitorTypes: structured.competitorTypes || [],
+          competitors: buildStructuredCompetitors(structured.competitors),
+          pricingPosition: structured.pricingPosition || null,
+          marketMaturity: structured.marketMaturity || null,
+          marketGaps: structured.marketGaps || [],
+          competitorWeaknesses: structured.competitorWeaknesses || [],
+          differentiationOpportunities: structured.differentiationOpportunities || [],
+        },
+        intentPrediction,
+        positioningEngine,
+        status: "completed",
+      },
+      update: {
+        competitorAnalysis: {
+          competitorTypes: structured.competitorTypes || [],
+          competitors: buildStructuredCompetitors(structured.competitors),
+          pricingPosition: structured.pricingPosition || null,
+          marketMaturity: structured.marketMaturity || null,
+          marketGaps: structured.marketGaps || [],
+          competitorWeaknesses: structured.competitorWeaknesses || [],
+          differentiationOpportunities: structured.differentiationOpportunities || [],
+        },
+        intentPrediction,
+        positioningEngine,
+        status: "completed",
+      },
+    });
+
+    const campaignCreativeAngles = structured.marketingAngles?.length ? structured.marketingAngles.map(a => ({
+      value: typeof a === "string" ? a : a.value || a.angle || a.title || "",
+      confidence: null,
+      impact: null,
+    })) : [];
+
+    const campaignCopyHooks = structured.campaignIdeas?.length ? structured.campaignIdeas.map(ci => ({
+      value: typeof ci === "string" ? ci : ci.value || ci.hook || ci.title || ci.headline || "",
+      confidence: null,
+      impact: null,
+    })) : [];
+
+    await prisma.campaignIntelligence.upsert({
+      where: { chatId },
+      create: {
+        chatId, userId,
+        campaignGenerator: {
+          campaignIdeas: structured.campaignIdeas || [],
+          marketingAngles: structured.marketingAngles || [],
+          creativeAngles: campaignCreativeAngles,
+          copyHooks: campaignCopyHooks,
+          actionPlan: structured.actionPlan || null,
+          targetAudience: latestAnalysis?.targetAudience || "Not specified",
+        },
+        channelRecommendation: {
+          bestChannels: structured.bestChannels || [],
+          channelReasoning: structured.channelReasoning || null,
+          channelPriority: structured.channelPriority || null,
+          channelExpectedOutcome: structured.channelExpectedOutcome || null,
+        },
+        executiveStory: structured.executiveStory || null,
+        actionPlan: structured.actionPlan || null,
+        status: "completed",
+      },
+      update: {
+        campaignGenerator: {
+          campaignIdeas: structured.campaignIdeas || [],
+          marketingAngles: structured.marketingAngles || [],
+          creativeAngles: campaignCreativeAngles,
+          copyHooks: campaignCopyHooks,
+          actionPlan: structured.actionPlan || null,
+          targetAudience: latestAnalysis?.targetAudience || "Not specified",
+        },
+        channelRecommendation: {
+          bestChannels: structured.bestChannels || [],
+          channelReasoning: structured.channelReasoning || null,
+          channelPriority: structured.channelPriority || null,
+          channelExpectedOutcome: structured.channelExpectedOutcome || null,
+        },
+        executiveStory: structured.executiveStory || null,
+        actionPlan: structured.actionPlan || null,
+        status: "completed",
       },
     });
 

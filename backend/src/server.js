@@ -9,6 +9,7 @@ import compression from "compression";
 import path from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { prisma } from "./config/prisma.js";
 
 import { authRouter } from "./routes/auth.routes.js";
 import { chatRouter } from "./routes/chat.routes.js";
@@ -273,10 +274,19 @@ app.options("*", cors());
 
 app.use(express.json({ limit: isProduction ? "1mb" : "10mb" }));
 
-app.get("/api/health", (req, res) => {
+app.get("/api/health", async (req, res) => {
+  let dbStatus = "ok";
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch {
+    dbStatus = "error";
+  }
   res.json({
     status: "ok",
     message: "Backend running successfully",
+    environment: process.env.NODE_ENV || "development",
+    database: dbStatus,
+    timestamp: new Date().toISOString(),
   });
 });
 

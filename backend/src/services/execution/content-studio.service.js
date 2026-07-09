@@ -20,13 +20,25 @@ export async function generateContent(assetType, context) {
   const typeConfig = CONTENT_TYPES[assetType];
   if (!typeConfig) throw new Error(`Unknown content type: ${assetType}`);
 
-  const { productName, companyName, targetAudience, industry, seoKeywords, tone } = context;
+  const { productName, companyName, targetAudience, industry, seoKeywords, tone, productUsp, seoData, growthData, campaignGoal, platforms } = context;
   const toneGuide = tone || 'professional';
+
+  const evidenceSections = [];
+  evidenceSections.push(`Product/Company: ${productName || 'N/A'}`);
+  if (companyName) evidenceSections.push(`Company: ${companyName}`);
+  if (targetAudience) evidenceSections.push(`Target Audience: ${targetAudience}`);
+  if (industry) evidenceSections.push(`Industry: ${industry}`);
+  if (productUsp) evidenceSections.push(`Unique Value Proposition: ${productUsp}`);
+  if (campaignGoal) evidenceSections.push(`Campaign Goal: ${campaignGoal}`);
+  if (seoData) evidenceSections.push(`SEO Evidence: ${seoData}`);
+  if (growthData) evidenceSections.push(`Growth Data: ${growthData}`);
+  if (seoKeywords) evidenceSections.push(`SEO Keywords: ${Array.isArray(seoKeywords) ? seoKeywords.slice(0, 10).join(', ') : seoKeywords}`);
+  if (platforms && platforms.length > 0) evidenceSections.push(`Marketing Platforms: ${platforms.join(', ')}`);
 
   const prompt = `Generate a complete ${typeConfig.label} for marketing execution. Use the verified company/product data below.
 
 COMPANY/PRODUCT DATA:
-Product/Company: ${productName || 'N/A'}${companyName ? `\nCompany: ${companyName}` : ''}${targetAudience ? `\nTarget Audience: ${targetAudience}` : ''}${industry ? `\nIndustry: ${industry}` : ''}${seoKeywords ? `\nSEO Keywords: ${Array.isArray(seoKeywords) ? seoKeywords.slice(0, 10).join(', ') : seoKeywords}` : ''}
+${evidenceSections.join('\n')}
 
 TONE: ${toneGuide}
 
@@ -52,7 +64,7 @@ Return valid JSON with all required fields. Do NOT invent fake statistics, testi
         _label: typeConfig.label,
         _generatedAt: new Date().toISOString(),
         _provider: result.provider || 'ai',
-        _evidence: { source: 'content_studio_ai', confidence: 85, dataSource: 'ai_generation' },
+        _evidence: { source: 'content_studio_ai', confidence: null, dataSource: 'ai_generation' },
       };
     }
   } catch (e) {

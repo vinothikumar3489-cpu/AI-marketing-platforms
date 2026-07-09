@@ -4,21 +4,25 @@ import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 
 const registerSchema = z.object({
-  name: z.string().min(1),
-  email: z.string().email(),
+  name: z.string().trim().min(1),
+  email: z.string().email().transform((e) => e.trim().toLowerCase()),
   password: z.string().min(8),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
+  email: z.string().email().transform((e) => e.trim().toLowerCase()),
+  password: z.string().min(1),
 });
 
 const signToken = (user) => {
   if (!process.env.JWT_SECRET) {
     throw new Error("JWT_SECRET is not configured");
   }
-  return jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign(
+    { userId: user.id, email: user.email, role: user.role || "member" },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
 };
 
 export const register = async (req, res) => {
@@ -75,7 +79,25 @@ export const login = async (req, res) => {
 export const me = async (req, res) => {
   try {
     const user = req.user;
-    return res.json({ success: true, user: { id: user.id, name: user.name, email: user.email } });
+    const projectCount = await prisma.chat.count({ where: { userId: user.id } });
+    const analysesCount = await prisma.analysis.count({ where: { userId: user.id } });
+    const seoCount = await prisma.seoAnalysis.count({ where: { userId: user.id } });
+
+    return res.json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        profileImage: user.profileImage || null,
+        role: user.role || "member",
+        lastActiveAt: user.lastActiveAt,
+        createdAt: user.createdAt,
+        projectCount,
+        analysesCount,
+        seoCount,
+      },
+    });
   } catch (error) {
     console.error(`[Controller] me error:`, error);
     return res.status(500).json({ success: false, error: error.message || 'Internal server error' });

@@ -11,7 +11,7 @@ import { EnterpriseActionWorkspace } from '../components/EnterpriseActionWorkspa
 import { getIntegrationHealth, sendTestEmail, generatePosterImage, renderVideo } from '../lib/api';
 
 function formatValue(v: any): string {
-  if (v === null || v === undefined) return 'Unavailable';
+  if (v === null || v === undefined) return '—';
   if (typeof v === 'string') return v;
   if (typeof v === 'number') return String(v);
   if (typeof v === 'boolean') return v ? 'Yes' : 'No';
@@ -20,10 +20,10 @@ function formatValue(v: any): string {
     const label = v.title || v.name || v.label || v.key || v.value || '';
     if (label) return String(label);
     const keys = Object.keys(v);
-    if (keys.length === 0) return 'Unavailable';
+    if (keys.length === 0) return '—';
     return keys.map(k => `${k}: ${formatValue(v[k])}`).join(' | ');
   }
-  return 'Unavailable';
+  return '—';
 }
 
 function formatArray(arr: any[]): string {
@@ -51,10 +51,10 @@ function renderObjectCard(obj: any, fields: string[], labelMap?: Record<string, 
 }
 
 function renderValue(v: any): React.ReactNode {
-  if (v === null || v === undefined) return <span style={{ color: '#9aa7bd' }}>Unavailable</span>;
+  if (v === null || v === undefined) return <span style={{ color: '#6b7a93', fontStyle: 'italic' }}>Not available</span>;
   if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v);
   if (Array.isArray(v)) {
-    if (v.length === 0) return <span style={{ color: '#9aa7bd' }}>None</span>;
+    if (v.length === 0) return <span style={{ color: '#6b7a93', fontStyle: 'italic' }}>None</span>;
     return (
       <ul style={{ margin: '4px 0', paddingLeft: '20px' }}>
         {v.map((item, i) => (
@@ -65,7 +65,7 @@ function renderValue(v: any): React.ReactNode {
   }
   if (typeof v === 'object') {
     const keys = Object.keys(v || {});
-    if (keys.length === 0) return <span style={{ color: '#9aa7bd' }}>Unavailable</span>;
+    if (keys.length === 0) return <span style={{ color: '#6b7a93', fontStyle: 'italic' }}>Not available</span>;
     const preferredFields = ['title', 'problem', 'owner', 'priority', 'difficulty', 'expectedGain', 'businessImpact', 'evidence', 'estimatedTimeline'];
     const structuredFields = preferredFields.filter(f => keys.includes(f) && v[f] !== undefined && v[f] !== null);
     if (structuredFields.length > 0) return renderObjectCard(v, structuredFields);
@@ -75,122 +75,26 @@ function renderValue(v: any): React.ReactNode {
     }
     return renderObjectCard(v, keys);
   }
-  return <span style={{ color: '#9aa7bd' }}>Unavailable</span>;
+  return <span style={{ color: '#6b7a93', fontStyle: 'italic' }}>Not available</span>;
 }
 
 function PlanTabContent({ data }: { data: any }) {
-  const [showDecisionPanel, setShowDecisionPanel] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
-
   if (!data || Object.keys(data).length === 0) return <EnterpriseEmptyState title="No automation plan" message="Click Generate Automation Plan to create one." icon={Zap} />;
 
   const sections: { title: string; content: React.ReactNode }[] = [];
 
   const kpiItems = [
-    data.readinessScore ? { label: 'Readiness', value: `${data.readinessScore}%`, icon: Zap, color: '#53a7ff' } : null,
+    data.readinessScore != null && data.readinessScore > 0 ? { label: 'Readiness', value: `${data.readinessScore}%`, icon: Zap, color: '#53a7ff' } : null,
     data.campaignName ? { label: 'Campaign', value: data.campaignName.slice(0, 20), icon: Target, color: '#a855f7' } : null,
     data.kpis?.conversionRate ? { label: 'Conversion', value: `${data.kpis.conversionRate}%`, icon: TrendingUp, color: '#10e18b' } : null,
     data.channels?.length ? { label: 'Channels', value: `${data.channels.length}`, icon: Activity, color: '#ffb347' } : null,
     data.budgetSplit ? { label: 'Budget Allocated', value: 'Yes', icon: Map, color: '#ff4757' } : null,
   ].filter(Boolean);
 
-  // Phase 6C: Executive Summary data for automation
-  const readiness = data.readinessScore || 70;
-  const execSummaryData = {
-    keyFindings: [
-      { text: `Campaign readiness score is ${readiness}%`, confidence: 85, impact: 'high' },
-      { text: `${data.channels?.length || 0} channels configured for multi-channel outreach`, confidence: 80, impact: 'medium' },
-      { text: data.campaignObjective ? `Campaign objective: ${data.campaignObjective}` : 'Campaign objective defined', confidence: 75, impact: 'high' },
-    ],
-    biggestRisks: [
-      ...(readiness < 60 ? [{ text: 'Low automation readiness may impact execution quality', severity: 'high' as const, probability: 70 }] : []),
-      { text: 'Channel fatigue from over-automation', severity: 'medium' as const, probability: 50 },
-      { text: 'Insufficient personalization in automated sequences', severity: 'medium' as const, probability: 45 },
-    ],
-    biggestOpportunities: [
-      { text: 'Multi-channel orchestration for 360° customer view', roi: '200%', effort: 'Medium' },
-      { text: 'A/B test automation to optimize conversion', roi: '150%', effort: 'Low' },
-      { text: 'Trigger-based email sequences for lead nurturing', roi: '180%', effort: 'Low' },
-    ],
-    overallHealth: {
-      score: readiness,
-      label: readiness >= 80 ? 'Excellent' : readiness >= 60 ? 'Good' : readiness >= 40 ? 'Needs Improvement' : 'Critical',
-      color: readiness >= 80 ? '#10e18b' : readiness >= 60 ? '#53a7ff' : readiness >= 40 ? '#ffb347' : '#ff4757'
-    },
-    executiveRecommendation: {
-      text: data.campaignObjective || 'Launch the automated multi-channel campaign with continuous optimization.',
-      reasoning: `Readiness score of ${readiness}% ${readiness >= 60 ? 'supports immediate execution.' : 'suggests preparation before launch.'}`,
-      confidence: readiness
-    }
-  };
-
-  // Phase 6C: Health score
-  const healthScoreData = {
-    overall: readiness,
-    components: [
-      { label: 'Automation Readiness', value: readiness, color: '#53a7ff' },
-      { label: 'Channel Coverage', value: Math.min((data.channels?.length || 0) * 20, 100), color: '#10e18b' },
-      { label: 'Campaign Structure', value: data.campaignName ? 80 : 40, color: '#a855f7' },
-      { label: 'Targeting Quality', value: data.targetAudience ? 75 : 30, color: '#ffb347' },
-      { label: 'KPI Tracking', value: data.kpis ? 85 : 50, color: '#818cf8' },
-    ]
-  };
-
-  // Phase 6C: AI Decisions
-  const autoDecisions = [
-    { label: 'Should Launch Campaign?', question: 'Should campaign launch now?', answer: (readiness >= 60 ? 'Yes' : 'No') as 'Yes' | 'No', reasoning: `Readiness score of ${readiness}% ${readiness >= 60 ? 'meets the launch threshold.' : 'is below the 60% threshold.'}`, confidence: readiness },
-    { label: 'Should Scale Channels?', question: 'Scale to more channels?', answer: ((data.channels?.length || 0) >= 3 ? 'Likely' : 'No') as 'Likely' | 'No', reasoning: `Currently ${data.channels?.length || 0} channels configured.`, confidence: 75 },
-    { label: 'Should Improve Targeting?', question: 'Improve audience targeting?', answer: (data.targetAudience ? 'No' : 'Yes') as 'No' | 'Yes', reasoning: data.targetAudience ? 'Target audience is defined.' : 'No target audience defined.', confidence: 80 },
-  ];
-
-  // Phase 6C: Recommendations
-  const autoRecommendations = [
-    ...(data.channels || []).slice(0, 5).map((ch: any, i: number) => ({
-      title: `Optimize ${ch.channel || ch.name || 'channel'} automation`,
-      description: ch.reason || `Improve ${ch.channel || ch.name || 'channel'} performance through A/B testing.`,
-      group: i < 2 ? 'Quick Wins' as const : 'High ROI' as const,
-      priority: (i < 2 ? 'High' : 'Medium') as 'High' | 'Medium',
-      difficulty: 35 + i * 10,
-      roi: '150%',
-      timeline: `${i + 1}5 days`,
-      owner: ch.owner || 'Automation Team',
-      confidence: 80 - i * 5
-    })),
-    { title: 'Set up trigger-based email sequences', description: 'Automate lead nurturing with behavior-based triggers.', group: 'High ROI' as const, priority: 'High' as const, difficulty: 40, roi: '200%', timeline: '14 days', owner: 'Email Marketing', confidence: 75 },
-    { title: 'Create A/B testing framework', description: 'Systematically test subject lines, CTAs, and send times.', group: 'Quick Wins' as const, priority: 'Medium' as const, difficulty: 30, roi: '120%', timeline: '7 days', owner: 'Growth Team', confidence: 85 },
-    { title: 'Build cross-channel attribution', description: 'Track and attribute conversions across all channels.', group: 'Long-Term' as const, priority: 'Medium' as const, difficulty: 70, roi: '250%', timeline: '60 days', owner: 'Analytics Team', confidence: 65 },
-  ];
-
-  // Phase 6C: Risk items
-  const autoRisks = [
-    { title: 'Low automation readiness', category: 'Business' as const, probability: 100 - readiness, impact: (readiness < 50 ? 'high' : 'medium') as 'high' | 'medium', mitigation: 'Review and improve automation infrastructure before launch.', owner: 'Engineering' },
-    { title: 'Channel fatigue risk', category: 'Market' as const, probability: 40, impact: 'medium' as const, mitigation: 'Implement frequency capping and smart scheduling.', owner: 'Marketing' },
-    { title: 'Deliverability issues', category: 'Technical' as const, probability: 35, impact: 'high' as const, mitigation: 'Warm up domains and monitor sender reputation.', owner: 'Email Operations' },
-  ];
-
-  // Phase 6C: Cross module insights
+  // Cross module insights derived from real data gaps
   const crossModuleItems = [
     ...(!data.emailSequence?.length ? [{ title: 'No Email Sequences Configured', description: 'Email marketing is a high-ROI automation channel that is not yet configured.', sourceModule: 'Automation' as const, targetModule: 'Growth' as const, impact: 'high' as const, type: 'Missing Channel' }] : []),
     ...(!data.contentCalendar?.length ? [{ title: 'Content Calendar Not Set', description: 'A structured content calendar improves campaign consistency and ROI tracking.', sourceModule: 'Automation' as const, targetModule: 'Reports' as const, impact: 'medium' as const, type: 'Opportunity' }] : []),
-  ];
-
-  const confidenceData = [
-    { section: 'Campaign Strategy', confidence: data.campaignName ? 80 : 50, evidenceStrength: 75, sourceCount: data.channels?.length || 2, dataFreshness: 'Today' },
-    { section: 'Channel Planning', confidence: Math.min((data.channels?.length || 0) * 20, 100), evidenceStrength: 70, sourceCount: data.channels?.length || 2, dataFreshness: 'Today' },
-    { section: 'KPI Framework', confidence: data.kpis ? 85 : 40, evidenceStrength: data.kpis ? 80 : 30, sourceCount: data.kpis ? 3 : 1, dataFreshness: 'Today' },
-  ];
-
-  const filterOptions = [
-    { key: 'priority', label: 'Priority', values: ['Critical', 'High', 'Medium', 'Low'] },
-    { key: 'channel', label: 'Channel', values: ['Email', 'LinkedIn', 'Instagram', 'Google Ads', 'Content'] },
-  ];
-  const handleFilterChange = (key: string, values: string[]) => setActiveFilters(prev => ({ ...prev, [key]: values }));
-
-  const productivityItems = [
-    { label: 'Campaign Summary', content: data.campaignObjective || 'Automation campaign plan' },
-    { label: 'Channel List', content: (data.channels || []).map((c: any) => c.channel || c.name || '').join('\n') },
-    { label: 'Key Recommendations', content: autoRecommendations.map(r => r.title).join('\n') },
   ];
 
   if (data.campaignName) {
@@ -247,57 +151,17 @@ function PlanTabContent({ data }: { data: any }) {
     )});
   }
 
+  const hasAnyContent = sections.length > 0 || kpiItems.length > 0 || crossModuleItems.length > 0;
+  if (!hasAnyContent) return <EnterpriseEmptyState title="No automation plan data" message="Click Generate Automation Plan to create one." icon={Zap} />;
+
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
-      {/* Phase 6C: Filters + Decision Toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-        <button onClick={() => setShowFilters(!showFilters)}
-          style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #293245', background: showFilters ? 'rgba(129,140,248,0.1)' : '#0f1729', cursor: 'pointer', fontSize: '11px', color: showFilters ? '#818cf8' : '#9aa7bd', display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <Sliders size={12} /> Filters
-        </button>
-        <button onClick={() => setShowDecisionPanel(true)}
-          style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #818cf8', background: 'rgba(129,140,248,0.1)', cursor: 'pointer', fontSize: '11px', color: '#818cf8', display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <GripHorizontal size={12} /> AI Decisions
-        </button>
-      </div>
-      {showFilters && <InteractiveFilters options={filterOptions} activeFilters={activeFilters} onFilterChange={handleFilterChange} />}
-
-      {/* Phase 6C: Executive Summary + Health */}
-      <ExecutiveSummaryCards data={execSummaryData} />
-      <ProductivityBar items={productivityItems} />
-
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        <BusinessHealthScore data={healthScoreData} />
         <div>{kpiItems.length > 0 && <KPIDashboard items={kpiItems} columns={2} />}</div>
       </div>
 
-      {/* Phase 6C: Risk Matrix + Opportunity Matrix */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        <OpportunityMatrix items={[
-          { title: 'Email automation sequences', impact: 85, effort: 30 },
-          { title: 'LinkedIn DM automation', impact: 70, effort: 40 },
-          { title: 'Google Ads smart bidding', impact: 75, effort: 35 },
-          { title: 'Instagram content scheduling', impact: 60, effort: 25 },
-          { title: 'Cross-channel attribution', impact: 80, effort: 70 },
-        ]} />
-        <RiskMatrix items={autoRisks} />
-      </div>
+      {crossModuleItems.length > 0 && <CrossModuleInsights items={crossModuleItems} />}
 
-      {/* Phase 6C: Recommendations */}
-      <RecommendationPriorities items={autoRecommendations} />
-
-      {/* Phase 6C: Cross Module + Compare */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        {crossModuleItems.length > 0 && <CrossModuleInsights items={crossModuleItems} />}
-        <ConfidenceVisualization items={confidenceData} />
-      </div>
-
-      {/* Phase 6C: AI Decision Panel */}
-      {showDecisionPanel && (
-        <AIDecisionPanel decisions={autoDecisions} onClose={() => setShowDecisionPanel(false)} />
-      )}
-
-      {/* Existing sections */}
       {sections.map((s, i) => (
         <Card key={i}>
           <h3 style={{ margin: '0 0 12px 0' }}>{s.title}</h3>

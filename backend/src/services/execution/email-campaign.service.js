@@ -45,7 +45,7 @@ REQUIRED OUTPUT FIELDS (return valid JSON):
     "caslCompliant": true/false
   },
   "approvalStatus": "draft",
-  "evidence": { "source": "email_campaign_studio", "confidence": 85, "dataSource": "ai_generation" }
+  "evidence": { "source": "email_campaign_studio", "confidence": null, "dataSource": "ai_generation" }
 }
 
 RULES:

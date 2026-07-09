@@ -280,36 +280,25 @@ export async function sendTestEmail({ recipientEmail, subject, body, senderName,
     triedProviders.push('gmail');
     const result = await sendViaGmail(opts);
     if (result.success) return result;
-    if (result.code === 'TIMEOUT') {
+    if (result.code === 'TIMEOUT' || result.code === 'AUTH_FAILED' || result.code === 'CONNECTION_FAILED') {
       if (providers.length > 1) {
-        console.log('[EmailService] Gmail timed out, trying fallback provider...');
+        console.log(`[EmailService] Gmail ${result.code.toLowerCase().replace(/_/g, ' ')}, trying fallback provider...`);
       } else {
         return result;
       }
     } else {
-      return result;
+      return { ...result, error: `Gmail: ${result.error}`, code: result.code };
     }
   }
 
-  if (providers.includes('sendgrid')) {
-    triedProviders.push('sendgrid');
-    const result = await sendViaSendGrid(opts);
+  let lastError = null;
+  for (const p of ['sendgrid', 'brevo', 'resend']) {
+    if (!providers.includes(p)) continue;
+    triedProviders.push(p);
+    const fn = p === 'sendgrid' ? sendViaSendGrid : p === 'brevo' ? sendViaBrevo : sendViaResend;
+    const result = await fn(opts);
     if (result.success) return result;
-    if (providers.length === triedProviders.length) return result;
-  }
-
-  if (providers.includes('brevo')) {
-    triedProviders.push('brevo');
-    const result = await sendViaBrevo(opts);
-    if (result.success) return result;
-    if (providers.length === triedProviders.length) return result;
-  }
-
-  if (providers.includes('resend')) {
-    triedProviders.push('resend');
-    const result = await sendViaResend(opts);
-    if (result.success) return result;
-    if (providers.length === triedProviders.length) return result;
+    lastError = result;
   }
 
   if (triedProviders.length > 0) {

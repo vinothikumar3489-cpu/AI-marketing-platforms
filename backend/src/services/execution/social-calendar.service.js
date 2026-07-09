@@ -58,7 +58,7 @@ REQUIRED OUTPUT FIELDS (return valid JSON):
     "engagement": "percentage",
     "behindTheScenes": "percentage"
   },
-  "evidence": { "source": "social_calendar", "confidence": 85, "dataSource": "ai_generation" }
+  "evidence": { "source": "social_calendar", "confidence": null, "dataSource": "ai_generation" }
 }
 
 RULES:

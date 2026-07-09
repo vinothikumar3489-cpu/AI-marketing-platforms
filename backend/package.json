@@ -7,8 +7,11 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "prisma": "prisma",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:generate": "prisma generate",
     "seed": "node prisma/seed.js",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "build": "prisma generate"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

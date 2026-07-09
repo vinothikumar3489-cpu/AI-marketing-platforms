@@ -28,7 +28,7 @@ export function clearAuth() {
   localStorage.removeItem('selectedChatId');
 }
 
-async function request<T>(method: Method, path: string, body?: any): Promise<T> {
+async function request<T>(method: Method, path: string, body?: any, signal?: AbortSignal): Promise<T> {
   const token = getToken();
   let res: Response;
   try {
@@ -39,6 +39,7 @@ async function request<T>(method: Method, path: string, body?: any): Promise<T> 
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: body ? JSON.stringify(body) : undefined,
+      signal,
     });
   } catch (err) {
     throw new ApiError('Backend server is unreachable. Please ensure the server is running.', 502, err);
@@ -48,6 +49,9 @@ async function request<T>(method: Method, path: string, body?: any): Promise<T> 
   try { data = await res.json(); } catch { data = null; }
   
   if (!res.ok) {
+    if (res.status === 401) {
+      clearAuth();
+    }
     throw new ApiError(data?.error || data?.message || `Request failed: ${res.status}`, res.status, data);
   }
 
@@ -69,10 +73,10 @@ async function request<T>(method: Method, path: string, body?: any): Promise<T> 
 }
 
 export const api = {
-  get: <T = any>(path: string) => request<T>('GET', path),
-  post: <T = any>(path: string, body?: any) => request<T>('POST', path, body),
-  put: <T = any>(path: string, body?: any) => request<T>('PUT', path, body),
-  del: <T = any>(path: string) => request<T>('DELETE', path),
+  get: <T = any>(path: string, signal?: AbortSignal) => request<T>('GET', path, undefined, signal),
+  post: <T = any>(path: string, body?: any, signal?: AbortSignal) => request<T>('POST', path, body, signal),
+  put: <T = any>(path: string, body?: any, signal?: AbortSignal) => request<T>('PUT', path, body, signal),
+  del: <T = any>(path: string, signal?: AbortSignal) => request<T>('DELETE', path, undefined, signal),
 };
 
 export async function tryPost(paths: string[], body?: any) {

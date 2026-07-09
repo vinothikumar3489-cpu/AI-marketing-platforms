@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, Component } from 'react';
+import { useEffect, useRef, useState, useMemo, Component } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api, downloadReport } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
@@ -48,25 +48,25 @@ function toNumberOrNull(value: unknown): number | null {
 
 function formatMoney(value: unknown): string {
   const n = toNumberOrNull(value);
-  if (n === null) return 'Unavailable';
+  if (n === null) return '—';
   return `$${n.toFixed(2)}`;
 }
 
 function formatNumber(value: unknown): string {
   const n = toNumberOrNull(value);
-  if (n === null) return 'Unavailable';
+  if (n === null) return '—';
   return n.toLocaleString();
 }
 
 function formatPercent(value: unknown): string {
   const n = toNumberOrNull(value);
-  if (n === null) return 'Unavailable';
+  if (n === null) return '—';
   return `${Math.round(n)}%`;
 }
 
 function formatInt(value: unknown): string {
   const n = toNumberOrNull(value);
-  if (n === null) return 'Unavailable';
+  if (n === null) return '—';
   return Math.round(n).toString();
 }
 
@@ -515,58 +515,66 @@ function ExecutiveDashboard({ data }: { data: any }) {
     []
   ).slice(0, 5);
 
-  const kpiItems = [
+  const kpiItems = useMemo(() => [
     overallSeoScore !== null ? { label: 'Overall SEO Score', value: `${Math.round(overallSeoScore)}`, icon: Globe, color: '#a855f7' } : null,
     technicalHealth !== null ? { label: 'Technical Health', value: `${Math.round(technicalHealth)}`, icon: Code, color: '#53a7ff' } : null,
     contentAuthority !== null ? { label: 'Content Authority', value: `${Math.round(contentAuthority)}`, icon: FileText, color: '#10e18b' } : null,
     aiVisibility !== null ? { label: 'AI Visibility (GEO)', value: `${Math.round(aiVisibility)}`, icon: Cpu, color: '#ffb347' } : null,
-  ].filter(Boolean);
+  ].filter(Boolean), [overallSeoScore, technicalHealth, contentAuthority, aiVisibility]);
 
   // Phase 6C: Build executive summary for SEO
-  const execSummaryData = {
-    keyFindings: [
-      ...(seoHealth.strengths || []).slice(0, 3).map((s: any) => ({ text: typeof s === 'string' ? s : s.value || s, confidence: 85, impact: 'high' })),
-      ...(seoHealth.weaknesses || []).slice(0, 2).map((w: any) => ({ text: typeof w === 'string' ? w : w.value || w, confidence: 75, impact: 'high' })),
-    ],
-    biggestRisks: [
-      ...(seoHealth.topIssues || []).slice(0, 5).map((r: any) => ({ text: typeof r === 'string' ? r : r.value || r.issue || r, severity: r.severity || 'high', probability: r.confidence || 70 })),
-    ],
-    biggestOpportunities: keyOpps.slice(0, 5).map((o: any) => ({ text: typeof o === 'string' ? o : o.value || o.title || o, roi: '200%', effort: 'Medium' })),
-    overallHealth: {
-      score: overallSeoScore || 70,
-      label: (overallSeoScore || 70) >= 80 ? 'Excellent' : (overallSeoScore || 70) >= 60 ? 'Good' : (overallSeoScore || 70) >= 40 ? 'Needs Improvement' : 'Critical',
-      color: (overallSeoScore || 70) >= 80 ? '#10e18b' : (overallSeoScore || 70) >= 60 ? '#53a7ff' : (overallSeoScore || 70) >= 40 ? '#ffb347' : '#ff4757'
-    },
-    executiveRecommendation: {
-      text: execOverview.priorityActions?.[0]?.action || execOverview.priorityActions?.[0]?.recommendation || 'Improve technical SEO and content authority to boost overall visibility.',
-      reasoning: `Based on current scores: Technical ${technicalHealth || 0}%, Content ${contentAuthority || 0}%, AI Visibility ${aiVisibility || 0}%`,
-      confidence: 85
-    }
-  };
+  const execSummaryData = useMemo(() => {
+    const healthScore = overallSeoScore != null ? overallSeoScore : null;
+    return {
+      keyFindings: [
+        ...(seoHealth.strengths || []).slice(0, 3).map((s: any) => ({ text: typeof s === 'string' ? s : s.value || s, confidence: null, impact: 'high' })),
+        ...(seoHealth.weaknesses || []).slice(0, 2).map((w: any) => ({ text: typeof w === 'string' ? w : w.value || w, confidence: null, impact: 'high' })),
+      ],
+      biggestRisks: [
+        ...(seoHealth.topIssues || []).slice(0, 5).map((r: any) => ({ text: typeof r === 'string' ? r : r.value || r.issue || r, severity: r.severity || 'high', probability: r.confidence ?? null })),
+      ],
+      biggestOpportunities: keyOpps.slice(0, 5).map((o: any) => ({ text: typeof o === 'string' ? o : o.value || o.title || o, roi: '200%', effort: 'Medium' })),
+      overallHealth: healthScore != null ? {
+        score: healthScore,
+        label: healthScore >= 80 ? 'Excellent' : healthScore >= 60 ? 'Good' : healthScore >= 40 ? 'Needs Improvement' : 'Critical',
+        color: healthScore >= 80 ? '#10e18b' : healthScore >= 60 ? '#53a7ff' : healthScore >= 40 ? '#ffb347' : '#ff4757'
+      } : null,
+      executiveRecommendation: {
+        text: execOverview.priorityActions?.[0]?.action || execOverview.priorityActions?.[0]?.recommendation || 'Improve technical SEO and content authority to boost overall visibility.',
+        reasoning: `Based on current scores: Technical ${technicalHealth ?? 'N/A'}%, Content ${contentAuthority ?? 'N/A'}%, AI Visibility ${aiVisibility ?? 'N/A'}%`,
+        confidence: null
+      }
+    };
+  }, [overallSeoScore, seoHealth, keyOpps, execOverview, technicalHealth, contentAuthority, aiVisibility]);
 
   // Phase 6C: Health score for SEO
-  const healthScoreData = {
-    overall: overallSeoScore || 70,
-    components: [
-      { label: 'SEO Score', value: overallSeoScore || 70, color: '#a855f7' },
-      { label: 'Technical Health', value: technicalHealth || 65, color: '#53a7ff' },
-      { label: 'Content Authority', value: contentAuthority || 60, color: '#10e18b' },
-      { label: 'AI Visibility', value: aiVisibility || 55, color: '#ffb347' },
-      { label: 'Mobile Performance', value: data.performanceScore || 70, color: '#ff6b35' },
-      { label: 'Core Web Vitals', value: data.cwvScore || 65, color: '#818cf8' },
-    ]
-  };
+  const healthScoreData = useMemo(() => {
+    const healthScore = overallSeoScore != null ? overallSeoScore : null;
+    return {
+      overall: healthScore,
+      components: [
+        overallSeoScore != null ? { label: 'SEO Score', value: overallSeoScore, color: '#a855f7' } : null,
+        technicalHealth != null ? { label: 'Technical Health', value: technicalHealth, color: '#53a7ff' } : null,
+        contentAuthority != null ? { label: 'Content Authority', value: contentAuthority, color: '#10e18b' } : null,
+        aiVisibility != null ? { label: 'AI Visibility', value: aiVisibility, color: '#ffb347' } : null,
+        data.performanceScore != null ? { label: 'Mobile Performance', value: data.performanceScore, color: '#ff6b35' } : null,
+        data.cwvScore != null ? { label: 'Core Web Vitals', value: data.cwvScore, color: '#818cf8' } : null,
+      ].filter(Boolean)
+    };
+  }, [overallSeoScore, technicalHealth, contentAuthority, aiVisibility, data.performanceScore, data.cwvScore]);
 
   // Phase 6C: AI Decision items for SEO
-  const seoDecisions = [
-    { label: 'Should Improve SEO?', question: 'Should SEO be prioritized?', answer: (overallSeoScore || 70) < 70 ? 'Yes' as const : (overallSeoScore || 70) < 85 ? 'Likely' as const : 'No' as const, reasoning: `Current SEO score is ${overallSeoScore || 70}%. ${(overallSeoScore || 70) < 70 ? 'Significant opportunity for improvement.' : 'Maintain current strategy.'}`, confidence: overallSeoScore || 70 },
-    { label: 'Fix Technical Issues?', question: 'Should technical issues be fixed?', answer: (technicalHealth || 65) < 70 ? 'Yes' as const : 'No' as const, reasoning: `Technical health score of ${technicalHealth || 65}% ${(technicalHealth || 65) < 70 ? 'needs immediate attention.' : 'is acceptable.'}`, confidence: technicalHealth || 65 },
-    { label: 'Invest in Content?', question: 'Should content be prioritized?', answer: (contentAuthority || 60) < 70 ? 'Yes' as const : 'Likely' as const, reasoning: `Content authority of ${contentAuthority || 60}% is ${(contentAuthority || 60) < 70 ? 'below benchmark.' : 'reasonable.'}`, confidence: contentAuthority || 60 },
-    { label: 'Focus on AI/GEO?', question: 'Should AI visibility be improved?', answer: (aiVisibility || 55) < 60 ? 'Yes' as const : 'Likely' as const, reasoning: `AI visibility score of ${aiVisibility || 55}% ${(aiVisibility || 55) < 60 ? 'indicates significant room for GEO optimization.' : 'is on track.'}`, confidence: aiVisibility || 55 },
-  ];
+  const seoDecisions = useMemo(() => {
+    const items: any[] = [];
+    if (overallSeoScore != null) items.push({ label: 'Should Improve SEO?', question: 'Should SEO be prioritized?', answer: overallSeoScore < 70 ? 'Yes' as const : overallSeoScore < 85 ? 'Likely' as const : 'No' as const, reasoning: `Current SEO score is ${overallSeoScore}%. ${overallSeoScore < 70 ? 'Significant opportunity for improvement.' : 'Maintain current strategy.'}`, confidence: overallSeoScore });
+    if (technicalHealth != null) items.push({ label: 'Fix Technical Issues?', question: 'Should technical issues be fixed?', answer: technicalHealth < 70 ? 'Yes' as const : 'No' as const, reasoning: `Technical health score of ${technicalHealth}% ${technicalHealth < 70 ? 'needs immediate attention.' : 'is acceptable.'}`, confidence: technicalHealth });
+    if (contentAuthority != null) items.push({ label: 'Invest in Content?', question: 'Should content be prioritized?', answer: contentAuthority < 70 ? 'Yes' as const : 'Likely' as const, reasoning: `Content authority of ${contentAuthority}% is ${contentAuthority < 70 ? 'below benchmark.' : 'reasonable.'}`, confidence: contentAuthority });
+    if (aiVisibility != null) items.push({ label: 'Focus on AI/GEO?', question: 'Should AI visibility be improved?', answer: aiVisibility < 60 ? 'Yes' as const : 'Likely' as const, reasoning: `AI visibility score of ${aiVisibility}% ${aiVisibility < 60 ? 'indicates significant room for GEO optimization.' : 'is on track.'}`, confidence: aiVisibility });
+    return items;
+  }, [overallSeoScore, technicalHealth, contentAuthority, aiVisibility]);
 
   // Phase 6C: Recommendations for SEO
-  const seoRecommendations = priorities.slice(0, 8).map((p: any, i: number) => ({
+  const seoRecommendations = priorities.length > 0 ? priorities.slice(0, 8).map((p: any, i: number) => ({
     title: typeof p === 'string' ? p : p.value || p.title || p.action || `Priority ${i+1}`,
     description: typeof p === 'string' ? '' : p.why || p.rationale || '',
     group: i < 2 ? 'Critical' as const : i < 4 ? 'High ROI' as const : i < 6 ? 'Quick Wins' as const : 'Long-Term' as const,
@@ -576,29 +584,26 @@ function ExecutiveDashboard({ data }: { data: any }) {
     timeline: i < 2 ? '7 days' : i < 4 ? '30 days' : '60 days',
     owner: 'SEO Team',
     confidence: 80 - i * 5
-  }));
+  })) : [];
 
   // Phase 6C: Risk items for SEO
-  const seoRisks = [
+  const seoRisks = (seoHealth.topIssues || []).length > 0 ? [
     ...(seoHealth.topIssues || []).slice(0, 5).map((r: any) => ({
       title: typeof r === 'string' ? r : r.value || r.issue || r,
       category: 'SEO' as const,
-      probability: r.confidence || 60,
+      probability: r.confidence ?? null,
       impact: r.severity === 'high' ? 'high' as const : r.severity === 'medium' ? 'medium' as const : 'low' as const,
       mitigation: r.mitigation || 'Address through standard SEO remediation.',
       owner: 'SEO Team'
     })),
-    { title: 'Algorithm updates affecting rankings', category: 'Technical' as const, probability: 55, impact: 'high' as const, mitigation: 'Monitor Google updates and maintain best practices.', owner: 'SEO Team' },
-    { title: 'Competitor content outpacing', category: 'Competition' as const, probability: 60, impact: 'medium' as const, mitigation: 'Increase content production cadence.', owner: 'Content Team' },
-  ].slice(0, 6);
+  ].slice(0, 6) : [];
 
-  const confidenceData = [
-    { section: 'Technical Audit', confidence: technicalHealth || 65, evidenceStrength: 80, sourceCount: 3, dataFreshness: 'Today' },
-    { section: 'Keyword Analysis', confidence: data.keywordIntelligence?.keywordCount ? Math.min(data.keywordIntelligence.keywordCount, 100) : 70, evidenceStrength: 75, sourceCount: 2, dataFreshness: 'Today' },
-    { section: 'Content Analysis', confidence: contentAuthority || 60, evidenceStrength: 70, sourceCount: 4, dataFreshness: 'Today' },
-    { section: 'Competitor SEO', confidence: 65, evidenceStrength: 70, sourceCount: 5, dataFreshness: 'Today' },
-    { section: 'AI/GEO Visibility', confidence: aiVisibility || 55, evidenceStrength: 65, sourceCount: 2, dataFreshness: 'Today' },
-  ];
+  const confidenceData = useMemo(() => [
+    technicalHealth != null ? { section: 'Technical Audit', confidence: technicalHealth, evidenceStrength: 80, sourceCount: 3, dataFreshness: 'Today' } : null,
+    data.keywordIntelligence?.keywordCount ? { section: 'Keyword Analysis', confidence: Math.min(data.keywordIntelligence.keywordCount, 100), evidenceStrength: 75, sourceCount: 2, dataFreshness: 'Today' } : null,
+    contentAuthority != null ? { section: 'Content Analysis', confidence: contentAuthority, evidenceStrength: 70, sourceCount: 4, dataFreshness: 'Today' } : null,
+    aiVisibility != null ? { section: 'AI/GEO Visibility', confidence: aiVisibility, evidenceStrength: 65, sourceCount: 2, dataFreshness: 'Today' } : null,
+  ].filter(Boolean), [technicalHealth, data.keywordIntelligence, contentAuthority, aiVisibility]);
 
   const filterOptions = [
     { key: 'impact', label: 'Impact', values: ['High', 'Medium', 'Low'] },
@@ -646,7 +651,7 @@ function ExecutiveDashboard({ data }: { data: any }) {
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Globe size={18} /> SEO Health Radar</h3>
           {radarData.some(d => d.A !== null) ? (
             <>
-              <MiniRadarLegend items={radarData.filter(d => d.A !== null).map(d => ({ label: d.subject, value: d.A || 0 }))} />
+              <MiniRadarLegend items={radarData.filter(d => d.A !== null).map(d => ({ label: d.subject, value: d.A ?? 0 }))} />
               <ResponsiveContainer width="100%" height={260}>
                 <RadarChart cx="50%" cy="50%" outerRadius="65%" data={radarData}>
                   <PolarGrid stroke="#293245" />
@@ -677,16 +682,16 @@ function ExecutiveDashboard({ data }: { data: any }) {
       </div>
 
       {/* Phase 6C: Opportunity + Risk Matrix */}
+      {keyOpps.length > 0 && (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        <OpportunityMatrix items={[
-          { title: 'Fix technical SEO issues', impact: 80, effort: 30 },
-          { title: 'Build topical authority', impact: 75, effort: 50 },
-          { title: 'Optimize for AI search', impact: 70, effort: 40 },
-          { title: 'Create video content', impact: 60, effort: 60 },
-          { title: 'Local SEO optimization', impact: 50, effort: 25 },
-        ]} />
-        <RiskMatrix items={seoRisks} />
+        <OpportunityMatrix items={keyOpps.slice(0, 5).map((o: any) => ({
+          title: typeof o === 'string' ? o : o.title || o.opportunity || 'Opportunity',
+          impact: o.impact ? (typeof o.impact === 'number' ? o.impact : o.impact === 'high' ? 80 : 50) : 50,
+          effort: o.effort ? (typeof o.effort === 'number' ? o.effort : o.effort === 'low' ? 20 : 50) : 50,
+        }))} />
+        {seoRisks.length > 0 && <RiskMatrix items={seoRisks} />}
       </div>
+      )}
 
       {/* Phase 6C: Recommendations */}
       {seoRecommendations.length > 0 && <RecommendationPriorities items={seoRecommendations} />}
@@ -694,10 +699,10 @@ function ExecutiveDashboard({ data }: { data: any }) {
       {/* Phase 6C: Compare + Confidence */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         <CompareResults metrics={[
-          { label: 'SEO Score', current: overallSeoScore || 70, previous: (overallSeoScore || 70) - 5 },
-          { label: 'Technical Health', current: technicalHealth || 65, previous: (technicalHealth || 65) - 8 },
-          { label: 'Content Authority', current: contentAuthority || 60, previous: (contentAuthority || 60) - 3 },
-        ]} />
+          overallSeoScore != null ? { label: 'SEO Score', current: overallSeoScore, previous: (overallSeoScore) - 5 } : null,
+          technicalHealth != null ? { label: 'Technical Health', current: technicalHealth, previous: (technicalHealth) - 8 } : null,
+          contentAuthority != null ? { label: 'Content Authority', current: contentAuthority, previous: (contentAuthority) - 3 } : null,
+        ].filter(Boolean)} />
         <ConfidenceVisualization items={confidenceData} />
       </div>
 
@@ -1161,30 +1166,30 @@ function TechnicalAudit({ data }: { data: any }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#9aa7bd' }}>Performance:</span>
                     <span style={{ color: mobileScores.performance >= 90 ? '#10e18b' : mobileScores.performance >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                      {mobileScores.performance !== null ? mobileScores.performance : 'Unavailable'}
+                      {mobileScores.performance !== null ? mobileScores.performance : '—'}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#9aa7bd' }}>SEO:</span>
                     <span style={{ color: mobileScores.seo >= 90 ? '#10e18b' : mobileScores.seo >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                      {mobileScores.seo !== null ? mobileScores.seo : 'Unavailable'}
+                      {mobileScores.seo !== null ? mobileScores.seo : '—'}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#9aa7bd' }}>Accessibility:</span>
                     <span style={{ color: mobileScores.accessibility >= 90 ? '#10e18b' : mobileScores.accessibility >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                      {mobileScores.accessibility !== null ? mobileScores.accessibility : 'Unavailable'}
+                      {mobileScores.accessibility !== null ? mobileScores.accessibility : '—'}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#9aa7bd' }}>Best Practices:</span>
                     <span style={{ color: mobileScores.bestPractices >= 90 ? '#10e18b' : mobileScores.bestPractices >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                      {mobileScores.bestPractices !== null ? mobileScores.bestPractices : 'Unavailable'}
+                      {mobileScores.bestPractices !== null ? mobileScores.bestPractices : '—'}
                     </span>
                   </div>
                 </div>
               ) : (
-                <span style={{ color: '#9aa7bd' }}>Unavailable</span>
+                <span style={{ color: '#6b7a93', fontStyle: 'italic' }}>Not available</span>
               )}
             </div>
             
@@ -1196,30 +1201,30 @@ function TechnicalAudit({ data }: { data: any }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#9aa7bd' }}>Performance:</span>
                     <span style={{ color: desktopScores.performance >= 90 ? '#10e18b' : desktopScores.performance >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                      {desktopScores.performance !== null ? desktopScores.performance : 'Unavailable'}
+                      {desktopScores.performance !== null ? desktopScores.performance : '—'}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#9aa7bd' }}>SEO:</span>
                     <span style={{ color: desktopScores.seo >= 90 ? '#10e18b' : desktopScores.seo >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                      {desktopScores.seo !== null ? desktopScores.seo : 'Unavailable'}
+                      {desktopScores.seo !== null ? desktopScores.seo : '—'}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#9aa7bd' }}>Accessibility:</span>
                     <span style={{ color: desktopScores.accessibility >= 90 ? '#10e18b' : desktopScores.accessibility >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                      {desktopScores.accessibility !== null ? desktopScores.accessibility : 'Unavailable'}
+                      {desktopScores.accessibility !== null ? desktopScores.accessibility : '—'}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#9aa7bd' }}>Best Practices:</span>
                     <span style={{ color: desktopScores.bestPractices >= 90 ? '#10e18b' : desktopScores.bestPractices >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                      {desktopScores.bestPractices !== null ? desktopScores.bestPractices : 'Unavailable'}
+                      {desktopScores.bestPractices !== null ? desktopScores.bestPractices : '—'}
                     </span>
                   </div>
                 </div>
               ) : (
-                <span style={{ color: '#9aa7bd' }}>Unavailable</span>
+                <span style={{ color: '#6b7a93', fontStyle: 'italic' }}>Not available</span>
               )}
             </div>
           </div>
@@ -1518,7 +1523,7 @@ function CompetitorSEO({ data }: { data: any }) {
                   <div style={{ padding: '10px', background: '#0b1220', borderRadius: '6px' }}>
                     <div style={{ fontSize: '11px', color: '#9aa7bd', textTransform: 'uppercase' }}>Authority Score</div>
                     <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#a855f7' }}>
-                      {c.estimatedAuthority !== null && c.estimatedAuthority !== undefined ? renderSafeValue(c.estimatedAuthority) : 'Unavailable'}
+                      {c.estimatedAuthority !== null && c.estimatedAuthority !== undefined ? renderSafeValue(c.estimatedAuthority) : '—'}
                     </div>
                   </div>
                   <div style={{ padding: '10px', background: '#0b1220', borderRadius: '6px' }}>
@@ -1651,9 +1656,9 @@ function ContentGaps({ data }: { data: any }) {
                 <div style={{ display: 'flex', gap: '15px', fontSize: '13px', color: '#9aa7bd', background: '#0b1220', padding: '10px', borderRadius: '6px', width: '100%' }}>
                   {g.targetKeyword && <span>🎯 <b>Keyword:</b> <span style={{ color: '#fff' }}>{renderSafeValue(g.targetKeyword)}</span></span>}
                   {g.searchVolume !== null && g.searchVolume !== undefined && <span>📊 <b>Volume:</b> <span style={{ color: '#10e18b' }}>{formatNumber(g.searchVolume)}</span></span>}
-                  {g.searchVolume === null && <span>📊 <b>Volume:</b> <span style={{ color: '#9aa7bd' }}>Unavailable</span></span>}
+                  {g.searchVolume === null && <span>📊 <b>Volume:</b> <span style={{ color: '#6b7a93', fontStyle: 'italic' }}>Not available</span></span>}
                   {g.keywordDifficulty !== null && g.keywordDifficulty !== undefined && <span>📈 <b>KD:</b> <span style={{ color: '#ffa502' }}>{renderSafeValue(g.keywordDifficulty)}</span></span>}
-                  {g.keywordDifficulty === null && <span>📈 <b>KD:</b> <span style={{ color: '#9aa7bd' }}>Unavailable</span></span>}
+                  {g.keywordDifficulty === null && <span>📈 <b>KD:</b> <span style={{ color: '#6b7a93', fontStyle: 'italic' }}>Not available</span></span>}
                   {g.intent && <span>💡 <b>Intent:</b> <span style={{ color: '#53a7ff' }}>{renderSafeValue(g.intent)}</span></span>}
                 </div>
                 {g.confidence && (
@@ -1713,17 +1718,17 @@ function GeoIntelligence({ data }: { data: any }) {
   const aiVisibilityScore = data.aiVisibilityScore || null;
   const citationReadinessScore = data.citationReadinessScore || null;
   const answerabilityScore = data.answerabilityScore || null;
-  const entityCoverageScore = data.entityCoverageScore || 60;
+  const entityCoverageScore = data.entityCoverageScore != null ? data.entityCoverageScore : null;
   const geoKeywords = asArray(data.geoKeywords || []);
   const aiContentOpportunities = asArray(data.aiContentOpportunities || data.citationOpportunities || []);
 
   const chartData = [
-    { name: 'ChatGPT', score: asNumber(data.chatGptScore || aiVisibilityScore, 40) },
-    { name: 'Gemini', score: asNumber(data.geminiScore, 45) },
-    { name: 'Claude', score: asNumber(data.claudeScore, 30) },
-    { name: 'Perplexity', score: asNumber(data.perplexityScore, 50) },
-    { name: 'Google AI', score: asNumber(data.googleAiOverviewScore, 60) },
-  ];
+    data.chatGptScore != null ? { name: 'ChatGPT', score: asNumber(data.chatGptScore) } : null,
+    data.geminiScore != null ? { name: 'Gemini', score: asNumber(data.geminiScore) } : null,
+    data.claudeScore != null ? { name: 'Claude', score: asNumber(data.claudeScore) } : null,
+    data.perplexityScore != null ? { name: 'Perplexity', score: asNumber(data.perplexityScore) } : null,
+    data.googleAiOverviewScore != null ? { name: 'Google AI', score: asNumber(data.googleAiOverviewScore) } : null,
+  ].filter(Boolean);
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
@@ -1870,7 +1875,7 @@ function BlogIntelligence({ data }: { data: any }) {
                     {formatNumber(b.searchVolume)}
                   </td>
                   <td style={{ padding: '12px', color: b.keywordDifficulty ? '#ffa502' : '#9aa7bd' }}>
-                    {b.keywordDifficulty !== null && b.keywordDifficulty !== undefined ? renderSafeValue(b.keywordDifficulty) : 'Unavailable'}
+                    {b.keywordDifficulty !== null && b.keywordDifficulty !== undefined ? renderSafeValue(b.keywordDifficulty) : '—'}
                   </td>
                   <td style={{ padding: '12px' }}>
                     <Badge className="dark">{asText(b?.intent || 'Informational')}</Badge>
@@ -1888,7 +1893,7 @@ function BlogIntelligence({ data }: { data: any }) {
                         {b.confidence}%
                       </span>
                     ) : (
-                      <span style={{ color: '#9aa7bd' }}>Unavailable</span>
+                      <span style={{ color: '#6b7a93', fontStyle: 'italic' }}>Not available</span>
                     )}
                   </td>
                   <td style={{ padding: '12px' }}>

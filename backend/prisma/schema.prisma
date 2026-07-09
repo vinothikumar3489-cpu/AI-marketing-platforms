@@ -86,10 +86,10 @@ model Analysis {
   productName         String
   productDescription  String
   targetAudience      String
-  marketInsights      Json
-  competitorInsights  Json
-  campaignSuggestions Json
-  roiSuggestions      Json
+  marketInsights      Json?
+  competitorInsights  Json?
+  campaignSuggestions Json?
+  roiSuggestions      Json?
   createdAt           DateTime @default(now())
 
   @@index([chatId])
