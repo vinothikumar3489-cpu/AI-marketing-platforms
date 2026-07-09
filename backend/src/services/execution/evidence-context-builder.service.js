@@ -3,19 +3,37 @@ import { buildSEOEvidenceData } from '../../modules/evidence/evidence.normalizer
 import { buildGrowthWorkspaceDataFromEvidence } from '../../modules/evidence/evidence.normalizer.js';
 
 export async function buildEvidenceContext(prisma, userId, chatId) {
+  if (!prisma) {
+    throw new Error('Prisma client missing in buildEvidenceContext');
+  }
+  if (!userId) {
+    throw new Error('userId missing in buildEvidenceContext');
+  }
+  if (!chatId) {
+    throw new Error('chatId missing in buildEvidenceContext');
+  }
+
   const evidenceSnapshot = await getLatestEvidenceSnapshot({ prisma, userId, chatId });
   const evidence = evidenceSnapshot?.evidence || null;
   const seoEvidence = evidence ? buildSEOEvidenceData(evidence) : null;
 
-  const [productIntel, competitorIntel, campaignIntel, seoIntel, growthWs] = await Promise.all([
-    prisma.productIntelligence.findFirst({ where: { chatId, userId } }),
-    prisma.competitorIntelligence.findFirst({ where: { chatId, userId } }),
-    prisma.campaignIntelligence.findFirst({ where: { chatId, userId } }),
+  let growthWs = null;
+  try {
+    if (prisma.growthWorkspace) {
+      growthWs = await prisma.growthWorkspace.findFirst({ where: { chatId, userId } });
+    }
+  } catch {
+    growthWs = null;
+  }
+
+  const [productIntel, competitorIntel, campaignIntel, seoIntel] = await Promise.all([
+    prisma.productIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
+    prisma.competitorIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
+    prisma.campaignIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
     prisma.seoIntelligence.findFirst({
       where: { chatId, userId },
       include: { scoreBreakdown: true, technicalSeoAudit: true, keywordIntelligence: true },
-    }),
-    prisma.growthWorkspace.findFirst({ where: { chatId, userId } }),
+    }).catch(() => null),
   ]);
 
   const productAnalysis = productIntel?.productAnalysis || null;
