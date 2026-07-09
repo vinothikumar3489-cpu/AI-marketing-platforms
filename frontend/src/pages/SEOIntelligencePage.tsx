@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useMemo, Component } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api, downloadReport } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
-import { asArray, asNumber, asText, normalizeSeo, normalizeSeoDisplay, seoSafeText, sanitizeSeoForDisplay, renderSafeValue } from '../lib/normalizers';
+import { asArray, asNumber, asText, normalizeSeo, normalizeSeoDisplay, seoSafeText, sanitizeSeoForDisplay, renderSafeValue, toDisplayText, normalizeSeoItem } from '../lib/normalizers';
 import { Badge, Card, EmptyState, Loading, PageHeader, ScoreCard, SectionTitle } from '../components/UI';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { Shield, Target, TrendingUp, Zap, Search, Globe, Code, FileText, Cpu, LayoutList, CheckCircle, AlertTriangle, Loader2, Building, Activity, Map, Clock, Layers, Eye, Users, Star, PieChart, Info, Sliders, GripHorizontal } from 'lucide-react';
@@ -30,6 +30,47 @@ function findRiskyObjects(obj: any, path = "root") {
     );
   }
 }
+
+// Safe render helpers — prevent React error #31 (rendering raw objects in JSX)
+const isPlainObject = (value: unknown): value is Record<string, any> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+// Coerce any value to a display string without dumping raw JSON.
+const renderText = (value: unknown, fallback = 'Not measured'): string => {
+  if (value === null || value === undefined || value === '') return fallback;
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (Array.isArray(value)) return value.map(v => renderText(v, '')).filter(Boolean).join(', ') || fallback;
+  if (isPlainObject(value)) {
+    return (
+      value.label ||
+      value.title ||
+      value.name ||
+      value.action ||
+      value.recommendation ||
+      value.opportunity ||
+      value.text ||
+      value.value ||
+      value.summary ||
+      value.reason ||
+      fallback
+    );
+  }
+  return fallback;
+};
+
+// Render a structured score/recommendation object as labelled fields (never JSON).
+const renderScoreObject = (value: unknown) => {
+  if (!isPlainObject(value)) return renderText(value);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      {value.score !== null && value.score !== undefined && <div>Score: {String(value.score)}</div>}
+      {value.reason && <div>Reason: {renderText(value.reason)}</div>}
+      {value.source && <div>Source: {renderText(value.source)}</div>}
+      {value.category && <div>Category: {renderText(value.category)}</div>}
+      {value.priority && <div>Priority: {renderText(value.priority)}</div>}
+    </div>
+  );
+};
 
 // Safe format helpers to handle non-number values from backend
 function toNumberOrNull(value: unknown): number | null {
@@ -71,8 +112,8 @@ function formatInt(value: unknown): string {
 }
 
 // ErrorBoundary to prevent black screen from individual tab errors
-class TabErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
-  constructor(props: { children: React.ReactNode }) {
+class TabErrorBoundary extends Component<{ children: React.ReactNode; tabName?: string }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: React.ReactNode; tabName?: string }) {
     super(props);
     this.state = { hasError: false, error: null };
   }
@@ -82,7 +123,7 @@ class TabErrorBoundary extends Component<{ children: React.ReactNode }, { hasErr
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Tab rendering error:', error, errorInfo);
+    console.error(`[SEO Tab Error] Tab "${this.props.tabName || 'unknown'}" failed to render:`, error, errorInfo);
   }
 
   render() {
@@ -90,8 +131,8 @@ class TabErrorBoundary extends Component<{ children: React.ReactNode }, { hasErr
       return (
         <Card>
           <EnterpriseEmptyState 
-            title="Tab Error" 
-            message={`This tab encountered an error: ${this.state.error?.message || 'Unknown error'}. Please try refreshing or check the data.`}
+            title={`${this.props.tabName || 'This tab'} could not be displayed`}
+            message={`The "${this.props.tabName || 'selected'}" tab encountered a rendering error: ${this.state.error?.message || 'Unknown error'}. Other tabs are unaffected — try switching tabs or re-running the analysis.`}
             icon={AlertTriangle}
           />
         </Card>
@@ -396,7 +437,7 @@ export default function SEOIntelligencePage() {
           </div>
 
           <div className="tab-content" style={{ marginTop: '20px' }}>
-            <TabErrorBoundary>
+            <TabErrorBoundary key={activeTab} tabName={activeTab}>
               {activeTab === 'Executive Dashboard' && <ExecutiveDashboard data={seo} />}
               {activeTab === 'Executive Story' && <ExecutiveStory data={seo} />}
               {activeTab === 'Technical Audit' && <TechnicalAudit data={{ ...seo, ...seo.technicalAudit }} />}
@@ -534,21 +575,21 @@ function ExecutiveDashboard({ data }: { data: any }) {
     const healthScore = overallSeoScore != null ? overallSeoScore : null;
     return {
       keyFindings: [
-        ...(seoHealth.strengths || []).slice(0, 3).map((s: any) => ({ text: typeof s === 'string' ? s : s.value || s, confidence: null, impact: 'high' })),
-        ...(seoHealth.weaknesses || []).slice(0, 2).map((w: any) => ({ text: typeof w === 'string' ? w : w.value || w, confidence: null, impact: 'high' })),
-      ],
+        ...(seoHealth.strengths || []).slice(0, 3).map((s: any) => ({ text: toDisplayText(s, ''), confidence: null, impact: 'high' })),
+        ...(seoHealth.weaknesses || []).slice(0, 2).map((w: any) => ({ text: toDisplayText(w, ''), confidence: null, impact: 'high' })),
+      ].filter((f: any) => f.text),
       biggestRisks: [
-        ...(seoHealth.topIssues || []).slice(0, 5).map((r: any) => ({ text: typeof r === 'string' ? r : r.value || r.issue || r, severity: r.severity || 'high', probability: r.confidence ?? null })),
-      ],
-      biggestOpportunities: keyOpps.slice(0, 5).map((o: any) => ({ text: typeof o === 'string' ? o : o.value || o.title || o, roi: '200%', effort: 'Medium' })),
+        ...(seoHealth.topIssues || []).slice(0, 5).map((r: any) => ({ text: toDisplayText(r?.issue ?? r, ''), severity: r?.severity || null, probability: r?.confidence ?? null })),
+      ].filter((r: any) => r.text),
+      biggestOpportunities: keyOpps.slice(0, 5).map((o: any) => ({ text: toDisplayText(o, ''), roi: null, effort: null })).filter((o: any) => o.text),
       overallHealth: healthScore != null ? {
         score: healthScore,
         label: healthScore >= 80 ? 'Excellent' : healthScore >= 60 ? 'Good' : healthScore >= 40 ? 'Needs Improvement' : 'Critical',
         color: healthScore >= 80 ? '#10e18b' : healthScore >= 60 ? '#53a7ff' : healthScore >= 40 ? '#ffb347' : '#ff4757'
       } : null,
       executiveRecommendation: {
-        text: execOverview.priorityActions?.[0]?.action || execOverview.priorityActions?.[0]?.recommendation || 'Improve technical SEO and content authority to boost overall visibility.',
-        reasoning: `Based on current scores: Technical ${technicalHealth ?? 'N/A'}%, Content ${contentAuthority ?? 'N/A'}%, AI Visibility ${aiVisibility ?? 'N/A'}%`,
+        text: toDisplayText(execOverview.priorityActions?.[0], 'Improve technical SEO and content authority to boost overall visibility.'),
+        reasoning: `Based on current scores: Technical ${technicalHealth ?? 'Not measured'}, Content ${contentAuthority ?? 'Not measured'}, AI Visibility ${aiVisibility ?? 'Not measured'}`,
         confidence: null
       }
     };
@@ -582,27 +623,27 @@ function ExecutiveDashboard({ data }: { data: any }) {
 
   // Phase 6C: Recommendations for SEO
   const seoRecommendations = priorities.length > 0 ? priorities.slice(0, 8).map((p: any, i: number) => ({
-    title: typeof p === 'string' ? p : p.value || p.title || p.action || `Priority ${i+1}`,
-    description: typeof p === 'string' ? '' : p.why || p.rationale || '',
+    title: toDisplayText(p, `Priority ${i + 1}`),
+    description: typeof p === 'string' ? '' : toDisplayText(p?.why ?? p?.rationale ?? p?.description, ''),
     group: i < 2 ? 'Critical' as const : i < 4 ? 'High ROI' as const : i < 6 ? 'Quick Wins' as const : 'Long-Term' as const,
     priority: i < 2 ? 'Critical' as const : i < 4 ? 'High' as const : i < 6 ? 'Medium' as const : 'Low' as const,
     difficulty: null,
-    roi: '150-300%',
+    roi: null,
     timeline: i < 2 ? '7 days' : i < 4 ? '30 days' : '60 days',
     owner: 'SEO Team',
-    confidence: 80 - i * 5
+    confidence: null
   })) : [];
 
   // Phase 6C: Risk items for SEO
   const seoRisks = (seoHealth.topIssues || []).length > 0 ? [
     ...(seoHealth.topIssues || []).slice(0, 5).map((r: any) => ({
-      title: typeof r === 'string' ? r : r.value || r.issue || r,
+      title: toDisplayText(r?.issue ?? r, ''),
       category: 'SEO' as const,
-      probability: r.confidence ?? null,
-      impact: r.severity === 'high' ? 'high' as const : r.severity === 'medium' ? 'medium' as const : 'low' as const,
-      mitigation: r.mitigation || 'Address through standard SEO remediation.',
+      probability: r?.confidence ?? null,
+      impact: r?.severity === 'high' ? 'high' as const : r?.severity === 'medium' ? 'medium' as const : 'low' as const,
+      mitigation: toDisplayText(r?.mitigation, 'Address through standard SEO remediation.'),
       owner: 'SEO Team'
-    })),
+    })).filter((r: any) => r.title),
   ].slice(0, 6) : [];
 
   const confidenceData = useMemo(() => [
@@ -716,7 +757,7 @@ function ExecutiveDashboard({ data }: { data: any }) {
       {keyOpps.length > 0 && (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         <OpportunityMatrix items={keyOpps.slice(0, 5).map((o: any) => ({
-          title: typeof o === 'string' ? o : o.title || o.opportunity || 'Opportunity',
+          title: toDisplayText(o, 'Opportunity'),
           impact: o.impact ? (typeof o.impact === 'number' ? o.impact : o.impact === 'high' ? 80 : 50) : 50,
           effort: o.effort ? (typeof o.effort === 'number' ? o.effort : o.effort === 'low' ? 20 : 50) : 50,
         }))} />

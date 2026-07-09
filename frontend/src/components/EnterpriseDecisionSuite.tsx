@@ -65,7 +65,7 @@ export function ExecutiveSummaryCards({ data }: { data?: ExecSummaryData }) {
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                   <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(83,167,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, color: '#53a7ff', flexShrink: 0, marginTop: '1px' }}>{i + 1}</div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '13px', color: C.text }}>{f.text}</div>
+                    <div style={{ fontSize: '13px', color: C.text }}>{renderSafeValue(f.text)}</div>
                     <div style={{ display: 'flex', gap: '6px', marginTop: '3px' }}>{f.confidence && <ConfidenceBadge value={f.confidence} />}{f.impact && <StatusBadge status={f.impact} />}</div>
                   </div>
                 </div>
@@ -79,7 +79,7 @@ export function ExecutiveSummaryCards({ data }: { data?: ExecSummaryData }) {
               <div key={i} style={{ padding: '8px 0', borderBottom: i < data.biggestRisks!.length - 1 ? '1px solid #1d2738' : 'none' }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                   <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(255,71,87,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, color: '#ff4757', flexShrink: 0, marginTop: '1px' }}>{i + 1}</div>
-                  <div style={{ flex: 1 }}><div style={{ fontSize: '13px', color: C.text }}>{r.text}</div><div style={{ display: 'flex', gap: '6px', marginTop: '3px' }}>{r.severity && <StatusBadge status={r.severity} />}{r.probability !== undefined && <ConfidenceBadge value={r.probability} />}</div></div>
+                  <div style={{ flex: 1 }}><div style={{ fontSize: '13px', color: C.text }}>{renderSafeValue(r.text)}</div><div style={{ display: 'flex', gap: '6px', marginTop: '3px' }}>{r.severity && <StatusBadge status={r.severity} />}{r.probability !== undefined && <ConfidenceBadge value={r.probability} />}</div></div>
                 </div>
               </div>
             ))}
@@ -91,7 +91,7 @@ export function ExecutiveSummaryCards({ data }: { data?: ExecSummaryData }) {
               <div key={i} style={{ padding: '8px 0', borderBottom: i < data.biggestOpportunities!.length - 1 ? '1px solid #1d2738' : 'none' }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                   <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(16,225,139,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, color: '#10e18b', flexShrink: 0, marginTop: '1px' }}>{i + 1}</div>
-                  <div style={{ flex: 1 }}><div style={{ fontSize: '13px', color: C.text }}>{o.text}</div><div style={{ display: 'flex', gap: '6px', marginTop: '3px', fontSize: '11px', color: C.dim }}>{o.roi && <span style={{ color: '#10e18b' }}>ROI: {o.roi}</span>}{o.effort && <span style={{ color: '#ffb347' }}>Effort: {o.effort}</span>}</div></div>
+                  <div style={{ flex: 1 }}><div style={{ fontSize: '13px', color: C.text }}>{renderSafeValue(o.text)}</div><div style={{ display: 'flex', gap: '6px', marginTop: '3px', fontSize: '11px', color: C.dim }}>{o.roi && <span style={{ color: '#10e18b' }}>ROI: {renderSafeValue(o.roi)}</span>}{o.effort && <span style={{ color: '#ffb347' }}>Effort: {renderSafeValue(o.effort)}</span>}</div></div>
                 </div>
               </div>
             ))}
@@ -104,8 +104,8 @@ export function ExecutiveSummaryCards({ data }: { data?: ExecSummaryData }) {
             <Star size={18} style={{ color: '#818cf8' }} /><span style={{ fontSize: '14px', fontWeight: 600, color: '#818cf8' }}>AI Executive Recommendation</span>
             {data.executiveRecommendation.confidence && <ConfidenceBadge value={data.executiveRecommendation.confidence} />}
           </div>
-          <p style={{ fontSize: '15px', color: C.text, lineHeight: 1.6, margin: '0 0 8px' }}>{data.executiveRecommendation.text}</p>
-          {data.executiveRecommendation.reasoning && <div style={{ fontSize: '12px', color: C.dim, fontStyle: 'italic', padding: '8px 10px', background: C.bg, borderRadius: '6px' }}>Why: {data.executiveRecommendation.reasoning}</div>}
+          <p style={{ fontSize: '15px', color: C.text, lineHeight: 1.6, margin: '0 0 8px' }}>{renderSafeValue(data.executiveRecommendation.text)}</p>
+          {data.executiveRecommendation.reasoning && <div style={{ fontSize: '12px', color: C.dim, fontStyle: 'italic', padding: '8px 10px', background: C.bg, borderRadius: '6px' }}>Why: {renderSafeValue(data.executiveRecommendation.reasoning)}</div>}
         </div>
       )}
     </div>
@@ -208,10 +208,10 @@ export function RecommendationPriorities({ items }: { items: RecommendationItem[
               {groupItems.map((r, i) => (
                 <div key={i} style={{ padding: '10px 12px', background: C.bg, borderRadius: '8px', border: '1px solid #1d2738' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{r.title}</div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{renderSafeValue(r.title)}</div>
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}><PriorityChip priority={r.priority} /><ConfidenceBadge value={r.confidence} /></div>
                   </div>
-                  {r.description && <div style={{ fontSize: '12px', color: C.muted, marginBottom: '6px' }}>{r.description}</div>}
+                  {r.description && <div style={{ fontSize: '12px', color: C.muted, marginBottom: '6px' }}>{renderSafeValue(r.description)}</div>}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '11px', color: C.dim, marginTop: '4px' }}>
                     <span>Difficulty: <strong style={{ color: r.difficulty >= 70 ? C.critical : r.difficulty >= 40 ? C.needsImprovement : C.excellent }}>{r.difficulty}/100</strong></span>
                     <span>ROI: <strong style={{ color: C.excellent }}>{r.roi}</strong></span><span>Timeline: <strong style={{ color: C.good }}>{r.timeline}</strong></span><span>Owner: <strong style={{ color: C.muted }}>{r.owner}</strong></span>
@@ -235,8 +235,8 @@ export function CrossModuleInsights({ items }: { items: CrossModuleItem[] }) {
     <div style={{ display: 'grid', gap: '12px' }}>
       {items.map((item, i) => (
         <div key={i} style={{ background: C.card, borderRadius: '10px', border: `1px solid ${C.border}`, padding: '14px 16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><div style={{ fontSize: '13px', fontWeight: 600, color: C.text, flex: 1 }}>{item.title}</div><StatusBadge status={item.impact} /></div>
-          <div style={{ fontSize: '12px', color: C.muted, marginBottom: '10px' }}>{item.description}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><div style={{ fontSize: '13px', fontWeight: 600, color: C.text, flex: 1 }}>{renderSafeValue(item.title)}</div><StatusBadge status={item.impact} /></div>
+          <div style={{ fontSize: '12px', color: C.muted, marginBottom: '10px' }}>{renderSafeValue(item.description)}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
             <span style={{ padding: '2px 8px', borderRadius: '4px', background: `${(moduleColors[item.sourceModule] || C.dim)}15`, color: moduleColors[item.sourceModule] || C.dim, fontWeight: 600 }}>{item.sourceModule}</span>
             <ArrowRight size={12} style={{ color: C.dim }} />
@@ -333,7 +333,7 @@ export function OpportunityMatrix({ items }: { items: MatrixItem[] }) {
           return (
             <div key={q.name} style={{ background: q.bg, borderRadius: '8px', border: `1px solid ${q.color}30`, padding: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: q.color }} /><span style={{ fontSize: '12px', fontWeight: 600, color: q.color }}>{q.name}</span><span style={{ fontSize: '10px', color: C.dim }}>({qItems.length})</span></div>
-              {qItems.map((item, i) => <div key={i} style={{ fontSize: '11px', color: C.muted, padding: '3px 0', borderBottom: i < qItems.length - 1 ? '1px solid #1d2738' : 'none' }}>{item.title}</div>)}
+              {qItems.map((item, i) => <div key={i} style={{ fontSize: '11px', color: C.muted, padding: '3px 0', borderBottom: i < qItems.length - 1 ? '1px solid #1d2738' : 'none' }}>{renderSafeValue(item.title)}</div>)}
             </div>
           );
         })}
@@ -360,9 +360,9 @@ export function RiskMatrix({ items }: { items: RiskItem[] }) {
             {catItems.map((r, i) => (
               <div key={i} style={{ padding: '8px 10px', background: C.bg, borderRadius: '6px', marginBottom: '4px', border: '1px solid #1d2738' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: C.text }}>{r.title}</div><div style={{ display: 'flex', gap: '4px' }}><StatusBadge status={r.probability >= 70 ? 'critical' : r.probability >= 40 ? 'warning' : 'low'} /><StatusBadge status={r.impact} /></div>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: C.text }}>{renderSafeValue(r.title)}</div><div style={{ display: 'flex', gap: '4px' }}><StatusBadge status={r.probability >= 70 ? 'critical' : r.probability >= 40 ? 'warning' : 'low'} /><StatusBadge status={r.impact} /></div>
                 </div>
-                <div style={{ fontSize: '11px', color: C.muted, marginBottom: '4px' }}><strong>Mitigation:</strong> {r.mitigation}</div>
+                <div style={{ fontSize: '11px', color: C.muted, marginBottom: '4px' }}><strong>Mitigation:</strong> {renderSafeValue(r.mitigation)}</div>
                 <div style={{ fontSize: '10px', color: C.dim }}>Probability: {r.probability}% | Owner: {r.owner}</div>
               </div>
             ))}

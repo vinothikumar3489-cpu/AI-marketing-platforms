@@ -36,6 +36,57 @@ export const asText = (value: any, fallback = 'Not available') => {
   return fallback;
 };
 
+// Type guard: a real plain object (not null, not array)
+export const isPlainObject = (value: unknown): value is Record<string, any> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+// Display-safe adapter: coerce any value into a human-readable string WITHOUT
+// dumping raw JSON. Preserves the most meaningful field of structured objects.
+// Returns the fallback for empty/missing values (never fabricates data).
+export const toDisplayText = (value: unknown, fallback = 'Not available'): string => {
+  if (value === null || value === undefined || value === '') return fallback;
+  if (typeof value === 'string') return value.trim() || fallback;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) {
+    const joined = value.map(v => toDisplayText(v, '')).filter(Boolean).join(', ');
+    return joined || fallback;
+  }
+  if (isPlainObject(value)) {
+    const candidate =
+      value.label ??
+      value.title ??
+      value.name ??
+      value.action ??
+      value.recommendation ??
+      value.opportunity ??
+      value.issue ??
+      value.text ??
+      value.value ??
+      value.description ??
+      value.summary ??
+      value.reason ??
+      value.keyword;
+    if (candidate !== undefined && candidate !== null && candidate !== '') {
+      return toDisplayText(candidate, fallback);
+    }
+    return fallback;
+  }
+  return fallback;
+};
+
+// Structured SEO item adapter for score-style objects.
+// Preserves ALL useful fields (score/reason/source/category/priority/...) and
+// adds a display-safe `label`. Never removes fields, never converts null -> 0.
+export const normalizeSeoItem = (value: unknown): Record<string, any> => {
+  if (isPlainObject(value)) {
+    return {
+      ...value,
+      label: toDisplayText(value, ''),
+    };
+  }
+  return { label: toDisplayText(value, ''), value };
+};
+
 export const asInsight = (value: any, fallbackTitle?: string) => {
   // Always return an object, never null
   if (!value) {
