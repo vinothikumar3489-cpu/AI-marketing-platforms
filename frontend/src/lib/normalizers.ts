@@ -338,8 +338,8 @@ export function normalizeFullResults(data: any) {
         actionPlan: safeParse(growth.actionPlan, growth.actionPlan),
         summary: growth.summary || null,
       },
-      seoIntelligence: sanitizeSeoForDisplay(normalizeSeo(root.seoIntelligence || root.seo || {})),
-      seo: sanitizeSeoForDisplay(normalizeSeo(root.seoIntelligence || root.seo || {})), // Legacy compatibility
+      seoIntelligence: normalizeSeo(root.seoIntelligence || root.seo || {}),
+      seo: normalizeSeo(root.seoIntelligence || root.seo || {}), // Legacy compatibility
       agents: asArray(root.agentRuns || []),
       automation: root.automationPlan || {},
       hasGrowthWorkspace: root.hasGrowthWorkspace === false ? false : hasRealGrowthContent,
@@ -379,8 +379,8 @@ export function normalizeFullResults(data: any) {
       actionPlan: safeParse(actPlan, actPlan),
       summary: growth.summary || safeParse(growth.summary, growth.summary) || null,
     },
-    seoIntelligence: sanitizeSeoForDisplay(normalizeSeo(root.seoIntelligence || root.seo || {})),
-    seo: sanitizeSeoForDisplay(normalizeSeo(root.seoIntelligence || root.seo || {})), // Legacy compatibility
+    seoIntelligence: normalizeSeo(root.seoIntelligence || root.seo || {}),
+    seo: normalizeSeo(root.seoIntelligence || root.seo || {}), // Legacy compatibility
     agents: asArray(root.agentRuns || []),
     automation: root.automationPlan || root.automationPlans || root.automation || {},
     hasGrowthWorkspace: !!(productIntel?.productAnalysis || competitorIntel?.competitorAnalysis || campaignIntel?.campaignGenerator),
@@ -706,11 +706,37 @@ export function normalizeSeo(data: any) {
     accessibilityScore,
     bestPracticesScore,
     mobileScore,
-    desktopScore
+    desktopScore,
+    // Identity aliases at top level for easy access
+    websiteUrl: seo.identity?.websiteUrl || seo.websiteUrl || '',
+    domain: seo.identity?.domain || seo.domain || '',
+    companyName: seo.identity?.companyName || seo.companyName || '',
+    productName: seo.identity?.productName || seo.productName || '',
+    // Extract technical issues from the audit
+    technicalIssues: tabTechnical?.criticalIssues || tabTechnical?.highIssues || tabTechnical?.mediumIssues || tabTechnical?.issues || [],
+    // Extract content opportunities from keyword intelligence
+    contentOpportunities: tabKeywords?.contentOpportunities || [],
+    // Evidence source summary
+    sourceSummary: seo.sourceSummary || seo.identity?.sourceSummary || {},
   };
 
-  if (import.meta.env.DEV && false) {
-    // Dev debug logs removed for production safety
+  if (import.meta.env.DEV) {
+    console.debug('[normalizeSeo] input keys:', Object.keys(seo));
+    console.debug('[normalizeSeo] hasScoreBreakdown:', !!seo.scoreBreakdown);
+    console.debug('[normalizeSeo] hasTechnicalAudit:', !!tabTechnical);
+    console.debug('[normalizeSeo] keywordPrimaryCount:', (tabKeywords?.primaryKeywords || []).length);
+    console.debug('[normalizeSeo] blogIdeasCount:', (tabBlogs?.blogIdeas || []).length);
+    console.debug('[normalizeSeo] hasExecutiveDashboard:', !!seo.executiveDashboard);
+    console.debug('[normalizeSeo] hasExecutiveStory:', !!execStory);
+    console.debug('[normalizeSeo] hasActionPlan:', !!normalizedActionPlan);
+    console.debug('[normalizeSeo] output keys:', Object.keys(normalizedSeo));
+    console.debug('[normalizeSeo] hasRealSeoData check:', {
+      websiteUrl: normalizedSeo.websiteUrl,
+      technicalIssues: normalizedSeo.technicalIssues?.length,
+      contentOpportunities: normalizedSeo.contentOpportunities?.length,
+      performanceScore: normalizedSeo.performanceScore,
+      seoScore: normalizedSeo.seoScore,
+    });
   }
 
   return normalizedSeo;

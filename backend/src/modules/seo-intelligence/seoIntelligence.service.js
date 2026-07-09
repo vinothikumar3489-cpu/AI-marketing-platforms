@@ -78,7 +78,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     // Step 1b: Load Evidence Snapshot
     let evidenceSEOData = null;
     try {
-      const evidenceSnapshot = await getLatestEvidenceSnapshot(prisma, userId, chatId);
+      const evidenceSnapshot = await getLatestEvidenceSnapshot({ userId, chatId });
       if (evidenceSnapshot?.evidence) {
         evidenceSEOData = buildSEOEvidenceData(evidenceSnapshot.evidence);
         if (process.env.NODE_ENV !== 'production') {

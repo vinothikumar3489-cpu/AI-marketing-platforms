@@ -1,6 +1,6 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-import { sanitizeSeoForDisplay } from './normalizers';
+import { normalizeDeep } from './normalizers';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -60,12 +60,12 @@ async function request<T>(method: Method, path: string, body?: any, signal?: Abo
     data = data.data as T;
   }
 
-  // Hard safety: sanitize SEO data in full-results response to prevent React error #31
+  // Normalize deep to prevent React error #31 while preserving data structure
   if (path.includes('full-results') && data && typeof data === 'object') {
     return {
       ...data,
-      seoIntelligence: sanitizeSeoForDisplay(data?.seoIntelligence),
-      seo: sanitizeSeoForDisplay(data?.seo),
+      seoIntelligence: normalizeDeep(data?.seoIntelligence),
+      seo: normalizeDeep(data?.seo),
     } as T;
   }
 

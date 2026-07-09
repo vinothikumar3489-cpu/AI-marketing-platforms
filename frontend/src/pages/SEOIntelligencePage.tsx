@@ -150,18 +150,26 @@ export default function SEOIntelligencePage() {
     if (!d || typeof d !== 'object') return false;
     const keys = Object.keys(d);
     if (keys.length === 0) return false;
-    // Must have at least one meaningful content field
-    return !!(
-      (d.scoreBreakdown && typeof d.scoreBreakdown === 'object' && Object.keys(d.scoreBreakdown).length > 0) ||
-      d.performanceScore ||
-      d.seoScore ||
-      (d.technical && typeof d.technical === 'object' && Object.keys(d.technical).length > 0) ||
-      (d.keywords && typeof d.keywords === 'object' && Object.keys(d.keywords).length > 0) ||
-      (d.executiveDashboard && typeof d.executiveDashboard === 'object' && Object.keys(d.executiveDashboard).length > 0) ||
-      d.executiveStory ||
-      (d.actionPlan && (d.actionPlan.day7?.length || d.actionPlan.day30?.length || d.actionPlan.day60?.length || d.actionPlan.day90?.length)) ||
-      d.websiteUrl
-    );
+    if (d.websiteUrl) return true;
+    if (d.sourceSummary && typeof d.sourceSummary === 'object' && Object.keys(d.sourceSummary).length > 0) return true;
+    if (d.technicalAudit && typeof d.technicalAudit === 'object' && Object.keys(d.technicalAudit).length > 0) return true;
+    if (d.technicalIssues && Array.isArray(d.technicalIssues) && d.technicalIssues.length > 0) return true;
+    if (d.contentOpportunities && Array.isArray(d.contentOpportunities) && d.contentOpportunities.length > 0) return true;
+    if (d.keywordIntelligence && typeof d.keywordIntelligence === 'object' && Object.keys(d.keywordIntelligence).length > 0) return true;
+    if (d.blogIntelligence && typeof d.blogIntelligence === 'object' && Object.keys(d.blogIntelligence).length > 0) return true;
+    if (d.executiveDashboard && typeof d.executiveDashboard === 'object' && Object.keys(d.executiveDashboard).length > 0) return true;
+    if (d.executiveStory) return true;
+    if (d.actionPlan && typeof d.actionPlan === 'object') {
+      const plan = d.actionPlan;
+      if (plan.immediate?.length || plan.day7?.length || plan.day30?.length || plan.day60?.length || plan.day90?.length) return true;
+    }
+    if (d.scoreBreakdown && typeof d.scoreBreakdown === 'object' && Object.keys(d.scoreBreakdown).length > 0) return true;
+    if (d.identity && typeof d.identity === 'object' && Object.keys(d.identity).length > 0) return true;
+    if (d.performanceScore != null || d.seoScore != null) return true;
+    if (d.competitorIntelligence && typeof d.competitorIntelligence === 'object' && Object.keys(d.competitorIntelligence).length > 0) return true;
+    if (d.contentGapAnalysis && typeof d.contentGapAnalysis === 'object' && Object.keys(d.contentGapAnalysis).length > 0) return true;
+    if (d.geoIntelligence && typeof d.geoIntelligence === 'object' && Object.keys(d.geoIntelligence).length > 0) return true;
+    return false;
   }
 
   // On mount, hydrate from fullResults if data exists for this chat
