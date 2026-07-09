@@ -529,6 +529,7 @@ function PosterGenerateSection() {
   const { selectedChatId } = useProject();
   const [prompt, setPrompt] = useState('');
   const [headline, setHeadline] = useState('');
+  const [audience, setAudience] = useState('');
   const [cta, setCta] = useState('');
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -544,6 +545,7 @@ function PosterGenerateSection() {
         cta: cta.trim() || undefined,
         platform: 'linkedin',
         brandColors: ['#2563eb', '#111827'],
+        audience: audience.trim() || undefined,
       });
       setResult(res);
     } catch (err: any) {
@@ -564,6 +566,7 @@ function PosterGenerateSection() {
           <input value={headline} onChange={e => setHeadline(e.target.value)} placeholder="Headline (optional)" style={{ padding: '8px 12px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px', outline: 'none' }} />
           <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA (optional)" style={{ padding: '8px 12px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px', outline: 'none' }} />
         </div>
+        <input value={audience} onChange={e => setAudience(e.target.value)} placeholder="Target audience (optional)" style={{ width: '100%', padding: '8px 12px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px', outline: 'none' }} />
         <button onClick={handleGenerate} disabled={generating || !prompt.trim() || !selectedChatId} style={{ padding: '8px 20px', borderRadius: '6px', border: '1px solid #f59e0b', background: 'rgba(245,158,11,0.15)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: '#f59e0b', display: 'inline-flex', alignItems: 'center', gap: '4px', alignSelf: 'flex-start' }}>
           {generating ? <><Loader2 className="spin" size={14} /> Generating...</> : <><Image size={14} /> Generate Poster</>}
         </button>
@@ -686,6 +689,7 @@ function VideoRenderSection() {
         duration: scenes.reduce((sum, s) => sum + s.duration, 0),
         platform: 'linkedin',
         aspectRatio: '16:9',
+        prompt: script.trim() || 'Marketing video',
       });
       setResult(res);
     } catch (err: any) {

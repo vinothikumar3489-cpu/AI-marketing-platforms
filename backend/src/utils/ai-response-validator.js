@@ -220,6 +220,14 @@ const PLACEHOLDER_PHRASES = [
   'solution presentation',
   'proof and social proof',
   'get started',
+  'reach your target audience with data-driven marketing campaigns',
+  'designed for teenage people to drive engagement',
+  'professional, modern, #e94560 accent',
+  'social creative for general audience',
+  'social creative for teenage people',
+  'growth analysis placeholder',
+  'designed for target audience',
+  'designed for ',
 ];
 
 /**

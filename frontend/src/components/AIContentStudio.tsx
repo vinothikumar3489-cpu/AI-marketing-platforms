@@ -287,20 +287,65 @@ function generateCreative(assetType: string, platform: string, headline: string,
     thumbnail: '1280x720', poster: '1080x1920', carousel: '1080x1080'
   };
   const brandColors = ['#1a1a2e', '#16213e', '#0f3460', '#e94560', '#53a7ff'];
+  const topic = headline || '';
+  const aud = audience || '';
+
+  let visualDirection = 'Bold typography with gradient background, modern digital aesthetic';
+  let layoutDescription = 'Full-bleed background with centered headline and CTA button at bottom';
+  let imagePrompt = `${platform} visual for ${aud || 'target audience'}, no text, no letters, no words, no typography, no watermark`;
+  let cta = 'Learn More';
+  let subheadline = '';
+
+  const hl = topic.toLowerCase();
+  if (hl.includes('movie') || hl.includes('poster') || hl.includes('figma')) {
+    visualDirection = 'Cinematic poster design with dramatic lighting, bold title area, character silhouette, layered gradients, and Figma-style design elements.';
+    layoutDescription = 'Large movie title at top, central hero visual, supporting tagline below, CTA button near bottom.';
+    imagePrompt = 'Cinematic poster design workspace inspired by Figma, teen-focused creative design, dramatic lighting, colorful gradients, digital design elements, blank poster mockup, no words, no letters, no typography, no watermark.';
+    cta = 'Create Your Poster';
+    subheadline = 'Create a bold cinematic poster that grabs attention and looks professional.';
+  } else if (hl.includes('skincare') || hl.includes('organic') || hl.includes('beauty')) {
+    visualDirection = 'Clean natural aesthetics with botanical elements, soft lighting, and organic textures.';
+    layoutDescription = 'Product hero centered, ingredient callouts on sides, CTA at bottom.';
+    imagePrompt = 'Organic skincare product photography, natural ingredients, botanical background, clean aesthetic, no text, no words, no typography, no watermark.';
+    cta = 'Shop Now';
+    subheadline = 'Natural ingredients. Real results. Perfect for modern wellness routines.';
+  } else if (hl.includes('hospital') || hl.includes('chatbot') || hl.includes('clinic') || hl.includes('health')) {
+    visualDirection = 'Modern medical interface with chatbot UI, clean gradients, and professional healthcare aesthetics.';
+    layoutDescription = 'Split layout: left side chatbot interface preview, right side headline and benefits.';
+    imagePrompt = 'Modern hospital reception with AI chatbot interface, clean medical design, professional healthcare, no text, no words, no typography, no watermark.';
+    cta = 'Book Demo';
+    subheadline = 'Automate patient scheduling with intelligent AI conversation flows.';
+  } else if (hl.includes('bike') || hl.includes('electric') || hl.includes('vehicle') || hl.includes('scooter')) {
+    visualDirection = 'Sleek futuristic design with dynamic motion lines, urban backdrop, and product hero shot.';
+    layoutDescription = 'Product hero center-left, speed/range specs right, CTA below.';
+    imagePrompt = 'Sleek electric bike on urban street, futuristic design, eco-friendly commuting, no text, no words, no typography, no watermark.';
+    cta = 'Test Ride';
+    subheadline = 'Eco-friendly commuting with cutting-edge electric vehicle technology.';
+  } else if (hl.includes('course') || hl.includes('coding') || hl.includes('learn') || hl.includes('education')) {
+    visualDirection = 'Modern educational design with code snippets, graduation cap, and interactive elements.';
+    layoutDescription = 'Top hero section with headline, middle course highlights, bottom CTA.';
+    imagePrompt = 'Modern online learning setup, laptop with code on screen, student studying, no text, no words, no typography, no watermark.';
+    cta = 'Enroll Today';
+    subheadline = 'Learn from industry experts with hands-on projects and real-world skills.';
+  } else if (aud) {
+    subheadline = `Designed specifically for ${aud} to achieve real results.`;
+    imagePrompt = `${platform} visual for ${aud}, modern professional design, no text, no letters, no words, no typography, no watermark`;
+  } else {
+    imagePrompt = `${platform} creative, modern professional marketing visual, no text, no letters, no words, no typography, no watermark`;
+    subheadline = 'Professional design crafted for maximum impact and engagement.';
+  }
+
   return {
     id: generateId(), type: 'creative', subType: assetType,
     title: `${assetType}: ${headline || 'Creative Asset'}`,
     content: {
       headline: headline || (audience ? `Campaign for ${audience}` : 'Featured Campaign'),
-      subheadline: audience ? `Tailored messaging for ${audience} to maximize engagement and impact` : 'Strategic messaging designed to drive engagement and conversions',
-      visualDirection: `${platform === 'social' ? 'Bold typography with gradient background' : 'Clean product-focused layout with clear value proposition'}`,
-      layoutDescription: `${assetType === 'poster' ? 'Full-bleed background with centered headline and CTA button at bottom' :
-        assetType === 'banner' ? 'Horizontal layout with headline left, CTA right, subtle brand elements' :
-        assetType === 'carousel' ? 'Multi-slide format with progressive storytelling, 4-6 slides' :
-        'Clean grid layout with prominent visual element and supporting copy'}`,
+      subheadline,
+      visualDirection,
+      layoutDescription,
       brandColors, typography: 'Inter (headlines), system-ui (body)',
-      imagePrompt: `${platform} creative for ${audience || 'target audience'} — professional, modern, ${brandColors[3]} accent, clean whitespace`,
-      cta: headline ? `Explore ${headline}` : 'Learn More', dimensions: dimensions[assetType] || '1200x630',
+      imagePrompt,
+      cta, dimensions: dimensions[assetType] || '1200x630',
       platform, audience: audience || 'Target Audience',
       campaignGoal: 'Brand awareness and engagement',
       evidenceRef: evidence.length > 0 ? evidence[0].source : undefined
@@ -876,6 +921,7 @@ export function CreativeStudio({ evidence, onSave }: { evidence: EvidenceRef[]; 
         cta: asset.content.cta,
         platform: asset.content.platform || platform,
         brandColors: asset.content.brandColors,
+        audience: asset.content.audience || audience,
       });
       setImageResult(result);
       if (result.success) onSave({ ...asset, id: generateId(), type: 'creative', subType: 'generated-poster', title: `Poster: ${headline || 'Generated'}` });
@@ -1049,6 +1095,7 @@ export function VideoStudio({ evidence, onSave }: { evidence: EvidenceRef[]; onS
         duration: durationSec,
         platform,
         aspectRatio,
+        prompt: topic || asset.title,
       });
       setVideoResult(result);
       if (result.success) onSave({ ...asset, id: generateId(), type: 'video', subType: 'rendered-video', title: `Video: ${topic || 'Rendered'}` });

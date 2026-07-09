@@ -13,20 +13,27 @@ export async function getHealth(req, res) {
     const config = getProviderHealth();
     const storage = await checkStorageProvider();
 
+    const vidShotstack = config.video.shotstack.configured;
+    const vidCreatomate = config.video.creatomate.configured;
+    const vidCloudinary = config.video.cloudinary.configured;
+
     res.json({
       success: true,
       providers: {
-        email: { configured: email.configured, provider: email.provider || null, smtpUserConfigured: email.smtpUserConfigured ?? false, smtpPassConfigured: email.smtpPassConfigured ?? false, smtpPassLength: email.smtpPassLength ?? 0, from: email.from ?? null, port587: email.port587 ?? 'unknown', port465: email.port465 ?? 'unknown' },
+        email: { provider: email.provider || 'gmail', configured: email.configured, smtpUserConfigured: email.smtpUserConfigured ?? false, smtpPassConfigured: email.smtpPassConfigured ?? false, smtpPassLength: email.smtpPassLength ?? 0, from: email.from ?? null, port587: email.port587 ?? (process.env.SMTP_USER ? 'unknown' : 'unknown'), port465: email.port465 ?? (process.env.SMTP_USER ? 'unknown' : 'unknown') },
         image: {
           pollinations: { configured: true },
           fal: { configured: config.image.fal.configured, model: config.image.fal.model },
+          cloudinary: { configured: config.image.cloudinary.configured },
           reason: config.image.fal.configured ? 'pollinations_fal_configured' : 'pollinations_only',
         },
         storage: { configured: storage.configured, provider: storage.provider || null, reason: storage.reason || null },
         video: {
-          shotstack: { configured: config.video.shotstack.configured, stage: config.video.shotstack.stage },
-          creatomate: { configured: config.video.creatomate.configured },
-          reason: config.video.shotstack.configured ? 'shotstack_configured' : config.video.creatomate.configured ? 'creatomate_configured' : 'no_video_provider',
+          shotstack: { configured: vidShotstack, stage: config.video.shotstack.stage },
+          creatomate: { configured: vidCreatomate },
+          cloudinary: { configured: vidCloudinary },
+          storyboardFallback: { configured: true },
+          reason: vidShotstack ? 'shotstack_configured' : vidCreatomate ? 'creatomate_configured' : 'storyboard_fallback',
         },
         ai: { gemini: !!process.env.GEMINI_API_KEY, groq: !!process.env.GROQ_API_KEY },
       },

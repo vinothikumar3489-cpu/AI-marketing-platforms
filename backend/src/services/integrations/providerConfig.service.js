@@ -1,15 +1,29 @@
 export function getProviderHealth() {
+  const hasGmail = !!(process.env.SMTP_USER && process.env.SMTP_PASS);
+  const hasResend = !!process.env.RESEND_API_KEY;
+  const hasSendGrid = !!process.env.SENDGRID_API_KEY;
+  const hasBrevo = !!process.env.BREVO_API_KEY;
+
+  let emailProvider = null;
+  if (hasGmail) emailProvider = 'gmail';
+  else if (hasSendGrid) emailProvider = 'sendgrid';
+  else if (hasBrevo) emailProvider = 'brevo';
+  else if (hasResend) emailProvider = 'resend';
+
   return {
     email: {
-      provider: 'resend',
-      configured: !!process.env.RESEND_API_KEY,
-      fromConfigured: !!process.env.RESEND_FROM_EMAIL,
+      provider: emailProvider,
+      configured: hasGmail || hasResend || hasSendGrid || hasBrevo,
+      fromConfigured: !!process.env.RESEND_FROM_EMAIL || hasGmail,
     },
     image: {
       pollinations: { configured: true },
       fal: {
         configured: !!process.env.FAL_KEY,
         model: process.env.FAL_IMAGE_MODEL || 'fal-ai/flux/schnell',
+      },
+      cloudinary: {
+        configured: !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET),
       },
     },
     video: {
@@ -20,6 +34,10 @@ export function getProviderHealth() {
       creatomate: {
         configured: !!process.env.CREATOMATE_API_KEY,
       },
+      cloudinary: {
+        configured: !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET),
+      },
+      storyboardFallback: { configured: true },
     },
     storage: {
       cloudinary: {

@@ -37,7 +37,7 @@ function getProvider() {
 
 async function tryGmailPort(port, secure) {
   const nodemailerDefault = await getNodemailer();
-  const transporter = nodemailerDefault.default.createTransport({
+  const transportOptions = {
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port,
     secure,
@@ -51,7 +51,11 @@ async function tryGmailPort(port, secure) {
     connectionTimeout: 30000,
     greetingTimeout: 30000,
     socketTimeout: 30000,
-  });
+  };
+  if (port === 587 && !secure) {
+    transportOptions.requireTLS = true;
+  }
+  const transporter = nodemailerDefault.default.createTransport(transportOptions);
   await transporter.verify();
   return transporter;
 }
@@ -309,7 +313,7 @@ export async function sendTestEmail({ recipientEmail, subject, body, senderName,
   }
 
   if (triedProviders.length > 0) {
-    return { success: false, error: `All providers failed. Tried: ${triedProviders.join(', ')}.`, code: 'ALL_PROVIDERS_FAILED' };
+    return { success: false, error: `All email providers failed. Tried: ${triedProviders.join(', ')}. Check that SMTP credentials are valid and Gmail App Passwords are 16 characters. For Render, Gmail SMTP port 587 may be blocked — try port 465 or switch to Brevo/Resend/SendGrid which use HTTP APIs.`, code: 'ALL_PROVIDERS_FAILED' };
   }
 
   return { success: false, error: 'No email provider configured. Set EMAIL_PROVIDER=gmail with SMTP_USER/SMTP_PASS, or set SENDGRID_API_KEY / BREVO_API_KEY / RESEND_API_KEY.', code: 'NO_PROVIDER' };
@@ -322,6 +326,7 @@ export async function checkEmailProvider() {
     const smtpUser = !!process.env.SMTP_USER;
     const smtpPass = !!process.env.SMTP_PASS;
     const passLength = process.env.SMTP_PASS ? process.env.SMTP_PASS.length : 0;
+    const smtpPort = Number(process.env.SMTP_PORT || 587);
     return {
       configured: smtpUser && smtpPass && passLength >= 10,
       provider: 'gmail',
@@ -329,8 +334,8 @@ export async function checkEmailProvider() {
       smtpPassConfigured: smtpPass,
       smtpPassLength: passLength,
       from: process.env.SMTP_FROM ? maskEmail(process.env.SMTP_FROM) : (process.env.SMTP_USER ? maskEmail(process.env.SMTP_USER) : null),
-      port587: process.env.SMTP_PORT ? 'configured' : 'unknown',
-      port465: 'unknown',
+      port587: smtpPort === 465 ? 'unknown' : smtpUser ? 'configured' : 'unknown',
+      port465: smtpPort === 465 ? 'configured' : smtpUser ? 'configured' : 'unknown',
     };
   }
 

@@ -79,7 +79,7 @@ function deriveSubheadline(prompt) {
 
 function containsPlaceholder(str) {
   if (!str) return true;
-  const placeholders = ['compelling headline here', 'untitled brief', 'general audience', 'to be determined', 'undefined', 'null', '[object object]', 'get started', 'reach your target audience with data-driven marketing campaigns', 'designed for target audience', 'designed for '];
+  const placeholders = ['compelling headline here', 'untitled brief', 'general audience', 'to be determined', 'undefined', 'null', '[object object]', 'get started', 'reach your target audience with data-driven marketing campaigns', 'designed for target audience', 'designed for teenage people to drive engagement', 'professional, modern, #e94560 accent', 'social creative for general audience', 'social creative for teenage people', 'growth analysis placeholder', 'problem introduction', 'solution presentation', 'proof and social proof', 'new analysis', 'designed for '];
   const lower = str.toLowerCase().trim();
   return placeholders.some(p => lower.includes(p));
 }

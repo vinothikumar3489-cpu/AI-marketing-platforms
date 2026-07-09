@@ -137,6 +137,7 @@ export async function generatePosterImage(chatId: string, payload: {
   platform?: string;
   dimensions?: string;
   brandColors?: string[];
+  audience?: string;
 }) {
   return api.post<{
     success: boolean;
@@ -156,16 +157,21 @@ export async function renderVideo(chatId: string, payload: {
   duration?: number;
   platform?: string;
   aspectRatio?: string;
+  prompt?: string;
 }) {
   return api.post<{
     success: boolean;
     provider?: string;
     videoUrl?: string | null;
-    storyboard?: string;
+    storyboard?: any;
+    scenes?: any[];
+    script?: string;
     duration?: number;
     generatedAt?: string;
     warnings?: string[];
     error?: string;
+    renderId?: string;
+    status?: string;
   }>(`/integrations/${chatId}/studio/video/render`, payload);
 }
 
