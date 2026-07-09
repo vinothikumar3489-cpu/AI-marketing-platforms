@@ -525,7 +525,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     await tx.technicalSeoAudit.upsert({
       where: { seoIntelligenceId: savedId },
       create: {
-        seoIntelligenceId: savedId,
+        seoIntelligence: { connect: { id: savedId } },
         auditData: technicalAudit,
         overallScore: safeTechnicalScores.overall ?? 0,
         titleScore: safeTechnicalScores.title ?? 0,
@@ -562,7 +562,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     await tx.seoScoreBreakdown.upsert({
       where: { seoIntelligenceId: savedId },
       create: {
-        seoIntelligenceId: savedId,
+        seoIntelligence: { connect: { id: savedId } },
         technicalScore: safeSeoScores.technical,
         onPageScore: safeSeoScores.onPage,
         contentScore: safeSeoScores.content,
@@ -591,7 +591,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     await tx.keywordIntelligenceRecord.upsert({
       where: { seoIntelligenceId: savedId },
       create: {
-        seoIntelligenceId: savedId,
+        seoIntelligence: { connect: { id: savedId } },
         primaryKeywords: parsedKeywordIntelligence.primaryKeywords || [],
         secondaryKeywords: parsedKeywordIntelligence.secondaryKeywords || [],
         longTailKeywords: parsedKeywordIntelligence.longTailKeywords || [],
@@ -624,7 +624,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     await tx.geoIntelligenceRecord.upsert({
       where: { seoIntelligenceId: savedId },
       create: {
-        seoIntelligenceId: savedId,
+        seoIntelligence: { connect: { id: savedId } },
         aiVisibilityScore: parsedGeoIntelligence.aiVisibilityScore,
         chatGptScore: parsedGeoIntelligence.chatGptScore,
         geminiScore: parsedGeoIntelligence.geminiScore,
@@ -671,7 +671,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     await tx.competitorSeoRecord.upsert({
       where: { seoIntelligenceId: savedId },
       create: {
-        seoIntelligenceId: savedId,
+        seoIntelligence: { connect: { id: savedId } },
         competitors: parsedCompetitorIntelligence.competitors || [],
         competitorProfiles: parsedCompetitorIntelligence.competitorProfiles || [],
         keywordGaps: parsedCompetitorIntelligence.keywordGaps || {},
@@ -702,7 +702,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     await tx.contentGapRecord.upsert({
       where: { seoIntelligenceId: savedId },
       create: {
-        seoIntelligenceId: savedId,
+        seoIntelligence: { connect: { id: savedId } },
         contentGaps: parsedContentGapIntelligence.contentGaps || parsedContentGapIntelligence.missingPages || [],
         landingPageIdeas: parsedContentGapIntelligence.landingPageIdeas || [],
         comparisonPageIdeas: parsedContentGapIntelligence.comparisonPageIdeas || [],
@@ -736,7 +736,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     await tx.blogIntelligenceRecord.upsert({
       where: { seoIntelligenceId: savedId },
       create: {
-        seoIntelligenceId: savedId,
+        seoIntelligence: { connect: { id: savedId } },
         blogIdeas: parsedBlogIntelligence.blogIdeas || [],
         blogClusters: parsedBlogIntelligence.blogClusters || [],
         blogBriefs: parsedBlogIntelligence.blogBriefs || [],

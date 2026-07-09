@@ -198,7 +198,7 @@ export async function generateExecutiveDashboard(input = {}) {
     const dashboard = await prisma.executiveSeoDashboard.upsert({
       where: { seoIntelligenceId },
       create: {
-        seoIntelligenceId,
+        seoIntelligence: { connect: { id: seoIntelligenceId } },
         executiveOverview,
         seoHealthSummary,
         keyOpportunities,
