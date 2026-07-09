@@ -461,6 +461,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
       console.log('🔒 [SEO Intelligence] Using transactional save (old data preserved until success)');
     }
     
+    console.log('[SEO] Starting transaction save for chat:', chatId, 'userId:', userId);
     const saved = await prisma.$transaction(async (tx) => {
       // First, upsert the main SEO intelligence record
       const seoRecord = await tx.seoIntelligence.upsert({
@@ -504,20 +505,21 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
 
     const savedId = seoRecord.id;
 
-    // Save raw crawl data
+    // Save raw crawl data (null-safe required fields to prevent transaction rollback)
     await tx.rawCrawlData.create({
       data: {
         seoIntelligenceId: savedId,
-        url: websiteUrl,
-        html: websiteData.html.substring(0, 100000), // Limit to 100KB
-        text: websiteData.text.substring(0, 50000), // Limit to 50KB
-        metadata: websiteData.metadata,
-        technical: websiteData.technical,
-        content: websiteData.content,
-        structured: websiteData.structured,
+        url: websiteUrl || '',
+        html: (websiteData?.html || '').substring(0, 100000),
+        text: (websiteData?.text || '').substring(0, 50000),
+        metadata: websiteData?.metadata || {},
+        technical: websiteData?.technical || {},
+        content: websiteData?.content || {},
+        structured: websiteData?.structured || {},
         provider: 'orchestrator'
       }
     });
+    console.log('[SEO] Saved rawCrawlData for chat:', chatId);
 
     // Save technical audit details
     await tx.technicalSeoAudit.upsert({
@@ -760,6 +762,20 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
 
     return seoRecord;
   });
+
+  // Post-save verification: confirm SeoIntelligence was actually saved
+  const savedId = saved?.id;
+  if (!savedId) {
+    throw new Error('SEO analysis completed but SeoIntelligence was not saved (transaction returned no ID).');
+  }
+  const verifyMain = await prisma.seoIntelligence.findUnique({
+    where: { id: savedId },
+    select: { id: true, chatId: true, userId: true, status: true }
+  });
+  if (!verifyMain) {
+    throw new Error('SEO analysis completed but SeoIntelligence was not saved (record not found after transaction).');
+  }
+  console.log('[SEO] Saved SeoIntelligence', { chatId, userId, seoIntelligenceId: savedId, status: verifyMain.status });
 
   // ==== DB VERIFICATION: Read back and verify every relation (AFTER transaction commits) ====
   let verifySaved = null;

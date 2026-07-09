@@ -338,12 +338,12 @@ export function normalizeFullResults(data: any) {
         actionPlan: safeParse(growth.actionPlan, growth.actionPlan),
         summary: growth.summary || null,
       },
-      seoIntelligence: normalizeSeo(root.seoIntelligence || root.seo || {}),
-      seo: normalizeSeo(root.seoIntelligence || root.seo || {}), // Legacy compatibility
+      seoIntelligence: normalizeSeo(root.seoIntelligence || root.seo || root.seoData || root.seoAnalysis || {}),
+      seo: normalizeSeo(root.seoIntelligence || root.seo || root.seoData || root.seoAnalysis || {}), // Legacy compatibility
       agents: asArray(root.agentRuns || []),
       automation: root.automationPlan || {},
       hasGrowthWorkspace: root.hasGrowthWorkspace === false ? false : hasRealGrowthContent,
-      hasSeoIntelligence: root.hasSeoIntelligence || !!root.seoIntelligence,
+      hasSeoIntelligence: root.hasSeoIntelligence || !!root.seoIntelligence || !!root.seoData || !!root.seoAnalysis,
     };
   }
 
@@ -379,12 +379,12 @@ export function normalizeFullResults(data: any) {
       actionPlan: safeParse(actPlan, actPlan),
       summary: growth.summary || safeParse(growth.summary, growth.summary) || null,
     },
-    seoIntelligence: normalizeSeo(root.seoIntelligence || root.seo || {}),
-    seo: normalizeSeo(root.seoIntelligence || root.seo || {}), // Legacy compatibility
+    seoIntelligence: normalizeSeo(root.seoIntelligence || root.seo || root.seoData || root.seoAnalysis || {}),
+    seo: normalizeSeo(root.seoIntelligence || root.seo || root.seoData || root.seoAnalysis || {}), // Legacy compatibility
     agents: asArray(root.agentRuns || []),
     automation: root.automationPlan || root.automationPlans || root.automation || {},
     hasGrowthWorkspace: !!(productIntel?.productAnalysis || competitorIntel?.competitorAnalysis || campaignIntel?.campaignGenerator),
-    hasSeoIntelligence: !!root.seoIntelligence,
+    hasSeoIntelligence: !!root.seoIntelligence || !!root.seoData || !!root.seoAnalysis,
   };
 }
 

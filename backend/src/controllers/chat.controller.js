@@ -151,7 +151,7 @@ export const getFullResults = async (req, res) => {
     const productIntelligence = await prisma.productIntelligence.findUnique({ where: { chatId } });
     const competitorIntelligence = await prisma.competitorIntelligence.findUnique({ where: { chatId } });
     const campaignIntelligence = await prisma.campaignIntelligence.findUnique({ where: { chatId } });
-  const seoIntelligence = await prisma.seoIntelligence.findUnique({ 
+  let seoIntelligence = await prisma.seoIntelligence.findUnique({ 
     where: { chatId },
     include: {
       technicalAuditDetail: true,
@@ -164,18 +164,35 @@ export const getFullResults = async (req, res) => {
       executiveDashboard: true,
     }
   });
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('[FullResults DB]');
-    console.log('chatId:', chatId);
-    console.log('hasSeoIntelligence:', !!seoIntelligence);
-    console.log('seoIntelligenceId:', seoIntelligence?.id || 'N/A');
-    console.log('keywordCount:', (seoIntelligence?.keywordIntelligence?.primaryKeywords || []).length);
-    console.log('competitorCount:', (seoIntelligence?.competitorSeoRecord?.competitorProfiles || []).length);
-    console.log('contentGapCount:', (seoIntelligence?.contentGapRecord?.contentGaps || []).length);
-    console.log('blogCount:', (seoIntelligence?.blogIntelligenceRecord?.blogIdeas || []).length);
-    console.log('technicalHasAuditData:', !!seoIntelligence?.technicalAuditDetail?.auditData);
-    console.log('');
+
+  // Fallback: try findFirst if findUnique fails (defensive)
+  if (!seoIntelligence) {
+    seoIntelligence = await prisma.seoIntelligence.findFirst({
+      where: { chatId },
+      include: {
+        technicalAuditDetail: true,
+        scoreBreakdown: true,
+        keywordIntelligence: true,
+        geoIntelligence: true,
+        competitorSeoRecord: true,
+        contentGapRecord: true,
+        blogIntelligenceRecord: true,
+        executiveDashboard: true,
+      },
+      orderBy: { createdAt: 'desc' }
+    });
   }
+
+  console.log('[FullResults DB]');
+  console.log('chatId:', chatId);
+  console.log('hasSeoIntelligence:', !!seoIntelligence);
+  console.log('seoIntelligenceId:', seoIntelligence?.id || 'N/A');
+  console.log('keywordCount:', (seoIntelligence?.keywordIntelligence?.primaryKeywords || []).length);
+  console.log('competitorCount:', (seoIntelligence?.competitorSeoRecord?.competitorProfiles || []).length);
+  console.log('contentGapCount:', (seoIntelligence?.contentGapRecord?.contentGaps || []).length);
+  console.log('blogCount:', (seoIntelligence?.blogIntelligenceRecord?.blogIdeas || []).length);
+  console.log('technicalHasAuditData:', !!seoIntelligence?.technicalAuditDetail?.auditData);
+  console.log('');
 
   const agentRuns = await prisma.agentRun.findMany({
     where: { chatId },

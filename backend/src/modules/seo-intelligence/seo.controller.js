@@ -57,13 +57,11 @@ export const runSeoHandler = async (req, res) => {
     });
 
     if (!result.success) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('⚠️ [SEO Run] Analysis failed, using fallback');
-      }
-      return res.json({
-        success: true,
-        seoIntelligence: result.fallback,
-        warning: 'Using fallback analysis due to: ' + result.error
+      console.error('❌ [SEO Run] Service reported failure:', result.error);
+      return res.status(500).json({
+        success: false,
+        error: result.error || 'SEO analysis failed',
+        warning: 'Analysis failed and was not saved to database. Please try again.'
       });
     }
 
