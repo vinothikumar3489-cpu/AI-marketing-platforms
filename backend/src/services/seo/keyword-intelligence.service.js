@@ -144,10 +144,10 @@ function markAsTopicIdeas(keywords) {
     cpc: null,
     competition: null,
     source: k.source || 'topic_idea_only',
-    confidence: k.confidence || null,
+    confidence: null,
     metricType: 'topic_idea_only',
     label: 'topic idea only',
-    intent: k.intent || null,
+    intent: null,
   }));
 }
 
@@ -243,7 +243,8 @@ function filterJunkKeywords(keywords, source = 'unknown') {
         keywordDifficulty: null,
         cpc: null,
         source: source,
-        confidence: source === 'category_seeds' ? 70 : 40
+        confidence: null,
+        metricType: 'topic_idea_only'
       };
     }
     return {
@@ -252,7 +253,8 @@ function filterJunkKeywords(keywords, source = 'unknown') {
       keywordDifficulty: kw.keywordDifficulty ?? null,
       cpc: kw.cpc ?? null,
       source: kw.source || source,
-      confidence: kw.confidence || (source === 'category_seeds' ? 70 : 40)
+      confidence: null,
+      metricType: kw.metricType || 'topic_idea_only'
     };
   });
 }
@@ -264,42 +266,132 @@ async function extractKeywordsFromWebsite({
   companyName = '',
   industry = ''
 }) {
-  console.log('📊 [Keyword Extraction] Analyzing website content...');
+  console.log('📊 [Keyword Extraction] Building keyword candidates from website content...');
 
   const text = websiteData.text || '';
   const title = websiteData.metadata?.title || '';
   const description = websiteData.metadata?.description || '';
-  const h1 = websiteData.h1?.[0] || '';
-  
-  const allText = `${title}\n${description}\n${h1}\n${text.substring(0, 3000)}`;
+  const h1Texts = websiteData.h1 || [];
+  const h2Texts = websiteData.h2 || [];
+  const headings = websiteData.content?.headings || [];
+  const schemaTypes = websiteData.schema?.types || websiteData.extract?.schemaTypes || [];
+  const featuresText = websiteData.featuresText || websiteData.content?.features || [];
 
-  // Detect product category from content
-  const detectCategory = () => {
-    const content = allText.toLowerCase();
+  const contentSources = [];
 
-    if (content.includes('canva') || (content.includes('graphic design') && content.includes('social media'))) return 'canva';
-    if (content.includes('gamma') || (content.includes('ai presentation') && (content.includes('maker') || content.includes('tool')))) return 'gamma';
-    if (content.includes('figma') || (content.includes('design') && (content.includes('prototyp') || content.includes('collaborat') || content.includes('ui') || content.includes('ux')))) return 'figma';
-    if (content.includes('notion') || content.includes('workspace') || content.includes('productivity') || content.includes('wiki') || content.includes('knowledge base')) return 'notion';
-    if (content.includes('orkyn') || content.includes('software development') || content.includes('erp') || content.includes('salesforce') || content.includes('crm') || content.includes('custom software') || content.includes('consulting')) return 'orkyn';
-    return 'general';
-  };
+  if (title) contentSources.push({ text: title, weight: 10 });
+  if (description) contentSources.push({ text: description, weight: 8 });
+  h1Texts.forEach(h => contentSources.push({ text: typeof h === 'string' ? h : (h.text || h), weight: 6 }));
+  h2Texts.forEach(h => contentSources.push({ text: typeof h === 'string' ? h : (h.text || h), weight: 4 }));
+  (headings || []).forEach(h => contentSources.push({ text: h.text || h, weight: 3 }));
+  featuresText.forEach(f => contentSources.push({ text: f, weight: 5 }));
 
-  const category = detectCategory();
+  const STOPWORDS = new Set([
+    'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
+    'from', 'as', 'is', 'was', 'are', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
+    'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'shall',
+    'can', 'need', 'dare', 'ought', 'used', 'this', 'that', 'these', 'those', 'it', 'its',
+    'we', 'you', 'they', 'he', 'she', 'what', 'which', 'who', 'whom', 'when', 'where', 'why',
+    'how', 'all', 'each', 'every', 'both', 'few', 'more', 'most', 'some', 'any', 'no', 'not',
+    'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just', 'because', 'about', 'into',
+    'over', 'after', 'before', 'between', 'under', 'above', 'below', 'up', 'down', 'out',
+    'off', 'through', 'during', 'without', 'within', 'along', 'around', 'among',
+    'our', 'your', 'their', 'my', 'his', 'her', 'get', 'gets', 'got', 'getting',
+    'make', 'makes', 'made', 'making', 'use', 'uses', 'used', 'using', 'find',
+    'found', 'finding', 'see', 'sees', 'saw', 'seen', 'come', 'comes', 'came', 'coming',
+    'take', 'takes', 'took', 'taking', 'know', 'knows', 'knew', 'known', 'like', 'likes',
+    'go', 'goes', 'went', 'gone', 'going', 'want', 'wants', 'wanted', 'look', 'looks',
+    'help', 'helps', 'helped', 'work', 'works', 'worked', 'working', 'seem', 'seems',
+    'try', 'tries', 'tried', 'leave', 'leaves', 'call', 'calls', 'called'
+  ]);
 
-  // Category-based topic ideas (no fake metrics)
-  const categoryTopicIdeas = {
-    canva: ['graphic design tool', 'online design platform', 'AI design tool', 'presentation maker', 'social media design tool', 'logo maker', 'brand kit software', 'Canva alternatives', 'Canva pricing', 'Canva vs Adobe Express'],
-    gamma: ['AI presentation maker', 'AI presentation tool', 'presentation software', 'Gamma alternatives', 'Gamma vs Canva', 'AI website builder', 'slide deck generator'],
-    figma: ['collaborative design tool', 'UI design software', 'UX design tool', 'design prototyping tool', 'design system tool', 'Figma alternatives'],
-    notion: ['productivity workspace', 'project management tool', 'Notion alternatives', 'team wiki software', 'knowledge base software'],
-    orkyn: ['custom software development', 'ERP consulting', 'Salesforce consulting', 'business automation', 'CRM integration services'],
-    general: ['software solution', 'business tool', 'productivity software', 'collaboration platform']
-  };
-  
-  const topicIdeas = categoryTopicIdeas[category] || [];
+  const BOILERPLATE_PHRASES = [
+    'sign in', 'sign up', 'log in', 'login', 'register', 'create account',
+    'forgot password', 'reset password', 'terms of service', 'privacy policy',
+    'cookie policy', 'accept cookies', 'manage cookies', 'subscribe',
+    'newsletter', 'unsubscribe', 'all rights reserved', 'powered by',
+    'get started free', 'start free trial', 'free trial', 'download now',
+    'learn more', 'read more', 'contact us', 'contact sales', 'get in touch',
+    'follow us', 'share this', 'copyright', 'legal notice', 'sitemap',
+    'search', 'menu', 'navigation', 'skip to content', 'back to top',
+    'loading', 'please wait', 'under construction', 'coming soon',
+    'stay connected', 'join our community', 'follow on social',
+    'download on app store', 'get it on google play', 'available on',
+    'workspace', 'google workspace', 'admin console', 'google admin'
+  ];
+
+  function normalizeText(t) {
+    return t.toLowerCase().replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function extractPhrases(text, maxWords = 5, minWords = 2) {
+    const normalized = normalizeText(text);
+    const words = normalized.split(' ').filter(w => w.length > 0 && !STOPWORDS.has(w) && w.length > 1);
+    const phrases = [];
+
+    for (let len = Math.min(maxWords, words.length); len >= minWords; len--) {
+      for (let i = 0; i <= words.length - len; i++) {
+        const phrase = words.slice(i, i + len).join(' ');
+        if (phrase.length >= 5 && phrase.split(' ').every(w => w.length > 1)) {
+          const isBoilerplate = BOILERPLATE_PHRASES.some(bp => phrase.includes(bp));
+          if (!isBoilerplate) {
+            phrases.push(phrase);
+          }
+        }
+      }
+    }
+    return [...new Set(phrases)];
+  }
+
+  function scoreRelevance(phrase, productName, companyName, industry) {
+    let score = 50;
+    const lowerPhrase = phrase.toLowerCase();
+    const lowerProduct = (productName || '').toLowerCase();
+    const lowerCompany = (companyName || '').toLowerCase();
+    const lowerIndustry = (industry || '').toLowerCase();
+
+    if (lowerProduct && lowerPhrase.includes(lowerProduct)) score += 30;
+    if (lowerCompany && lowerPhrase.includes(lowerCompany)) score += 20;
+    if (lowerIndustry && lowerPhrase.includes(lowerIndustry)) score += 15;
+
+    const productTerms = ['software', 'platform', 'tool', 'solution', 'app', 'service', 'product',
+      'cloud', 'saas', 'enterprise', 'business', 'professional', 'collaboration',
+      'analytics', 'automation', 'management', 'integration', 'security', 'performance'];
+
+    const termScore = productTerms.filter(t => lowerPhrase.includes(t)).length * 5;
+    score += Math.min(termScore, 20);
+
+    if (/\d/.test(lowerPhrase)) score += 5;
+
+    return Math.min(100, score);
+  }
+
+  function deduplicateSimilar(phrases) {
+    const result = [];
+    const seen = new Set();
+    for (const phrase of phrases) {
+      const key = phrase.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!seen.has(key)) {
+        seen.add(key);
+        let isDuplicate = false;
+        for (const existing of result) {
+          const existingKey = existing.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (existingKey.includes(key) || key.includes(existingKey)) {
+            if (key.length > existingKey.length) {
+              result[result.indexOf(existing)] = phrase;
+            }
+            isDuplicate = true;
+            break;
+          }
+        }
+        if (!isDuplicate) result.push(phrase);
+      }
+    }
+    return result;
+  }
 
   // Try AI extraction with GROQ
+  const allText = `${title}\n${description}\n${h1Texts.join('\n')}\n${text.substring(0, 3000)}`;
   const GROQ_API_KEY = process.env.GROQ_API_KEY;
   if (GROQ_API_KEY) {
     try {
@@ -343,12 +435,40 @@ Rules:
         const data = await response.json();
         const parsed = JSON.parse(data.choices[0].message.content);
         if (parsed.primary || parsed.secondary) {
-          return {
-            primary: (parsed.primary || []).map(k => ({ keyword: k, source: 'ai_extracted', confidence: 50 })),
-            secondary: (parsed.secondary || []).map(k => ({ keyword: k, source: 'ai_extracted', confidence: 40 })),
-            longTail: (parsed.longTail || []).map(k => ({ keyword: k, source: 'ai_extracted', confidence: 35 })),
-            questions: (parsed.questions || []).map(k => ({ keyword: k, source: 'ai_extracted', confidence: 40 })),
-          };
+          // Filter through heuristic pipeline too
+          const allAi = [
+            ...(parsed.primary || []).map(k => ({ phrase: k, score: 80 })),
+            ...(parsed.secondary || []).map(k => ({ phrase: k, score: 65 })),
+            ...(parsed.longTail || []).map(k => ({ phrase: k, score: 50 })),
+          ];
+          const cleanPhrases = allAi
+            .filter(p => {
+              const lower = p.phrase.toLowerCase();
+              const isBoilerplate = BOILERPLATE_PHRASES.some(bp => lower.includes(bp));
+              return !isBoilerplate && lower.split(' ').every(w => !STOPWORDS.has(w) || w.length <= 1);
+            })
+            .filter(p => p.phrase.length >= 5);
+          const deduped = deduplicateSimilar(cleanPhrases.map(p => p.phrase));
+          const scored = deduped.map(phrase => {
+            const found = cleanPhrases.find(p => p.phrase === phrase);
+            return { phrase, score: found ? found.score : 50 };
+          }).filter(p => p.score >= 50);
+
+          if (scored.length > 0) {
+            const primaryKeywords = scored.slice(0, 8).map(p => ({
+              keyword: p.phrase, source: 'ai_extracted', confidence: null, metricType: 'topic_idea_only', label: 'topic idea only', intent: null, relevanceScore: p.score
+            }));
+            const secondaryKeywords = scored.slice(8, 20).map(p => ({
+              keyword: p.phrase, source: 'ai_extracted', confidence: null, metricType: 'topic_idea_only', label: 'topic idea only', intent: null, relevanceScore: p.score
+            }));
+            const longTailKeywords = scored.slice(20, 30).map(p => ({
+              keyword: p.phrase, source: 'ai_extracted', confidence: null, metricType: 'topic_idea_only', label: 'topic idea only', intent: null, relevanceScore: p.score
+            }));
+            console.log(`[Keyword Extraction] AI extracted ${scored.length} keyword candidates`);
+            return {
+              primary: primaryKeywords, secondary: secondaryKeywords, longTail: longTailKeywords, questions: parsed.questions || [],
+            };
+          }
         }
       }
     } catch (e) {
@@ -356,17 +476,76 @@ Rules:
     }
   }
 
-  // Fallback: return topic ideas from category (no fake metrics)
-  console.log('⚠️ [Keyword Extraction] Using category-based topic ideas');
+  // Heuristic keyword candidate pipeline
+  console.log('[Keyword Extraction] Generating keyword candidates from website content...');
 
-  const result = {
-    primary: topicIdeas.slice(0, 5).map(k => ({ keyword: k, source: 'topic_idea', confidence: 40 })),
-    secondary: topicIdeas.slice(5, 10).map(k => ({ keyword: k, source: 'topic_idea', confidence: 35 })),
-    longTail: topicIdeas.slice(10, 15).map(k => ({ keyword: k, source: 'topic_idea', confidence: 30 })),
-    questions: [],
-  };
+  let allPhrases = [];
+  for (const source of contentSources) {
+    const phrases = extractPhrases(source.text);
+    const scored = phrases.map(p => ({
+      phrase: p,
+      score: scoreRelevance(p, productName, companyName, industry) + source.weight,
+      source: source.text.substring(0, 50)
+    }));
+    allPhrases = allPhrases.concat(scored);
+  }
 
-  return result;
+  allPhrases.sort((a, b) => b.score - a.score);
+  const uniquePhrases = deduplicateSimilar(allPhrases.map(p => p.phrase));
+
+  const relevant = uniquePhrases
+    .map(phrase => {
+      const existing = allPhrases.find(p => p.phrase === phrase);
+      return { phrase, score: existing ? existing.score : 50 };
+    })
+    .filter(p => p.score >= 50)
+    .slice(0, 30);
+
+  const primary = relevant.slice(0, 8).map(p => ({
+    keyword: p.phrase,
+    searchVolume: null,
+    keywordDifficulty: null,
+    cpc: null,
+    competition: null,
+    source: 'topic_candidate',
+    confidence: null,
+    metricType: 'topic_idea_only',
+    label: 'topic idea only',
+    intent: null,
+    relevanceScore: p.score
+  }));
+
+  const secondary = relevant.slice(8, 20).map(p => ({
+    keyword: p.phrase,
+    searchVolume: null,
+    keywordDifficulty: null,
+    cpc: null,
+    competition: null,
+    source: 'topic_candidate',
+    confidence: null,
+    metricType: 'topic_idea_only',
+    label: 'topic idea only',
+    intent: null,
+    relevanceScore: p.score
+  }));
+
+  const longTail = relevant.slice(20, 30).map(p => ({
+    keyword: p.phrase,
+    searchVolume: null,
+    keywordDifficulty: null,
+    cpc: null,
+    competition: null,
+    source: 'topic_candidate',
+    confidence: null,
+    metricType: 'topic_idea_only',
+    label: 'topic idea only',
+    intent: null,
+    relevanceScore: p.score
+  }));
+
+  console.log(`[Keyword Extraction] Generated ${relevant.length} keyword candidates: ${primary.length} primary, ${secondary.length} secondary, ${longTail.length} long-tail`);
+
+  return { primary, secondary, longTail, questions: [] };
 }
 
 // ============================================

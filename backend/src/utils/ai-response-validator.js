@@ -303,7 +303,7 @@ function ensureString(value, fallback = '') {
 /**
  * Ensure value is a valid number
  */
-function ensureNumber(value, fallback = 0) {
+function ensureNumber(value, fallback = null) {
   const num = Number(value);
   if (isNaN(num) || num < 0) {
     return fallback;
@@ -330,8 +330,8 @@ function ensureInsightArray(value) {
     if (typeof item === 'string') {
       return {
         value: item,
-        confidence: 75,
-        impact: 'Medium'
+        confidence: null,
+        impact: null
       };
     }
     
@@ -339,8 +339,8 @@ function ensureInsightArray(value) {
     if (typeof item === 'object' && item !== null) {
       return {
         value: ensureString(item.value || item.insight || item.recommendation || item.opportunity || item.risk || item.trend || item),
-        confidence: ensureNumber(item.confidence, 0),
-        impact: ensureString(item.impact || item.priority, 'Low')
+        confidence: ensureNumber(item.confidence, null),
+        impact: ensureString(item.impact || item.priority, null)
       };
     }
     
@@ -358,7 +358,7 @@ function ensurePersonaArray(value) {
     if (typeof persona !== 'object' || persona === null) return null;
     
     return {
-      name: ensureString(persona.name || persona.personaName, 'Target Persona'),
+      name: ensureString(persona.name || persona.personaName, ''),
       demographics: ensureString(persona.demographics || persona.description),
       intentScore: ensureNumber(persona.intentScore || persona.score, 0),
       goals: ensureStringArray(persona.goals || []),
@@ -378,7 +378,7 @@ function ensureCompetitorArray(value) {
     if (typeof comp !== 'object' || comp === null) return null;
     
     return {
-      name: ensureString(comp.name || comp.competitorName, 'Competitor'),
+      name: ensureString(comp.name || comp.competitorName, ''),
       domain: ensureString(comp.domain || comp.url || comp.website),
       opportunityScore: ensureNumber(comp.opportunityScore || comp.score, 0),
       strengths: ensureStringArray(comp.strengths || []),
@@ -398,10 +398,7 @@ function ensureChannelArray(value) {
     if (typeof channel === 'string') {
       return {
         channel: channel,
-        name: channel,
-        budgetAllocation: 0,
-        expectedRoi: 0,
-        confidence: 0
+        name: channel
       };
     }
     
@@ -409,9 +406,6 @@ function ensureChannelArray(value) {
       return {
         channel: ensureString(channel.channel || channel.name, 'Channel'),
         name: ensureString(channel.channel || channel.name, 'Channel'),
-        budgetAllocation: ensureNumber(channel.budgetAllocation || channel.budget, 0),
-        expectedRoi: ensureNumber(channel.expectedRoi || channel.roi, 0),
-        confidence: ensureNumber(channel.confidence, 0),
         reasoning: ensureString(channel.reasoning || channel.reason)
       };
     }
@@ -467,57 +461,57 @@ function generateProductFallback(input) {
     summary: `${productName} provides value to customers`,
     productSummary: `${productName} provides value to customers`,
     keyFeatures: [
-      { value: 'Core functionality', confidence: 0, impact: 'Low' }
+      { value: 'Core functionality', confidence: null, impact: null }
     ],
     features: [
-      { value: 'Core functionality', confidence: 0, impact: 'Low' }
+      { value: 'Core functionality', confidence: null, impact: null }
     ],
     coreBenefits: [
-      { value: 'Saves time', confidence: 0, impact: 'Low' }
+      { value: 'Saves time', confidence: null, impact: null }
     ],
     painPointsSolved: [
-      { value: 'Inefficiency', confidence: 0, impact: 'Low' }
+      { value: 'Inefficiency', confidence: null, impact: null }
     ],
     painPoints: [
-      { value: 'Inefficiency', confidence: 0, impact: 'Low' }
+      { value: 'Inefficiency', confidence: null, impact: null }
     ],
     targetUsers: [
-      { value: input?.targetAudience || 'Business users', confidence: 0, impact: 'Low' }
+      { value: input?.targetAudience || 'Business users', confidence: null, impact: null }
     ],
     differentiators: [
-      { value: 'Unique approach', confidence: 0, impact: 'Low' }
+      { value: 'Unique approach', confidence: null, impact: null }
     ],
     jobsToBeDone: [
-      { value: 'Solve core problem', confidence: 0, impact: 'Low' }
+      { value: 'Solve core problem', confidence: null, impact: null }
     ],
-    confidenceScore: 0,
+    confidenceScore: null,
     provider: 'fallback'
   };
 }
 
 function generateMarketFallback(input) {
   return {
-    demandScore: 0,
-    confidence: 0,
-    confidenceScore: 0,
+    demandScore: null,
+    confidence: null,
+    confidenceScore: null,
     tam: 'Insufficient Data',
     sam: 'Insufficient Data',
     som: 'Insufficient Data',
     cagr: 'Insufficient Data',
     marketTrends: [
-      { value: 'Market trend data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Market trend data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     opportunities: [
-      { value: 'Market opportunity data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Market opportunity data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     growthOpportunities: [
-      { value: 'Growth opportunity data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Growth opportunity data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     risks: [
-      { value: 'Market risk data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Market risk data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     marketRisks: [
-      { value: 'Market risk data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Market risk data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     entryStrategy: 'Market entry strategy unavailable. No verified source found.',
     provider: 'fallback'
@@ -547,18 +541,18 @@ function generateAudienceFallback(input) {
       }
     ],
     buyingTriggers: [
-      { value: 'Buying trigger data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Buying trigger data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     commonObjections: [
-      { value: 'Objection data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Objection data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     bestChannels: [
-      { value: 'Channel data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Channel data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     decisionMakers: [
-      { value: 'Decision maker data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Decision maker data unavailable. No verified source found.', confidence: null, impact: null }
     ],
-    confidenceScore: 0,
+    confidenceScore: null,
     provider: 'fallback'
   };
 }
@@ -568,15 +562,15 @@ function generateCompetitorFallback(input) {
     directCompetitors: [],
     competitorMatrix: 'Competitive landscape analysis unavailable - SERP API required',
     differentiationOpportunities: [
-      { value: 'Competitor data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Competitor data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     marketGaps: [
-      { value: 'Market gap analysis unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Market gap analysis unavailable. No verified source found.', confidence: null, impact: null }
     ],
     competitorWeaknesses: [
-      { value: 'Competitor analysis unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Competitor analysis unavailable. No verified source found.', confidence: null, impact: null }
     ],
-    confidenceScore: 0,
+    confidenceScore: null,
     provider: 'fallback'
   };
 }
@@ -584,27 +578,27 @@ function generateCompetitorFallback(input) {
 function generateIntentFallback(input) {
   return {
     hotSegments: [
-      { value: 'Intent data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Intent data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     highIntentSegments: [
-      { value: 'Intent data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Intent data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     warmSegments: [
-      { value: 'Intent data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Intent data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     coldSegments: [
-      { value: 'Intent data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Intent data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     buyingSignals: [
-      { value: 'Buying signal data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Buying signal data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     triggerEvents: [
-      { value: 'Trigger event data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Trigger event data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     leadScoringRules: [
-      { value: 'Lead scoring data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Lead scoring data unavailable. No verified source found.', confidence: null, impact: null }
     ],
-    confidenceScore: 0,
+    confidenceScore: null,
     provider: 'fallback'
   };
 }
@@ -617,15 +611,15 @@ function generatePositioningFallback(input) {
     valueProposition: 'Value proposition unavailable. No verified source found.',
     brandPromise: 'Brand promise unavailable. No verified source found.',
     messagingPillars: [
-      { value: 'Messaging pillar data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Messaging pillar data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     pillars: [
-      { value: 'Messaging pillar data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Messaging pillar data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     competitorWeaknessesToAttack: [
-      { value: 'Competitor weakness data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Competitor weakness data unavailable. No verified source found.', confidence: null, impact: null }
     ],
-    confidenceScore: 0,
+    confidenceScore: null,
     provider: 'fallback'
   };
 }
@@ -633,22 +627,22 @@ function generatePositioningFallback(input) {
 function generateCampaignFallback(input) {
   return {
     creativeAngles: [
-      { value: 'Creative angle data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Creative angle data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     copyHooks: [
-      { value: 'Copy hook data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Copy hook data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     ctaSuggestions: [
-      { value: 'CTA data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'CTA data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     emailSequence: [
-      { value: 'Email sequence data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Email sequence data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     socialPostIdeas: [
-      { value: 'Social post data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Social post data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     videoIdeas: [
-      { value: 'Video idea data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Video idea data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     actionPlan: {
       sevenDay: [],
@@ -658,9 +652,9 @@ function generateCampaignFallback(input) {
     },
     nextActions: ['Campaign data unavailable. No verified source found.'],
     campaignIdeas: [
-      { value: 'Campaign idea data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Campaign idea data unavailable. No verified source found.', confidence: null, impact: null }
     ],
-    confidenceScore: 0,
+    confidenceScore: null,
     provider: 'fallback'
   };
 }
@@ -671,18 +665,18 @@ function generateChannelFallback(input) {
     channels: [],
     primaryChannel: 'Channel data unavailable. No verified source found.',
     budgetSplit: [
-      { value: 'Budget split data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Budget split data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     channelFitScores: [
-      { value: 'Channel fit data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Channel fit data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     postingFrequency: [
-      { value: 'Posting frequency data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Posting frequency data unavailable. No verified source found.', confidence: null, impact: null }
     ],
     contentTypes: [
-      { value: 'Content type data unavailable. No verified source found.', confidence: 0, impact: 'Low' }
+      { value: 'Content type data unavailable. No verified source found.', confidence: null, impact: null }
     ],
-    confidenceScore: 0,
+    confidenceScore: null,
     provider: 'fallback'
   };
 }

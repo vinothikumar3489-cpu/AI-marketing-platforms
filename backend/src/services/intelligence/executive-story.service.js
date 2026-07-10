@@ -172,19 +172,19 @@ function inferProductMaturity(company, competitors) {
 function generateStrengths(company, technology, pricing) {
   const strengths = [];
   if (company.employeeEstimate !== 'Unknown' && parseInt(company.employeeEstimate) > 20) {
-    strengths.push({ value: `Established team of ${company.employeeEstimate} employees indicating operational capacity`, confidence: 80, impact: 'High' });
+    strengths.push({ value: `Established team of ${company.employeeEstimate} employees indicating operational capacity`, confidence: null, impact: 'High' });
   }
   if (technology.technologies?.length > 5) {
-    strengths.push({ value: `Sophisticated technology stack with ${technology.technologies.length} verified technologies`, confidence: 90, impact: 'High' });
+    strengths.push({ value: `Sophisticated technology stack with ${technology.technologies.length} verified technologies`, confidence: null, impact: 'High' });
   }
   if (pricing.tiers?.length > 0) {
-    strengths.push({ value: `Clear pricing model with ${pricing.tiers.length} tiers enabling customer segmentation`, confidence: 85, impact: 'Medium' });
+    strengths.push({ value: `Clear pricing model with ${pricing.tiers.length} tiers enabling customer segmentation`, confidence: null, impact: 'Medium' });
   }
   if (pricing.hasFree || pricing.hasTrial) {
-    strengths.push({ value: 'Free tier or trial available reducing barrier to entry', confidence: 90, impact: 'High' });
+    strengths.push({ value: 'Free tier or trial available reducing barrier to entry', confidence: null, impact: 'High' });
   }
   if (company.socialChannels?.length > 2) {
-    strengths.push({ value: `Active presence on ${company.socialChannels.length}+ social channels`, confidence: 85, impact: 'Medium' });
+    strengths.push({ value: `Active presence on ${company.socialChannels.length}+ social channels`, confidence: null, impact: 'Medium' });
   }
   if (strengths.length === 0) {
     strengths.push({ value: 'Insufficient evidence to determine strengths', confidence: 0, impact: 'Low' });
@@ -195,19 +195,19 @@ function generateStrengths(company, technology, pricing) {
 function generateWeaknesses(company, technology, pricing, warnings) {
   const weaknesses = [];
   if (pricing.tiers?.length === 0 && !pricing.hasFree && !pricing.hasTrial) {
-    weaknesses.push({ value: 'Pricing information not publicly available on website', confidence: 95, impact: 'High' });
+    weaknesses.push({ value: 'Pricing information not publicly available on website', confidence: null, impact: 'High' });
   }
   if (technology.technologies?.length === 0) {
-    weaknesses.push({ value: 'Technology stack could not be identified from public sources', confidence: 85, impact: 'Medium' });
+    weaknesses.push({ value: 'Technology stack could not be identified from public sources', confidence: null, impact: 'Medium' });
   }
   if (company.employeeEstimate === 'Unknown') {
-    weaknesses.push({ value: 'Company size could not be verified from public data', confidence: 80, impact: 'Medium' });
+    weaknesses.push({ value: 'Company size could not be verified from public data', confidence: null, impact: 'Medium' });
   }
   if (company.fundingStage === 'Unknown') {
-    weaknesses.push({ value: 'Funding status could not be verified from public sources', confidence: 75, impact: 'Low' });
+    weaknesses.push({ value: 'Funding status could not be verified from public sources', confidence: null, impact: 'Low' });
   }
   if (warnings?.length > 0) {
-    weaknesses.push({ value: `${warnings.length} data quality warnings during intelligence collection`, confidence: 90, impact: 'Medium' });
+    weaknesses.push({ value: `${warnings.length} data quality warnings during intelligence collection`, confidence: null, impact: 'Medium' });
   }
   if (weaknesses.length === 0) {
     weaknesses.push({ value: 'Insufficient evidence to determine weaknesses', confidence: 0, impact: 'Low' });
@@ -222,17 +222,17 @@ function generateOpportunities(market, competitors, audience) {
     topTrends.forEach(t => {
       const text = typeof t === 'string' ? t : t.keyword || t.signal || '';
       if (text) {
-        opportunities.push({ value: `Market trend: ${text}`, confidence: 75, impact: 'High' });
+        opportunities.push({ value: `Market trend: ${text}`, confidence: null, impact: 'High' });
       }
     });
   }
   if (market.opportunities?.length > 0) {
     market.opportunities.slice(0, 3).forEach(o => {
-      opportunities.push({ value: typeof o === 'string' ? o : o.value || o, confidence: 70, impact: 'High' });
+      opportunities.push({ value: typeof o === 'string' ? o : o.value || o, confidence: null, impact: 'High' });
     });
   }
   if ((competitors.direct || []).length === 0) {
-    opportunities.push({ value: 'Potential first-mover advantage in identified market space', confidence: 50, impact: 'High' });
+    opportunities.push({ value: 'Potential first-mover advantage in identified market space', confidence: null, impact: 'High' });
   }
   if (opportunities.length === 0) {
     opportunities.push({ value: 'Insufficient evidence to determine opportunities', confidence: 0, impact: 'Low' });
@@ -243,15 +243,15 @@ function generateOpportunities(market, competitors, audience) {
 function generateThreats(competitors, market, warnings) {
   const threats = [];
   if ((competitors.direct || []).length > 3) {
-    threats.push({ value: `High competitive intensity with ${competitors.direct.length} direct competitors`, confidence: 85, impact: 'High' });
+    threats.push({ value: `High competitive intensity with ${competitors.direct.length} direct competitors`, confidence: null, impact: 'High' });
   }
   if (market.risks?.length > 0) {
     market.risks.slice(0, 3).forEach(r => {
-      threats.push({ value: typeof r === 'string' ? r : r.value || r, confidence: 70, impact: 'High' });
+      threats.push({ value: typeof r === 'string' ? r : r.value || r, confidence: null, impact: 'High' });
     });
   }
   if (warnings?.length > 3) {
-    threats.push({ value: 'Data quality gaps may indicate opaque market positioning', confidence: 60, impact: 'Medium' });
+    threats.push({ value: 'Data quality gaps may indicate opaque market positioning', confidence: null, impact: 'Medium' });
   }
   if (threats.length === 0) {
     threats.push({ value: 'Insufficient evidence to determine threats', confidence: 0, impact: 'Low' });
@@ -295,7 +295,7 @@ function generateKeyFindings(company, competitors, market, technology, audience,
   if (technology.technologies?.length > 0) {
     findings.push({
       finding: `Technology stack includes ${technology.technologies.length} verified technologies across framework, analytics, and infrastructure categories.`,
-      confidence: 85,
+      confidence: null,
       evidence: 'Technology fingerprinting from website source code analysis',
       impact: 'Medium'
     });
@@ -304,7 +304,7 @@ function generateKeyFindings(company, competitors, market, technology, audience,
   if (audience.personas?.length > 0) {
     findings.push({
       finding: `Developed ${audience.personas.length} ideal customer profiles based on industry patterns and website evidence.`,
-      confidence: 70,
+      confidence: null,
       evidence: 'Industry evidence patterns and website content analysis',
       impact: 'High'
     });
@@ -313,7 +313,7 @@ function generateKeyFindings(company, competitors, market, technology, audience,
   if (warnings?.length > 0) {
     findings.push({
       finding: `${warnings.length} data quality warnings were identified during intelligence collection.`,
-      confidence: 90,
+      confidence: null,
       evidence: 'Intelligence collection process logs',
       impact: 'Medium'
     });
@@ -337,7 +337,7 @@ function generateTopPriorities(company, competitors, market, technology, audienc
       owner: 'Strategy Team',
       kpi: 'Identify minimum 5 direct and indirect competitors',
       evidence: `Current intelligence identified ${totalCompetitors} competitors. SERP analysis and market research required.`,
-      confidence: 100
+      confidence: null
     });
   } else {
     priorities.push({
@@ -349,7 +349,7 @@ function generateTopPriorities(company, competitors, market, technology, audienc
       owner: 'Product Management',
       kpi: 'Complete feature comparison matrix for top 5 competitors',
       evidence: `${directCount} direct competitors identified via ${(competitors.sources || []).map(s => s.source).join(', ') || 'available sources'}.`,
-      confidence: 85
+      confidence: null
     });
   }
 
@@ -363,7 +363,7 @@ function generateTopPriorities(company, competitors, market, technology, audienc
       owner: 'Strategy Team',
       kpi: 'Verified TAM/SAM/SOM with source attribution',
       evidence: 'Current market intelligence unable to verify market size from available data sources.',
-      confidence: 100
+      confidence: null
     });
   } else {
     priorities.push({
@@ -375,7 +375,7 @@ function generateTopPriorities(company, competitors, market, technology, audienc
       owner: 'Strategy Team',
       kpi: 'Cross-validated TAM/SAM/SOM from 2+ independent sources',
       evidence: `Market intelligence from ${(market.sources || []).length} sources.`,
-      confidence: 75
+      confidence: null
     });
   }
 
@@ -389,7 +389,7 @@ function generateTopPriorities(company, competitors, market, technology, audienc
       owner: 'Marketing',
       kpi: '3 validated buyer personas with ICP criteria',
       evidence: `${(audience.personas || []).length} personas developed from industry patterns.`,
-      confidence: 90
+      confidence: null
     });
   }
 
@@ -401,8 +401,8 @@ function generateTopPriorities(company, competitors, market, technology, audienc
     timeline: '60-90 days',
     owner: 'Marketing / Growth',
     kpi: 'GTM plan with channel mix, budget allocation, and messaging framework',
-    evidence: 'Synthesized from competitive, market, and audience intelligence.',
-    confidence: 70
+      evidence: 'Synthesized from competitive, market, and audience intelligence.',
+      confidence: null
   });
 
   priorities.push({
@@ -413,8 +413,8 @@ function generateTopPriorities(company, competitors, market, technology, audienc
     timeline: '90-180 days',
     owner: 'Data & Analytics',
     kpi: 'Automated competitive monitoring dashboard with weekly updates',
-    evidence: 'Intelligence infrastructure requires automation for scalability.',
-    confidence: 80
+      evidence: 'Intelligence infrastructure requires automation for scalability.',
+      confidence: null
   });
 
   return priorities;

@@ -308,11 +308,10 @@ export async function generateReportCharts(chatId, userId) {
   }
 
   if (data.market.trends.length > 0) {
-    // Use index-based deterministic values since no actual trend numbers exist
     charts.marketTrend = generateTrendChartSvg(
       data.market.trends.slice(0, 10).map((t, i) => ({
         label: typeof t === 'string' ? t.substring(0, 20) : t.keyword?.substring(0, 20) || `Point ${i + 1}`,
-        value: 30 + (i * 7) % 60
+        value: null
       }))
     );
   }
@@ -461,11 +460,11 @@ function generateMarkdown(data, type = 'executive') {
 
     md += `## 1. Executive Summary & KPI Dashboard\n\n`;
     md += `| Metric | Value |\n| --- | --- |\n`;
-    md += `| Overall Score | ${scores?.overallGrowthScore || 0}/100 |\n`;
-    md += `| Market Opportunity | ${scores?.marketOpportunityScore || 0}/100 |\n`;
-    md += `| Audience Clarity | ${scores?.audienceClarityScore || 0}/100 |\n`;
-    md += `| Competitive Defensibility | ${scores?.competitiveDefensibilityScore || 0}/100 |\n`;
-    md += `| Campaign Readiness | ${scores?.campaignReadinessScore || 0}/100 |\n\n`;
+    md += `| Overall Score | ${scores?.overallGrowthScore ?? null}/100 |\n`;
+    md += `| Market Opportunity | ${scores?.marketOpportunityScore ?? null}/100 |\n`;
+    md += `| Audience Clarity | ${scores?.audienceClarityScore ?? null}/100 |\n`;
+    md += `| Competitive Defensibility | ${scores?.competitiveDefensibilityScore ?? null}/100 |\n`;
+    md += `| Campaign Readiness | ${scores?.campaignReadinessScore ?? null}/100 |\n\n`;
 
     md += `## 2. Company Overview\n\n`;
     md += `| Attribute | Value |\n| --- | --- |\n`;
@@ -645,11 +644,11 @@ function generateCsv(data) {
   csv += `Market,SOM,${csvEscape(data.market?.som)}\n`;
   csv += `Market,Growth Rate,${csvEscape(data.market?.growthRate)}\n`;
 
-  csv += `Scores,Overall Growth,${data.scores?.overallGrowthScore || 0}\n`;
-  csv += `Scores,Market Opportunity,${data.scores?.marketOpportunityScore || 0}\n`;
-  csv += `Scores,Audience Clarity,${data.scores?.audienceClarityScore || 0}\n`;
-  csv += `Scores,Competitive Defensibility,${data.scores?.competitiveDefensibilityScore || 0}\n`;
-  csv += `Scores,Campaign Readiness,${data.scores?.campaignReadinessScore || 0}\n`;
+  csv += `Scores,Overall Growth,${data.scores?.overallGrowthScore ?? null}\n`;
+  csv += `Scores,Market Opportunity,${data.scores?.marketOpportunityScore ?? null}\n`;
+  csv += `Scores,Audience Clarity,${data.scores?.audienceClarityScore ?? null}\n`;
+  csv += `Scores,Competitive Defensibility,${data.scores?.competitiveDefensibilityScore ?? null}\n`;
+  csv += `Scores,Campaign Readiness,${data.scores?.campaignReadinessScore ?? null}\n`;
 
   if (data.competitor?.direct?.length > 0) {
     data.competitor.direct.forEach(c => {

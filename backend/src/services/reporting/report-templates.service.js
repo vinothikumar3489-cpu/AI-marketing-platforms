@@ -197,9 +197,10 @@ function priorityBadge(priority) {
 function confidenceBadge(score) {
   const n = Number(score);
   if (!Number.isFinite(n)) return '';
-  const color = n >= 70 ? '#16a34a' : n >= 40 ? '#d97706' : '#dc2626';
-  const bg = n >= 70 ? '#f0fdf4' : n >= 40 ? '#fffbeb' : '#fef2f2';
-  return `<span class="badge" style="background:${bg};color:${color}">${Math.round(n)}% confidence</span>`;
+  const level = n >= 80 ? 'Verified' : n >= 50 ? 'Evidence-backed' : n >= 25 ? 'AI-inferred' : 'Topic idea only';
+  const color = n >= 80 ? '#16a34a' : n >= 50 ? '#2563eb' : n >= 25 ? '#d97706' : '#dc2626';
+  const bg = n >= 80 ? '#f0fdf4' : n >= 50 ? '#eff6ff' : n >= 25 ? '#fffbeb' : '#fef2f2';
+  return `<span class="badge" style="background:${bg};color:${color}">${level}</span>`;
 }
 
 function buildSwotSection(market) {
@@ -212,11 +213,11 @@ function buildSwotSection(market) {
     <div class="swot-grid">
       <div class="swot-card swot-s">
         <h4>Strengths</h4>
-        <ul><li>Technology infrastructure with verified stack components</li><li>Clear market positioning and business model definition</li><li>Data-driven intelligence platform coverage</li></ul>
+        <div class="na">Strengths data available only from verified evidence sources.</div>
       </div>
       <div class="swot-card swot-w">
         <h4>Weaknesses</h4>
-        <ul><li>Data gaps requiring additional API integrations</li><li>Limited verified competitive intelligence without DataForSEO</li><li>Analytics connectivity needed for performance metrics</li></ul>
+        <div class="na">Weaknesses data available only from verified evidence sources.</div>
       </div>
       <div class="swot-card swot-o">
         <h4>Opportunities</h4>
@@ -248,7 +249,7 @@ function buildRoadmapTable(actionPlan) {
   phases.forEach(p => {
     const items = arr(actionPlan?.[p.key]).slice(0, 5);
     if (items.length === 0) return;
-    html += `<tr><td class="roadmap-period" style="color:${p.color}">${p.label}</td><td><ul class="bullet-list" style="margin:0">${items.map(i => `<li class="roadmap-item">${esc(i.title || i.task || i.action || i.recommendation || i)}</li>`).join('')}</ul></td><td style="font-size:9pt">${safe(items[0]?.impact || items[0]?.reason || items[0]?.evidence, 'Metrics pending analytics connection')}</td></tr>`;
+    html += `<tr><td class="roadmap-period" style="color:${p.color}">${p.label}</td><td><ul class="bullet-list" style="margin:0">${items.map(i => `<li class="roadmap-item">${esc(i.title || i.task || i.action || i.recommendation || i)}</li>`).join('')}</ul></td><td style="font-size:9pt">${safe(items[0]?.impact || items[0]?.reason || items[0]?.evidence, '')}</td></tr>`;
   });
   html += '</tbody></table>';
   return html;
@@ -430,10 +431,10 @@ ${buildSwotSection(market)}
 <div class="section">
   <h2>5. Market Intelligence</h2>
   <div class="kpi-grid">
-    <div class="kpi-card"><div class="kpi-icon" style="color:#059669">◆</div><div class="kpi-value" style="color:#059669">${safe(market?.tam)}</div><div class="kpi-label">Total Addressable Market</div></div>
-    <div class="kpi-card"><div class="kpi-icon" style="color:#2563eb">◆</div><div class="kpi-value" style="color:#2563eb">${safe(market?.sam)}</div><div class="kpi-label">Serviceable Available Market</div></div>
-    <div class="kpi-card"><div class="kpi-icon" style="color:#7c3aed">◆</div><div class="kpi-value" style="color:#7c3aed">${safe(market?.som)}</div><div class="kpi-label">Serviceable Obtainable Market</div></div>
-    <div class="kpi-card"><div class="kpi-icon" style="color:#d97706">◆</div><div class="kpi-value" style="color:#d97706">${safe(market?.growthRate)}</div><div class="kpi-label">Market Growth Rate</div></div>
+    <div class="kpi-card"><div class="kpi-icon" style="color:#059669">◆</div><div class="kpi-value" style="color:#059669">${opportunities.length || '—'}</div><div class="kpi-label">Growth Signals</div></div>
+    <div class="kpi-card"><div class="kpi-icon" style="color:#2563eb">◆</div><div class="kpi-value" style="color:#2563eb">${trends.length || '—'}</div><div class="kpi-label">Market Trends</div></div>
+    <div class="kpi-card"><div class="kpi-icon" style="color:#7c3aed">◆</div><div class="kpi-value" style="color:#7c3aed">${directCompetitors.length || '—'}</div><div class="kpi-label">Direct Competitors</div></div>
+    <div class="kpi-card"><div class="kpi-icon" style="color:#d97706">◆</div><div class="kpi-value" style="color:#d97706">${techStack.length || '—'}</div><div class="kpi-label">Tech Components</div></div>
   </div>
   ${trends.length > 0 ? `<h3>Market Trends</h3>${bulletList(trends, 8)}` : ''}
   ${opportunities.length > 0 ? `<h3>Growth Opportunities</h3>${bulletList(opportunities, 6)}` : ''}
@@ -722,10 +723,10 @@ ${buildSwotSection(market)}
 <div class="section">
   <h2>5. Market Intelligence</h2>
   <div class="kpi-grid">
-    <div class="kpi-card"><div class="kpi-icon" style="color:#059669">◆</div><div class="kpi-value" style="color:#059669">${safe(market?.tam)}</div><div class="kpi-label">Total Addressable Market</div></div>
-    <div class="kpi-card"><div class="kpi-icon" style="color:#2563eb">◆</div><div class="kpi-value" style="color:#2563eb">${safe(market?.sam)}</div><div class="kpi-label">Serviceable Available Market</div></div>
-    <div class="kpi-card"><div class="kpi-icon" style="color:#7c3aed">◆</div><div class="kpi-value" style="color:#7c3aed">${safe(market?.som)}</div><div class="kpi-label">Serviceable Obtainable Market</div></div>
-    <div class="kpi-card"><div class="kpi-icon" style="color:#d97706">◆</div><div class="kpi-value" style="color:#d97706">${safe(market?.growthRate)}</div><div class="kpi-label">Market Growth Rate</div></div>
+    <div class="kpi-card"><div class="kpi-icon" style="color:#059669">◆</div><div class="kpi-value" style="color:#059669">${opportunities.length || '—'}</div><div class="kpi-label">Growth Signals</div></div>
+    <div class="kpi-card"><div class="kpi-icon" style="color:#2563eb">◆</div><div class="kpi-value" style="color:#2563eb">${trends.length || '—'}</div><div class="kpi-label">Market Trends</div></div>
+    <div class="kpi-card"><div class="kpi-icon" style="color:#7c3aed">◆</div><div class="kpi-value" style="color:#7c3aed">${directCompetitors.length || '—'}</div><div class="kpi-label">Direct Competitors</div></div>
+    <div class="kpi-card"><div class="kpi-icon" style="color:#d97706">◆</div><div class="kpi-value" style="color:#d97706">${techStack.length || '—'}</div><div class="kpi-label">Tech Components</div></div>
   </div>
   ${trends.length > 0 ? `<h3>Market Trends</h3>${bulletList(trends, 8)}` : ''}
   ${opportunities.length > 0 ? `<h3>Opportunities</h3>${bulletList(opportunities, 6)}` : ''}
@@ -788,12 +789,11 @@ ${buildSwotSection(market)}
 <div class="section">
   <h2>10. Channel Plan</h2>
   ${channels.length > 0 ? dataTable(
-    ['Channel', 'Fit Score', 'Budget Allocation', 'Expected ROI'],
+    ['Channel', 'Fit Level', 'Rationale'],
     channels.slice(0, 12).map(c => [
       safe(c.name || c.channel),
-      c.fitScore || c.fit ? `${c.fitScore || c.fit}/100` : '<span class="na">—</span>',
-      c.budgetAllocation ? `${c.budgetAllocation}%` : '<span class="na">—</span>',
-      c.expectedRoi ? `${c.expectedRoi}%` : '<span class="na">Metric unavailable — connect analytics</span>'
+      c.fitScore || c.fit ? `${c.fitScore || c.fit}` : '<span class="na">—</span>',
+      safe(c.reasoning || c.reason || c.fit || '')
     ]),
     'Channel plan data unavailable. Connect analytics/ad account for verified recommendations.'
   ) : '<div class="notice warn">Channel plan data unavailable. Connect analytics/ad account for verified recommendations.</div>'}

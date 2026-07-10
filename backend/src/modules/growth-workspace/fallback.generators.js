@@ -24,7 +24,7 @@ export function generateProductFallback(input, websiteData) {
     buyerPersonas: [],
     targetUsers: [],
     pricingPosition: 'Unknown',
-    confidenceScore: 0,
+    confidenceScore: null,
     provider: 'fallback_unavailable'
   };
 }
@@ -40,12 +40,12 @@ export function generateMarketFallback(input, productData) {
     som: 'Unknown',
     cagr: 'Unknown',
     marketTrends: [],
-    demandScore: 0,
+    demandScore: null,
     growthOpportunities: [],
     marketRisks: [],
     entryStrategy: 'Insufficient Data - Market discovery unavailable from verified sources',
     competitiveLandscape: 'Insufficient Data - Competitive landscape unavailable from verified sources',
-    confidenceScore: 0,
+    confidenceScore: null,
     provider: 'fallback_unavailable'
   };
 }
@@ -61,7 +61,7 @@ export function generateAudienceFallback(input, productData) {
     decisionMakers: [],
     bestChannels: [],
     messagingStyle: 'Insufficient Data - Audience intelligence unavailable from verified sources',
-    confidenceScore: 0,
+    confidenceScore: null,
     provider: 'fallback_unavailable'
   };
 }
@@ -104,7 +104,7 @@ export function generateCompetitorFallback(input, productData, orchestratorCompe
     differentiationOpportunities: [],
     strengths: [],
     weaknesses: [],
-    confidenceScore: orchestratorCompetitors.length > 0 ? 65 : 0,
+    confidenceScore: null,
     provider: orchestratorCompetitors.length > 0 ? 'orchestrator_fallback' : 'fallback_unavailable'
   };
 }
@@ -119,7 +119,7 @@ export function generateIntentFallback(input, audienceData) {
     mediumIntentSegments: [],
     lowIntentSegments: [],
     buyingSignals: [],
-    confidenceScore: 0,
+    confidenceScore: null,
     provider: 'fallback_unavailable'
   };
 }
@@ -137,7 +137,7 @@ export function generatePositioningFallback(input, productData, competitorData) 
     brandPromise: 'Insufficient Data - Brand promise unavailable from verified sources',
     competitorWeaknessToAttack: [],
     targetPerception: 'Insufficient Data - Target perception unavailable from verified sources',
-    confidenceScore: 0,
+    confidenceScore: null,
     provider: 'fallback_unavailable'
   };
 }
@@ -158,7 +158,7 @@ export function generateCampaignFallback(input, websiteData, allResults) {
       day90: []
     },
     ctaSuggestions: [],
-    confidenceScore: 0,
+    confidenceScore: null,
     provider: 'fallback_unavailable'
   };
 }
@@ -171,7 +171,7 @@ export function generateChannelFallback(input, audienceData, campaignData) {
   return {
     primaryChannel: 'Unknown',
     recommendedChannels: [],
-    confidenceScore: 0,
+    confidenceScore: null,
     provider: 'fallback_unavailable'
   };
 }

@@ -17,8 +17,8 @@ export default function ExecutiveStoryPage() {
   // Derive top insights for the executive summary
   const topTrend = market?.marketTrends?.[0]?.value || 'Market expanding rapidly';
   const topRisk = market?.risks?.[0]?.value || 'Growing competition';
-  const bestChannel = channel?.recommendedChannels?.[0]?.channel || 'LinkedIn';
-  const expectedRoi = channel?.recommendedChannels?.[0]?.expectedRoi || 150;
+  const bestChannel = channel?.recommendedChannels?.[0]?.channel || null;
+  const expectedRoi = channel?.recommendedChannels?.[0]?.expectedRoi || null;
 
   return (
     <div className="page-container" style={{ animation: 'fadeIn 0.5s ease-out' }}>
@@ -52,7 +52,7 @@ export default function ExecutiveStoryPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
             <div style={{ padding: '15px', background: '#101622', borderRadius: '8px', borderLeft: '3px solid #10e18b' }}>
               <h4 style={{ color: '#9aa7bd', margin: '0 0 5px 0' }}>TAM</h4>
-              <div style={{ fontSize: '24px', color: '#fff', fontWeight: 'bold' }}>{renderSafeValue(market?.tam) || '$X B'}</div>
+              <div style={{ fontSize: '24px', color: '#fff', fontWeight: 'bold' }}>{market?.tam != null ? renderSafeValue(market.tam) : 'Not measured'}</div>
             </div>
             <div style={{ padding: '15px', background: '#101622', borderRadius: '8px', borderLeft: '3px solid #ffb347' }}>
               <h4 style={{ color: '#9aa7bd', margin: '0 0 5px 0' }}>Top Trend</h4>
@@ -64,13 +64,13 @@ export default function ExecutiveStoryPage() {
             </div>
             <div style={{ padding: '15px', background: '#101622', borderRadius: '8px', borderLeft: '3px solid #53a7ff' }}>
               <h4 style={{ color: '#9aa7bd', margin: '0 0 5px 0' }}>Expected ROI</h4>
-              <div style={{ fontSize: '24px', color: '#fff', fontWeight: 'bold' }}>{renderSafeValue(expectedRoi)}%</div>
+              <div style={{ fontSize: '24px', color: '#fff', fontWeight: 'bold' }}>{expectedRoi != null ? `${renderSafeValue(expectedRoi)}%` : 'Not measured'}</div>
             </div>
           </div>
           <div style={{ marginTop: '20px', padding: '20px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
             <h4 style={{ margin: '0 0 10px 0', color: '#53a7ff' }}>Core Value Proposition</h4>
             <p style={{ fontStyle: 'italic', color: '#fff', fontSize: '18px', lineHeight: '1.5', margin: 0 }}>
-              "{renderSafeValue(positioning?.positioningStatement || positioning?.statement) || 'A premium solution built for scale.'}"
+              "{renderSafeValue(positioning?.positioningStatement || positioning?.statement) || 'Not available'}"
             </p>
           </div>
         </Card>
@@ -80,7 +80,7 @@ export default function ExecutiveStoryPage() {
           <SectionTitle title="Market Dynamics" subtitle="Growth drivers and unexploited opportunities." />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px' }}>
             {(market?.opportunities || market?.growthOpportunities || []).slice(0, 4).map((opp: any, idx: number) => (
-              <InsightCard key={idx} insight={{ value: typeof opp === 'object' ? opp.value : opp, impact: typeof opp === 'object' ? opp.impact : 'High', confidence: typeof opp === 'object' ? opp.confidence : 80 }} icon={TrendingUp} />
+              <InsightCard key={idx} insight={{ value: typeof opp === 'object' ? opp.value : opp, impact: typeof opp === 'object' ? opp.impact : 'High', confidence: typeof opp === 'object' ? opp.confidence : null }} icon={TrendingUp} />
             ))}
           </div>
         </Card>

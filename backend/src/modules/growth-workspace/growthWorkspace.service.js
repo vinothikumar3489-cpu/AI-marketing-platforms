@@ -34,6 +34,7 @@ import {
 } from '../../services/intelligence/business-intelligence-logger.js';
 import { getLatestEvidenceSnapshot, saveEvidenceSnapshot } from '../evidence/evidence.service.js';
 import { buildGrowthWorkspaceDataFromEvidence, buildEvidenceContext } from '../evidence/evidence.normalizer.js';
+import { NOT_ENOUGH_EVIDENCE } from '../../utils/evidence-level.util.js';
 
 
 
@@ -618,13 +619,16 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       return `Launch ${primaryChannel} campaign to validate ${productName} positioning.`;
     }
 
-    const overallGrowthScore = calculateGrowthScore(normalizedResults);
     const marketOpportunityScore = calculateMarketOpportunityScore(normalizedResults.market);
     const campaignViabilityScore = calculateCampaignReadinessScore(normalizedResults.campaign, normalizedResults.channel);
     const productFitScore = calculateProductFitScore(normalizedResults.product);
     const audienceClarityScore = calculateAudienceClarityScore(normalizedResults.audience);
     const competitiveDefensibilityScore = calculateCompetitiveDefensibilityScore(normalizedResults.competitor);
     const campaignReadinessScore = campaignViabilityScore;
+    const componentScores = [productFitScore, marketOpportunityScore, audienceClarityScore, competitiveDefensibilityScore, campaignReadinessScore].filter(s => s !== null && s !== undefined);
+    const measurableComponents = componentScores.length;
+    const overallGrowthScore = measurableComponents >= 3 ? Math.round(componentScores.reduce((a, b) => a + b, 0) / measurableComponents) : null;
+    const growthScoreStatus = measurableComponents >= 3 ? null : NOT_ENOUGH_EVIDENCE;
 
     console.log('[Growth Scores]', {
       overallGrowthScore,
@@ -642,6 +646,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       audienceClarityScore,
       competitiveDefensibilityScore,
       campaignReadinessScore,
+      growthScoreStatus,
       // Generate product-specific recommendations
       topRecommendation: generateTopRecommendation(normalizedResults, input),
       primaryRisk: generatePrimaryRisk(normalizedResults, input),
@@ -900,15 +905,15 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       } : null,
       summary: {
         overallGrowthScore,
-        growthPotential: Math.min(100, Math.round(((normalizedResults.market?.demandScore || 50) + (overallGrowthScore || 50)) / 2)),
-        marketReadiness: Math.min(100, Math.round((normalizedResults.market?.demandScore || 50) * 0.95)),
-        competitiveStrength: Math.min(100, Math.round(50 + ((normalizedResults.competitor?.directCompetitors?.length || 0) * 5))),
-        customerDemand: normalizedResults.market?.demandScore || 50,
-        brandPosition: Math.min(100, Math.round((overallGrowthScore || 50) * 0.9)),
-        bestChannel: normalizedResults.channel?.primaryChannel || normalizedResults.channel?.recommendedChannels?.[0]?.channel || normalizedResults.channel?.recommendedChannels?.[0]?.name || 'Unknown',
-        topOpportunity: normalizedResults.market?.growthOpportunities?.[0] || 'Unknown',
-        topRisk: normalizedResults.market?.marketRisks?.[0] || 'Unknown',
-        nextAction: normalizedResults.campaign?.nextActions?.[0] || normalizedResults.campaign?.campaignIdeas?.[0] || 'Unknown',
+        growthPotential: null,
+        marketReadiness: null,
+        competitiveStrength: null,
+        customerDemand: null,
+        brandPosition: null,
+        bestChannel: normalizedResults.channel?.primaryChannel || normalizedResults.channel?.recommendedChannels?.[0]?.channel || null,
+        topOpportunity: null,
+        topRisk: null,
+        nextAction: null,
         completedSteps: steps.filter(s => s.status === 'completed').length,
         progress: Math.round((steps.filter(s => s.status === 'completed').length / steps.length) * 100)
       }
@@ -986,13 +991,13 @@ Provide a JSON response with:
 {
   "usp": "Actual Unique Selling Proposition from website evidence",
   "summary": "comprehensive 2-3 sentence summary based on evidence",
-  "keyFeatures": [{"value": "Feature 1", "confidence": 90, "impact": "High"}],
-  "coreBenefits": [{"value": "Benefit 1", "confidence": 90, "impact": "High"}],
-  "painPointsSolved": [{"value": "Pain Point", "confidence": 90, "impact": "High"}],
-  "targetUsers": [{"value": "User Segment", "confidence": 90, "impact": "High"}],
-  "differentiators": [{"value": "Differentiator", "confidence": 85, "impact": "Medium"}],
-  "jobsToBeDone": [{"value": "Actual JTBD", "confidence": 90, "impact": "High"}],
-  "confidenceScore": 85
+  "keyFeatures": [{"value": "Feature 1", "confidence": null, "impact": null}],
+  "coreBenefits": [{"value": "Benefit 1", "confidence": null, "impact": null}],
+  "painPointsSolved": [{"value": "Pain Point", "confidence": null, "impact": null}],
+  "targetUsers": [{"value": "User Segment", "confidence": null, "impact": null}],
+  "differentiators": [{"value": "Differentiator", "confidence": null, "impact": null}],
+  "jobsToBeDone": [{"value": "Actual JTBD", "confidence": null, "impact": null}],
+  "confidenceScore": null
 }
 
 CRITICAL INSTRUCTION: Extract REAL information from the evidence and website content. NEVER use generic placeholders. Return only valid JSON.`;
@@ -1003,7 +1008,7 @@ CRITICAL INSTRUCTION: Extract REAL information from the evidence and website con
   return {
     ...aiResult,
     provider: aiResult.provider || 'fallback',
-    confidenceScore: aiResult.confidenceScore ?? (websiteData || evidenceGrowthData ? 85 : 70)
+    confidenceScore: aiResult.confidenceScore ?? null
   };
 }
 
@@ -1023,10 +1028,10 @@ Provide JSON response:
 {
   "demandScore": null,
   "confidence": null,
-  "marketTrends": [{"value": "Trend description based on industry knowledge", "confidence": 60, "impact": "Medium"}],
-  "opportunities": [{"value": "Opportunity description", "confidence": 75, "impact": "High"}],
-  "risks": [{"value": "Risk description", "confidence": 70, "impact": "Medium"}],
-  "growthSignals": [{"signal": "Observable market signal from product positioning", "source": "AI-inferred", "confidence": 60}],
+  "marketTrends": [{"value": "Trend description based on industry knowledge", "confidence": null, "impact": null}],
+  "opportunities": [{"value": "Opportunity description", "confidence": null, "impact": null}],
+  "risks": [{"value": "Risk description", "confidence": null, "impact": null}],
+  "growthSignals": [{"signal": "Observable market signal from product positioning", "source": "AI-inferred", "confidence": null}],
   "entryStrategy": "Detailed description of entry strategy"
 }
 
@@ -1056,16 +1061,16 @@ Provide JSON response:
     {
       "name": "Persona Name",
       "demographics": "Detailed description",
-      "intentScore": 85,
+      "intentScore": null,
       "goals": ["Goal 1"],
       "painPoints": ["Pain 1"]
     }
   ],
-  "buyingTriggers": [{"value": "Trigger", "confidence": 85, "impact": "High"}],
-  "commonObjections": [{"value": "Objection", "confidence": 85, "impact": "High"}],
-  "bestChannels": [{"value": "Channel", "confidence": 85, "impact": "High"}],
-  "decisionMakers": [{"value": "Title", "confidence": 85, "impact": "High"}],
-  "confidenceScore": 75
+  "buyingTriggers": [{"value": "Trigger", "confidence": null, "impact": null}],
+  "commonObjections": [{"value": "Objection", "confidence": null, "impact": null}],
+  "bestChannels": [{"value": "Channel", "confidence": null, "impact": null}],
+  "decisionMakers": [{"value": "Title", "confidence": null, "impact": null}],
+  "confidenceScore": null
 }
 
 CRITICAL INSTRUCTION: NEVER use generic text. Personas must deeply reflect the real problems ${input.productName} solves. Return only valid JSON.`;
@@ -1100,16 +1105,16 @@ Provide JSON response:
     {
       "name": "Competitor 1",
       "domain": "competitor1.com",
-      "opportunityScore": 75,
+      "opportunityScore": null,
       "strengths": ["s1"],
       "weaknesses": ["w1"]
     }
   ],
   "competitorMatrix": "Matrix description",
-  "differentiationOpportunities": [{"value": "Opp", "confidence": 85, "impact": "High"}],
-  "marketGaps": [{"value": "Gap", "confidence": 80, "impact": "High"}],
-  "competitorWeaknesses": [{"value": "Weakness", "confidence": 80, "impact": "High"}],
-  "confidenceScore": 70
+  "differentiationOpportunities": [{"value": "Opp", "confidence": null, "impact": null}],
+  "marketGaps": [{"value": "Gap", "confidence": null, "impact": null}],
+  "competitorWeaknesses": [{"value": "Weakness", "confidence": null, "impact": null}],
+  "confidenceScore": null
 }
 
 CRITICAL INSTRUCTION: NEVER use generic placeholders like "Competitor 1". Use real competitor names if known, or infer real players in the ${input.industry} space. Return only valid JSON.`;
@@ -1136,13 +1141,13 @@ Audience Insights: ${JSON.stringify(audienceData.buyingTriggers)}
 
 Provide JSON response:
 {
-  "hotSegments": [{"value": "Segment", "confidence": 90, "impact": "High"}],
-  "warmSegments": [{"value": "Segment", "confidence": 75, "impact": "Medium"}],
-  "coldSegments": [{"value": "Segment", "confidence": 50, "impact": "Low"}],
-  "buyingSignals": [{"value": "Signal", "confidence": 90, "impact": "High"}],
-  "triggerEvents": [{"value": "Event", "confidence": 90, "impact": "High"}],
-  "leadScoringRules": [{"value": "Rule", "confidence": 90, "impact": "High"}],
-  "confidenceScore": 75
+  "hotSegments": [{"value": "Segment", "confidence": null, "impact": null}],
+  "warmSegments": [{"value": "Segment", "confidence": null, "impact": null}],
+  "coldSegments": [{"value": "Segment", "confidence": null, "impact": null}],
+  "buyingSignals": [{"value": "Signal", "confidence": null, "impact": null}],
+  "triggerEvents": [{"value": "Event", "confidence": null, "impact": null}],
+  "leadScoringRules": [{"value": "Rule", "confidence": null, "impact": null}],
+  "confidenceScore": null
 }
 
 CRITICAL INSTRUCTION: Return ONLY valid JSON in the exact schema specified. Use the value/confidence/impact schema.`;
@@ -1169,9 +1174,9 @@ Provide JSON response:
   "positioningStatement": "A single powerful positioning statement",
   "valueProposition": "Core value proposition",
   "brandPromise": "Brand promise statement",
-  "messagingPillars": [{"value": "Pillar description", "confidence": 85, "impact": "High"}],
-  "competitorWeaknessesToAttack": [{"value": "Weakness", "confidence": 85, "impact": "High"}],
-  "confidenceScore": 80
+  "messagingPillars": [{"value": "Pillar description", "confidence": null, "impact": null}],
+  "competitorWeaknessesToAttack": [{"value": "Weakness", "confidence": null, "impact": null}],
+  "confidenceScore": null
 }
 
 CRITICAL INSTRUCTION: Return ONLY valid JSON using the exact schema above.`;
@@ -1202,12 +1207,12 @@ Budget: ${input.budgetRange}
 
 Provide JSON response:
 {
-  "creativeAngles": [{"value": "Angle", "confidence": 85, "impact": "High"}],
-  "copyHooks": [{"value": "Hook", "confidence": 85, "impact": "High"}],
-  "ctaSuggestions": [{"value": "CTA", "confidence": 85, "impact": "High"}],
-  "emailSequence": [{"value": "Email Idea", "confidence": 85, "impact": "High"}],
-  "socialPostIdeas": [{"value": "Post Idea", "confidence": 85, "impact": "High"}],
-  "videoIdeas": [{"value": "Video Idea", "confidence": 85, "impact": "High"}],
+  "creativeAngles": [{"value": "Angle", "confidence": null, "impact": null}],
+  "copyHooks": [{"value": "Hook", "confidence": null, "impact": null}],
+  "ctaSuggestions": [{"value": "CTA", "confidence": null, "impact": null}],
+  "emailSequence": [{"value": "Email Idea", "confidence": null, "impact": null}],
+  "socialPostIdeas": [{"value": "Post Idea", "confidence": null, "impact": null}],
+  "videoIdeas": [{"value": "Video Idea", "confidence": null, "impact": null}],
   "actionPlan": {
     "sevenDay": [{"title": "Task", "problem": "What problem this solves", "evidence": "Data evidence", "researchSource": "Source module", "businessImpact": "Business impact", "difficulty": "Low/Medium/High", "priority": "High", "estimatedTimeline": "1 week", "owner": "Role"}],
     "thirtyDay": [{"title": "Task", "problem": "What problem this solves", "evidence": "Data evidence", "researchSource": "Source module", "businessImpact": "Business impact", "difficulty": "Low/Medium/High", "priority": "High", "estimatedTimeline": "2-4 weeks", "owner": "Role"}],
@@ -1247,9 +1252,9 @@ Provide JSON response:
   "recommendedChannels": [
     {"channel": "Channel Name", "fit": "Why this channel fits the product/audience", "reasoning": "Channel fit reasoning"}
   ],
-  "channelFitScores": [{"value": "Channel fit reasoning based on evidence", "confidence": 75, "impact": "High"}],
-  "postingFrequency": [{"value": "Recommended frequency", "confidence": 70, "impact": "Medium"}],
-  "contentTypes": [{"value": "Content Type", "confidence": 75, "impact": "High"}],
+  "channelFitScores": [{"value": "Channel fit reasoning based on evidence", "confidence": null, "impact": null}],
+  "postingFrequency": [{"value": "Recommended frequency", "confidence": null, "impact": null}],
+  "contentTypes": [{"value": "Content Type", "confidence": null, "impact": null}],
   "confidenceScore": null
 }
 
@@ -1483,7 +1488,7 @@ function normalizeGrowthResults(results, input) {
       targetUsers: ensureArray(data.targetUsers || data.buyerPersonas),
       differentiators: ensureArray(data.differentiators || data.keyDifferentiators),
       jobsToBeDone: ensureArray(data.jobsToBeDone),
-      confidenceScore: ensureNumber(data.confidenceScore, 0),
+      confidenceScore: data.confidenceScore ?? null,
       provider: ensureString(data.provider, 'unknown')
     };
   }
@@ -1512,7 +1517,7 @@ function normalizeGrowthResults(results, input) {
       commonObjections: ensureArray(data.commonObjections || data.objections),
       bestChannels: ensureArray(data.bestChannels),
       decisionMakers: ensureArray(data.decisionMakers),
-      confidenceScore: ensureNumber(data.confidenceScore, 0),
+      confidenceScore: data.confidenceScore ?? null,
       provider: ensureString(data.provider, 'unknown')
     };
   }
@@ -1526,7 +1531,7 @@ function normalizeGrowthResults(results, input) {
       differentiationOpportunities: ensureArray(data.differentiationOpportunities),
       marketGaps: ensureArray(data.marketGaps),
       competitorWeaknesses: ensureArray(data.competitorWeaknesses || data.weaknesses),
-      confidenceScore: ensureNumber(data.confidenceScore, 0),
+      confidenceScore: data.confidenceScore ?? null,
       provider: ensureString(data.provider, 'unknown')
     };
   }
@@ -1541,7 +1546,7 @@ function normalizeGrowthResults(results, input) {
       buyingSignals: ensureArray(data.buyingSignals),
       triggerEvents: ensureArray(data.triggerEvents),
       leadScoringRules: ensureArray(data.leadScoringRules),
-      confidenceScore: ensureNumber(data.confidenceScore, 0),
+      confidenceScore: data.confidenceScore ?? null,
       provider: ensureString(data.provider, 'unknown')
     };
   }
@@ -1555,7 +1560,7 @@ function normalizeGrowthResults(results, input) {
       brandPromise: ensureString(data.brandPromise, 'Unknown'),
       messagingPillars: ensureArray(data.messagingPillars),
       competitorWeaknessesToAttack: ensureArray(data.competitorWeaknessesToAttack),
-      confidenceScore: ensureNumber(data.confidenceScore, 0),
+      confidenceScore: data.confidenceScore ?? null,
       provider: ensureString(data.provider, 'unknown')
     };
   }
@@ -1571,7 +1576,7 @@ function normalizeGrowthResults(results, input) {
       socialPostIdeas: ensureArray(data.socialPostIdeas),
       videoIdeas: ensureArray(data.videoIdeas || data.videoAdScriptIdeas),
       actionPlan: data.actionPlan || null,
-      confidenceScore: ensureNumber(data.confidenceScore, 0),
+      confidenceScore: data.confidenceScore ?? null,
       provider: ensureString(data.provider, 'unknown')
     };
   }
@@ -1606,7 +1611,7 @@ function normalizeGrowthResults(results, input) {
       primaryChannel: ensureString(data.primaryChannel || normalizedChannels[0]?.name || normalizedChannels[0]?.channel, 'Unknown'),
       channelStrategy: ensureString(data.channelStrategy, 'Insufficient Data'),
       budgetRecommendation: ensureString(data.budgetRecommendation, 'Unknown'),
-      confidenceScore: ensureNumber(data.confidenceScore, 0),
+      confidenceScore: data.confidenceScore ?? null,
       provider: ensureString(data.provider, 'unknown')
     };
   }
@@ -1630,9 +1635,9 @@ function ensureArray(value) {
   return [];
 }
 
-function ensureNumber(value, fallback = 60) {
+function ensureNumber(value, fallback = null) {
   const n = Number(value);
-  return Number.isFinite(n) && n >= 0 && n <= 100 ? n : fallback;
+  return Number.isFinite(n) && n >= 0 && n <= 100 ? n : null;
 }
 
 function extractDomainSimple(url) {

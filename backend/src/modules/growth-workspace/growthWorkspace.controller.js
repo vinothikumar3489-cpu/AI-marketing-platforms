@@ -96,7 +96,8 @@ export const getResultsHandler = async (req, res) => {
       results: result.results,
       steps: result.steps,
       input: result.input,
-      summary: result.summary
+      summary: result.summary,
+      overallStatus: result.overallStatus || 'completed'
     });
 
   } catch (error) {
@@ -112,10 +113,11 @@ export const getStatusHandler = async (req, res) => {
   const { chatId } = req.params;
   const userId = req.user?.id;
 
-  console.log('🔍 [Growth Workspace Controller] Get Status:', { chatId, userId });
-
   if (!chatId || !userId) {
-    return res.status(400).json({ success: false, error: 'Missing chatId or user' });
+    return res.status(400).json({ 
+      status: 'error',
+      error: 'Missing chatId or user' 
+    });
   }
 
   try {
@@ -124,25 +126,67 @@ export const getStatusHandler = async (req, res) => {
     if (!result.success || !result.exists) {
       return res.json({
         status: 'not_started',
-        progress: 0,
-        steps: []
+        currentStep: 0,
+        totalSteps: 12,
+        stage: null,
+        startedAt: null,
+        completedSteps: [],
+        error: null
       });
     }
 
-    const completedCount = result.steps.filter(s => s.status === 'completed').length;
-    const progress = Math.round((completedCount / result.steps.length) * 100);
+    if (result.overallStatus === 'in_progress') {
+      const runningStep = result.steps?.findIndex(s => s.status === 'running');
+      const completedSteps = result.steps?.filter(s => s.status === 'completed').map(s => s.label) || [];
+      
+      const stageNames = [
+        'Preparing analysis',
+        'Loading website evidence',
+        'Analysing product',
+        'Discovering market signals',
+        'Building audience intelligence',
+        'Validating competitors',
+        'Creating positioning',
+        'Planning campaigns',
+        'Building channel recommendations',
+        'Generating executive brief',
+        'Saving results',
+        'Finalising dashboard'
+      ];
 
+      const currentStepIndex = runningStep >= 0 ? Math.min(runningStep + 3, 11) : completedSteps.length;
+      
+      return res.json({
+        status: 'running',
+        currentStep: currentStepIndex + 1,
+        totalSteps: 12,
+        stage: stageNames[Math.min(currentStepIndex, 11)] || 'Processing',
+        startedAt: null,
+        completedSteps,
+        error: null
+      });
+    }
+
+    const completedCount = result.steps?.filter(s => s.status === 'completed').length || 0;
+    
     return res.json({
-      status: progress === 100 ? 'completed' : 'in_progress',
-      progress,
-      currentStep: result.steps.find(s => s.status === 'running')?.label || null,
-      steps: result.steps
+      status: completedCount >= 8 ? 'completed' : 'partial',
+      currentStep: 12,
+      totalSteps: 12,
+      stage: 'Complete',
+      startedAt: null,
+      completedSteps: result.steps?.filter(s => s.status === 'completed').map(s => s.label) || [],
+      error: null
     });
 
   } catch (error) {
-    console.error('❌ [Growth Workspace Controller] Error:', error);
     return res.status(500).json({
-      success: false,
+      status: 'error',
+      currentStep: 0,
+      totalSteps: 12,
+      stage: null,
+      startedAt: null,
+      completedSteps: [],
       error: error.message || 'Failed to get status'
     });
   }

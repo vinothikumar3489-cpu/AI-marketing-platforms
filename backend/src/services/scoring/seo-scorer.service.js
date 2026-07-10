@@ -79,32 +79,32 @@ export function calculateSeoScores(data) {
 // ============================================
 
 function calculateTechnicalScore(technicalAudit) {
-  if (!technicalAudit) return 50;
+  if (!technicalAudit) return null;
 
   const scores = technicalAudit.scores || {};
   
   // Critical factors (must have)
   const criticalFactors = {
-    security: scores.security || 0,      // HTTPS
-    mobile: scores.mobile || 0,          // Mobile-friendly
-    indexability: scores.indexability || 0 // Robots.txt, sitemap
+    security: scores.security ?? null,      // HTTPS
+    mobile: scores.mobile ?? null,          // Mobile-friendly
+    indexability: scores.indexability ?? null // Robots.txt, sitemap
   };
 
   // Important factors
   const importantFactors = {
-    title: scores.title || 0,
-    meta: scores.meta || 0,
-    headings: scores.headings || 0,
-    canonical: scores.canonical || 0
+    title: scores.title ?? null,
+    meta: scores.meta ?? null,
+    headings: scores.headings ?? null,
+    canonical: scores.canonical ?? null
   };
 
   // Optimization factors
   const optimizationFactors = {
-    schema: scores.schema || 0,
-    openGraph: scores.openGraph || 0,
-    images: scores.images || 0,
-    internalLinks: scores.internalLinks || 0,
-    pageMetrics: scores.pageMetrics || 0
+    schema: scores.schema ?? null,
+    openGraph: scores.openGraph ?? null,
+    images: scores.images ?? null,
+    internalLinks: scores.internalLinks ?? null,
+    pageMetrics: scores.pageMetrics ?? null
   };
 
   // Weighted calculation
@@ -127,7 +127,7 @@ function calculateTechnicalScore(technicalAudit) {
 // ============================================
 
 function calculateOnPageScore(scrapedData, technicalAudit) {
-  if (!scrapedData || !technicalAudit) return 50;
+  if (!scrapedData || !technicalAudit) return null;
 
   let score = 0;
   let maxScore = 0;
@@ -153,7 +153,7 @@ function calculateOnPageScore(scrapedData, technicalAudit) {
 
   // Content quality (20 points)
   maxScore += 20;
-  const wordCount = scrapedData.content?.wordCount || 0;
+  const wordCount = scrapedData.content?.wordCount ?? null;
   if (wordCount >= 1500) score += 20;
   else if (wordCount >= 1000) score += 15;
   else if (wordCount >= 500) score += 10;
@@ -161,7 +161,7 @@ function calculateOnPageScore(scrapedData, technicalAudit) {
 
   // Internal linking (15 points)
   maxScore += 15;
-  const internalLinks = scrapedData.content?.internalLinks?.length || 0;
+  const internalLinks = scrapedData.content?.internalLinks?.length ?? null;
   if (internalLinks >= 10) score += 15;
   else if (internalLinks >= 5) score += 10;
   else if (internalLinks >= 3) score += 5;
@@ -180,14 +180,14 @@ function calculateOnPageScore(scrapedData, technicalAudit) {
 // ============================================
 
 function calculateContentScore(scrapedData, contentData) {
-  if (!scrapedData) return 50;
+  if (!scrapedData) return null;
 
   let score = 0;
   let maxScore = 0;
 
   // Content length (25 points)
   maxScore += 25;
-  const wordCount = scrapedData.content?.wordCount || 0;
+  const wordCount = scrapedData.content?.wordCount ?? null;
   if (wordCount >= 2000) score += 25;
   else if (wordCount >= 1500) score += 20;
   else if (wordCount >= 1000) score += 15;
@@ -196,15 +196,15 @@ function calculateContentScore(scrapedData, contentData) {
 
   // Content structure (25 points)
   maxScore += 25;
-  const paragraphs = scrapedData.content?.paragraphCount || 0;
-  const headings = scrapedData.content?.headings?.length || 0;
+  const paragraphs = scrapedData.content?.paragraphCount ?? null;
+  const headings = scrapedData.content?.headings?.length ?? null;
   if (paragraphs >= 10 && headings >= 5) score += 25;
   else if (paragraphs >= 5 && headings >= 3) score += 15;
   else if (paragraphs >= 3 && headings >= 1) score += 10;
 
   // Multimedia (20 points)
   maxScore += 20;
-  const images = scrapedData.content?.imageCount || 0;
+  const images = scrapedData.content?.imageCount ?? null;
   if (images >= 5) score += 20;
   else if (images >= 3) score += 15;
   else if (images >= 1) score += 10;
@@ -220,7 +220,7 @@ function calculateContentScore(scrapedData, contentData) {
   maxScore += 15;
   // If we have content gap data, use it
   if (contentData && contentData.contentGaps) {
-    const gaps = contentData.contentGaps.length || 0;
+    const gaps = contentData.contentGaps.length ?? null;
     if (gaps === 0) score += 15;
     else if (gaps <= 3) score += 10;
     else if (gaps <= 5) score += 5;
@@ -240,7 +240,7 @@ function calculateAuthorityScore(scrapedData, competitorData) {
   let score = 50; // Base score
 
   // External links (backlink indicators)
-  const externalLinks = scrapedData?.content?.externalLinks?.length || 0;
+  const externalLinks = scrapedData?.content?.externalLinks?.length ?? null;
   if (externalLinks >= 10) score += 10;
   else if (externalLinks >= 5) score += 5;
 
@@ -248,7 +248,7 @@ function calculateAuthorityScore(scrapedData, competitorData) {
   // Note: Would need actual backlink API for real data
   
   // Content depth
-  const wordCount = scrapedData?.content?.wordCount || 0;
+  const wordCount = scrapedData?.content?.wordCount ?? null;
   if (wordCount >= 2000) score += 15;
   else if (wordCount >= 1000) score += 10;
   else if (wordCount >= 500) score += 5;
@@ -260,7 +260,7 @@ function calculateAuthorityScore(scrapedData, competitorData) {
 
   // Competitor comparison
   if (competitorData && competitorData.competitors) {
-    const competitorCount = competitorData.competitors.length || 0;
+    const competitorCount = competitorData.competitors.length ?? null;
     if (competitorCount >= 5) score += 10;
     else if (competitorCount >= 3) score += 5;
   }
@@ -299,7 +299,7 @@ function calculateAiVisibilityScore(geoData, scrapedData) {
 
   // Content depth (20 points)
   maxScore += 20;
-  const wordCount = scrapedData?.content?.wordCount || 0;
+  const wordCount = scrapedData?.content?.wordCount ?? null;
   if (wordCount >= 1500) score += 20;
   else if (wordCount >= 1000) score += 15;
   else if (wordCount >= 500) score += 10;
@@ -357,7 +357,7 @@ function calculateLocalSeoScore(scrapedData) {
   if (locationKeywords.test(text)) score += 30;
 
   // If no local signals, score is low (expected for non-local businesses)
-  if (maxScore === 0) return 50; // Neutral score
+  if (maxScore === 0) return null; // Neutral score
 
   return Math.round((score / maxScore) * 100);
 }

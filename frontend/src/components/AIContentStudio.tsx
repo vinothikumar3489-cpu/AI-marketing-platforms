@@ -165,7 +165,7 @@ export function ContentStudio({ context, onSave }: { context: any; onSave: (asse
           goal,
           generatedAt: now(),
           approvalStatus: 'draft' as const,
-          confidence: context?.sourceSummary?.sourcesCollected?.length > 0 ? 85 : 45,
+          confidence: null,
         };
         setAsset(generated);
         onSave(generated);
@@ -292,7 +292,7 @@ export function EmailStudio({ context, onSave }: { context: any; onSave: (asset:
           tone,
           generatedAt: now(),
           approvalStatus: 'draft' as const,
-          confidence: context?.sourceSummary?.sourcesCollected?.length > 0 ? 80 : 50,
+          confidence: null,
         };
         setAsset(generated);
         onSave(generated);
@@ -387,7 +387,7 @@ export function SocialStudio({ context, onSave }: { context: any; onSave: (asset
           goal,
           generatedAt: now(),
           approvalStatus: 'draft' as const,
-          confidence: context?.sourceSummary?.sourcesCollected?.length > 0 ? 82 : 48,
+          confidence: null,
         };
         setAssets([generated]);
         onSave(generated);
@@ -477,7 +477,7 @@ export function CreativeStudio({ context, onSave }: { context: any; onSave: (ass
           content: result.data,
           generatedAt: now(),
           approvalStatus: 'draft' as const,
-          confidence: context?.sourceSummary?.sourcesCollected?.length > 0 ? 80 : 50,
+          confidence: null,
         };
         setAsset(generated);
         onSave(generated);
@@ -567,7 +567,7 @@ export function VideoStudio({ context, onSave }: { context: any; onSave: (asset:
           content: result.data,
           generatedAt: now(),
           approvalStatus: 'draft' as const,
-          confidence: context?.sourceSummary?.sourcesCollected?.length > 0 ? 78 : 45,
+          confidence: null,
         };
         setAsset(generated);
         onSave(generated);
@@ -656,7 +656,7 @@ export function CampaignPlanner({ context, onSave }: { context: any; onSave: (as
           content: result.data,
           generatedAt: now(),
           approvalStatus: 'draft' as const,
-          confidence: context?.sourceSummary?.sourcesCollected?.length > 0 ? 83 : 50,
+          confidence: null,
         };
         setAsset(generated);
         onSave(generated);

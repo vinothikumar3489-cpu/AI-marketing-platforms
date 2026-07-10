@@ -261,9 +261,9 @@ export function TechnologyCard({ tech }: { tech: any }) {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <div style={{ width: '40px', height: '6px', background: '#1d2738', borderRadius: '3px', overflow: 'hidden' }}>
-          <div style={{ width: `${tech.confidence || 0}%`, height: '100%', background: confidenceColor, borderRadius: '3px' }} />
+          <div style={{ width: `${typeof tech.confidence === 'number' ? tech.confidence : 0}%`, height: '100%', background: confidenceColor, borderRadius: '3px' }} />
         </div>
-        <span style={{ fontSize: '11px', fontWeight: 600, color: confidenceColor }}>{tech.confidence}%</span>
+        <span style={{ fontSize: '11px', fontWeight: 600, color: confidenceColor }}>{tech.confidence != null ? `${tech.confidence}%` : 'N/A'}</span>
       </div>
     </div>
   );

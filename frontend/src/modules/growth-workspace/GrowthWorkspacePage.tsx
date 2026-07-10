@@ -3,6 +3,7 @@ import { PageHeader, Section } from '@/components/ui-kit';
 import { getActiveProject, setActiveProjectId } from '@/lib/project-store';
 import { api } from '@/lib/api';
 import { UnifiedAnalysisForm } from './UnifiedAnalysisForm';
+import { AnalysisLoadingPage } from './AnalysisLoadingPage';
 import { WorkflowStepper } from './WorkflowStepper';
 import { WorkflowResultViewer } from './WorkflowResultViewer';
 import { AnalysisSummary } from './AnalysisSummary';
@@ -18,6 +19,8 @@ export function GrowthWorkspacePage() {
   const [steps, setSteps] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [savedInput, setSavedInput] = useState<any>(null);
+  const [analysisStage, setAnalysisStage] = useState<'idle' | 'running' | 'completed' | 'error'>('idle');
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = () => {
@@ -64,6 +67,9 @@ export function GrowthWorkspacePage() {
   async function handleRunAnalysis(formData: any) {
     let activeProject = project;
 
+    setAnalysisStage('running');
+    setAnalysisError(null);
+
     // Auto-create a real chat if project is null or has a temp ID
     if (!activeProject?.id || activeProject.id.startsWith('temp-')) {
       try {
@@ -77,12 +83,16 @@ export function GrowthWorkspacePage() {
         window.dispatchEvent(new Event('marketform-chat-change'));
       } catch (err: any) {
         toast.error('Failed to create project: ' + (err.message || 'Unknown error'));
+        setAnalysisStage('error');
+        setAnalysisError(err.message || 'Failed to create project');
         return;
       }
     }
 
     if (!activeProject?.id) {
       toast.error('Please select or create a project first.');
+      setAnalysisStage('error');
+      setAnalysisError('Please select or create a project first.');
       return;
     }
 
@@ -119,10 +129,13 @@ export function GrowthWorkspacePage() {
         setSteps(res.data.steps || initialSteps);
         setSummary(res.data.summary || null);
         setSavedInput(formData);
+        setAnalysisStage('completed');
         toast.success('Full growth analysis completed successfully!');
       } else {
         console.error('ΓÜá∩╕Å Analysis failed:', res.data.error);
         setSteps(res.data.steps || initialSteps);
+        setAnalysisStage('error');
+        setAnalysisError(res.data.error || 'Unknown error');
         
         // Show user-friendly error message
         if (res.data.errorCode === 'CHAT_NOT_FOUND') {
@@ -133,6 +146,8 @@ export function GrowthWorkspacePage() {
       }
     } catch (err: any) {
       console.error('Γ¥î Analysis error:', err);
+      setAnalysisStage('error');
+      setAnalysisError(err.response?.data?.error || err.message || 'Connection error');
       
       // Handle different error types
       if (err.response?.status === 404 || err.response?.data?.errorCode === 'CHAT_NOT_FOUND') {
@@ -153,6 +168,19 @@ export function GrowthWorkspacePage() {
     }
   }
 
+  function handleAnalysisComplete() {
+    if (project?.id) {
+      fetchSavedResults(project.id);
+    }
+    setAnalysisStage('completed');
+  }
+
+  function handleRetry() {
+    if (savedInput) {
+      handleRunAnalysis(savedInput);
+    }
+  }
+
   return (
     <>
       <Toaster theme="dark" position="bottom-right" />
@@ -162,7 +190,17 @@ export function GrowthWorkspacePage() {
         description="Enter your product details once and run a complete 8-module growth analysis: Product Analysis, Market Discovery, Audience Intelligence, Competitor Analysis, Intent Prediction, Positioning Engine, Campaign Generator, and Channel Recommendation."
       />
 
-      {loadingResults ? (
+      {analysisStage === 'running' && project?.id ? (
+        <AnalysisLoadingPage
+          chatId={project.id}
+          onComplete={handleAnalysisComplete}
+          onError={(error) => {
+            setAnalysisStage('error');
+            setAnalysisError(error);
+          }}
+          onRetry={handleRetry}
+        />
+      ) : loadingResults ? (
         <Card className="bg-white/5 border-white/10">
           <CardContent className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-purple-400" />

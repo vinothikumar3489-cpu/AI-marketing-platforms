@@ -79,12 +79,9 @@ export const toDisplayText = (value: unknown, fallback = 'Not available'): strin
 // adds a display-safe `label`. Never removes fields, never converts null -> 0.
 export const normalizeSeoItem = (value: unknown): Record<string, any> => {
   if (isPlainObject(value)) {
-    return {
-      ...value,
-      label: toDisplayText(value, ''),
-    };
+    return { ...value, label: toDisplayText(value, '') };
   }
-  return { label: toDisplayText(value, ''), value };
+  return { label: value !== null && value !== undefined ? String(value) : 'Not available' };
 };
 
 export const asInsight = (value: any, fallbackTitle?: string) => {
@@ -93,8 +90,8 @@ export const asInsight = (value: any, fallbackTitle?: string) => {
     return {
       value: fallbackTitle || 'No data',
       title: fallbackTitle,
-      confidence: 0,
-      impact: 'Low' as 'Low' | 'Medium' | 'High'
+      confidence: null,
+      impact: null
     };
   }
   
@@ -102,8 +99,8 @@ export const asInsight = (value: any, fallbackTitle?: string) => {
     return {
       value: value.trim() || fallbackTitle || 'No data',
       title: fallbackTitle,
-      confidence: 70,
-      impact: 'Medium' as 'Low' | 'Medium' | 'High'
+      confidence: null,
+      impact: null
     };
   }
   
@@ -112,7 +109,7 @@ export const asInsight = (value: any, fallbackTitle?: string) => {
   
   return {
     value: value.value || value.description || value.summary || asText(value, 'No data'),
-    confidence: value.confidence || value.confidenceScore || 70,
+    confidence: value.confidence ?? value.confidenceScore ?? null,
     evidence: value.evidence || value.proof || '',
     source: value.source || value.url || '',
     impact: validImpact as 'Low' | 'Medium' | 'High',
@@ -121,7 +118,7 @@ export const asInsight = (value: any, fallbackTitle?: string) => {
   };
 };
 
-export const asNumber = (value: any, fallback = 0) => {
+export const asNumber = (value: any, fallback = null) => {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 };
@@ -172,6 +169,14 @@ export const renderSafeValue = (value: any): string => {
       .join(" | ");
   }
   return String(value);
+};
+
+export const isRenderable = (value: any): boolean => {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return true;
+  if (Array.isArray(value)) return true;
+  if (typeof value === 'object') return true;
+  return false;
 };
 
 export const sanitizeForReact = (value: any): any => {

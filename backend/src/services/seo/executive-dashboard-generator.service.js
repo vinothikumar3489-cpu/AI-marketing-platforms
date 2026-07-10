@@ -340,7 +340,7 @@ function generateExecutiveOverview(seoData) {
 
   // Define all score variables FIRST to avoid TDZ issues
   const technicalHealthValue = hasTechnicalData
-    ? Math.round(((scoreBreakdown.onPageScore ?? scoreBreakdown.onPage ?? 0) + (scoreBreakdown.performanceScore ?? scoreBreakdown.technical ?? 0)) / 2)
+    ? Math.round(((scoreBreakdown.onPageScore ?? scoreBreakdown.onPage ?? null) + (scoreBreakdown.performanceScore ?? scoreBreakdown.technical ?? null)) / 2)
     : 50;
 
   const technicalHealth = {
@@ -348,7 +348,7 @@ function generateExecutiveOverview(seoData) {
     source: hasTechnicalData ? 'Technical SEO Audit' : 'Unavailable',
     calculationMethod: hasTechnicalData ? 'Average of on-page and performance scores' : 'No technical data available',
     inputsUsed: hasTechnicalData ? ['onPageScore', 'performanceScore'] : [],
-    confidence: hasTechnicalData ? 90 : 0,
+    confidence: null,
     evidence: hasTechnicalData ? `On-page: ${scoreBreakdown.onPageScore}, Performance: ${scoreBreakdown.performanceScore}` : 'Technical audit data unavailable',
     lastUpdated: technicalAudit.analyzedAt || new Date().toISOString()
   };
@@ -365,7 +365,7 @@ function generateExecutiveOverview(seoData) {
     source: hasContentData ? 'Content Gap + Blog Intelligence' : 'Unavailable',
     calculationMethod: hasContentData ? 'Base 100 minus gaps penalty plus blog ideas bonus' : 'No content data available',
     inputsUsed: hasContentData ? ['contentGaps', 'blogIdeas'] : [],
-    confidence: hasContentData ? 75 : 0,
+    confidence: null,
     evidence: hasContentData ? `${contentGapsCount} content gaps, ${blogIdeasCount} blog ideas available` : 'Content data unavailable',
     lastUpdated: contentGaps.analyzedAt || blogIntel.analyzedAt || new Date().toISOString()
   };
@@ -379,7 +379,7 @@ function generateExecutiveOverview(seoData) {
     source: hasCompetitorData ? 'Competitor SEO Intelligence' : 'Unavailable',
     calculationMethod: hasCompetitorData ? 'Average domain authority from competitor analysis' : 'No competitor data available',
     inputsUsed: hasCompetitorData ? ['competitorProfiles', 'domainAuthority'] : [],
-    confidence: hasCompetitorData ? 70 : 0,
+    confidence: null,
     evidence: hasCompetitorData ? `Based on ${competitorIntel.competitorProfiles.length} competitor profiles` : 'Competitor data unavailable',
     lastUpdated: competitorIntel.analyzedAt || new Date().toISOString()
   };
@@ -391,7 +391,7 @@ function generateExecutiveOverview(seoData) {
     source: hasGeoData ? 'GEO Intelligence' : 'Unavailable',
     calculationMethod: hasGeoData ? 'AI search visibility score from entity analysis' : 'No GEO data available',
     inputsUsed: hasGeoData ? ['aiVisibilityScore', 'citationReadinessScore', 'answerabilityScore'] : [],
-    confidence: hasGeoData ? 80 : 0,
+    confidence: null,
     evidence: hasGeoData ? `AI visibility: ${geoIntel.aiVisibilityScore}, Citation readiness: ${geoIntel.citationReadinessScore}` : 'GEO data unavailable',
     lastUpdated: geoIntel.analyzedAt || new Date().toISOString()
   };
@@ -406,7 +406,7 @@ function generateExecutiveOverview(seoData) {
     source: hasKeywordData ? 'Keyword Intelligence' : 'Unavailable',
     calculationMethod: hasKeywordData ? 'Percentage of available keywords vs target' : 'No keyword data available',
     inputsUsed: hasKeywordData ? ['primaryKeywords'] : [],
-    confidence: hasKeywordData ? 75 : 0,
+    confidence: null,
     evidence: hasKeywordData ? `${keywordCount} primary keywords identified` : 'Keyword data unavailable',
     lastUpdated: keywordIntel.analyzedAt || new Date().toISOString()
   };
@@ -423,7 +423,7 @@ function generateExecutiveOverview(seoData) {
     source: (hasTechnicalData || hasCompetitorData) ? 'Technical Audit + Competitor Intelligence' : 'Unavailable',
     calculationMethod: (hasTechnicalData || hasCompetitorData) ? 'Technical issues penalty plus competitor threat penalty' : 'No risk data available',
     inputsUsed: (hasTechnicalData || hasCompetitorData) ? ['criticalIssues', 'competitorProfiles'] : [],
-    confidence: (hasTechnicalData || hasCompetitorData) ? 70 : 0,
+    confidence: null,
     evidence: (hasTechnicalData || hasCompetitorData) ? `${technicalIssues} critical technical issues, ${competitorThreats} competitor threats` : 'Risk data unavailable',
     lastUpdated: technicalAudit.analyzedAt || competitorIntel.analyzedAt || new Date().toISOString()
   };
@@ -468,7 +468,7 @@ function generateExecutiveOverview(seoData) {
       ? 'Technical SEO audit score with data completeness adjustment'
       : 'Weighted average of available modules (content, authority, AI visibility, opportunity, risk)',
     inputsUsed: hasTechnicalData ? ['onPageScore', 'performanceScore', 'mobileScore', 'securityScore'] : [],
-    confidence: finalConfidence,
+    confidence: null,
     evidence: hasTechnicalData 
       ? `Based on ${Object.keys(scoreBreakdown).length} technical SEO factors. Data completeness: ${dataCompletenessPercentage}%. Penalty applied: -${completenessPenalty} points.` 
       : 'Weighted from available module data. Data completeness: ' + dataCompletenessPercentage + '%',
@@ -503,7 +503,7 @@ function generateExecutiveOverview(seoData) {
           expectedImpact: 'high',
           difficulty: issue.difficulty || 'medium',
           estimatedHours: issue.estimatedHours || 4,
-          confidence: 95,
+          confidence: null,
           evidence: `${issue.issue || issue} - ${issue.severity || 'critical'}`,
           // Technical-specific fields for PriorityCard rendering
           severity: issue.severity || 'critical',
@@ -535,7 +535,7 @@ function generateExecutiveOverview(seoData) {
           expectedImpact: kw.searchVolume > 1000 ? 'high' : 'medium',
           difficulty: kw.difficulty < 50 ? 'low' : 'medium',
           estimatedHours: kw.difficulty < 50 ? 8 : 16,
-          confidence: 85,
+          confidence: null,
           evidence: `Volume: ${kw.searchVolume}, Difficulty: ${kw.difficulty}, CPC: ${kw.cpc || 'N/A'}`
         });
       }
@@ -559,7 +559,7 @@ function generateExecutiveOverview(seoData) {
           expectedImpact: gap.businessImpact || 'high',
           difficulty: gap.estimatedImpact?.effort || 'medium',
           estimatedHours: gap.estimatedImpact?.hours || 12,
-          confidence: 80,
+          confidence: null,
           evidence: `Keyword: ${gap.targetKeyword}, Competitors: ${gap.competitorCount || 0}`
         });
       }
@@ -581,7 +581,7 @@ function generateExecutiveOverview(seoData) {
         expectedImpact: 'medium',
         difficulty: 'medium',
         estimatedHours: 20,
-        confidence: 75,
+        confidence: null,
         evidence: `AI Visibility: ${geoIntel.aiVisibilityScore}, Citation Readiness: ${geoIntel.citationReadinessScore || 'N/A'}`
       });
     }
@@ -604,7 +604,7 @@ function generateExecutiveOverview(seoData) {
           expectedImpact: gap.opportunity === 'high' ? 'high' : 'medium',
           difficulty: gap.difficulty < 50 ? 'medium' : 'high',
           estimatedHours: gap.difficulty < 50 ? 12 : 24,
-          confidence: 70,
+          confidence: null,
           evidence: `Competitors: ${gap.competitorCount || 0}, Volume: ${gap.searchVolume || 'N/A'}`
         });
       }
@@ -652,26 +652,24 @@ function generateSeoHealthSummary(seoData) {
   const hasCompetitorData = competitorIntel.competitorProfiles && competitorIntel.competitorProfiles.length > 0;
 
   // Calculate Local SEO score from geo intelligence (if available)
-  const localSeoScore = hasGeoData && geoIntel.localSeoScore !== undefined 
-    ? geoIntel.localSeoScore 
-    : (hasGeoData ? Math.round((geoIntel.aiVisibilityScore || 0) * 0.8) : null);
+  const localSeoScore = (hasGeoData && geoIntel.localSeoScore != null) ? geoIntel.localSeoScore : null;
 
   const categories = [
     {
       name: 'Technical SEO',
-      score: hasTechnicalData ? (scoreBreakdown.technicalScore || technicalAudit.overallScore || scoreBreakdown.overallScore || 0) : null,
+      score: hasTechnicalData ? (scoreBreakdown.technicalScore ?? technicalAudit.overallScore ?? scoreBreakdown.overallScore ?? null) : null,
       source: hasTechnicalData ? 'Technical SEO Audit' : 'Unavailable',
       status: hasTechnicalData 
-        ? ((scoreBreakdown.technicalScore || technicalAudit.overallScore || scoreBreakdown.overallScore || 0) >= 80 ? 'excellent' : (scoreBreakdown.technicalScore || technicalAudit.overallScore || scoreBreakdown.overallScore || 0) >= 60 ? 'good' : 'needs-improvement')
+        ? ((scoreBreakdown.technicalScore ?? technicalAudit.overallScore ?? scoreBreakdown.overallScore ?? null) >= 80 ? 'excellent' : (scoreBreakdown.technicalScore ?? technicalAudit.overallScore ?? scoreBreakdown.overallScore ?? null) >= 60 ? 'good' : 'needs-improvement')
         : 'unavailable',
       criticalIssues: hasTechnicalData && technicalAudit.criticalIssues ? technicalAudit.criticalIssues.length : 0
     },
     {
       name: 'On-Page SEO',
-      score: hasTechnicalData ? (scoreBreakdown.onPageScore || 0) : null,
+      score: hasTechnicalData ? (scoreBreakdown.onPageScore ?? null) : null,
       source: hasTechnicalData ? 'Technical SEO Audit' : 'Unavailable',
       status: hasTechnicalData 
-        ? ((scoreBreakdown.onPageScore || 0) >= 80 ? 'excellent' : (scoreBreakdown.onPageScore || 0) >= 60 ? 'good' : 'needs-improvement')
+        ? ((scoreBreakdown.onPageScore ?? null) >= 80 ? 'excellent' : (scoreBreakdown.onPageScore ?? null) >= 60 ? 'good' : 'needs-improvement')
         : 'unavailable',
       criticalIssues: 0
     },
@@ -695,10 +693,10 @@ function generateSeoHealthSummary(seoData) {
     },
     {
       name: 'AI Visibility',
-      score: hasGeoData ? (geoIntel.aiVisibilityScore || 0) : null,
+      score: hasGeoData ? (geoIntel.aiVisibilityScore ?? null) : null,
       source: hasGeoData ? 'GEO Intelligence' : 'Unavailable',
       status: hasGeoData 
-        ? ((geoIntel.aiVisibilityScore || 0) >= 80 ? 'excellent' : (geoIntel.aiVisibilityScore || 0) >= 60 ? 'good' : 'needs-improvement')
+        ? ((geoIntel.aiVisibilityScore ?? null) >= 80 ? 'excellent' : (geoIntel.aiVisibilityScore ?? null) >= 60 ? 'good' : 'needs-improvement')
         : 'unavailable',
       criticalIssues: 0
     },
@@ -1119,7 +1117,7 @@ function generateExecutiveActionPlan(seoData) {
         estimatedEffort: issue.estimatedHours || 4,
         seoImpact: 'high',
         businessImpact: 'high',
-        confidence: 95,
+        confidence: null,
         source: 'Technical Audit',
         completionCriteria: `Issue resolved: ${issue.issue || issue}`
       });
@@ -1135,7 +1133,7 @@ function generateExecutiveActionPlan(seoData) {
         estimatedEffort: 2,
         seoImpact: 'medium',
         businessImpact: 'medium',
-        confidence: 80,
+        confidence: null,
         source: 'Technical Audit',
         completionCriteria: 'All technical audit findings reviewed and prioritized'
       });
@@ -1152,9 +1150,9 @@ function generateExecutiveActionPlan(seoData) {
       estimatedEffort: 2,
       seoImpact: 'medium',
       businessImpact: 'medium',
-      confidence: 80,
-      source: 'GEO Intelligence',
-      completionCriteria: 'AI visibility baseline documented and optimization plan created'
+       confidence: null,
+       source: 'GEO Intelligence',
+       completionCriteria: 'AI visibility baseline documented and optimization plan created'
     });
   }
 
@@ -1171,7 +1169,7 @@ function generateExecutiveActionPlan(seoData) {
         estimatedEffort: kw.difficulty < 30 ? 8 : 16,
         seoImpact: 'high',
         businessImpact: 'high',
-        confidence: 85,
+        confidence: null,
         source: 'Keyword Intelligence',
         completionCriteria: `Content published targeting ${kw.keyword} with on-page optimization`
       });
@@ -1190,7 +1188,7 @@ function generateExecutiveActionPlan(seoData) {
         estimatedEffort: gap.estimatedImpact?.hours || 12,
         seoImpact: 'high',
         businessImpact: 'high',
-        confidence: 80,
+        confidence: null,
         source: 'Content Gap Analysis',
         completionCriteria: `Page created for ${gap.targetKeyword} with optimized content`
       });
@@ -1207,9 +1205,9 @@ function generateExecutiveActionPlan(seoData) {
       estimatedEffort: 20,
       seoImpact: 'high',
       businessImpact: 'medium',
-      confidence: 75,
-      source: 'GEO Intelligence',
-      completionCriteria: `AI visibility score improved to at least 70`
+       confidence: null,
+       source: 'GEO Intelligence',
+       completionCriteria: `AI visibility score improved to at least 70`
     });
   }
 
@@ -1225,7 +1223,7 @@ function generateExecutiveActionPlan(seoData) {
         estimatedEffort: gap.difficulty < 50 ? 12 : 24,
         seoImpact: 'medium',
         businessImpact: 'medium',
-        confidence: 70,
+        confidence: null,
         source: 'Competitor SEO Intelligence',
         completionCriteria: `Content published targeting ${gap.keyword} to compete with ${gap.competitorCount || 0} competitors`
       });
@@ -1244,7 +1242,7 @@ function generateExecutiveActionPlan(seoData) {
         estimatedEffort: gap.estimatedImpact?.hours || 16,
         seoImpact: 'medium',
         businessImpact: 'medium',
-        confidence: 75,
+        confidence: null,
         source: 'Content Gap Analysis',
         completionCriteria: `Page created and indexed for ${gap.targetKeyword}`
       });
@@ -1263,7 +1261,7 @@ function generateExecutiveActionPlan(seoData) {
         estimatedEffort: 8,
         seoImpact: 'medium',
         businessImpact: 'medium',
-        confidence: blog.confidence || 80,
+        confidence: blog.confidence ?? null,
         source: 'Blog Intelligence',
         completionCriteria: `Blog post published targeting ${blog.targetKeyword}`
       });
@@ -1274,24 +1272,24 @@ function generateExecutiveActionPlan(seoData) {
   const isCanva = brandName.toLowerCase().includes('canva') || domain.toLowerCase().includes('canva');
   if (isCanva) {
     day7.push(
-      { title: 'Review AI search visibility baseline', why: 'Measure current AI search engine visibility across ChatGPT, Gemini, Perplexity, Claude.', owner: 'SEO Specialist', dependencies: ['GEO Intelligence data'], estimatedEffort: 2, seoImpact: 'medium', businessImpact: 'high', confidence: 80, source: 'GEO Intelligence', completionCriteria: 'AI visibility baseline established' },
-      { title: 'Validate PageSpeed and technical SEO scores', why: 'Ensure canva.com meets Core Web Vitals thresholds and technical SEO best practices.', owner: 'SEO Specialist', dependencies: [], estimatedEffort: 4, seoImpact: 'high', businessImpact: 'high', confidence: 90, source: 'Technical Audit', completionCriteria: 'PageSpeed scores verified and Core Web Vitals passed' },
-      { title: 'Optimize top design tool landing pages', why: 'Improve on-page SEO for high-traffic design and template landing pages to maximize organic traffic.', owner: 'Content Team', dependencies: [], estimatedEffort: 8, seoImpact: 'high', businessImpact: 'high', confidence: 85, source: 'Technical Audit', completionCriteria: 'Top 5 landing pages optimized' }
+      { title: 'Review AI search visibility baseline', why: 'Measure current AI search engine visibility across ChatGPT, Gemini, Perplexity, Claude.', owner: 'SEO Specialist', dependencies: ['GEO Intelligence data'], estimatedEffort: 2, seoImpact: 'medium', businessImpact: 'high', confidence: null, source: 'GEO Intelligence', completionCriteria: 'AI visibility baseline established' },
+      { title: 'Validate PageSpeed and technical SEO scores', why: 'Ensure canva.com meets Core Web Vitals thresholds and technical SEO best practices.', owner: 'SEO Specialist', dependencies: [], estimatedEffort: 4, seoImpact: 'high', businessImpact: 'high', confidence: null, source: 'Technical Audit', completionCriteria: 'PageSpeed scores verified and Core Web Vitals passed' },
+      { title: 'Optimize top design tool landing pages', why: 'Improve on-page SEO for high-traffic design and template landing pages to maximize organic traffic.', owner: 'Content Team', dependencies: [], estimatedEffort: 8, seoImpact: 'high', businessImpact: 'high', confidence: null, source: 'Technical Audit', completionCriteria: 'Top 5 landing pages optimized' }
     );
     day30.push(
-      { title: 'Publish Canva vs Adobe Express comparison page', why: 'Capture commercial comparison search intent from users evaluating Canva alternatives.', owner: 'Content Writer', dependencies: ['Keyword research', 'Competitor analysis'], estimatedEffort: 12, seoImpact: 'high', businessImpact: 'high', confidence: 85, source: 'Content Gap Analysis', completionCriteria: 'Comparison page published and indexed' },
-      { title: 'Create Canva Brand Kit guide', why: 'Educate users on building brand kits to increase product adoption and brand-related search visibility.', owner: 'Content Writer', dependencies: [], estimatedEffort: 8, seoImpact: 'medium', businessImpact: 'medium', confidence: 80, source: 'Content Gap Analysis', completionCriteria: 'Brand Kit guide published' },
-      { title: 'Improve internal linking to design/template pages', why: 'Strengthen internal linking structure to distribute page authority to key design and template landing pages.', owner: 'SEO Specialist', dependencies: ['Site architecture review'], estimatedEffort: 6, seoImpact: 'medium', businessImpact: 'medium', confidence: 75, source: 'Technical Audit', completionCriteria: 'Internal link audit completed and improvements deployed' }
+      { title: 'Publish Canva vs Adobe Express comparison page', why: 'Capture commercial comparison search intent from users evaluating Canva alternatives.', owner: 'Content Writer', dependencies: ['Keyword research', 'Competitor analysis'], estimatedEffort: 12, seoImpact: 'high', businessImpact: 'high', confidence: null, source: 'Content Gap Analysis', completionCriteria: 'Comparison page published and indexed' },
+      { title: 'Create Canva Brand Kit guide', why: 'Educate users on building brand kits to increase product adoption and brand-related search visibility.', owner: 'Content Writer', dependencies: [], estimatedEffort: 8, seoImpact: 'medium', businessImpact: 'medium', confidence: null, source: 'Content Gap Analysis', completionCriteria: 'Brand Kit guide published' },
+      { title: 'Improve internal linking to design/template pages', why: 'Strengthen internal linking structure to distribute page authority to key design and template landing pages.', owner: 'SEO Specialist', dependencies: ['Site architecture review'], estimatedEffort: 6, seoImpact: 'medium', businessImpact: 'medium', confidence: null, source: 'Technical Audit', completionCriteria: 'Internal link audit completed and improvements deployed' }
     );
     day60.push(
-      { title: 'Build AI design tool content cluster', why: 'Create a comprehensive content cluster around AI design tools to dominate AI-generated search results.', owner: 'Content Team', dependencies: ['Keyword cluster analysis'], estimatedEffort: 16, seoImpact: 'high', businessImpact: 'high', confidence: 80, source: 'Keyword Intelligence', completionCriteria: 'Content cluster of 5+ articles published' },
-      { title: 'Publish Canva alternatives content', why: 'Target high-volume commercial keywords for users seeking Canva competitors and comparison tools.', owner: 'Content Writer', dependencies: [], estimatedEffort: 10, seoImpact: 'high', businessImpact: 'high', confidence: 85, source: 'Content Gap Analysis', completionCriteria: 'Alternatives content published and ranking' },
-      { title: 'Add FAQ/schema for AI search', why: 'Implement structured data and FAQ content optimized for AI overview responses in ChatGPT and Google SGE.', owner: 'SEO Specialist', dependencies: ['FAQ content creation', 'Schema markup knowledge'], estimatedEffort: 8, seoImpact: 'medium', businessImpact: 'high', confidence: 80, source: 'GEO Intelligence', completionCriteria: 'FAQ schema implemented on key pages' }
+      { title: 'Build AI design tool content cluster', why: 'Create a comprehensive content cluster around AI design tools to dominate AI-generated search results.', owner: 'Content Team', dependencies: ['Keyword cluster analysis'], estimatedEffort: 16, seoImpact: 'high', businessImpact: 'high', confidence: null, source: 'Keyword Intelligence', completionCriteria: 'Content cluster of 5+ articles published' },
+      { title: 'Publish Canva alternatives content', why: 'Target high-volume commercial keywords for users seeking Canva competitors and comparison tools.', owner: 'Content Writer', dependencies: [], estimatedEffort: 10, seoImpact: 'high', businessImpact: 'high', confidence: null, source: 'Content Gap Analysis', completionCriteria: 'Alternatives content published and ranking' },
+      { title: 'Add FAQ/schema for AI search', why: 'Implement structured data and FAQ content optimized for AI overview responses in ChatGPT and Google SGE.', owner: 'SEO Specialist', dependencies: ['FAQ content creation', 'Schema markup knowledge'], estimatedEffort: 8, seoImpact: 'medium', businessImpact: 'high', confidence: null, source: 'GEO Intelligence', completionCriteria: 'FAQ schema implemented on key pages' }
     );
     day90.push(
-      { title: 'Start backlink outreach for comparison pages', why: 'Build high-quality backlinks to comparison and landing pages to improve domain authority and rankings.', owner: 'PR/Link Building', dependencies: ['Comparison pages published'], estimatedEffort: 20, seoImpact: 'high', businessImpact: 'high', confidence: 70, source: 'Competitor SEO Intelligence', completionCriteria: '10+ high-quality backlinks acquired' },
-      { title: 'Refresh high-intent landing pages', why: 'Update and optimize high-intent landing pages with fresh content, improved CTAs, and current data to maintain rankings.', owner: 'Content Team', dependencies: ['Performance data review'], estimatedEffort: 12, seoImpact: 'medium', businessImpact: 'high', confidence: 75, source: 'Technical Audit', completionCriteria: 'Top 10 landing pages refreshed' },
-      { title: 'Track keyword ranking growth', why: 'Monitor keyword ranking changes across primary, secondary, and long-tail keywords to measure SEO program ROI.', owner: 'SEO Specialist', dependencies: ['Rank tracking tool setup'], estimatedEffort: 2, seoImpact: 'low', businessImpact: 'medium', confidence: 90, source: 'Keyword Intelligence', completionCriteria: 'Monthly rank tracking report delivered' }
+      { title: 'Start backlink outreach for comparison pages', why: 'Build high-quality backlinks to comparison and landing pages to improve domain authority and rankings.', owner: 'PR/Link Building', dependencies: ['Comparison pages published'], estimatedEffort: 20, seoImpact: 'high', businessImpact: 'high', confidence: null, source: 'Competitor SEO Intelligence', completionCriteria: '10+ high-quality backlinks acquired' },
+      { title: 'Refresh high-intent landing pages', why: 'Update and optimize high-intent landing pages with fresh content, improved CTAs, and current data to maintain rankings.', owner: 'Content Team', dependencies: ['Performance data review'], estimatedEffort: 12, seoImpact: 'medium', businessImpact: 'high', confidence: null, source: 'Technical Audit', completionCriteria: 'Top 10 landing pages refreshed' },
+      { title: 'Track keyword ranking growth', why: 'Monitor keyword ranking changes across primary, secondary, and long-tail keywords to measure SEO program ROI.', owner: 'SEO Specialist', dependencies: ['Rank tracking tool setup'], estimatedEffort: 2, seoImpact: 'low', businessImpact: 'medium', confidence: null, source: 'Keyword Intelligence', completionCriteria: 'Monthly rank tracking report delivered' }
     );
     console.log('✅ [Exec ActionPlan] Injected Canva-specific action plan items');
   }
@@ -1309,7 +1307,7 @@ function generateExecutiveActionPlan(seoData) {
         estimatedEffort: 2,
         seoImpact: 'high',
         businessImpact: 'high',
-        confidence: 95,
+        confidence: null,
         source: 'Technical Audit',
         completionCriteria: 'Technical audit reviewed with prioritized action items'
       });
@@ -1322,7 +1320,7 @@ function generateExecutiveActionPlan(seoData) {
         estimatedEffort: 4,
         seoImpact: 'high',
         businessImpact: 'high',
-        confidence: 85,
+        confidence: null,
         source: 'Keyword Intelligence',
         completionCriteria: 'Keyword analysis completed with content calendar'
       });
@@ -1335,7 +1333,7 @@ function generateExecutiveActionPlan(seoData) {
         estimatedEffort: 4,
         seoImpact: 'medium',
         businessImpact: 'high',
-        confidence: 75,
+        confidence: null,
         source: 'Competitor SEO Intelligence',
         completionCriteria: 'Competitor analysis completed with strategic recommendations'
       });
@@ -1348,7 +1346,7 @@ function generateExecutiveActionPlan(seoData) {
         estimatedEffort: 8,
         seoImpact: 'medium',
         businessImpact: 'medium',
-        confidence: 75,
+        confidence: null,
         source: 'GEO Intelligence',
         completionCriteria: 'AI visibility optimization plan implemented'
       });
@@ -1362,7 +1360,7 @@ function generateExecutiveActionPlan(seoData) {
         estimatedEffort: 4,
         seoImpact: 'high',
         businessImpact: 'high',
-        confidence: 90,
+        confidence: null,
         source: 'General Recommendation',
         completionCriteria: 'Complete technical SEO audit completed with prioritized action items'
       });
@@ -1399,6 +1397,10 @@ function generateRoiForecast(seoData) {
   
   const hasValidKeywordData = keywordIntel.primaryKeywords && keywordIntel.primaryKeywords.length > 0;
 
+  const totalSearchVolume = hasValidKeywordData
+    ? keywordIntel.primaryKeywords.reduce((sum, k) => sum + (k.searchVolume || 0), 0)
+    : 0;
+
   if (!hasValidKeywordData) {
     return {
       potentialTrafficGain: null,
@@ -1409,19 +1411,10 @@ function generateRoiForecast(seoData) {
     };
   }
 
-  const totalSearchVolume = keywordIntel.primaryKeywords.reduce((sum, k) => sum + (k.searchVolume || 0), 0);
-  const highOpportunityVolume = keywordIntel.primaryKeywords
-    .filter(k => k.opportunity === 'high' && k.difficulty < 50)
-    .reduce((sum, k) => sum + (k.searchVolume || 0), 0);
-
-  const potentialTrafficGain = Math.round(highOpportunityVolume * 0.15);
-  const estimatedRevenueImpact = potentialTrafficGain * 0.02;
-  const timeToResults = '3-6 months';
-
   return {
-    potentialTrafficGain,
-    estimatedRevenueImpact: Math.round(estimatedRevenueImpact),
-    timeToResults,
+    potentialTrafficGain: null,
+    estimatedRevenueImpact: null,
+    timeToResults: null,
     hasSufficientData: true,
     source: 'Keyword Intelligence',
     evidence: `Based on ${keywordIntel.primaryKeywords.length} keywords with ${totalSearchVolume.toLocaleString()} total monthly searches`

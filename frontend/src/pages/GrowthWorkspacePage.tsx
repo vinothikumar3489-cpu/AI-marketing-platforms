@@ -425,12 +425,12 @@ function ExecutiveSnapshot({ results }: { results: any }) {
     const risks = (swot?.weaknesses || swot?.threats || []).slice(0, 5).map((r: any) => ({
       text: r.value || r.finding || r || '',
       severity: 'warning',
-      probability: r.confidence || 65
+      probability: typeof r.confidence === 'number' ? r.confidence : null
     }));
 
     const opportunities = (swot?.opportunities || []).slice(0, 5).map((o: any) => ({
       text: o.value || o.finding || o || '',
-      roi: '150-300%',
+      roi: null,
       effort: 'Medium'
     }));
 

@@ -231,7 +231,7 @@ export function TaskManager({ actions, onActionUpdate }: { actions: StoredAction
       owner: form.owner || 'Unassigned', dueDate: form.dueDate, status: 'pending', progress: 0,
       comments: [], approvalStatus: 'pending', approvedBy: '', approvedDate: '', approverNotes: '',
       sourceModule: form.sourceModule, timeline: form.dueDate || 'TBD', businessImpact: '', expectedRoi: '',
-      confidence: 80, createdAt: new Date().toISOString(),
+      confidence: null, createdAt: new Date().toISOString(),
     };
     onActionUpdate?.([task, ...actions]);
     setForm({ title: '', description: '', priority: 'Medium', owner: '', dueDate: '', sourceModule: '' });
@@ -685,13 +685,13 @@ export function BusinessCalendar({ events, onEventClick }: { events: CalendarEve
 
 export function KpiTracking({ kpis, onKpiUpdate }: { kpis: KpiData[]; onKpiUpdate?: (kpis: KpiData[]) => void }) {
   const [editId, setEditId] = useState<string | null>(null);
-  const [newForm, setNewForm] = useState({ label: '', current: 0, target: 100, owner: '', deadline: '', confidence: 80 });
+  const [newForm, setNewForm] = useState({ label: '', current: 0, target: 100, owner: '', deadline: '', confidence: null });
 
   const handleAdd = () => {
     if (!newForm.label.trim()) return;
     const kpi: KpiData = { id: generateId(), ...newForm, trend: 'stable' };
     onKpiUpdate?.([...kpis, kpi]);
-    setNewForm({ label: '', current: 0, target: 100, owner: '', deadline: '', confidence: 80 });
+    setNewForm({ label: '', current: 0, target: 100, owner: '', deadline: '', confidence: null });
   };
 
   const handleDelete = (id: string) => onKpiUpdate?.(kpis.filter(k => k.id !== id));
@@ -1299,6 +1299,6 @@ export function generateWorkspaceData(actions: Partial<StoredAction>[]): StoredA
     comments: a.comments || [], approvalStatus: a.approvalStatus || 'pending', approvedBy: a.approvedBy || '',
     approvedDate: a.approvedDate || '', approverNotes: a.approverNotes || '', sourceModule: a.sourceModule || '',
     timeline: a.timeline || '', businessImpact: a.businessImpact || '', expectedRoi: a.expectedRoi || '',
-    confidence: a.confidence || 80, createdAt: a.createdAt || new Date().toISOString(),
+    confidence: typeof a.confidence === 'number' ? a.confidence : null, createdAt: a.createdAt || new Date().toISOString(),
   }));
 }

@@ -128,21 +128,23 @@ export interface HealthScoreData { overall: number; components: { label: string;
 
 export function BusinessHealthScore({ data }: { data?: HealthScoreData }) {
   if (!data) return null;
-  const grade = data.overall >= 85 ? 'Excellent' : data.overall >= 65 ? 'Good' : data.overall >= 40 ? 'Needs Improvement' : 'Critical';
-  const gradeColor = data.overall >= 85 ? C.excellent : data.overall >= 65 ? C.good : data.overall >= 40 ? C.needsImprovement : C.critical;
+  const overall = data.overall;
+  const grade = overall != null && overall >= 85 ? 'Excellent' : overall != null && overall >= 65 ? 'Good' : overall != null && overall >= 40 ? 'Needs Improvement' : 'Not measured';
+  const gradeColor = overall != null && overall >= 85 ? C.excellent : overall != null && overall >= 65 ? C.good : overall != null && overall >= 40 ? C.needsImprovement : C.dim;
   return (
     <div style={{ background: C.card, borderRadius: '12px', border: `1px solid ${C.border}`, padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
         <div><div style={{ fontSize: '11px', color: C.dim, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Business Health</div><div style={{ fontSize: '28px', fontWeight: 700, color: gradeColor }}>{grade}</div></div>
-        <div style={{ textAlign: 'right' }}><div style={{ fontSize: '36px', fontWeight: 700, color: gradeColor }}>{Math.round(data.overall)}%</div><div style={{ fontSize: '11px', color: C.dim }}>Composite Score</div></div>
+        <div style={{ textAlign: 'right' }}><div style={{ fontSize: '36px', fontWeight: 700, color: gradeColor }}>{overall != null ? `${Math.round(overall)}%` : 'Not measured'}</div><div style={{ fontSize: '11px', color: C.dim }}>Composite Score</div></div>
       </div>
       <div style={{ display: 'grid', gap: '8px' }}>
         {data.components.map((c, i) => {
-          const barColor = c.color || (c.value >= 70 ? C.excellent : c.value >= 40 ? C.needsImprovement : C.critical);
+          const val = c.value;
+          const barColor = c.color || (val != null && val >= 70 ? C.excellent : val != null && val >= 40 ? C.needsImprovement : C.dim);
           return (
             <div key={i}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '3px' }}><span style={{ color: C.muted }}>{c.label}</span><span style={{ color: barColor, fontWeight: 600 }}>{Math.round(c.value)}%</span></div>
-              <div style={{ height: '6px', background: '#1d2738', borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: `${Math.min(c.value, 100)}%`, height: '100%', background: barColor, borderRadius: '3px', transition: 'width 0.6s ease' }} /></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '3px' }}><span style={{ color: C.muted }}>{c.label}</span><span style={{ color: barColor, fontWeight: 600 }}>{val != null ? `${Math.round(val)}%` : 'Not measured'}</span></div>
+              <div style={{ height: '6px', background: '#1d2738', borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: val != null ? `${Math.min(val, 100)}%` : '0%', height: '100%', background: barColor, borderRadius: '3px', transition: 'width 0.6s ease' }} /></div>
             </div>
           );
         })}
@@ -213,8 +215,8 @@ export function RecommendationPriorities({ items }: { items: RecommendationItem[
                   </div>
                   {r.description && <div style={{ fontSize: '12px', color: C.muted, marginBottom: '6px' }}>{renderSafeValue(r.description)}</div>}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '11px', color: C.dim, marginTop: '4px' }}>
-                    <span>Difficulty: <strong style={{ color: r.difficulty >= 70 ? C.critical : r.difficulty >= 40 ? C.needsImprovement : C.excellent }}>{r.difficulty}/100</strong></span>
-                    <span>ROI: <strong style={{ color: C.excellent }}>{r.roi}</strong></span><span>Timeline: <strong style={{ color: C.good }}>{r.timeline}</strong></span><span>Owner: <strong style={{ color: C.muted }}>{r.owner}</strong></span>
+                    <span>Difficulty: <strong style={{ color: r.difficulty != null ? (r.difficulty >= 70 ? C.critical : r.difficulty >= 40 ? C.needsImprovement : C.excellent) : C.dim }}>{r.difficulty != null ? `${r.difficulty}/100` : 'Not measured'}</strong></span>
+                    <span>Timeline: <strong style={{ color: C.good }}>{r.timeline}</strong></span><span>Owner: <strong style={{ color: C.muted }}>{r.owner}</strong></span>
                   </div>
                 </div>
               ))}
@@ -359,11 +361,11 @@ export function RiskMatrix({ items }: { items: RiskItem[] }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: catColors[cat] }} /><span style={{ fontSize: '12px', fontWeight: 600, color: catColors[cat] }}>{cat} Risks</span></div>
             {catItems.map((r, i) => (
               <div key={i} style={{ padding: '8px 10px', background: C.bg, borderRadius: '6px', marginBottom: '4px', border: '1px solid #1d2738' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: C.text }}>{renderSafeValue(r.title)}</div><div style={{ display: 'flex', gap: '4px' }}><StatusBadge status={r.probability >= 70 ? 'critical' : r.probability >= 40 ? 'warning' : 'low'} /><StatusBadge status={r.impact} /></div>
-                </div>
-                <div style={{ fontSize: '11px', color: C.muted, marginBottom: '4px' }}><strong>Mitigation:</strong> {renderSafeValue(r.mitigation)}</div>
-                <div style={{ fontSize: '10px', color: C.dim }}>Probability: {r.probability}% | Owner: {r.owner}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: C.text }}>{renderSafeValue(r.title)}</div><div style={{ display: 'flex', gap: '4px' }}><StatusBadge status={r.probability != null ? (r.probability >= 70 ? 'critical' : r.probability >= 40 ? 'warning' : 'low') : 'unknown'} /><StatusBadge status={r.impact} /></div>
+                  </div>
+                  <div style={{ fontSize: '11px', color: C.muted, marginBottom: '4px' }}><strong>Mitigation:</strong> {renderSafeValue(r.mitigation)}</div>
+                <div style={{ fontSize: '10px', color: C.dim }}>Probability: {r.probability != null ? `${r.probability}%` : 'Not measured'} | Owner: {r.owner}</div>
               </div>
             ))}
           </div>
@@ -382,13 +384,13 @@ export function ConfidenceVisualization({ items }: { items: ConfidenceData[] }) 
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}><Shield size={18} style={{ color: C.accent }} /><span style={{ fontSize: '14px', fontWeight: 600, color: C.text }}>AI Confidence</span></div>
       <div style={{ display: 'grid', gap: '10px' }}>
         {items.map((item, i) => {
-          const confColor = item.confidence >= 70 ? C.excellent : item.confidence >= 40 ? C.needsImprovement : C.critical;
-          const evColor = item.evidenceStrength >= 70 ? C.excellent : item.evidenceStrength >= 40 ? C.needsImprovement : C.critical;
+          const confColor = item.confidence != null && item.confidence >= 70 ? C.excellent : item.confidence != null && item.confidence >= 40 ? C.needsImprovement : C.critical;
+          const evColor = item.evidenceStrength != null && item.evidenceStrength >= 70 ? C.excellent : item.evidenceStrength != null && item.evidenceStrength >= 40 ? C.needsImprovement : C.critical;
           return (
             <div key={i} style={{ padding: '10px 12px', background: C.bg, borderRadius: '8px', border: '1px solid #1d2738' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}><span style={{ fontSize: '12px', fontWeight: 600, color: C.text }}>{item.section}</span><span style={{ fontSize: '12px', fontWeight: 700, color: confColor }}>{Math.round(item.confidence)}%</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}><span style={{ fontSize: '12px', fontWeight: 600, color: C.text }}>{item.section}</span><span style={{ fontSize: '12px', fontWeight: 700, color: confColor }}>{item.confidence != null ? `${Math.round(item.confidence)}%` : 'Not measured'}</span></div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '10px', color: C.dim }}>
-                <div>Evidence: <strong style={{ color: evColor }}>{Math.round(item.evidenceStrength)}%</strong></div><div>Sources: <strong style={{ color: C.text }}>{item.sourceCount}</strong></div>
+                <div>Evidence: <strong style={{ color: evColor }}>{item.evidenceStrength != null ? `${Math.round(item.evidenceStrength)}%` : 'Not measured'}</strong></div><div>Sources: <strong style={{ color: C.text }}>{item.sourceCount}</strong></div>
                 <div style={{ gridColumn: '1 / -1' }}>Freshness: <strong style={{ color: C.text }}>{item.dataFreshness}</strong></div>
               </div>
               <div style={{ marginTop: '6px', display: 'flex', gap: '8px' }}>
@@ -403,8 +405,9 @@ export function ConfidenceVisualization({ items }: { items: ConfidenceData[] }) 
   );
 }
 
-function MiniConfBar({ label, value, color }: { label: string; value: number; color: string }) {
-  return <div style={{ flex: 1 }}><div style={{ fontSize: '9px', color: C.dim, marginBottom: '2px' }}>{label}</div><div style={{ height: '4px', background: '#1d2738', borderRadius: '2px', overflow: 'hidden' }}><div style={{ width: `${Math.min(value, 100)}%`, height: '100%', background: color, borderRadius: '2px' }} /></div></div>;
+function MiniConfBar({ label, value, color }: { label: string; value?: number; color: string }) {
+  const pct = value != null ? Math.min(Math.max(value, 0), 100) : 0;
+  return <div style={{ flex: 1 }}><div style={{ fontSize: '9px', color: C.dim, marginBottom: '2px' }}>{label}</div><div style={{ height: '4px', background: '#1d2738', borderRadius: '2px', overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '2px' }} /></div></div>;
 }
 
 export interface FilterOption { key: string; label: string; values: string[]; }
@@ -568,7 +571,8 @@ export interface CommandCenterData { companyLogo?: string; companyName: string; 
 
 export function ExecutiveCommandCenter({ data }: { data?: CommandCenterData }) {
   if (!data) return null;
-  const healthColor = data.businessHealthScore >= 80 ? C.excellent : data.businessHealthScore >= 60 ? C.good : data.businessHealthScore >= 40 ? C.needsImprovement : C.critical;
+  const bhScore = data.businessHealthScore;
+  const healthColor = bhScore != null && bhScore >= 80 ? C.excellent : bhScore != null && bhScore >= 60 ? C.good : bhScore != null && bhScore >= 40 ? C.needsImprovement : C.dim;
   const riskColor = data.riskLevel === 'Low' ? C.excellent : data.riskLevel === 'Medium' ? C.needsImprovement : data.riskLevel === 'High' ? C.orange : C.critical;
   return (
     <div style={{ background: 'linear-gradient(135deg, #0f1729 0%, #151d2b 50%, #1a1040 100%)', borderRadius: '16px', border: '1px solid #293245', padding: '28px', position: 'relative', overflow: 'hidden' }}>
@@ -589,13 +593,13 @@ export function ExecutiveCommandCenter({ data }: { data?: CommandCenterData }) {
         </div>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: `conic-gradient(${healthColor} ${data.businessHealthScore}%, #1d2738 ${data.businessHealthScore}%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: '#0f1729', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 700, color: healthColor }}>{data.businessHealthScore}%</div>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: bhScore != null ? `conic-gradient(${healthColor} ${bhScore}%, #1d2738 ${bhScore}%)` : '#1d2738', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: '#0f1729', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 700, color: healthColor }}>{bhScore != null ? `${bhScore}%` : '?'}</div>
             </div>
             <div style={{ fontSize: '9px', color: C.dim, marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Health</div>
           </div>
           <div style={{ textAlign: 'center' }}><div style={{ fontSize: '14px', fontWeight: 700, color: riskColor }}>{data.riskLevel}</div><div style={{ fontSize: '9px', color: C.dim, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Risk</div></div>
-          <div style={{ textAlign: 'center' }}><ConfidenceBadge value={data.aiConfidence} size="md" /><div style={{ fontSize: '9px', color: C.dim, marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Confidence</div></div>
+          <div style={{ textAlign: 'center' }}><ConfidenceBadge value={data.aiConfidence} size="md" /><div style={{ fontSize: '9px', color: C.dim, marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{data.aiConfidence != null ? 'Confidence' : 'Not measured'}</div></div>
         </div>
       </div>
       <div style={{ padding: '14px 18px', background: 'rgba(129,140,248,0.06)', borderRadius: '10px', border: '1px solid rgba(129,140,248,0.2)', marginBottom: '20px' }}>
@@ -709,7 +713,7 @@ export function DecisionSimulator({ scenarios, onRun }: { scenarios: SimScenario
       </div>
       {scenario && (
         <div style={{ background: C.bg, borderRadius: '10px', padding: '14px', border: '1px solid #1d2738', marginBottom: '14px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}><span style={{ fontSize: '13px', color: C.text, fontWeight: 600 }}>{scenario.label}</span><span style={{ fontSize: '11px', color: scenario.impact >= 0 ? C.excellent : C.critical, fontWeight: 600 }}>Impact: {scenario.impact >= 0 ? '+' : ''}{scenario.impact}%</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}><span style={{ fontSize: '13px', color: C.text, fontWeight: 600 }}>{scenario.label}</span><span style={{ fontSize: '11px', color: scenario.impact != null && scenario.impact >= 0 ? C.excellent : C.dim, fontWeight: 600 }}>{scenario.impact != null ? `Impact: ${scenario.impact >= 0 ? '+' : ''}${scenario.impact}%` : 'Not measured'}</span></div>
           <div style={{ display: 'grid', gap: '8px' }}>{scenario.effects.map((e, i) => (
             <div key={i} style={{ padding: '8px 10px', background: C.card, borderRadius: '6px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}><span style={{ color: C.muted }}>{e.label}</span><span style={{ color: e.improvement >= 0 ? C.excellent : C.critical, fontWeight: 600 }}>{e.before} → {e.after} ({e.improvement >= 0 ? '+' : ''}{e.improvement}%)</span></div>
@@ -937,7 +941,7 @@ export function EvidenceExplorer({ evidence, onClose }: { evidence: EvidenceItem
         {evidence.map((e, i) => (
           <div key={i} style={{ marginTop: '8px', background: C.bg, borderRadius: '8px', border: '1px solid #1d2738', overflow: 'hidden' }}>
             <button onClick={() => setExpanded(expanded === i ? null : i)} style={{ width: '100%', padding: '10px 12px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: e.confidence >= 70 ? C.excellent : e.confidence >= 40 ? C.needsImprovement : C.critical, flexShrink: 0 }} />
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: e.confidence != null && e.confidence >= 70 ? C.excellent : e.confidence != null && e.confidence >= 40 ? C.needsImprovement : C.dim, flexShrink: 0 }} />
               <div style={{ flex: 1 }}><div style={{ fontSize: '12px', fontWeight: 600, color: C.text }}>{e.source}</div><div style={{ fontSize: '10px', color: C.dim }}>{e.website} — {e.dateCollected}</div></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><ConfidenceBadge value={e.confidence} size="sm" />{expanded === i ? <ChevronUp size={14} style={{ color: C.dim }} /> : <ChevronDown size={14} style={{ color: C.dim }} />}</div>
             </button>

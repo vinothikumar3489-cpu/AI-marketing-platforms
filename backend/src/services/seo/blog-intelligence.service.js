@@ -209,15 +209,14 @@ async function generateBlogIdeas({ keywordIntelligence, competitorIntelligence, 
           outline: generateOutline('informational', keyword),
           estimatedTrafficPotential: null,
           source: 'CategorySeed',
-          confidence: 55,
-          evidence: 'Seed keyword for blog content opportunity',
+          evidence: 'Category-based seed keyword for blog topic exploration',
           internalLinkSuggestions: generateInternalLinks(keyword, productName)
         });
       });
       
       if (ideas.length > 0) {
         console.log(`✅ [Blog Ideas] Generated ${ideas.length} blog ideas from fallback keywords`);
-        return ideas.sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+        return ideas.sort((a, b) => (b.searchVolume || 0) - (a.searchVolume || 0));
       }
     }
     return ideas;
@@ -312,7 +311,6 @@ async function generateBlogIdeas({ keywordIntelligence, competitorIntelligence, 
         outline: generateOutline('informational', keyword),
         estimatedTrafficPotential: volume ? Math.round(volume * 0.15) : null,
         source: volume ? 'DataForSEO' : 'Seed Generation',
-        confidence: calculateConfidence(volume, difficulty),
         evidence: volume ? `Informational keyword with ${volume} monthly searches` : `Seed informational keyword`,
         internalLinkSuggestions: generateInternalLinks(keyword, productName)
       });
@@ -342,7 +340,6 @@ async function generateBlogIdeas({ keywordIntelligence, competitorIntelligence, 
         outline: generateOutline('how-to', keyword),
         estimatedTrafficPotential: volume ? Math.round(volume * 0.2) : null,
         source: 'DataForSEO',
-        confidence: calculateConfidence(volume, difficulty),
         evidence: `Question keyword with ${volume} monthly searches`,
         internalLinkSuggestions: generateInternalLinks(keyword, productName)
       });
@@ -367,8 +364,7 @@ async function generateBlogIdeas({ keywordIntelligence, competitorIntelligence, 
               outline: generateOutline('guide', keyword),
               estimatedTrafficPotential: volume ? Math.round(volume * 0.1) : null,
               source: 'SERP',
-              confidence: 70,
-              evidence: `Competitor ${comp.name} ranks for this keyword`,
+              evidence: `Competitor "${comp.name}" ranks for this keyword in search results`,
               internalLinkSuggestions: generateInternalLinks(keyword, productName)
             });
           }
@@ -392,8 +388,7 @@ async function generateBlogIdeas({ keywordIntelligence, competitorIntelligence, 
           outline: generateOutline('faq-style', question),
           estimatedTrafficPotential: null,
           source: 'GEO',
-          confidence: 75,
-          evidence: 'AI search question from GEO analysis',
+          evidence: 'Identified through GEO intelligence - targets AI search answer opportunities',
           internalLinkSuggestions: generateInternalLinks(question, productName)
         });
       }
@@ -418,8 +413,7 @@ async function generateBlogIdeas({ keywordIntelligence, competitorIntelligence, 
             outline: generateOutline('guide', keyword),
             estimatedTrafficPotential: co.searchVolume ? Math.round(co.searchVolume * 0.12) : null,
             source: 'DataForSEO',
-            confidence: 80,
-            evidence: 'High-impact content opportunity from keyword analysis',
+            evidence: 'High-impact content gap identified from keyword opportunity analysis',
             internalLinkSuggestions: generateInternalLinks(keyword, productName)
           });
         }
@@ -427,7 +421,7 @@ async function generateBlogIdeas({ keywordIntelligence, competitorIntelligence, 
   }
 
   console.log(`✅ [Blog Ideas] Generated ${ideas.length} blog ideas from real data`);
-  return ideas.sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+  return ideas.sort((a, b) => (b.searchVolume || 0) - (a.searchVolume || 0));
   } catch (blogIdeasError) {
     console.error('❌ [Blog Ideas] Error generating ideas:', blogIdeasError);
     return [];
@@ -453,18 +447,13 @@ function generateBlogTitle(keyword, productName, type) {
     return q;
   }
   if (type === 'competitor') {
-    return `${titleCase}: ${productName} vs The Competition`;
+    return `${productName} vs Alternatives: ${titleCase}`;
   }
   if (type === 'geo') {
-    return `Understanding ${titleCase}: A Complete Guide for ${productName}`;
+    return `${titleCase}: A Guide for ${productName}`;
   }
   if (type === 'gap') {
-    return `${titleCase}: How ${productName} Can Help`;
-  }
-  // Default: informational blog title
-  const words = lower.split(' ');
-  if (words.length <= 3) {
-    return `The Ultimate Guide to ${titleCase}`;
+    return `${titleCase} with ${productName}`;
   }
   return titleCase;
 }
@@ -498,13 +487,8 @@ function generateInternalLinks(keyword, productName) {
   ];
 }
 
-function calculateConfidence(volume, difficulty) {
-  if (!volume || !difficulty) return 60;
-  if (volume > 1000 && difficulty < 50) return 95;
-  if (volume > 500 && difficulty < 70) return 85;
-  if (volume > 200) return 75;
-  return 65;
-}
+
+
 
 // ============================================
 // BLOG CLUSTERS
@@ -572,7 +556,6 @@ function generateBlogBriefs(blogIdeas) {
     outline: idea.outline,
     estimatedTrafficPotential: idea.estimatedTrafficPotential,
     source: idea.source,
-    confidence: idea.confidence,
     evidence: idea.evidence,
     internalLinkSuggestions: idea.internalLinkSuggestions,
     wordCountEstimate: 1500,

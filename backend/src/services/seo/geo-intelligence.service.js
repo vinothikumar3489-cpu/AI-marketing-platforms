@@ -158,7 +158,6 @@ async function extractEntities(websiteData, productName) {
     entities.products.push({
       entity: productName,
       type: 'product',
-      confidenceScore: 100,
       mentions: (allText.match(new RegExp(productName, 'gi')) || []).length,
       context: 'Primary product'
     });
@@ -220,7 +219,6 @@ function extractEntitiesRuleBased(text, productName) {
       entities.push({
         entity: tech,
         type: 'technology',
-        confidenceScore: Math.min(matches * 20, 90),
         mentions: matches,
         context: `Technology mentioned ${matches} times`
       });
@@ -243,23 +241,21 @@ function extractEntitiesRuleBased(text, productName) {
       entities.push({
         entity: word,
         type: 'brand',
-        confidenceScore: Math.min(count * 15, 85),
         mentions: count,
         context: `Brand/entity mentioned ${count} times`
       });
     });
 
-  return entities.sort((a, b) => b.confidenceScore - a.confidenceScore).slice(0, 20);
+  return entities.sort((a, b) => (b.mentions || 0) - (a.mentions || 0)).slice(0, 20);
 }
 
 function calculateEntityScore(entities) {
   if (!entities || entities.length === 0) return 20;
   
-  const coverage = Math.min(entities.length * 5, 40); // Up to 40 points for entity count
-  const avgConfidence = entities.reduce((sum, e) => sum + (e.confidenceScore || 50), 0) / entities.length;
-  const confidencePoints = (avgConfidence / 100) * 60; // Up to 60 points for confidence
+  const coverage = Math.min(entities.length * 5, 60);
+  const mentionBonus = Math.min(entities.reduce((sum, e) => sum + (e.mentions || 1), 0) * 2, 40);
   
-  return Math.round(coverage + confidencePoints);
+  return Math.round(Math.min(coverage + mentionBonus, 100));
 }
 
 // ============================================
@@ -643,62 +639,26 @@ function isStopWord(word) {
 function calculatePlatformScores(data) {
   console.log('📊 [Platform Scores] Calculating individual platform visibility...');
 
-  // ChatGPT Score (focuses on clear definitions, structured content)
-  const chatgptScore = Math.round(
+  const overall = Math.round(
     (data.entities.score * 0.25) +
     (data.knowledgeGraphReadiness.score * 0.20) +
-    (data.answerability.score * 0.35) +
-    (data.citationReadiness.score * 0.20)
-  );
-
-  // Gemini Score (focuses on structured data, organization)
-  const geminiScore = Math.round(
-    (data.knowledgeGraphReadiness.score * 0.40) +
-    (data.entities.score * 0.20) +
-    (data.topicalAuthority.score * 0.20) +
-    (data.answerability.score * 0.20)
-  );
-
-  // Claude Score (focuses on depth, authority)
-  const claudeScore = Math.round(
-    (data.topicalAuthority.score * 0.35) +
-    (data.citationReadiness.score * 0.25) +
-    (data.answerability.score * 0.20) +
-    (data.entities.score * 0.20)
-  );
-
-  // Perplexity Score (focuses on citations, references)
-  const perplexityScore = Math.round(
-    (data.citationReadiness.score * 0.40) +
-    (data.topicalAuthority.score * 0.25) +
-    (data.entities.score * 0.20) +
-    (data.answerability.score * 0.15)
-  );
-
-  // Google AI Overview Score (focuses on FAQs, structured data, entities)
-  const googleAiOverviewScore = Math.round(
-    (data.knowledgeGraphReadiness.score * 0.35) +
-    (data.entities.score * 0.25) +
     (data.answerability.score * 0.25) +
-    (data.citationReadiness.score * 0.15)
-  );
-
-  // Overall AI visibility (weighted average)
-  const overall = Math.round(
-    (chatgptScore * 0.25) +
-    (geminiScore * 0.20) +
-    (claudeScore * 0.15) +
-    (perplexityScore * 0.20) +
-    (googleAiOverviewScore * 0.20)
+    (data.citationReadiness.score * 0.15) +
+    (data.topicalAuthority.score * 0.15)
   );
 
   return {
     overall,
-    chatgpt: chatgptScore,
-    gemini: geminiScore,
-    claude: claudeScore,
-    perplexity: perplexityScore,
-    googleAiOverview: googleAiOverviewScore
+    chatgpt: 'Not measured',
+    gemini: 'Not measured',
+    claude: 'Not measured',
+    perplexity: 'Not measured',
+    googleAiOverview: Math.round(
+      (data.knowledgeGraphReadiness.score * 0.35) +
+      (data.entities.score * 0.25) +
+      (data.answerability.score * 0.25) +
+      (data.citationReadiness.score * 0.15)
+    )
   };
 }
 
@@ -990,7 +950,7 @@ function generateFallbackGeoIntelligence(productName, industry) {
     answerabilityScore: 0,
     topicalAuthorityScore: 0,
     entities: [
-      { entity: productName, type: 'product', confidenceScore: 100, context: 'Primary product' }
+      { entity: productName, type: 'product', context: 'Primary product' }
     ],
     knowledgeGraphEntities: [],
     citationOpportunities: [

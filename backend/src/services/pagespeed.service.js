@@ -5,7 +5,7 @@ import fetch from 'node-fetch';
 // Real technical SEO audit data from Google PageSpeed API
 // ============================================
 
-const PAGESPEED_API_KEY = process.env.PAGESPEED_API_KEY;
+const PAGESPEED_API_KEY = process.env.PAGESPEED_INSIGHTS_API_KEY || process.env.GOOGLE_PAGESPEED_INSIGHTS_API_KEY || process.env.PAGESPEED_API_KEY;
 const PAGESPEED_API_URL = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
 
 /**
@@ -102,8 +102,7 @@ function extractLighthouseScores(categories) {
     accessibility: categories.accessibility?.score ? Math.round(categories.accessibility.score * 100) : null,
     bestPractices: categories['best-practices']?.score ? Math.round(categories['best-practices'].score * 100) : null,
     seo: categories.seo?.score ? Math.round(categories.seo.score * 100) : null,
-    source: 'PageSpeed',
-    confidence: 100
+    source: 'PageSpeed'
   };
 }
 
@@ -117,8 +116,7 @@ function extractCoreWebVitals(audits) {
     cls: getMetricValue(audits['cumulative-layout-shift']),
     inp: getMetricValue(audits['interaction-to-next-paint']) || getMetricValue(audits['total-blocking-time']),
     ttfb: getMetricValue(audits['time-to-first-byte']),
-    source: 'PageSpeed',
-    confidence: 100
+    source: 'PageSpeed'
   };
 }
 
@@ -136,8 +134,7 @@ function extractSeoAudits(audits) {
     hasStructuredData: audits['structured-data']?.score === 1,
     hasOpenGraph: audits['is-crawlable']?.score === 1,
     hasTwitterCard: audits['is-crawlable']?.score === 1,
-    source: 'PageSpeed',
-    confidence: 100
+    source: 'PageSpeed'
   };
 }
 
@@ -152,8 +149,7 @@ function extractPerformanceAudits(audits) {
     firstContentfulPaint: getMetricValue(audits['first-contentful-paint']),
     cumulativeLayoutShift: getMetricValue(audits['cumulative-layout-shift']),
     timeToInteractive: getMetricValue(audits['interactive']),
-    source: 'PageSpeed',
-    confidence: 100
+    source: 'PageSpeed'
   };
 }
 

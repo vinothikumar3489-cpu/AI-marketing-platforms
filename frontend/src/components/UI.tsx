@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle2, Loader2, Shield, ExternalLink, Clock } from 'lucide-react';
 import { downloadReport } from '../lib/api';
 import SafeValue from './SafeValue';
+import { EVIDENCE_LABELS, getEvidenceLabel } from '../lib/evidence-levels';
 
 export function PageHeader({ eyebrow, title, subtitle }: any) {
   return <div className="page-header"><div className="eyebrow">• <SafeValue value={eyebrow} /></div><h1><SafeValue value={title} /></h1><p><SafeValue value={subtitle} /></p></div>;
@@ -10,11 +11,11 @@ export function Badge({ children, tone = 'blue' }: any) { return <span className
 export function ScoreCard({ label, value, tone = 'purple', source, evidence }: any) {
   return (
     <Card className={`score-card ${tone}`}>
-      <div className="score-value">{value !== null && value !== undefined ? <SafeValue value={value} /> : 'N/A'}</div>
+      <div className="score-value">{value !== null && value !== undefined ? <SafeValue value={value} /> : 'Not measured'}</div>
       <div><SafeValue value={label} /></div>
       {source && <div className="score-source" style={{ fontSize: '11px', color: '#9aa7bd', marginTop: '4px' }}>Source: <SafeValue value={source} /></div>}
       {evidence && <div className="score-evidence" style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}><SafeValue value={evidence} /></div>}
-      <div className="bar"><span style={{ width: `${Math.min(Number(value)||0,100)}%` }} /></div>
+      {typeof value === 'number' && !isNaN(value) && <div className="bar"><span style={{ width: `${Math.min(Math.max(value,0),100)}%` }} /></div>}
     </Card>
   );
 }
@@ -26,7 +27,7 @@ export function Status({ ok, label }: any) { return <span className={`status ${o
 export function EvidenceBadge({ evidence, size = 'sm' }: { evidence?: any, size?: 'sm' | 'md' | 'lg' }) {
   if (!evidence) return null;
   const source = evidence.source || evidence.api || '';
-  const confidence = evidence.confidence ?? 0;
+  const confidence = evidence.confidence ?? null;
   const collectedAt = evidence.collectedAt || '';
   const nameMap: Record<string, string> = {
     'firecrawl': 'Firecrawl',
@@ -45,7 +46,7 @@ export function EvidenceBadge({ evidence, size = 'sm' }: { evidence?: any, size?
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize, padding: pad, background: '#151d2b', borderRadius: '6px', border: '1px solid #293245', color: '#9aa7bd' }}>
       <Shield size={size === 'lg' ? 14 : 12} style={{ color: confidenceColor }} />
       <span style={{ color: '#e5e7eb', fontWeight: 500 }}>{displaySource}</span>
-      <span style={{ color: confidenceColor, fontWeight: 600 }}>{confidence}%</span>
+      <span style={{ color: confidenceColor, fontWeight: 600 }}>{getEvidenceLabel(evidence.evidenceLevel || '')}</span>
       {collectedAt && (
         <span title={new Date(collectedAt).toLocaleString()} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#6b7280' }}>
           <Clock size={10} />
@@ -123,7 +124,7 @@ export function DataQualityPanel({ sources, evidence }: { sources?: any[], evide
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
         {sourceNames.map(s => (
-          <EvidenceBadge key={s} evidence={{ source: s, confidence: 85 }} />
+          <EvidenceBadge key={s} evidence={{ source: s, evidenceLevel: 'evidence_backed' }} />
         ))}
       </div>
       {warnings.length > 0 && (

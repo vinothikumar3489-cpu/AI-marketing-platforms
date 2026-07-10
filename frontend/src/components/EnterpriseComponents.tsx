@@ -318,7 +318,7 @@ function DetailChip({ icon: Icon, label, value }: { icon: any; label: string; va
 // ──────────────────────────────────────────────
 function EvidenceDetail({ insight }: { insight: EnterpriseInsight }) {
   const evidenceItems = [
-    { source: insight.source || 'Firecrawl', confidence: insight.confidence || 85, collectedAt: insight.collectedAt, collector: insight.collector || 'AI Scraper', url: insight.url },
+    { source: insight.source || 'Firecrawl', confidence: typeof insight.confidence === 'number' ? insight.confidence : null, collectedAt: insight.collectedAt, collector: insight.collector || 'AI Scraper', url: insight.url },
   ];
   return (
     <div style={{ marginTop: '8px', padding: '12px', background: '#0f1729', borderRadius: '8px', border: '1px solid #1d2738' }}>
@@ -326,7 +326,7 @@ function EvidenceDetail({ insight }: { insight: EnterpriseInsight }) {
       {evidenceItems.map((item, i) => (
         <div key={i} style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '12px', padding: '8px 0', borderBottom: i < evidenceItems.length - 1 ? '1px solid #1d2738' : 'none' }}>
           <span style={{ color: '#e5e7eb', fontWeight: 500 }}><Shield size={12} style={{ marginRight: '4px' }} />{item.source}</span>
-          {item.confidence && <span style={{ color: item.confidence >= 70 ? '#10e18b' : '#ffb347' }}>{item.confidence}%</span>}
+          {item.confidence != null && <span style={{ color: item.confidence >= 70 ? '#10e18b' : '#ffb347' }}>{item.confidence}%</span>}
           {item.collectedAt && <span style={{ color: '#6b7280' }}><Clock size={12} style={{ marginRight: '3px' }} />{new Date(item.collectedAt).toLocaleDateString()}</span>}
           {item.collector && <span style={{ color: '#6b7280' }}>Collector: {item.collector}</span>}
           {item.url && <a href={item.url} target="_blank" rel="noreferrer" style={{ color: '#53a7ff', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><ExternalLink size={12} />Source URL</a>}
@@ -467,8 +467,8 @@ export function EnterpriseCompetitorCard({ competitor }: { competitor: any }) {
                 </div>
               </div>
             )}
-            {competitor.opportunityScore && (
-              <div style={{ fontSize: '12px', color: '#10e18b' }}>Opportunity Score: {renderSafeValue(competitor.opportunityScore)}/100</div>
+            {competitor.opportunityScore != null && (
+              <div style={{ fontSize: '12px', color: '#10e18b' }}>Opportunity Score: {competitor.opportunityScore}/100</div>
             )}
           </div>
         )}
@@ -539,7 +539,7 @@ export function EnterpriseAudienceCard({ persona }: { persona: any }) {
           </div>
         </div>
       )}
-      {persona.evidence && <div style={{ marginTop: '10px' }}><ConfidenceBadge value={persona.confidence || persona.evidence.confidence} /></div>}
+      {persona.evidence && <div style={{ marginTop: '10px' }}><ConfidenceBadge value={typeof persona.confidence === 'number' ? persona.confidence : (persona.evidence?.confidence ?? null)} /></div>}
     </div>
   );
 }
@@ -590,7 +590,7 @@ export function TechnologyDashboard({ technologies }: { technologies: any[] }) {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '6px' }}>
               {items.map((t, i) => {
-                const conf = t.confidence || 0;
+                const conf = typeof t.confidence === 'number' ? t.confidence : 0;
                 const confColor = conf >= 90 ? '#10e18b' : conf >= 70 ? '#53a7ff' : conf >= 40 ? '#ffb347' : '#ff4757';
                 return (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#0f1729', borderRadius: '6px', border: '1px solid #1d2738' }}>

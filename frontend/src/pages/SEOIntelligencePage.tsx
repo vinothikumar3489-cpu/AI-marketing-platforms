@@ -706,7 +706,7 @@ function ExecutiveDashboard({ data }: { data: any }) {
               <div key={i} style={{ padding: '12px', border: '1px solid #293245', borderRadius: '8px', background: '#0f1729' }}>
                 <div style={{ fontSize: '11px', color: '#9aa7bd', marginBottom: '4px' }}>{item.label}</div>
                 <strong style={{ fontSize: '18px', color: item.value != null ? '#e5edff' : '#9aa7bd' }}>
-                  {item.value != null ? `${Math.round(item.value)}/100` : `${item.label.split(' ')[0]} score not measured`}
+                  {item.value != null ? `${Math.round(asNumber(item.value, 0))}/100` : `${item.label.split(' ')[0]} score not measured`}
                 </strong>
               </div>
             ))}
@@ -845,11 +845,11 @@ function ExecutiveStory({ data }: { data: any }) {
     topGaps: (data.contentGapAnalysis?.contentGaps || []).slice(0, 5)
   };
   const aiVisibility = story.aiVisibilityFindings || {
-    overallScore: data.geoIntelligence?.aiVisibilityScore || null,
-    chatGptScore: data.geoIntelligence?.chatGptScore || null,
-    geminiScore: data.geoIntelligence?.geminiScore || null,
-    claudeScore: data.geoIntelligence?.claudeScore || null,
-    perplexityScore: data.geoIntelligence?.perplexityScore || null,
+    overallScore: data.geoIntelligence?.aiVisibilityScore ?? null,
+    chatGptScore: data.geoIntelligence?.chatGptScore ?? null,
+    geminiScore: data.geoIntelligence?.geminiScore ?? null,
+    claudeScore: data.geoIntelligence?.claudeScore ?? null,
+    perplexityScore: data.geoIntelligence?.perplexityScore ?? null,
     topOpportunities: (data.geoIntelligence?.aiContentOpportunities || []).slice(0, 5).map((o: any) => ({
       opportunity: o.opportunity || o.type || '',
       impact: o.impact || o.priority || 'Medium'
@@ -877,11 +877,11 @@ function ExecutiveStory({ data }: { data: any }) {
       <Card>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Shield size={18} /> SEO Health Summary</h3>
         <div style={{ marginTop: '15px', display: 'grid', gap: '10px' }}>
-          <div><strong>Overall Score:</strong> {story.seoHealthSummary?.overallScore !== null ? story.seoHealthSummary.overallScore : 'N/A'}</div>
-          <div><strong>Technical Score:</strong> {story.seoHealthSummary?.technicalScore !== null ? story.seoHealthSummary.technicalScore : 'N/A'}</div>
-          <div><strong>Content Score:</strong> {story.seoHealthSummary?.contentScore !== null ? story.seoHealthSummary.contentScore : 'N/A'}</div>
-          <div><strong>Authority Score:</strong> {story.seoHealthSummary?.authorityScore !== null ? story.seoHealthSummary.authorityScore : 'N/A'}</div>
-          <div><strong>AI Visibility Score:</strong> {story.seoHealthSummary?.aiVisibilityScore !== null ? story.seoHealthSummary.aiVisibilityScore : 'N/A'}</div>
+          <div><strong>Overall Score:</strong> {asText(story.seoHealthSummary?.overallScore, 'N/A')}</div>
+          <div><strong>Technical Score:</strong> {asText(story.seoHealthSummary?.technicalScore, 'N/A')}</div>
+          <div><strong>Content Score:</strong> {asText(story.seoHealthSummary?.contentScore, 'N/A')}</div>
+          <div><strong>Authority Score:</strong> {asText(story.seoHealthSummary?.authorityScore, 'N/A')}</div>
+          <div><strong>AI Visibility Score:</strong> {asText(story.seoHealthSummary?.aiVisibilityScore, 'N/A')}</div>
           <div><strong>Status:</strong> {story.seoHealthSummary?.status || 'N/A'}</div>
         </div>
       </Card>
@@ -890,10 +890,10 @@ function ExecutiveStory({ data }: { data: any }) {
       <Card>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Code size={18} /> Technical Findings</h3>
         <div style={{ marginTop: '15px', display: 'grid', gap: '10px' }}>
-          <div><strong>Critical Issues:</strong> {story.technicalFindings?.criticalIssues || 0}</div>
-          <div><strong>High Issues:</strong> {story.technicalFindings?.highIssues || 0}</div>
-          <div><strong>Performance Score:</strong> {story.technicalFindings?.performanceScore !== null ? story.technicalFindings.performanceScore : 'N/A'}</div>
-          <div><strong>SEO Score:</strong> {story.technicalFindings?.seoScore !== null ? story.technicalFindings.seoScore : 'N/A'}</div>
+          <div><strong>Critical Issues:</strong> {asText(story.technicalFindings?.criticalIssues, '0')}</div>
+          <div><strong>High Issues:</strong> {asText(story.technicalFindings?.highIssues, '0')}</div>
+          <div><strong>Performance Score:</strong> {asText(story.technicalFindings?.performanceScore, 'N/A')}</div>
+          <div><strong>SEO Score:</strong> {asText(story.technicalFindings?.seoScore, 'N/A')}</div>
           {story.technicalFindings?.topIssues?.length > 0 && (
             <div style={{ marginTop: '10px' }}>
               <strong>Top Issues:</strong>
@@ -970,11 +970,11 @@ function ExecutiveStory({ data }: { data: any }) {
       <Card>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Cpu size={18} /> AI Visibility Findings</h3>
         <div style={{ marginTop: '15px', display: 'grid', gap: '10px' }}>
-          <div><strong>Overall Score:</strong> {story.aiVisibilityFindings?.overallScore !== null ? story.aiVisibilityFindings.overallScore : 'N/A'}</div>
-          <div><strong>ChatGPT Score:</strong> {story.aiVisibilityFindings?.chatGptScore !== null ? story.aiVisibilityFindings.chatGptScore : 'N/A'}</div>
-          <div><strong>Gemini Score:</strong> {story.aiVisibilityFindings?.geminiScore !== null ? story.aiVisibilityFindings.geminiScore : 'N/A'}</div>
-          <div><strong>Claude Score:</strong> {story.aiVisibilityFindings?.claudeScore !== null ? story.aiVisibilityFindings.claudeScore : 'N/A'}</div>
-          <div><strong>Perplexity Score:</strong> {story.aiVisibilityFindings?.perplexityScore !== null ? story.aiVisibilityFindings.perplexityScore : 'N/A'}</div>
+          <div><strong>Overall Score:</strong> {asText(story.aiVisibilityFindings?.overallScore, 'N/A')}</div>
+          <div><strong>ChatGPT Score:</strong> {asText(story.aiVisibilityFindings?.chatGptScore, 'N/A')}</div>
+          <div><strong>Gemini Score:</strong> {asText(story.aiVisibilityFindings?.geminiScore, 'N/A')}</div>
+          <div><strong>Claude Score:</strong> {asText(story.aiVisibilityFindings?.claudeScore, 'N/A')}</div>
+          <div><strong>Perplexity Score:</strong> {asText(story.aiVisibilityFindings?.perplexityScore, 'N/A')}</div>
           {story.aiVisibilityFindings?.topOpportunities?.length > 0 && (
             <div style={{ marginTop: '10px' }}>
               <strong>Top Opportunities:</strong>
@@ -1091,7 +1091,7 @@ function ExecutiveStory({ data }: { data: any }) {
             ))}
           </ul>
           <div><strong>Expected Timeline:</strong> {story.executiveRecommendation?.expectedTimeline || 'N/A'}</div>
-          <div><strong>Confidence:</strong> {story.executiveRecommendation?.confidence || 'N/A'}</div>
+          <div><strong>Confidence:</strong> {asText(story.executiveRecommendation?.confidence, 'N/A')}</div>
         </div>
       </Card>
     </div>
@@ -1237,26 +1237,26 @@ function TechnicalAudit({ data }: { data: any }) {
                 <div style={{ display: 'grid', gap: '8px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#9aa7bd' }}>Performance:</span>
-                    <span style={{ color: mobileScores.performance >= 90 ? '#10e18b' : mobileScores.performance >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                      {mobileScores.performance !== null ? mobileScores.performance : '—'}
+                    <span style={{ color: asNumber(mobileScores.performance) >= 90 ? '#10e18b' : asNumber(mobileScores.performance) >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
+                      {asText(mobileScores.performance, '—')}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#9aa7bd' }}>SEO:</span>
-                    <span style={{ color: mobileScores.seo >= 90 ? '#10e18b' : mobileScores.seo >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                      {mobileScores.seo !== null ? mobileScores.seo : '—'}
+                    <span style={{ color: asNumber(mobileScores.seo) >= 90 ? '#10e18b' : asNumber(mobileScores.seo) >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
+                      {asText(mobileScores.seo, '—')}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#9aa7bd' }}>Accessibility:</span>
-                    <span style={{ color: mobileScores.accessibility >= 90 ? '#10e18b' : mobileScores.accessibility >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                      {mobileScores.accessibility !== null ? mobileScores.accessibility : '—'}
+                    <span style={{ color: asNumber(mobileScores.accessibility) >= 90 ? '#10e18b' : asNumber(mobileScores.accessibility) >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
+                      {asText(mobileScores.accessibility, '—')}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#9aa7bd' }}>Best Practices:</span>
-                    <span style={{ color: mobileScores.bestPractices >= 90 ? '#10e18b' : mobileScores.bestPractices >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                      {mobileScores.bestPractices !== null ? mobileScores.bestPractices : '—'}
+                    <span style={{ color: asNumber(mobileScores.bestPractices) >= 90 ? '#10e18b' : asNumber(mobileScores.bestPractices) >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
+                      {asText(mobileScores.bestPractices, '—')}
                     </span>
                   </div>
                 </div>
@@ -1272,26 +1272,26 @@ function TechnicalAudit({ data }: { data: any }) {
                 <div style={{ display: 'grid', gap: '8px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#9aa7bd' }}>Performance:</span>
-                    <span style={{ color: desktopScores.performance >= 90 ? '#10e18b' : desktopScores.performance >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                      {desktopScores.performance !== null ? desktopScores.performance : '—'}
+                    <span style={{ color: asNumber(desktopScores.performance) >= 90 ? '#10e18b' : asNumber(desktopScores.performance) >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
+                      {asText(desktopScores.performance, '—')}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#9aa7bd' }}>SEO:</span>
-                    <span style={{ color: desktopScores.seo >= 90 ? '#10e18b' : desktopScores.seo >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                      {desktopScores.seo !== null ? desktopScores.seo : '—'}
+                    <span style={{ color: asNumber(desktopScores.seo) >= 90 ? '#10e18b' : asNumber(desktopScores.seo) >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
+                      {asText(desktopScores.seo, '—')}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#9aa7bd' }}>Accessibility:</span>
-                    <span style={{ color: desktopScores.accessibility >= 90 ? '#10e18b' : desktopScores.accessibility >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                      {desktopScores.accessibility !== null ? desktopScores.accessibility : '—'}
+                    <span style={{ color: asNumber(desktopScores.accessibility) >= 90 ? '#10e18b' : asNumber(desktopScores.accessibility) >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
+                      {asText(desktopScores.accessibility, '—')}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#9aa7bd' }}>Best Practices:</span>
-                    <span style={{ color: desktopScores.bestPractices >= 90 ? '#10e18b' : desktopScores.bestPractices >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                      {desktopScores.bestPractices !== null ? desktopScores.bestPractices : '—'}
+                    <span style={{ color: asNumber(desktopScores.bestPractices) >= 90 ? '#10e18b' : asNumber(desktopScores.bestPractices) >= 50 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
+                      {asText(desktopScores.bestPractices, '—')}
                     </span>
                   </div>
                 </div>
@@ -1733,9 +1733,9 @@ function ContentGaps({ data }: { data: any }) {
                   {g.keywordDifficulty === null && <span>📈 <b>KD:</b> <span style={{ color: '#6b7a93', fontStyle: 'italic' }}>Not available</span></span>}
                   {g.intent && <span>💡 <b>Intent:</b> <span style={{ color: '#53a7ff' }}>{renderSafeValue(g.intent)}</span></span>}
                 </div>
-                {g.confidence && (
+                {g.confidence != null && (
                   <div style={{ fontSize: '12px', color: '#9aa7bd' }}>
-                    <b>Confidence:</b> <span style={{ color: g.confidence > 80 ? '#10e18b' : g.confidence > 60 ? '#ffa502' : '#ff4757' }}>{g.confidence}%</span>
+                    <b>Confidence:</b> <span style={{ color: asNumber(g.confidence) > 80 ? '#10e18b' : asNumber(g.confidence) > 60 ? '#ffa502' : '#ff4757' }}>{asText(g.confidence)}</span>
                   </div>
                 )}
                 <div style={{ fontSize: '13px', color: '#9aa7bd', lineHeight: '1.5' }}>{asText(g?.evidence || g?.whyItMatters || g?.reason || g?.contentType, g?.pageType || 'Content opportunity')}</div>
@@ -1787,9 +1787,9 @@ function GeoIntelligence({ data }: { data: any }) {
   if (!data || Object.keys(data).length === 0) return <EnterpriseEmptyState title="No GEO Intelligence" message="No verified GEO intelligence data available." icon={Cpu} />;
 
   // Use canonical field paths from contract
-  const aiVisibilityScore = data.aiVisibilityScore || null;
-  const citationReadinessScore = data.citationReadinessScore || null;
-  const answerabilityScore = data.answerabilityScore || null;
+  const aiVisibilityScore = data.aiVisibilityScore ?? null;
+  const citationReadinessScore = data.citationReadinessScore ?? null;
+  const answerabilityScore = data.answerabilityScore ?? null;
   const entityCoverageScore = data.entityCoverageScore != null ? data.entityCoverageScore : null;
   const geoKeywords = asArray(data.geoKeywords || []);
   const aiContentOpportunities = asArray(data.aiContentOpportunities || data.citationOpportunities || []);
@@ -1966,9 +1966,9 @@ function BlogIntelligence({ data }: { data: any }) {
                     )}
                   </td>
                   <td style={{ padding: '12px' }}>
-                    {b.confidence ? (
-                      <span style={{ color: b.confidence > 80 ? '#10e18b' : b.confidence > 60 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
-                        {b.confidence}%
+                    {b.confidence != null ? (
+                      <span style={{ color: asNumber(b.confidence) > 80 ? '#10e18b' : asNumber(b.confidence) > 60 ? '#ffa502' : '#ff4757', fontWeight: 'bold' }}>
+                        {asText(b.confidence)}
                       </span>
                     ) : (
                       <span style={{ color: '#6b7a93', fontStyle: 'italic' }}>Not available</span>

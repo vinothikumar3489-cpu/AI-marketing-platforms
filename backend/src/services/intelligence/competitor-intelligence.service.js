@@ -22,10 +22,28 @@ export async function collectCompetitorIntelligence({ websiteUrl, productName, c
       if (serpResult?.success && serpResult?.data?.length > 0) {
         const identity = { domain, industry, productName };
         const serpCompetitors = normalizeSerpCompetitors(serpResult.data, identity);
-        const filtered = serpCompetitors.filter(c =>
-          c.domain !== domain &&
-          c.relevanceScore >= 40
-        );
+        const filtered = serpCompetitors.filter(c => {
+          if (!c.domain) return false;
+          const compDomain = c.domain.toLowerCase();
+          const currentDomain = domain.toLowerCase();
+          if (compDomain === currentDomain) return false;
+          if (compDomain.endsWith('.' + currentDomain)) return false;
+          if (currentDomain.endsWith('.' + compDomain)) return false;
+
+          const rejectedPatterns = ['support.', 'help.', 'docs.', 'login.', 'auth.', 'admin.', 'status.', 'api.', 'developers.', 'cloud.'];
+          for (const pattern of rejectedPatterns) {
+            if (compDomain.startsWith(pattern)) return false;
+            if (compDomain.includes('.' + pattern.replace('.', ''))) return false;
+          }
+
+          const path = (c.url || '').toLowerCase();
+          const rejectedPaths = ['/support', '/help', '/docs', '/login', '/signin', '/auth', '/status', '/pricing', '/blog', '/contact', '/about', '/careers', '/legal', '/privacy', '/terms', '/security', '/download', '/apps', '/app'];
+          for (const rp of rejectedPaths) {
+            if (path.startsWith(rp) || path.includes(rp + '/') || path.includes(rp + '?')) return false;
+          }
+
+          return c.relevanceScore >= 30;
+        });
         for (const comp of filtered) {
           competitors.push({
             name: comp.name,
@@ -56,7 +74,7 @@ export async function collectCompetitorIntelligence({ websiteUrl, productName, c
               acquisitionStrategy: null,
               evidence: {
                 source: 'DataForSEO SERP',
-                confidence: comp.confidence || 60,
+                confidence: comp.confidence || null,
                 collectedAt: new Date().toISOString()
               }
             }
@@ -88,7 +106,7 @@ export async function collectCompetitorIntelligence({ websiteUrl, productName, c
             evidence: comp.description || 'Identified via Tavily competitive research',
             source: 'Tavily',
             snippet: comp.description || '',
-            confidence: 60,
+            confidence: null,
             enterpriseFields: {
               pricing: null,
               funding: null,
@@ -105,7 +123,7 @@ export async function collectCompetitorIntelligence({ websiteUrl, productName, c
               acquisitionStrategy: null,
               evidence: {
                 source: 'Tavily web research',
-                confidence: 60,
+                confidence: null,
                 collectedAt: new Date().toISOString()
               }
             }
@@ -187,7 +205,7 @@ function enrichCompetitorFields(comp, industry) {
     comp.enterpriseFields.acquisitionStrategy = knownData.acquisitionStrategy ?? null;
     comp.enterpriseFields.evidence = {
       source: 'Industry analysis & public data',
-      confidence: 85,
+      confidence: null,
       collectedAt: new Date().toISOString()
     };
   }
@@ -222,7 +240,7 @@ function inferTechnologies(name, industry) {
   if (nameLower.includes('atlassian')) tech.push('Java', 'JavaScript', 'React', 'PostgreSQL', 'AWS');
   if (nameLower.includes('wordpress')) tech.push('PHP', 'JavaScript', 'React', 'MariaDB', 'nginx');
   if (nameLower.includes('wix')) tech.push('JavaScript', 'React', 'Node.js', 'AWS', 'Vue.js');
-  if (tech.length === 0) tech.push('Unknown');
+  if (tech.length === 0) return null;
   return tech;
 }
 
