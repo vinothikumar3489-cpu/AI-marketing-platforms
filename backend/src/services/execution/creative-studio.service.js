@@ -28,7 +28,7 @@ export async function generateCreativeBrief(creativeType, context) {
   if (evidence?.competitors?.list?.length) evidenceLines.push(`Competitors: ${evidence.competitors.list.slice(0, 3).map(c => c.name || c.url).filter(Boolean).join(', ')}`);
   if (evidence?.sourceSummary?.sourcesCollected?.length) evidenceLines.push(`Evidence Sources: ${evidence.sourceSummary.sourcesCollected.join(', ')}`);
 
-  const prompt = `Generate a creative brief for a ${typeConfig.label} (${typeConfig.dimensions}) for marketing execution. Use the verified product/company data below. CRITICAL: Visual direction must reference actual product features and audience pain points. No fake text or placeholder slogans — use readable English only.
+  const prompt = `Generate a creative brief for a ${typeConfig.label} (${typeConfig.dimensions}) for marketing execution. Use the verified product/company data below.
 
 CONTEXT:
 Product/Company: ${productName || 'N/A'}${companyName ? `\nCompany: ${companyName}` : ''}${targetAudience ? `\nTarget Audience: ${targetAudience}` : ''}${industry ? `\nIndustry: ${industry}` : ''}${brandColors ? `\nBrand Colors: ${brandColors}` : ''}${campaignGoal ? `\nCampaign Goal: ${campaignGoal}` : ''}
@@ -39,24 +39,23 @@ DIMENSIONS: ${typeConfig.dimensions}
 
 REQUIRED OUTPUT FIELDS (return valid JSON):
 {
-  "headline": "Primary headline based on actual product USP or feature (no placeholder text)",
+  "headline": "Product-specific headline based on USP or feature",
+  "usp": "One key differentiator from evidence",
+  "audienceReference": "Target audience from evidence",
+  "cta": "Single call to action using actual product CTA if available",
   "visualDirection": "Visual direction referencing actual product/audience/industry",
   "brandColors": ["color1", "color2", "color3"],
-  "typography": "Font recommendations",
-  "layout": "Layout description (e.g., 'image left, text right')",
-  "imageSuggestions": "Description of imagery referencing actual product use case",
-  "imageGenerationPrompt": "Detailed prompt for AI image generation tools including product details",
-  "cta": "Call to action using actual product CTA if available",
+  "textOverlay": "Safe text overlay rendered separately (not burned into image): headline, USP, CTA",
+  "imageGenerationPrompt": "AI image generation prompt — do NOT include text/words in the prompt. Generate visuals only — text will be overlaid separately.",
   "dimensions": "width x height in pixels",
-  "format": "File format recommendation (PNG, JPG, etc.)",
-  "additionalNotes": "Any additional design notes referencing evidence",
-  "evidence": { "source": "creative_studio", "confidence": null, "dataSource": "ai_generation" }
+  "format": "File format recommendation (PNG)",
+  "evidence": { "source": "creative_studio", "confidence": null, "evidenceLevel": "ai_inferred" }
 }
 
 RULES:
-1. Be specific about visual style, mood, and composition based on actual product/audience.
-2. Image generation prompt must include product name and audience details.
-3. No fake text, no placeholder slogans — use readable English only.
+1. imageGenerationPrompt must NOT request text in the image — text is overlaid separately.
+2. textOverlay is the safe text layer rendered on top of the image.
+3. Use readable English — no placeholder text.
 4. CTA must be specific to the product (not generic).
 5. Return ONLY valid JSON. No markdown code fences.`;
 

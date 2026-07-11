@@ -309,7 +309,7 @@ export function buildExecutiveReportHtml(data) {
   const name = company?.name || 'Company';
   companyName = name;
   const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const overallScore = scores?.overallGrowthScore || 0;
+  const overallScore = scores?.overallGrowthScore;
   const techStack = arr(technology?.technologies);
   const directCompetitors = arr(competitor?.direct);
   const personas = arr(audience?.personas);
@@ -615,7 +615,7 @@ export function buildGrowthReportHtml(data) {
   const name = company?.name || 'Company';
   companyName = name;
   const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const overallScore = scores?.overallGrowthScore || 0;
+  const overallScore = scores?.overallGrowthScore;
   const directCompetitors = arr(competitor?.direct);
   const techStack = arr(data?.technology?.technologies);
   const personas = arr(audience?.personas);
@@ -859,7 +859,7 @@ export function buildSeoReportHtml(data) {
   companyName = name;
   const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const geoPlatforms = ['chatgpt', 'gemini', 'claude', 'perplexity', 'googleAiOverview'];
-  const geoAvailable = geoPlatforms.filter(p => geo[p] !== undefined);
+  const geoAvailable = geoPlatforms.filter(p => geo[p] !== undefined && geo[p] !== 'Not measured');
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
@@ -951,7 +951,7 @@ ${getReportStyles()}
       k.volume || k.searchVolume ? `${k.volume || k.searchVolume}` : '<span class="na">—</span>',
       k.keywordDifficulty || k.difficulty ? `${k.keywordDifficulty || k.difficulty}/100` : '<span class="na">—</span>',
       safe(k.intent, 'Informational'),
-      confidenceBadge(k.confidence || (k.source === 'DataForSEO' ? 85 : k.source === 'AI' ? 60 : null))
+      confidenceBadge(k.confidence ?? k.confidenceScore ?? null)
     ]),
     'Keyword data unavailable. Configure DataForSEO API for verified keyword intelligence.'
   ) : '<div class="notice warn">Keyword data unavailable. Configure DataForSEO API for verified keyword intelligence.</div>'}

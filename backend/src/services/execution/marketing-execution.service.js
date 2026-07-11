@@ -92,15 +92,39 @@ export async function generateAllExecutionModules(context) {
     results.socialCalendars = { error: e.message, calendars: {}, totalGenerated: 0 };
   }
 
+  // Phase 7 — Measurement plan / KPI dashboard
+  const analyticsConnected = !!(process.env.GA_API_KEY || process.env.MIXPANEL_API_KEY || process.env.POSTHOG_API_KEY);
+  const measurementPlan = analyticsConnected ? {
+    status: 'connected',
+    note: 'Analytics provider detected. KPIs will be tracked automatically.',
+    platforms: {
+      googleAnalytics: !!process.env.GA_API_KEY,
+      mixpanel: !!process.env.MIXPANEL_API_KEY,
+      posthog: !!process.env.POSTHOG_API_KEY,
+    },
+  } : {
+    status: 'not_connected',
+    note: 'No analytics provider configured. KPIs show measurement plan with values marked "Not connected".',
+    measurementPlan: [
+      { metric: 'Website traffic', measurementMethod: 'Connect Google Analytics', currentValue: 'Not connected', targetValue: 'Not connected' },
+      { metric: 'Email open rate', measurementMethod: 'Connect email provider (Gmail/SendGrid/Brevo)', currentValue: 'Not connected', targetValue: 'Not connected' },
+      { metric: 'Conversion rate', measurementMethod: 'Connect analytics + CRM', currentValue: 'Not connected', targetValue: 'Not connected' },
+      { metric: 'Channel reach', measurementMethod: 'Per-platform analytics', currentValue: 'Not connected', targetValue: 'Not connected' },
+      { metric: 'Content engagement', measurementMethod: 'Connect analytics + social platform APIs', currentValue: 'Not connected', targetValue: 'Not connected' },
+    ],
+  };
+
   const totalAssets = Object.values(results).reduce((sum, mod) => sum + (mod.totalGenerated || 0), 0);
 
   return {
     ...results,
+    measurementPlan,
     _summary: {
       modulesGenerated: Object.keys(results).filter(k => !k.startsWith('_')).length,
       totalAssetsGenerated: totalAssets,
       generatedAt: new Date().toISOString(),
       evidenceVersion: '2.0.0',
+      analyticsConnected,
     },
   };
 }

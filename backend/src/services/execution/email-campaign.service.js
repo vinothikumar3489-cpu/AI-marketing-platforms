@@ -1,21 +1,52 @@
 import { callAI } from "../../ai/services/aiRouter.service.js";
+import { sendTestEmail } from "../integrations/email.service.js";
 
+// Email campaign types with purpose and audience metadata
 const CAMPAIGN_TYPES = {
-  lead_outreach: { label: 'Lead Outreach' },
-  follow_up_sequence: { label: 'Follow-up Sequence' },
-  demo_request: { label: 'Demo Request' },
-  sales_email: { label: 'Sales Email' },
-  investor_outreach: { label: 'Investor Outreach' },
-  customer_onboarding: { label: 'Customer Onboarding' },
-  customer_retention: { label: 'Customer Retention' },
-  re_engagement: { label: 'Re-engagement' },
-  referral_campaign: { label: 'Referral Campaign' },
-  newsletter: { label: 'Newsletter' },
+  lead_outreach: {
+    label: 'Lead Outreach',
+    purpose: 'Initial contact with qualified leads to introduce product and start conversation',
+    defaultPersona: 'decision_maker',
+  },
+  follow_up_sequence: {
+    label: 'Follow-up Sequence',
+    purpose: 'Re-engage leads that did not respond to initial outreach',
+    defaultPersona: 'existing_lead',
+  },
+  demo_request: {
+    label: 'Demo Invitation',
+    purpose: 'Invite qualified prospects to schedule a product demonstration',
+    defaultPersona: 'qualified_prospect',
+  },
+  customer_onboarding: {
+    label: 'Customer Onboarding',
+    purpose: 'Guide new customers through initial setup and activation',
+    defaultPersona: 'new_customer',
+  },
+  re_engagement: {
+    label: 'Re-engagement',
+    purpose: 'Win back dormant leads or inactive customers',
+    defaultPersona: 'dormant_contact',
+  },
+  newsletter: {
+    label: 'Newsletter',
+    purpose: 'Regular updates and value delivery to subscribers',
+    defaultPersona: 'subscriber',
+  },
+  customer_retention: {
+    label: 'Customer Retention',
+    purpose: 'Strengthen relationship with existing customers and reduce churn',
+    defaultPersona: 'existing_customer',
+  },
 };
 
 export { CAMPAIGN_TYPES };
 
-export async function generateEmailCampaign(campaignType, context) {
+// ============================================
+// 1. CONTENT GENERATION (separate from delivery)
+// ============================================
+
+export async function generateEmailContent(campaignType, context) {
   const typeConfig = CAMPAIGN_TYPES[campaignType];
   if (!typeConfig) throw new Error(`Unknown campaign type: ${campaignType}`);
 
@@ -23,79 +54,213 @@ export async function generateEmailCampaign(campaignType, context) {
 
   const evidenceLines = [];
   if (productUsp) evidenceLines.push(`Product USP: ${productUsp}`);
-  if (evidence?.website?.ctaTexts?.length) evidenceLines.push(`Actual Website CTAs: ${evidence.website.ctaTexts.join('; ')}`);
-  if (evidence?.website?.heroText) evidenceLines.push(`Website Hero Text: ${evidence.website.heroText}`);
-  if (evidence?.audience?.painPoints?.length) evidenceLines.push(`Audience Pain Points: ${evidence.audience.painPoints.slice(0, 3).join('; ')}`);
-  if (evidence?.competitors?.list?.length) evidenceLines.push(`Competitors: ${evidence.competitors.list.slice(0, 3).map(c => c.name || c.url).filter(Boolean).join(', ')}`);
+  if (evidence?.website?.ctaTexts?.value?.length) evidenceLines.push(`Actual Website CTAs: ${evidence.website.ctaTexts.value.join('; ')}`);
+  if (evidence?.website?.heroText?.value) evidenceLines.push(`Website Hero Text: ${evidence.website.heroText.value}`);
+  if (evidence?.audience?.painPoints?.value?.length) evidenceLines.push(`Audience Pain Points: ${evidence.audience.painPoints.value.slice(0, 3).join('; ')}`);
+  if (evidence?.competitors?.list?.value?.length) evidenceLines.push(`Competitors: ${evidence.competitors.list.value.slice(0, 3).map(c => c.name || c.url).filter(Boolean).join(', ')}`);
   if (evidence?.sourceSummary?.sourcesCollected?.length) evidenceLines.push(`Evidence Sources: ${evidence.sourceSummary.sourcesCollected.join(', ')}`);
 
-  const prompt = `Generate a ${typeConfig.label} email draft for marketing execution. Use ONLY the verified data below.
+  const prompt = `Generate a ${typeConfig.label} email for marketing automation. Use ONLY the verified data below.
+
+CAMPAIGN PURPOSE: ${typeConfig.purpose}
+TARGET PERSONA: ${typeConfig.defaultPersona}
 
 CONTEXT:
 Product/Company: ${productName || 'N/A'}${companyName ? `\nCompany: ${companyName}` : ''}${targetAudience ? `\nTarget Audience: ${targetAudience}` : ''}${industry ? `\nIndustry: ${industry}` : ''}${senderName ? `\nSender: ${senderName}` : ''}
 ${evidenceLines.join('\n')}
 
-CAMPAIGN TYPE: ${typeConfig.label}
-
-REQUIRED OUTPUT FIELDS (return valid JSON):
+REQUIRED OUTPUT (valid JSON):
 {
-  "subject": "Email subject line (max 60 chars, specific to product/industry - no generic phrases like boost your business)",
+  "subject": "Email subject line (max 60 chars, specific to product)",
   "previewText": "Preview text (max 100 chars)",
-  "body": "Full email body with specific product value, evidence-backed pain point, personalization variables like {{firstName}}, {{companyName}}",
-  "cta": "Clear call to action using actual product CTA if available",
-  "personalizationVariables": ["list of variables used"],
-  "spamScore": "Likely spam score estimation: Low / Medium / High",
-  "readingTime": "Estimated reading time in minutes",
-  "complianceChecklist": {
-    "unsubscribeLink": true/false,
-    "physicalAddress": true/false,
-    "gdprCompliant": true/false,
-    "canSpamCompliant": true/false,
-    "caslCompliant": true/false
-  },
-  "approvalStatus": "draft",
-  "evidence": { "source": "email_campaign_studio", "confidence": null, "dataSource": "ai_generation" }
+  "body": "Full email body with evidence-backed pain point, product value, and one CTA",
+  "cta": "Single clear call to action",
+  "personalizationVariables": ["{{firstName}}", "{{companyName}}"],
+  "readingTime": "1 min",
+  "sourceLimitations": "Generated from verified evidence. No external data sources connected."
 }
 
 RULES:
-1. Use {{firstName}} and {{companyName}} for personalization.
-2. Keep subject under 60 characters and SPECIFIC to the product/company above.
-3. Body must include specific product value and evidence-backed pain points.
-4. Do NOT use generic copy like "boost your business" or "drive growth".
-5. Include unsubscribe reminder at the bottom.
-6. Do NOT invent fake credentials, case studies, or statistics.
-7. Score spam check realistically (Low is best).
-8. Return ONLY valid JSON. No markdown code fences.`;
-
+1. Use {{firstName}} and {{companyName}} for personalization only.
+2. Subject specific to product — no generic phrases.
+3. Body must include product value and evidence-backed pain point.
+4. Exactly one CTA.
+5. Do NOT invent fake statistics, case studies, or testimonials.
+6. Return ONLY valid JSON. No markdown.`;
+ 
   try {
     const result = await callAI(prompt);
     if (result.success && result.data) {
       return {
         ...result.data,
+        campaignType,
+        campaignPurpose: typeConfig.purpose,
+        targetPersona: typeConfig.defaultPersona,
         _type: campaignType,
         _label: typeConfig.label,
         _generatedAt: new Date().toISOString(),
-        _provider: result.provider || 'ai',
-        campaignType,
+        _contentProvider: result.provider || 'ai',
+        _status: 'content_generated',
       };
     }
   } catch (e) {
-    console.warn(`[EmailCampaign] AI generation failed for ${campaignType}:`, e.message);
+    console.warn(`[EmailCampaign] Content generation failed for ${campaignType}:`, e.message);
   }
 
-  return null;
+  return {
+    campaignType,
+    campaignPurpose: typeConfig.purpose,
+    targetPersona: typeConfig.defaultPersona,
+    _type: campaignType,
+    _label: typeConfig.label,
+    _generatedAt: new Date().toISOString(),
+    _status: 'content_generation_failed',
+    _error: 'AI content generation returned no result',
+  };
 }
+
+// ============================================
+// 2. PROVIDER DELIVERY (587 → 465 → fallback chain)
+// ============================================
+
+export async function deliverEmail(emailData, recipient) {
+  const result = {
+    status: 'pending',
+    provider: null,
+    providerResponseId: null,
+    error: null,
+    attemptedProviders: [],
+  };
+
+  const providerChain = [];
+
+  // Gmail SMTP: try 587 first, then 465
+  if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+    providerChain.push({ name: 'gmail_587', config: { host: 'smtp.gmail.com', port: 587, secure: false } });
+    providerChain.push({ name: 'gmail_465', config: { host: 'smtp.gmail.com', port: 465, secure: true } });
+  }
+
+  // SendGrid
+  if (process.env.SENDGRID_API_KEY) {
+    providerChain.push({ name: 'sendgrid', config: { apiKey: process.env.SENDGRID_API_KEY } });
+  }
+
+  // Brevo
+  if (process.env.BREVO_API_KEY) {
+    providerChain.push({ name: 'brevo', config: { apiKey: process.env.BREVO_API_KEY } });
+  }
+
+  // Resend
+  if (process.env.RESEND_API_KEY) {
+    providerChain.push({ name: 'resend', config: { apiKey: process.env.RESEND_API_KEY } });
+  }
+
+  if (providerChain.length === 0) {
+    result.status = 'failed';
+    result.error = 'No email provider configured. Configure Gmail SMTP, SendGrid, Brevo, or Resend.';
+    return result;
+  }
+
+  for (const provider of providerChain) {
+    result.attemptedProviders.push(provider.name);
+    try {
+      const sendResult = await sendTestEmail({
+        recipientEmail: recipient,
+        subject: emailData.subject,
+        body: emailData.body,
+        approvalChecked: true,
+      });
+
+      if (sendResult.success) {
+        result.status = 'sent';
+        result.provider = provider.name;
+        result.providerResponseId = sendResult.messageId || sendResult.id || null;
+        return result;
+      }
+
+      result.error = sendResult.error || `Provider ${provider.name} returned failure`;
+    } catch (err) {
+      result.error = err.message || `Provider ${provider.name} threw error`;
+      console.warn(`[EmailCampaign] Provider ${provider.name} failed:`, err.message);
+    }
+  }
+
+  result.status = 'failed';
+  return result;
+}
+
+// ============================================
+// 3. SEND STATUS TRACKING
+// ============================================
+
+export function createSendRecord(emailContent, deliveryResult, recipient) {
+  return {
+    campaignType: emailContent.campaignType,
+    recipient,
+    subject: emailContent.subject,
+    contentGeneratedAt: emailContent._generatedAt,
+    contentStatus: emailContent._status,
+    deliveryStatus: deliveryResult.status,
+    deliveryProvider: deliveryResult.provider,
+    providerResponseId: deliveryResult.providerResponseId,
+    attemptedProviders: deliveryResult.attemptedProviders,
+    error: deliveryResult.error,
+    retryCount: 0,
+    maxRetries: 3,
+    sentAt: deliveryResult.status === 'sent' ? new Date().toISOString() : null,
+    lastAttemptedAt: new Date().toISOString(),
+  };
+}
+
+// ============================================
+// 4. RETRY / ERROR STATE
+// ============================================
+
+export function shouldRetry(sendRecord) {
+  if (sendRecord.deliveryStatus === 'sent') return false;
+  if (sendRecord.retryCount >= sendRecord.maxRetries) return false;
+
+  const error = sendRecord.error || '';
+  // Do not retry auth failures or invalid requests
+  if (error.includes('auth') || error.includes('credentials') || error.includes('invalid')) return false;
+
+  return true;
+}
+
+export function createRetryRecord(sendRecord, newDeliveryResult) {
+  return {
+    ...sendRecord,
+    deliveryStatus: newDeliveryResult.status,
+    deliveryProvider: newDeliveryResult.provider,
+    providerResponseId: newDeliveryResult.providerResponseId,
+    error: newDeliveryResult.error,
+    retryCount: sendRecord.retryCount + 1,
+    lastAttemptedAt: new Date().toISOString(),
+    sentAt: newDeliveryResult.status === 'sent' ? new Date().toISOString() : sendRecord.sentAt,
+  };
+}
+
+// ============================================
+// BATCH: Generate + track all campaign types
+// ============================================
 
 export async function generateEmailCampaignPlan(context) {
   const types = Object.keys(CAMPAIGN_TYPES);
   const results = {};
+
   for (const type of types) {
-    const email = await generateEmailCampaign(type, context);
-    if (email) results[type] = email;
+    const content = await generateEmailContent(type, context);
+    results[type] = {
+      content,
+      sendRecord: null,
+      deliveryStatus: 'not_attempted',
+    };
   }
+
   return {
     campaigns: results,
     totalGenerated: Object.keys(results).length,
+    providerConfigured: !!(process.env.GMAIL_USER || process.env.SENDGRID_API_KEY || process.env.BREVO_API_KEY || process.env.RESEND_API_KEY),
     _metadata: {
       evidenceVersion: '2.0.0',
       generatedAt: new Date().toISOString(),

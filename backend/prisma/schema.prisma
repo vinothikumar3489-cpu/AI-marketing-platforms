@@ -28,6 +28,7 @@ model User {
   notifications          Notification[]
   automationPlans        AutomationPlan[]
   automationLogs         AutomationLog[]
+  executionRecords       ExecutionRecord[]
   evidenceSnapshots      EvidenceSnapshot[]
 
   // Growth Execution Layer relations
@@ -60,8 +61,9 @@ model Chat {
   automationPlan  AutomationPlan?
 
   // Growth Execution Layer relations
-  growthSprints GrowthSprint[]
-  growthTasks   GrowthTask[]
+  growthSprints     GrowthSprint[]
+  growthTasks       GrowthTask[]
+  executionRecords  ExecutionRecord[]
   evidenceSnapshots EvidenceSnapshot[]
 
   @@index([userId])
@@ -839,14 +841,21 @@ model AutomationPlan {
   socialCalendars    Json? // Social media content calendars
   analyticsData      Json? // Execution analytics and metrics tracking
 
+  // Opportunities & Risks (Phase 3)
+  opportunities Json?
+  risks         Json?
+
   // Automation Assets
   assets AutomationAsset[]
 
   // Metadata
-  readinessScore Int?     @default(0)
-  status         String   @default("draft") // draft, approved, scheduled, running, paused, completed
-  provider       String?
-  fallbackUsed   Boolean? @default(false)
+  readinessScore     Int?     @default(0)
+  readinessChecklist Json?            // { status, items, missing } (Phase 2)
+  contextSnapshotId  String?          // ctx_<chatId>_<timestamp> (Phase 1)
+  executionRecords   ExecutionRecord[] // Phase 9
+  status             String   @default("draft") // draft, approved, scheduled, running, paused, completed
+  provider           String?
+  fallbackUsed       Boolean? @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -929,6 +938,43 @@ model AutomationLog {
 
   @@index([userId, createdAt])
   @@index([chatId, action])
+}
+
+// ============================================
+// EXECUTION RECORD (Phase 9 — Execution History)
+// ============================================
+
+model ExecutionRecord {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId    String
+  automationPlan   AutomationPlan? @relation(fields: [automationPlanId], references: [id], onDelete: SetNull)
+  automationPlanId String?
+
+  module          String   // email, poster, video, crm_workflow, campaign_plan, content, social
+  contextSnapshotId String? // ctx_<chatId>_<timestamp>
+  provider        String?  // gmail, sendgrid, pollinations, shotstack, etc.
+  requestStatus   String   // pending, running, success, failed, retrying
+  providerResponseId String? // provider's tracking ID
+  assetUrls       Json?    // [{ type, url }]
+  errorCategory   String?  // auth_failed, timeout, provider_unavailable, invalid_request, unknown
+
+  retryCount      Int      @default(0)
+  maxRetries      Int      @default(3)
+
+  requestPayload  Json?    // what was sent
+  responseSummary Json?    // what came back (no secrets)
+
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId, chatId, module])
+  @@index([chatId, requestStatus])
+  @@index([automationPlanId])
 }
 
 // ============================================

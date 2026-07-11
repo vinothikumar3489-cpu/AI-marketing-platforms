@@ -723,7 +723,7 @@ function ExecutiveDashboard({ data }: { data: any }) {
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Globe size={18} /> SEO Health Radar</h3>
           {radarData.some(d => d.A !== null) ? (
             <>
-              <MiniRadarLegend items={radarData.filter(d => d.A !== null).map(d => ({ label: d.subject, value: d.A ?? 0 }))} />
+              <MiniRadarLegend items={radarData.filter(d => d.A !== null).map(d => ({ label: d.subject, value: d.A }))} />
               <ResponsiveContainer width="100%" height={260}>
                 <RadarChart cx="50%" cy="50%" outerRadius="65%" data={radarData.filter(d => d.A !== null)}>
                   <PolarGrid stroke="#293245" />
@@ -825,7 +825,7 @@ function ExecutiveStory({ data }: { data: any }) {
     opportunitiesCount: data.keywordIntelligence?.contentOpportunities?.length || 0,
     topKeywords: (data.keywordIntelligence?.primaryKeywords || []).slice(0, 5).map((k: any) => ({
       keyword: k.keyword || k,
-      searchVolume: k.searchVolume || k.volume || 0,
+      searchVolume: k.searchVolume ?? k.volume ?? null,
       difficulty: k.difficulty ?? k.kd ?? null
     }))
   };
@@ -1533,7 +1533,7 @@ function KeywordIntelligence({ data }: { data: any }) {
                     </td>
                     <td style={{ padding: '12px', color: '#53a7ff' }}>{asText(k?.contentType || 'Blog Post')}</td>
                     <td style={{ padding: '12px' }}>
-                      <Badge className="green">{asNumber(k.opportunity, 80)}/100</Badge>
+                      <Badge className="green">{asNumber(k.opportunity) != null ? `${asNumber(k.opportunity)}/100` : '—'}</Badge>
                     </td>
                   </tr>
                 );

@@ -12,6 +12,14 @@ import {
   executeSingleModule,
   getExecutionData,
   getEvidenceContext,
+  getReadinessCheck,
+  getExecutionHistory,
+  getContentBrief,
+  generateContentItem,
+  generateAllContent,
+  getContentAssetList,
+  getAssetVersionHistory,
+  regenerateContentAsset,
 } from "../controllers/automation.controller.js";
 import { validate } from "../middleware/validate.js";
 
@@ -32,6 +40,9 @@ automationRouter.get("/:chatId/plan", getAutomationDemo);
 // POST /api/automation/:chatId/generate - Generate new automation plan
 automationRouter.post("/:chatId/generate", generateAutomationDemo);
 
+// GET /api/automation/:chatId/readiness - Get readiness checklist (Phase 2)
+automationRouter.get("/:chatId/readiness", getReadinessCheck);
+
 // GET /api/automation/:chatId/assets - Get all automation assets
 automationRouter.get("/:chatId/assets", getAutomationAssets);
 
@@ -49,3 +60,16 @@ automationRouter.post("/:chatId/execute", executeAllModules);
 automationRouter.post("/:chatId/execute/:module", executeSingleModule);
 automationRouter.get("/:chatId/execution", getExecutionData);
 automationRouter.get("/:chatId/evidence-context", getEvidenceContext);
+
+// Phase 9 — Execution History
+automationRouter.get("/:chatId/execution-history", getExecutionHistory);
+
+// Phase 1 — Content Brief
+automationRouter.get("/:chatId/content-brief", getContentBrief);
+
+// Phase 3–10 — Content Studio
+automationRouter.post("/:chatId/content", generateContentItem);
+automationRouter.post("/:chatId/content/plan", generateAllContent);
+automationRouter.get("/:chatId/content/assets", getContentAssetList);
+automationRouter.get("/content/assets/:assetId/versions", getAssetVersionHistory);
+automationRouter.post("/content/assets/:assetId/regenerate", regenerateContentAsset);

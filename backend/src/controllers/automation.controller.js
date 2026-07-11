@@ -2,7 +2,11 @@ import { prisma } from "../config/prisma.js";
 import { generateAutomationPlanWithAI, sanitizeAutomationPlanData } from "../services/automation.service.js";
 import { callAI } from "../ai/services/aiRouter.service.js";
 import { generateAllExecutionModules, generateSingleModule } from "../services/execution/marketing-execution.service.js";
-import { buildEvidenceContext } from "../services/execution/evidence-context-builder.service.js";
+import { buildEvidenceContext, buildReadinessChecklist } from "../services/execution/evidence-context-builder.service.js";
+import { buildContentBrief } from "../services/execution/content-brief.service.js";
+import { generateContent, generateContentStudioPlan, CONTENT_TYPES_LIST as CONTENT_TYPES } from "../services/execution/content-studio.service.js";
+import { scoreContentQuality } from "../services/execution/quality-scorer.service.js";
+import { saveContentAsset, getContentAssets, getAssetVersions, regenerateAsset as renewAssetInDb } from "../services/execution/content-asset.service.js";
 
 /**
  * GET /api/automation/:chatId/demo
@@ -88,29 +92,24 @@ export const generateAutomationDemo = async (req, res) => {
     // Fetch existing analysis data (scoped by userId)
     const evidenceContext = await buildEvidenceContext(prisma, userId, chatId);
 
+    // Handle rejection from evidence context
+    if (evidenceContext.rejected) {
+      return res.status(400).json({
+        success: false,
+        rejected: true,
+        code: evidenceContext.code,
+        error: evidenceContext.reason,
+      });
+    }
+
     const { _raw } = evidenceContext;
     const productIntelligence = _raw.productIntel;
     const competitorIntelligence = _raw.competitorIntel;
     const campaignIntelligence = _raw.campaignIntel;
     const seoIntelligence = _raw.seoIntel;
 
-    // Calculate readiness score from evidence context
-    const readinessModules = {
-      evidenceSnapshot: evidenceContext.sourceSummary.hasEvidenceSnapshot,
-      productAnalysis: !!productIntelligence?.productAnalysis,
-      marketDiscovery: !!productIntelligence?.marketDiscovery,
-      audienceIntelligence: !!productIntelligence?.audienceIntelligence,
-      competitorAnalysis: !!competitorIntelligence?.competitorAnalysis,
-      campaignGenerator: !!campaignIntelligence?.campaignGenerator,
-      channelRecommendation: !!campaignIntelligence?.channelRecommendation,
-      seoAnalysis: !!seoIntelligence?.seoScore || evidenceContext.seo?.issues?.length > 0,
-    };
-
-    const totalModules = Object.keys(readinessModules).length;
-    const completedModules = Object.values(readinessModules).filter(Boolean).length;
-    const readinessScore = Math.round((completedModules / totalModules) * 100);
-
-    console.log('[Automation] Readiness:', { completedModules, totalModules, readinessScore });
+    // Build readiness checklist (replaces numeric score)
+    const readinessChecklist = buildReadinessChecklist(evidenceContext);
 
     // Generate automation plan using AI or evidence-based fallback
     const automationData = await generateAutomationPlanWithAI({
@@ -146,106 +145,21 @@ export const generateAutomationDemo = async (req, res) => {
         userId,
         chatId,
         ...sanitizedData,
-        readinessScore,
+        readinessChecklist,
         status: 'draft',
       }
     });
-
-    // Create automation assets
-    const assets = [];
-
-    // Email assets
-    if (automationData.emailSequence && Array.isArray(automationData.emailSequence)) {
-      for (let i = 0; i < automationData.emailSequence.length; i++) {
-        const email = automationData.emailSequence[i];
-        assets.push({
-          automationPlanId: automationPlan.id,
-          assetType: 'email',
-          assetTitle: email.subject || `Email ${i + 1}`,
-          assetContent: email,
-          channel: 'email',
-          status: 'draft',
-        });
-      }
-    }
-
-    // LinkedIn assets
-    if (automationData.linkedInPosts && Array.isArray(automationData.linkedInPosts)) {
-      for (let i = 0; i < automationData.linkedInPosts.length; i++) {
-        const post = automationData.linkedInPosts[i];
-        assets.push({
-          automationPlanId: automationPlan.id,
-          assetType: 'linkedin_post',
-          assetTitle: post.title || `LinkedIn Post ${i + 1}`,
-          assetContent: post,
-          channel: 'linkedin',
-          status: 'draft',
-        });
-      }
-    }
-
-    // Instagram assets
-    if (automationData.instagramCaptions && Array.isArray(automationData.instagramCaptions)) {
-      for (let i = 0; i < automationData.instagramCaptions.length; i++) {
-        const caption = automationData.instagramCaptions[i];
-        assets.push({
-          automationPlanId: automationPlan.id,
-          assetType: 'instagram_post',
-          assetTitle: caption.title || `Instagram Post ${i + 1}`,
-          assetContent: caption,
-          channel: 'instagram',
-          status: 'draft',
-        });
-      }
-    }
-
-    // Video ads
-    if (automationData.videoScripts && Array.isArray(automationData.videoScripts)) {
-      for (let i = 0; i < automationData.videoScripts.length; i++) {
-        const video = automationData.videoScripts[i];
-        assets.push({
-          automationPlanId: automationPlan.id,
-          assetType: 'video_ad',
-          assetTitle: video.title || `Video Ad ${i + 1}`,
-          assetContent: video,
-          channel: 'video',
-          status: 'draft',
-        });
-      }
-    }
-
-    // Image ads
-    if (automationData.posterPrompts && Array.isArray(automationData.posterPrompts)) {
-      for (let i = 0; i < automationData.posterPrompts.length; i++) {
-        const poster = automationData.posterPrompts[i];
-        assets.push({
-          automationPlanId: automationPlan.id,
-          assetType: 'image_ad',
-          assetTitle: poster.title || `Image Ad ${i + 1}`,
-          assetContent: poster,
-          channel: 'image',
-          status: 'draft',
-        });
-      }
-    }
-
-    // Create all assets in database
-    if (assets.length > 0) {
-      await prisma.automationAsset.createMany({
-        data: assets
-      });
-    }
 
     // Log automation generation
     await prisma.automationLog.create({
       data: {
         userId,
         chatId,
-        action: 'generated',
-        message: `Automation plan generated with ${assets.length} assets`,
+        action: 'plan_generated',
+        message: `Automation plan generated with readiness: ${readinessChecklist.status}`,
         metadata: {
-          readinessScore,
-          assetsCount: assets.length,
+          readinessStatus: readinessChecklist.status,
+          missingItems: readinessChecklist.missing,
         }
       }
     });
@@ -260,12 +174,12 @@ export const generateAutomationDemo = async (req, res) => {
       }
     });
 
-    console.log('✅ [Automation] Plan generated with', assets.length, 'assets');
+    console.log('✅ [Automation] Plan generated with readiness:', readinessChecklist.status);
 
     return res.json({
       success: true,
       automationPlan: completePlan,
-      readinessModules,
+      readinessChecklist,
     });
 
   } catch (error) {
@@ -616,6 +530,28 @@ export const executeAllModules = async (req, res) => {
       },
     });
 
+    // Phase 9 — Create execution records
+    const modules = ['contentStudio', 'emailCampaigns', 'creativeStudio', 'videoStudio', 'campaignPlans', 'socialCalendars'];
+    const planRecord = await prisma.automationPlan.findFirst({ where: { chatId, userId } });
+    for (const mod of modules) {
+      if (executionData[mod] && !executionData[mod].error) {
+        await prisma.executionRecord.create({
+          data: {
+            userId, chatId,
+            automationPlanId: planRecord?.id || null,
+            module: mod,
+            contextSnapshotId: `ctx_${chatId}_${Date.now()}`,
+            provider: mod === 'emailCampaigns' ? (executionData[mod].providerConfigured ? 'email_provider' : 'no_provider') : 'ai_generation',
+            requestStatus: 'success',
+            retryCount: 0,
+            maxRetries: 3,
+            startedAt: new Date(Date.now() - 1000),
+            completedAt: new Date(),
+          },
+        });
+      }
+    }
+
     console.log('✅ [MarketingExecution] All modules generated:', executionData._summary);
     return res.json({ success: true, data: executionData });
   } catch (error) {
@@ -681,6 +617,22 @@ export const executeSingleModule = async (req, res) => {
 
     await prisma.automationLog.create({
       data: { userId, chatId, action: `module_${moduleType}_generated`, message: `${moduleType} module generated with ${result.data?.totalGenerated || 0} assets`, metadata: { module: moduleType, result: result.data } },
+    });
+
+    // Phase 9 — Create execution record for single module
+    await prisma.executionRecord.create({
+      data: {
+        userId, chatId,
+        automationPlanId: plan?.id || null,
+        module: moduleType,
+        contextSnapshotId: `ctx_${chatId}_${Date.now()}`,
+        provider: result.data?.provider || 'ai_generation',
+        requestStatus: result.data ? 'success' : 'failed',
+        retryCount: 0,
+        maxRetries: 3,
+        startedAt: new Date(Date.now() - 1000),
+        completedAt: new Date(),
+      },
     });
 
     return res.json({ success: true, data: result.data });
@@ -758,5 +710,257 @@ export const getEvidenceContext = async (req, res) => {
   } catch (error) {
     console.error('❌ [EvidenceContext] Error:', error);
     return res.status(500).json({ success: false, error: error.message || 'Failed to fetch evidence context' });
+  }
+};
+
+/**
+ * GET /api/automation/:chatId/readiness
+ * Get readiness checklist (Phase 2)
+ */
+export const getReadinessCheck = async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
+    if (!chat) return res.status(404).json({ success: false, error: "Chat not found" });
+
+    const evidenceContext = await buildEvidenceContext(prisma, userId, chatId);
+    if (evidenceContext.rejected) {
+      return res.json({ success: true, rejected: true, code: evidenceContext.code, reason: evidenceContext.reason });
+    }
+
+    const checklist = buildReadinessChecklist(evidenceContext);
+    return res.json({ success: true, readiness: checklist });
+  } catch (error) {
+    console.error('❌ [Readiness] Error:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Failed to check readiness' });
+  }
+};
+
+/**
+ * GET /api/automation/:chatId/execution-history
+ * Get execution history (Phase 9)
+ */
+export const getExecutionHistory = async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
+    if (!chat) return res.status(404).json({ success: false, error: "Chat not found" });
+
+    const records = await prisma.executionRecord.findMany({
+      where: { chatId, userId },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    return res.json({ success: true, records });
+  } catch (error) {
+    console.error('❌ [ExecutionHistory] Error:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Failed to fetch execution history' });
+  }
+};
+
+/**
+ * GET /api/automation/:chatId/content-brief
+ * Get canonical content brief (Phase 1)
+ */
+export const getContentBrief = async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
+    if (!chat) return res.status(404).json({ success: false, error: "Chat not found" });
+
+    const brief = await buildContentBrief(prisma, userId, chatId);
+    return res.json({ success: true, data: brief });
+  } catch (error) {
+    console.error('❌ [ContentBrief] Error:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Failed to build content brief' });
+  }
+};
+
+/**
+ * POST /api/automation/:chatId/content
+ * Generate specific content type via Content Studio (Phase 3–8)
+ */
+export const generateContentItem = async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user.id;
+  const { contentType } = req.body;
+
+  if (!contentType || !CONTENT_TYPES.includes(contentType)) {
+    return res.status(400).json({
+      success: false,
+      error: `Invalid contentType. Must be one of: ${CONTENT_TYPES.join(', ')}`,
+    });
+  }
+
+  try {
+    const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
+    if (!chat) return res.status(404).json({ success: false, error: "Chat not found" });
+
+    const brief = await buildContentBrief(prisma, userId, chatId);
+    const evidenceContext = await buildEvidenceContext(prisma, userId, chatId);
+
+    const result = await generateContent(contentType, brief, evidenceContext, callAI, userId, chatId);
+    const contentBody = result?.content || result;
+    const meta = result?.metadata || {};
+
+    // Quality scoring (Phase 9)
+    const qualityScore = scoreContentQuality(contentBody, brief, contentType);
+
+    // Save asset (Phase 10)
+    const asset = await saveContentAsset(prisma, {
+      userId,
+      chatId,
+      contentType,
+      briefSnapshot: brief,
+      evidenceSnapshot: evidenceContext,
+      provider: 'groq',
+      content: contentBody,
+      metadata: meta,
+      qualityScore,
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        content: contentBody,
+        metadata: meta,
+        qualityScore,
+        asset,
+      },
+    });
+  } catch (error) {
+    console.error('❌ [ContentStudio] Error:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Failed to generate content' });
+  }
+};
+
+/**
+ * POST /api/automation/:chatId/content/plan
+ * Generate all content types via Content Studio
+ */
+export const generateAllContent = async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user.id;
+  const { types = CONTENT_TYPES } = req.body;
+
+  try {
+    const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
+    if (!chat) return res.status(404).json({ success: false, error: "Chat not found" });
+
+    const brief = await buildContentBrief(prisma, userId, chatId);
+    const evidenceContext = await buildEvidenceContext(prisma, userId, chatId);
+
+    const invalid = types.filter(t => !CONTENT_TYPES.includes(t));
+    if (invalid.length) {
+      return res.status(400).json({ success: false, error: `Invalid types: ${invalid.join(', ')}` });
+    }
+
+    const planResult = await generateContentStudioPlan(types, brief, evidenceContext, callAI, userId, chatId);
+    const generatedItems = planResult?.assets || [];
+
+    // Score each, save each
+    const assets = [];
+    const qualityScores = [];
+
+    for (const item of generatedItems) {
+      const contentBody = item.content || item;
+      const meta = item.metadata || {};
+      const score = scoreContentQuality(contentBody, brief, item.type);
+      qualityScores.push({ type: item.type, ...score });
+
+      const asset = await saveContentAsset(prisma, {
+        userId,
+        chatId,
+        contentType: item.type,
+        briefSnapshot: brief,
+        evidenceSnapshot: evidenceContext,
+        provider: 'groq',
+        content: contentBody,
+        metadata: meta,
+        qualityScore: score,
+      });
+      assets.push(asset);
+    }
+
+    return res.status(201).json({
+      success: true,
+      data: { results: planResult, qualityScores: qualityScores.reduce((a, s) => ({ ...a, [s.type]: s }), {}), assets },
+    });
+  } catch (error) {
+    console.error('❌ [ContentStudioPlan] Error:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Failed to generate content plan' });
+  }
+};
+
+/**
+ * GET /api/automation/:chatId/content/assets
+ * Get all content assets for a chat
+ */
+export const getContentAssetList = async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user.id;
+  const { type } = req.query;
+
+  try {
+    const assets = await getContentAssets(prisma, userId, chatId, type);
+    return res.json({ success: true, data: assets });
+  } catch (error) {
+    console.error('❌ [ContentAssets] Error:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Failed to fetch assets' });
+  }
+};
+
+/**
+ * GET /api/automation/content/assets/:assetId/versions
+ * Get version history for an asset
+ */
+export const getAssetVersionHistory = async (req, res) => {
+  const { assetId } = req.params;
+
+  try {
+    const versions = await getAssetVersions(prisma, assetId);
+    return res.json({ success: true, data: versions });
+  } catch (error) {
+    console.error('❌ [AssetVersions] Error:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Failed to fetch versions' });
+  }
+};
+
+/**
+ * POST /api/automation/content/assets/:assetId/regenerate
+ * Regenerate (create new version) of a content asset
+ */
+export const regenerateContentAsset = async (req, res) => {
+  const { assetId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const existing = await prisma.automationAsset.findUnique({ where: { id: assetId } });
+    if (!existing) return res.status(404).json({ success: false, error: 'Asset not found' });
+
+    const chatId = (await prisma.automationPlan.findUnique({ where: { id: existing.automationPlanId } })).chatId;
+    const brief = await buildContentBrief(prisma, userId, chatId);
+    const evidenceContext = await buildEvidenceContext(prisma, userId, chatId);
+    const contentType = existing.assetType.replace('content_', '');
+
+    const result = await generateContent(contentType, brief, evidenceContext, callAI, userId, chatId);
+    const contentBody = result?.content || result;
+    const meta = result?.metadata || {};
+
+    const asset = await renewAssetInDb(prisma, assetId, result);
+
+    const qualityScore = scoreContentQuality(contentBody, brief, contentType);
+
+    return res.status(201).json({ success: true, data: { content: contentBody, metadata: meta, qualityScore, asset } });
+  } catch (error) {
+    console.error('❌ [RegenerateAsset] Error:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Failed to regenerate asset' });
   }
 };

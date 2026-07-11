@@ -229,6 +229,13 @@ function generateEvidenceBasedPlan(context) {
   const seoInfo = seoIntelligence || {};
   const competitorData = competitorIntelligence?.competitorAnalysis || {};
 
+  // Provider availability (from env)
+  const providerEmail = !!(process.env.GMAIL_USER || process.env.SENDGRID_API_KEY || process.env.BREVO_API_KEY || process.env.RESEND_API_KEY);
+  const providerCreative = !!(process.env.POLLINATIONS_API_KEY || process.env.FAL_API_KEY);
+  const providerVideo = !!(process.env.SHOTSTACK_API_KEY || process.env.CREATOMATE_API_KEY);
+  const analyticsConnected = !!(process.env.GA_API_KEY || process.env.MIXPANEL_API_KEY);
+  const crmConfigured = !!(process.env.HUBSPOT_API_KEY || process.env.SALESFORCE_API_KEY);
+
   const companyName = executiveStory?.companyOverview?.name || product;
   const plan = {};
 
@@ -764,64 +771,92 @@ function generateEvidenceBasedPlan(context) {
     plan.contentCalendar = calendarEntries;
   }
 
-  // === CRM WORKFLOWS ===
-  const crmWorkflows = [];
-  if (hasCompetitorData && competitorData.directCompetitors?.length > 0) {
-    crmWorkflows.push({
-      workflowName: 'Competitor Monitoring',
-      trigger: 'Weekly competitor check',
-      conditions: ['Competitor activity detected', 'Market share change > 5%'],
-      actions: ['Analyze competitor move', 'Update positioning', 'Adjust campaign messaging'],
-      crmTool: 'CRM not detected',
-      recommendation: 'Connect CRM before activation. Recommended: HubSpot or Salesforce.',
-      owner: 'competitive_intelligence',
-      expectedKPI: 'Market share maintained',
-      evidence: 'competitor_analysis_intelligence',
-      confidence: 'high',
-      priority: 'high',
-      difficulty: 'medium',
-      timeline: 'Weekly',
-      dataSource: 'competitor_intelligence',
-    });
-  }
-  if (hasSeoData && keywordsTexts.length > 0) {
-    crmWorkflows.push({
-      workflowName: 'SEO Content Pipeline',
-      trigger: 'Weekly SEO audit',
-      conditions: ['Keyword ranking dropped', 'New content gap identified'],
-      actions: ['Assign content to writer', 'Create SEO-optimized article', 'Publish and promote'],
-      crmTool: 'CRM not detected',
-      recommendation: 'Connect CRM for lead tracking from content downloads.',
-      owner: 'seo_specialist',
-      expectedKPI: `Improve ranking for ${keywordsTexts.length} keywords`,
-      evidence: 'seo_content_gap_analysis',
-      confidence: 'high',
-      priority: 'high',
-      difficulty: 'medium',
-      timeline: 'Bi-weekly',
-      dataSource: 'seo_intelligence',
-    });
-  }
-  if (hasProductData) {
-    crmWorkflows.push({
-      workflowName: 'Lead Nurturing Sequence',
-      trigger: 'New lead captured',
-      conditions: ['Lead score > 50', 'Source identified'],
-      actions: ['Send welcome email', 'Assign to SDR', 'Schedule follow-up'],
-      crmTool: 'CRM not detected',
-      recommendation: 'Connect CRM before activation. Automated lead routing requires CRM integration.',
-      owner: 'sales_development',
-      expectedKPI: 'Lead response time < 5 min',
-      evidence: 'sales_process_standard',
-      confidence: 'medium',
-      priority: 'high',
-      difficulty: 'high',
-      timeline: 'Ongoing',
-      dataSource: 'sales_process',
-    });
-  }
-  if (crmWorkflows.length > 0) {
-    plan.crmWorkflows = crmWorkflows;
+  // === CRM WORKFLOW (Phase 5) ===
+  if (!crmConfigured) {
+    // Export platform-neutral workflow when no CRM connected
+    const neutralWorkflow = {
+      workflowName: `${companyName || product} Automation Workflow (No CRM)`,
+      trigger: {
+        type: 'manual_or_api',
+        description: 'Workflow must be triggered manually or via API — no CRM connected',
+        source: campaignData?.triggerSources?.[0] || 'manual_trigger',
+      },
+      qualificationCondition: {
+        type: 'manual_review',
+        description: 'Leads require manual qualification — CRM connection needed for automated scoring',
+        minimumCriteria: targetAudience ? [`Matches audience: ${targetAudience}`] : ['Manual review required'],
+      },
+      segment: targetAudience ? { name: `${targetAudience} segment`, criteria: [`Target: ${targetAudience}`] } : null,
+      action: {
+        type: 'export_csv_or_manual',
+        description: 'Export leads and process manually, or connect CRM for automation',
+        steps: campaignData?.campaignObjectives ? [`Execute: ${campaignData.campaignObjectives}`] : ['Define campaign objective first'],
+      },
+      delay: { description: 'Manual delay — set based on campaign schedule', recommendedValue: '24-48 hours for follow-up' },
+      branch: {
+        description: 'No CRM branching available. Connect HubSpot or Salesforce for conditional workflows.',
+        alternatives: ['Responded → manual follow-up', 'Not responded → manual re-engagement after 72h'],
+      },
+      owner: 'marketing_team',
+      exitCondition: { description: 'Manual — mark complete when campaign objective met', trigger: 'manual_check' },
+      measurementEvent: { description: 'Track manually in spreadsheet or analytics platform', event: 'manual_tracking' },
+      evidence: 'no_crm_connected',
+      evidenceLevel: 'not_verified',
+      crmConnected: false,
+      recommendation: 'Connect HubSpot or Salesforce CRM for automated lead routing, scoring, and workflow execution.',
+    };
+    plan.crmWorkflows = { platformNeutral: neutralWorkflow, workflows: [], crmConnected: false };
+  } else {
+    const crmWorkflows = [];
+    if (hasCompetitorData && competitorData.directCompetitors?.length > 0) {
+      crmWorkflows.push({
+        workflowName: 'Competitor Monitoring',
+        trigger: { type: 'scheduled', description: 'Weekly competitor check', source: 'competitor_analysis' },
+        qualificationCondition: { type: 'event_detected', description: 'Competitor activity detected or market share change', criteria: ['Competitor product launch', 'Pricing change > 10%', 'New market entry'] },
+        segment: { name: 'Markets with active competitors', criteria: ['Industry matches', 'Geo matches'] },
+        actions: ['Trigger alert to competitive_intelligence team', 'Update positioning document', 'Adjust campaign messaging'],
+        delay: { description: 'Alert immediately, analysis within 24h', recommendedValue: '24h' },
+        branch: { description: 'High impact → immediate strategy review', alternatives: ['Medium → add to next sprint', 'Low → log for quarterly review'] },
+        owner: 'competitive_intelligence',
+        exitCondition: { description: 'Positioning updated and acknowledged', trigger: 'manual_review' },
+        measurementEvent: { event: 'competitor_action_responded', metric: 'Response time', target: '< 48 hours' },
+        evidence: 'competitor_intelligence',
+        evidenceLevel: 'evidence_backed',
+      });
+    }
+    if (hasSeoData && keywordsTexts.length > 0) {
+      crmWorkflows.push({
+        workflowName: 'SEO Content Pipeline',
+        trigger: { type: 'scheduled', description: 'Weekly SEO audit triggers content assignments', source: 'seo_intelligence' },
+        qualificationCondition: { type: 'condition_met', description: 'Keyword ranking dropped or new gap identified', criteria: ['Ranking dropped > 3 positions', 'New content gap with search volume > 100'] },
+        segment: { name: 'Keywords requiring content', criteria: [`${keywordsTexts.length} keywords in pipeline`] },
+        actions: ['Assign content brief to writer', 'SEO-optimized article creation', 'Publish and distribute'],
+        delay: { description: 'Assign within 24h, content due in 5 business days', recommendedValue: '5 days' },
+        branch: { description: 'High priority keyword → expedite', alternatives: ['Medium → standard timeline', 'Low → add to backlog'] },
+        owner: 'seo_specialist',
+        exitCondition: { description: 'Article published and indexed', trigger: 'search_console_verification' },
+        measurementEvent: { event: 'content_published', metric: 'Keyword ranking improvement', target: 'Top 10 within 90 days' },
+        evidence: 'seo_content_gap_analysis',
+        evidenceLevel: 'evidence_backed',
+      });
+    }
+    if (hasProductData) {
+      crmWorkflows.push({
+        workflowName: 'Lead Nurturing Sequence',
+        trigger: { type: 'event', description: 'New lead captured via form or landing page', source: 'crm_webhook' },
+        qualificationCondition: { type: 'score_based', description: 'Lead score and source validation', criteria: ['Lead score > configured threshold', 'Valid email domain', 'Not in suppression list'] },
+        segment: { name: 'Qualified inbound leads', criteria: ['Source identified', 'Company size matches ICP'] },
+        actions: ['Send automated welcome email', 'Assign to SDR based on territory', 'Schedule discovery call', 'Log activity in CRM'],
+        delay: { description: 'Email immediately, SDR assignment within 1h', recommendedValue: '1h' },
+        branch: { description: 'Hot lead (score > 80) → immediate SDR call', alternatives: ['Warm → nurture sequence', 'Cold → monthly newsletter'] },
+        owner: 'sales_development',
+        exitCondition: { description: 'Lead converted to opportunity or disqualified', trigger: 'stage_change_in_crm' },
+        measurementEvent: { event: 'lead_conversion', metric: 'Lead-to-opportunity rate', target: 'Improve by 15%' },
+        evidence: 'audience_intelligence',
+        evidenceLevel: 'evidence_backed',
+      });
+    }
+    plan.crmWorkflows = { platformNeutral: null, workflows: crmWorkflows, crmConnected: true };
   }
 
   // === IDEAL LEAD PROFILE / LEAD CRITERIA ===
@@ -858,6 +893,128 @@ function generateEvidenceBasedPlan(context) {
   }
   if (leadSources.length > 0) {
     plan.leadSources = leadSources;
+  }
+
+  // === OPPORTUNITIES (Phase 3) ===
+  const opportunities = [];
+  if (hasSeoData && keywordsTexts.length > 0) {
+    opportunities.push({
+      title: `Target "${keywordsTexts[0]}" content gap`,
+      action: 'Create SEO-optimized content for identified keyword gap',
+      reason: `Keyword "${keywordsTexts[0]}" identified as a content gap with verified search potential`,
+      evidence: 'seo_keyword_opportunity',
+      evidenceLevel: keywordsTexts.length > 5 ? 'evidence_backed' : 'ai_inferred',
+      businessArea: 'seo',
+      priority: 'high',
+      effort: 'medium',
+      expectedImpactCategory: 'organic_traffic',
+      requiredIntegration: null,
+    });
+  }
+  if (hasAudienceData && audienceData.buyerPersonas?.length > 0) {
+    opportunities.push({
+      title: `Build targeted campaigns for ${audienceData.buyerPersonas[0].name || 'primary persona'}`,
+      action: 'Design custom marketing automation workflows for identified persona',
+      reason: `${audienceData.buyerPersonas.length} buyer personas defined with verified pain points and goals`,
+      evidence: 'audience_intelligence',
+      evidenceLevel: 'evidence_backed',
+      businessArea: 'audience_marketing',
+      priority: 'high',
+      effort: 'medium',
+      expectedImpactCategory: 'conversion_rate',
+      requiredIntegration: null,
+    });
+  }
+  if (channels.length > 0) {
+    const topChannel = channels[0];
+    opportunities.push({
+      title: `Activate ${topChannel.channel} channel with evidence-based strategy`,
+      action: `Set up ${topChannel.channel} automation workflow with targeting rules`,
+      reason: topChannel.reason || `${topChannel.channel} recommended by channel analysis`,
+      evidence: 'channel_recommendation',
+      evidenceLevel: 'evidence_backed',
+      businessArea: 'channel_activation',
+      priority: topChannel.priority || 'medium',
+      effort: 'low',
+      expectedImpactCategory: 'channel_reach',
+      requiredIntegration: topChannel.channel === 'email' ? 'email_provider' : `social_platform`,
+    });
+  }
+  if (competitorData?.directCompetitors?.length > 0) {
+    opportunities.push({
+      title: `Monitor ${competitorData.directCompetitors[0].name || 'top competitor'} positioning shifts`,
+      action: 'Set up automated competitor intelligence tracking',
+      reason: `${competitorData.directCompetitors.length} direct competitors identified in analysis`,
+      evidence: 'competitor_intelligence',
+      evidenceLevel: 'evidence_backed',
+      businessArea: 'competitive_intelligence',
+      priority: 'medium',
+      effort: 'low',
+      expectedImpactCategory: 'competitive_position',
+      requiredIntegration: null,
+    });
+  }
+  if (opportunities.length > 0) {
+    plan.opportunities = opportunities;
+  }
+
+  // === RISKS (Phase 3) ===
+  const risks = [];
+  if (!hasProductData || !productAnalysis?.usp) {
+    risks.push({
+      risk: 'Product identity not fully defined',
+      cause: 'No verified USP or product description available from evidence sources',
+      evidence: 'product_intelligence',
+      likelihoodLevel: 'high',
+      impactLevel: 'high',
+      mitigation: 'Complete product analysis with verified evidence before executing automated campaigns',
+    });
+  }
+  if (!hasAudienceData) {
+    risks.push({
+      risk: 'Audience targeting precision limited',
+      cause: 'No buyer personas or audience data collected',
+      evidence: 'audience_intelligence',
+      likelihoodLevel: 'high',
+      impactLevel: 'high',
+      mitigation: 'Run audience intelligence analysis to define target segments',
+    });
+  }
+  if (!providerEmail) {
+    risks.push({
+      risk: 'Email delivery not configured',
+      cause: 'No email provider credentials (Gmail SMTP, SendGrid, or Brevo API key)',
+      evidence: 'provider_configuration',
+      likelihoodLevel: 'high',
+      impactLevel: 'medium',
+      mitigation: 'Configure Gmail SMTP, SendGrid, or Brevo API key in environment settings',
+    });
+  }
+  if (Array.isArray(plan.channels) && plan.channels.length > 0 && !providerEmail) {
+    const emailChan = plan.channels.find(c => c.channel === 'email');
+    if (emailChan) {
+      risks.push({
+        risk: 'Email channel planned but no provider connected',
+        cause: 'Email channel is in the plan but no email provider is configured',
+        evidence: 'provider_configuration',
+        likelihoodLevel: 'high',
+        impactLevel: 'high',
+        mitigation: 'Configure email provider before launching email automation',
+      });
+    }
+  }
+  if (!competitorData?.directCompetitors?.length) {
+    risks.push({
+      risk: 'Competitor blind spot',
+      cause: 'No competitor intelligence data available for competitive positioning',
+      evidence: 'competitor_intelligence',
+      likelihoodLevel: 'medium',
+      impactLevel: 'medium',
+      mitigation: 'Run competitor analysis to identify market positioning gaps',
+    });
+  }
+  if (risks.length > 0) {
+    plan.risks = risks;
   }
 
   // === EVIDENCE VALIDATION ===

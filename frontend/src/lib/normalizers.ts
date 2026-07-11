@@ -119,6 +119,7 @@ export const asInsight = (value: any, fallbackTitle?: string) => {
 };
 
 export const asNumber = (value: any, fallback = null) => {
+  if (value === null || value === undefined) return fallback;
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 };

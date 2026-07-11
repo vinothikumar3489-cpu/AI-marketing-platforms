@@ -639,26 +639,28 @@ function isStopWord(word) {
 function calculatePlatformScores(data) {
   console.log('📊 [Platform Scores] Calculating individual platform visibility...');
 
-  const overall = Math.round(
-    (data.entities.score * 0.25) +
-    (data.knowledgeGraphReadiness.score * 0.20) +
-    (data.answerability.score * 0.25) +
-    (data.citationReadiness.score * 0.15) +
-    (data.topicalAuthority.score * 0.15)
-  );
+  // Platform-specific scores require API keys (GROQ + DataForSEO/Exa/Tavily).
+  // When unavailable, return null for aggregate scores to avoid fabricated metrics.
+  const platformApisAvailable = !!(GROQ_API_KEY || TAVILY_API_KEY || EXA_API_KEY);
 
   return {
-    overall,
+    overall: platformApisAvailable ? Math.round(
+      (data.entities.score * 0.25) +
+      (data.knowledgeGraphReadiness.score * 0.20) +
+      (data.answerability.score * 0.25) +
+      (data.citationReadiness.score * 0.15) +
+      (data.topicalAuthority.score * 0.15)
+    ) : null,
     chatgpt: 'Not measured',
     gemini: 'Not measured',
     claude: 'Not measured',
     perplexity: 'Not measured',
-    googleAiOverview: Math.round(
+    googleAiOverview: platformApisAvailable ? Math.round(
       (data.knowledgeGraphReadiness.score * 0.35) +
       (data.entities.score * 0.25) +
       (data.answerability.score * 0.25) +
       (data.citationReadiness.score * 0.15)
-    )
+    ) : null
   };
 }
 
@@ -938,17 +940,17 @@ function generateFallbackGeoIntelligence(productName, industry) {
   console.log('🔄 [Fallback] Generating fallback GEO intelligence...');
 
   return {
-    aiVisibilityScore: 0,
-    chatGptScore: 0,
-    geminiScore: 0,
-    claudeScore: 0,
-    perplexityScore: 0,
-    googleAiOverviewScore: 0,
-    entityCoverageScore: 0,
-    knowledgeGraphReadinessScore: 0,
-    citationReadinessScore: 0,
-    answerabilityScore: 0,
-    topicalAuthorityScore: 0,
+    aiVisibilityScore: null,
+    chatGptScore: 'Not measured',
+    geminiScore: 'Not measured',
+    claudeScore: 'Not measured',
+    perplexityScore: 'Not measured',
+    googleAiOverviewScore: 'Not measured',
+    entityCoverageScore: null,
+    knowledgeGraphReadinessScore: null,
+    citationReadinessScore: null,
+    answerabilityScore: null,
+    topicalAuthorityScore: null,
     entities: [
       { entity: productName, type: 'product', context: 'Primary product' }
     ],

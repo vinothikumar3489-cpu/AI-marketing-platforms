@@ -270,3 +270,32 @@ export async function generateExecutionModule(chatId: string, module: string) {
 export async function getExecutionData(chatId: string) {
   return api.get<{ success: boolean; exists: boolean; data: any }>(`/automation/${chatId}/execution`);
 }
+
+// ============================================
+// CONTENT STUDIO API (Phases 1–10)
+// ============================================
+
+export async function getContentBrief(chatId: string, signal?: AbortSignal) {
+  return api.get<any>(`/automation/${chatId}/content-brief`, signal);
+}
+
+export async function generateContentItem(chatId: string, contentType: string, signal?: AbortSignal) {
+  return api.post<any>(`/automation/${chatId}/content`, { contentType }, signal);
+}
+
+export async function generateContentPlan(chatId: string, types?: string[], signal?: AbortSignal) {
+  return api.post<any>(`/automation/${chatId}/content/plan`, { types }, signal);
+}
+
+export async function getContentAssets(chatId: string, type?: string, signal?: AbortSignal) {
+  const query = type ? `?type=${type}` : '';
+  return api.get<any>(`/automation/${chatId}/content/assets${query}`, signal);
+}
+
+export async function getAssetVersionHistory(assetId: string, signal?: AbortSignal) {
+  return api.get<any>(`/automation/content/assets/${assetId}/versions`, signal);
+}
+
+export async function regenerateContentAsset(assetId: string, signal?: AbortSignal) {
+  return api.post<any>(`/automation/content/assets/${assetId}/regenerate`, {}, signal);
+}

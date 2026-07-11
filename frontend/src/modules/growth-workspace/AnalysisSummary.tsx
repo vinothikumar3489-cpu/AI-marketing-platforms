@@ -5,7 +5,7 @@ import { TrendingUp, Target, AlertTriangle, Sparkles } from 'lucide-react';
 
 interface AnalysisSummaryProps {
   summary: {
-    overallGrowthScore: number;
+    overallGrowthScore: number | null;
     bestChannel: string;
     topOpportunity: string;
     topRisk: string;
@@ -17,14 +17,16 @@ interface AnalysisSummaryProps {
 export function AnalysisSummary({ summary }: AnalysisSummaryProps) {
   const { overallGrowthScore, bestChannel, topOpportunity, topRisk, nextAction } = summary;
 
-  const getScoreColor = (score: number) => {
+  const getScoreColor = (score: number | null) => {
+    if (score == null) return 'text-gray-400';
     if (score >= 80) return 'text-green-400';
     if (score >= 60) return 'text-blue-400';
     if (score >= 40) return 'text-yellow-400';
     return 'text-red-400';
   };
 
-  const getScoreLabel = (score: number) => {
+  const getScoreLabel = (score: number | null) => {
+    if (score == null) return 'Not measured';
     if (score >= 80) return 'Excellent';
     if (score >= 60) return 'Good';
     if (score >= 40) return 'Fair';
@@ -46,10 +48,10 @@ export function AnalysisSummary({ summary }: AnalysisSummaryProps) {
             <CardContent className="p-4">
               <div className="text-xs text-muted-foreground mb-2">Overall Growth Score</div>
               <div className={`text-3xl font-display font-bold ${getScoreColor(overallGrowthScore)}`}>
-                {overallGrowthScore}
-                <span className="text-lg text-muted-foreground">/100</span>
+                {overallGrowthScore != null ? overallGrowthScore : '—'}
+                {overallGrowthScore != null && <span className="text-lg text-muted-foreground">/100</span>}
               </div>
-              <Progress value={overallGrowthScore} className="mt-3 h-2" />
+              {overallGrowthScore != null && <Progress value={overallGrowthScore} className="mt-3 h-2" />}
               <Badge variant="outline" className="mt-2 text-xs">
                 {getScoreLabel(overallGrowthScore)}
               </Badge>

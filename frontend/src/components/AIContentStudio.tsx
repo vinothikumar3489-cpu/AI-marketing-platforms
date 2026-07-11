@@ -1,39 +1,24 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  AlertTriangle, CheckCircle2, Lightbulb, Zap, Target, TrendingUp, Shield,
-  ChevronDown, ChevronUp, Info, X, Search, Copy, Download, Share2,
-  Clock, FileText, BarChart2, Activity, Users, Building, Code, DollarSign,
-  ExternalLink, Flag, Calendar, UserCheck, Layers, Sliders, Eye,
-  ArrowUpRight, ArrowDownRight, ArrowRight, GripHorizontal, Star, Flame,
-  Filter, Globe, Map, Briefcase, Loader2, Sparkles, Link, Plus, Check,
-  MoreHorizontal, Edit3, MessageSquare, Bell, Pin, Trash2, ThumbsUp,
-  ThumbsDown, HelpCircle, User, List, Grid, Maximize2, Minimize2,
-  Keyboard, Command, CheckSquare, Square, LayoutDashboard, RefreshCw,
-  Send, Image, Video, Music, PenTool, Megaphone, BookOpen, Mail,
-  Hash, AtSign, Quote, ArrowLeft, ArrowRight as ArrowRightIcon,
-  AlignLeft, AlignCenter, AlignJustify, Bold, Italic, Underline,
-  Type, Heading1, Heading2, ListOrdered, List as ListIcon,
-  Table, ImagePlus, Upload, FolderOpen, Save, Printer,
-  FileDown, FileUp, Clipboard, ClipboardCheck,
-  Settings, SlidersHorizontal, PanelRightOpen, PanelRightClose,
-  Radio, RadioTower, Waypoints, ScrollText, NotepadText,
-  CalendarDays, CalendarCheck, CalendarRange, ChartNoAxesCombined,
-  FolderKanban, CheckCheck, Bookmark, BookmarkCheck,
-  CircleCheckBig, CircleDashed, CircleDot, CircleOff,
-  Speech, TextSelect, WholeWord, Wifi, Monitor,
-  Eraser, EyeOff, Gavel
+  AlertTriangle, CheckCircle2, Loader2, BookOpen, Mail, RadioTower,
+  PenTool, Video, Megaphone, FolderOpen, Search, X, Trash2, ExternalLink,
+  RefreshCw, History, Eye, ChevronDown, ChevronUp, Shield, Sparkles,
+  Target, Wifi, Clock, FileText, Quote, Hash, Twitter, Globe, Camera,
+  Youtube, Instagram, Facebook, Linkedin, HelpCircle, Info, Copy, Save,
+  Layers, BarChart2, FileDown, List, Grid, Tag
 } from 'lucide-react';
-import {
-  ProgressBar, StatusBadge, ConfidenceBadge, PriorityChip, EnterpriseInsightCard,
-  KPIDashboard, MiniRadarLegend, EnterpriseEmptyState, SmartNavigation,
-  SearchBar, LoadingSkeleton
-} from './EnterpriseComponents';
-import { Badge, Card, EmptyState, Loading, PageHeader, ScoreCard, SectionTitle, EvidenceBadge } from './UI';
+import { Badge, Card, EmptyState, Loading, PageHeader, ScoreCard } from './UI';
 import { useWorkspaceMemory } from './EnterpriseDecisionSuite';
-import { api, getEvidenceContext, generateExecutionModule, getExecutionData } from '../lib/api';
+import {
+  api, getEvidenceContext, getContentBrief, generateContentItem,
+  generateContentPlan, getContentAssets, getAssetVersionHistory,
+  regenerateContentAsset, getIntegrationHealth
+} from '../lib/api';
 import { useProject } from '../context/ProjectContext';
-import { asArray, asText, asNumber, renderSafeValue } from '../lib/normalizers';
-import { getIntegrationHealth, sendTestEmail, generatePosterImage, renderVideo } from '../lib/api';
+
+// ============================================
+// CONSTANTS
+// ============================================
 
 const C = {
   excellent: '#10e18b', good: '#53a7ff', needsImprovement: '#ffb347',
@@ -46,782 +31,677 @@ const C = {
 const S = {
   card: { background: C.card, borderRadius: '12px', border: `1px solid ${C.border}`, padding: '20px' },
   cardHeader: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' },
-  cardTitle: { fontSize: '15px', fontWeight: 600, color: C.text, flex: 1 },
+  cardTitle: { fontSize: '15px', fontWeight: 600, color: C.text, flex: 1, minWidth: 0, overflowWrap: 'anywhere' as const },
   flexCenter: { display: 'flex', alignItems: 'center', gap: '8px' },
   grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' },
   grid3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' },
-  grid4: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '14px' },
-  input: { width: '100%', padding: '8px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.text, fontSize: '13px', outline: 'none' },
-  btn: (color: string) => ({ padding: '6px 14px', borderRadius: '6px', border: `1px solid ${color}`, background: `${color}15`, cursor: 'pointer', fontSize: '11px', fontWeight: 600, color, display: 'inline-flex', alignItems: 'center', gap: '4px' }),
+  gridAuto: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '14px' },
+  input: { width: '100%', padding: '8px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.text, fontSize: '13px', outline: 'none', minWidth: 0, boxSizing: 'border-box' as const },
+  btn: (color: string) => ({ padding: '6px 14px', borderRadius: '6px', border: `1px solid ${color}`, background: `${color}15`, cursor: 'pointer', fontSize: '11px', fontWeight: 600, color, display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }),
   tag: (color: string) => ({ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, background: `${color}15`, color }),
-  row: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: C.bg, borderRadius: '8px', border: `1px solid #1d2738` },
+  row: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: C.bg, borderRadius: '8px', border: `1px solid #1d2738`, minWidth: 0 },
+  scrollY: { maxHeight: '400px', overflowY: 'auto' as const, overflowX: 'hidden' as const },
+  previewBox: { padding: '12px', background: C.bg, borderRadius: '8px', fontSize: '13px', color: C.muted, lineHeight: 1.6, maxHeight: '500px', overflowY: 'auto' as const, overflowX: 'hidden' as const, minWidth: 0, wordBreak: 'break-word' as const, whiteSpace: 'pre-wrap' as const },
 };
 
-function generateId(): string { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
-function now(): string { return new Date().toISOString(); }
+// Must match backend content-studio.service.js CONTENT_TYPES keys
+const CONTENT_TYPES = [
+  { value: 'blog_article', label: 'Blog Article', icon: FileText, group: 'long-form' },
+  { value: 'faq_page', label: 'FAQ Page', icon: HelpCircle, group: 'long-form' },
+  { value: 'landing_page', label: 'Landing Page', icon: Globe, group: 'long-form' },
+  { value: 'product_page', label: 'Product Page', icon: Tag, group: 'long-form' },
+  { value: 'comparison_page', label: 'Comparison Page', icon: BarChart2, group: 'long-form' },
+  { value: 'feature_announcement', label: 'Feature Announcement', icon: Megaphone, group: 'long-form' },
+  { value: 'whitepaper', label: 'Whitepaper', icon: BookOpen, group: 'long-form' },
+  { value: 'linkedin_post', label: 'LinkedIn Post', icon: Linkedin, group: 'social' },
+  { value: 'instagram_post', label: 'Instagram Post', icon: Instagram, group: 'social' },
+  { value: 'twitter_post', label: 'X (Twitter) Post', icon: Twitter, group: 'social' },
+  { value: 'facebook_post', label: 'Facebook Post', icon: Facebook, group: 'social' },
+  { value: 'youtube_description', label: 'YouTube Description', icon: Youtube, group: 'social' },
+  { value: 'email_copy', label: 'Email Copy', icon: Mail, group: 'email' },
+  { value: 'creative_brief', label: 'Creative Brief', icon: PenTool, group: 'brief' },
+  { value: 'video_script', label: 'Video Script', icon: Camera, group: 'brief' },
+] as const;
+
+type ContentType = typeof CONTENT_TYPES[number]['value'];
+const CONTENT_TYPE_VALUES = CONTENT_TYPES.map(t => t.value);
+
+function isValidContentType(v: string): v is ContentType {
+  return CONTENT_TYPE_VALUES.includes(v as ContentType);
+}
 
 // ============================================
-// EVIDENCE PANEL
+// HELPERS
 // ============================================
 
-function EvidencePanel({ context }: { context: any }) {
-  if (!context) return null;
-  const { website, product, audience, seo, sourceSummary } = context;
-  const hasData = website?.heroText || product?.features?.length > 0 || audience?.painPoints?.length > 0 || seo?.issues?.length > 0;
+function renderVal(v: unknown): string {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) return v.map(renderVal).filter(Boolean).join(', ');
+  if (typeof v === 'object') {
+    const obj = v as Record<string, unknown>;
+    return Object.values(obj).map(renderVal).filter(Boolean).join(', ');
+  }
+  return String(v);
+}
+
+function toText(v: unknown, fallback = ''): string {
+  if (v === null || v === undefined) return fallback;
+  if (typeof v === 'string') return v.trim() || fallback;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) {
+    const items = v.map(i => toText(i, '')).filter(Boolean);
+    return items.length > 0 ? items.join(', ') : fallback;
+  }
+  if (typeof v === 'object') {
+    const obj = v as Record<string, unknown>;
+    return toText(obj.title || obj.name || obj.label || obj.text || obj.headline || obj.description || obj.summary || '', fallback);
+  }
+  return fallback;
+}
+
+function statusColor(s: string): string {
+  if (s === 'passed') return C.excellent;
+  if (s === 'needs_review') return C.needsImprovement;
+  if (s === 'blocked') return C.critical;
+  if (s === 'draft') return C.needsImprovement;
+  if (s === 'approved') return C.excellent;
+  if (s === 'generation_failed') return C.critical;
+  return C.dim;
+}
+
+const CONTENT_GROUP_LABELS: Record<string, string> = {
+  'long-form': 'Long-Form Content',
+  'social': 'Social Media',
+  'email': 'Email',
+  'brief': 'Briefs & Scripts',
+};
+
+// ============================================
+// STAGE A — CONTENT BRIEF
+// ============================================
+
+function ContentBriefPanel({ brief, loading }: { brief: any; loading: boolean }) {
+  if (loading) {
+    return (
+      <div style={S.card}>
+        <div style={S.cardHeader}><Target size={18} style={{ color: C.brand }} /><span style={S.cardTitle}>Content Brief</span></div>
+        <div style={{ padding: '20px', textAlign: 'center', color: C.muted, fontSize: '12px' }}><Loader2 className="spin" size={16} /> Loading brief...</div>
+      </div>
+    );
+  }
+
+  if (!brief) return null;
+
+  const hasData = brief.product?.name || brief.company?.name || brief.targetPersonas?.length > 0;
+
+  if (!hasData) {
+    return (
+      <div style={S.card}>
+        <div style={S.cardHeader}><Target size={18} style={{ color: C.needsImprovement }} /><span style={S.cardTitle}>Content Brief</span></div>
+        <div style={{ padding: '16px', textAlign: 'center', color: C.muted, fontSize: '12px', background: 'rgba(255,179,71,0.08)', borderRadius: '8px', border: '1px solid rgba(255,179,71,0.2)' }}>
+          <AlertTriangle size={20} style={{ marginBottom: '8px', color: C.needsImprovement }} />
+          <div>Run product analysis with a website URL first to generate a content brief.</div>
+        </div>
+      </div>
+    );
+  }
+
+  const sections: Array<{ label: string; items: Array<{ key: string; val: string; color?: string }> }> = [
+    {
+      label: 'Company & Product',
+      items: [
+        { key: 'Company', val: toText(brief.company?.name) },
+        { key: 'Industry', val: toText(brief.company?.industry) },
+        { key: 'Product', val: toText(brief.product?.name) },
+        { key: 'Summary', val: toText(brief.product?.summary) },
+        { key: 'USP', val: toText(brief.product?.usp) },
+        { key: 'Features', val: (brief.product?.features || []).slice(0, 6).join(', ') },
+      ],
+    },
+    {
+      label: 'Audience',
+      items: [
+        { key: 'Personas', val: (brief.targetPersonas || []).map((p: any) => p.name).filter(Boolean).join(', ') },
+        { key: 'Pain Points', val: (brief.painPoints || []).slice(0, 5).join(', ') },
+        { key: 'Objections', val: (brief.objections || []).slice(0, 3).join(', ') },
+      ],
+    },
+    {
+      label: 'SEO & Content',
+      items: [
+        { key: 'Keywords', val: (brief.verifiedKeywords || []).map((k: any) => k.keyword).filter(Boolean).slice(0, 8).join(', ') },
+        { key: 'Topic Ideas', val: (brief.topicIdeas || []).map((t: any) => t.topic).filter(Boolean).slice(0, 4).join(', ') },
+        { key: 'Content Gaps', val: (brief.contentGaps || []).slice(0, 4).join(', ') },
+        { key: 'CTAs', val: (brief.CTA || []).join(', ') },
+      ],
+    },
+    {
+      label: 'Competitors',
+      items: [
+        { key: 'Validated', val: (brief.validatedCompetitors || []).map((c: any) => c.name).filter(Boolean).join(', ') },
+      ],
+    },
+  ];
 
   return (
-    <div style={{ ...S.card, marginBottom: '16px' }}>
-      <div style={S.cardHeader}><Target size={18} style={{ color: C.excellent }} /><span style={S.cardTitle}>Evidence-Backed Product Data</span></div>
-      {!hasData ? (
-        <div style={{ fontSize: '12px', color: C.needsImprovement, padding: '8px', background: C.bg, borderRadius: '6px' }}>
-          No evidence data available. Run product analysis with a website URL first.
+    <div style={S.card}>
+      <div style={S.cardHeader}><Target size={18} style={{ color: C.brand }} /><span style={S.cardTitle}>Content Brief</span></div>
+      {brief.limitations?.length > 0 && (
+        <div style={{ marginBottom: '12px', padding: '8px 12px', background: 'rgba(255,179,71,0.08)', borderRadius: '6px', border: '1px solid rgba(255,179,71,0.2)', fontSize: '11px', color: C.needsImprovement, display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+          <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '1px' }} />
+          <span>Evidence limitations: {brief.limitations.join('; ')}</span>
         </div>
-      ) : (
-        <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
-          {website?.heroText && (
-            <div style={{ padding: '8px', background: C.bg, borderRadius: '6px' }}>
-              <div style={{ fontSize: '10px', color: C.accent, fontWeight: 600, marginBottom: '2px' }}>HERO TEXT</div>
-              <div style={{ fontSize: '11px', color: C.muted }}>{renderSafeValue(website.heroText)}</div>
+      )}
+      <div style={{ display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+        {sections.map(section => {
+          const hasVal = section.items.some(i => i.val);
+          if (!hasVal) return null;
+          return (
+            <div key={section.label} style={{ padding: '10px', background: C.bg, borderRadius: '8px', border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: '10px', fontWeight: 700, color: C.accent, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>{section.label}</div>
+              {section.items.map(item => item.val ? (
+                <div key={item.key} style={{ marginBottom: '6px', fontSize: '11px', minWidth: 0 }}>
+                  <span style={{ color: C.dim, fontWeight: 500, display: 'block', marginBottom: '1px' }}>{item.key}</span>
+                  <span style={{ color: C.text, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{item.val}</span>
+                </div>
+              ) : null)}
             </div>
-          )}
-          {website?.ctaTexts?.length > 0 && (
-            <div style={{ padding: '8px', background: C.bg, borderRadius: '6px' }}>
-              <div style={{ fontSize: '10px', color: C.accent, fontWeight: 600, marginBottom: '2px' }}>CTAs</div>
-              {website.ctaTexts.map((cta: string, i: number) => (
-                <div key={i} style={{ fontSize: '11px', color: C.excellent, marginBottom: '2px' }}>{renderSafeValue(cta)}</div>
-              ))}
-            </div>
-          )}
-          {audience?.painPoints?.length > 0 && (
-            <div style={{ padding: '8px', background: C.bg, borderRadius: '6px' }}>
-              <div style={{ fontSize: '10px', color: C.accent, fontWeight: 600, marginBottom: '2px' }}>PAIN POINTS</div>
-              {audience.painPoints.slice(0, 3).map((p: string, i: number) => (
-                <div key={i} style={{ fontSize: '11px', color: C.muted }}>• {renderSafeValue(p)}</div>
-              ))}
-            </div>
-          )}
-          {seo?.issues?.length > 0 && (
-            <div style={{ padding: '8px', background: C.bg, borderRadius: '6px' }}>
-              <div style={{ fontSize: '10px', color: C.accent, fontWeight: 600, marginBottom: '2px' }}>SEO ISSUES</div>
-              <div style={{ fontSize: '11px', color: C.needsImprovement }}>{seo.issues.length} technical issues found</div>
-            </div>
-          )}
-          <div style={{ padding: '8px', background: C.bg, borderRadius: '6px' }}>
-            <div style={{ fontSize: '10px', color: C.accent, fontWeight: 600, marginBottom: '2px' }}>SOURCES</div>
-            <div style={{ fontSize: '11px', color: C.muted }}>
-              {sourceSummary?.sourcesCollected?.length > 0
-                ? sourceSummary.sourcesCollected.join(', ')
-                : 'No data sources connected'}
-            </div>
-          </div>
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 // ============================================
-// CONTENT STUDIO
+// STAGE B — GENERATOR
 // ============================================
 
-const contentTypes = [
-  { value: 'blog-article', label: 'Blog Article' },
-  { value: 'landing-page', label: 'Landing Page' },
-  { value: 'faq-page', label: 'FAQ Page' },
-  { value: 'whitepaper-outline', label: 'Whitepaper Outline' },
-  { value: 'case-study', label: 'Case Study' },
-  { value: 'feature-announcement', label: 'Feature Announcement' },
-  { value: 'comparison-page', label: 'Comparison Page' },
-  { value: 'linkedin-article', label: 'LinkedIn Article' },
-];
+const TYPE_GROUPS = ['long-form', 'social', 'email', 'brief'] as const;
 
-export function ContentStudio({ context, onSave }: { context: any; onSave: (asset: any) => void }) {
-  const { selectedChatId } = useProject();
-  const [type, setType] = useState('blog-article');
-  const [topic, setTopic] = useState('');
-  const [audience, setAudience] = useState('');
-  const [tone, setTone] = useState('professional');
-  const [goal, setGoal] = useState('inform');
-  const [generating, setGenerating] = useState(false);
-  const [asset, setAsset] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleGenerate = async () => {
-    if (!topic.trim() || !selectedChatId) return;
-    setGenerating(true);
-    setError(null);
-    try {
-      const result = await generateExecutionModule(selectedChatId, 'content-studio');
-      if (result?.success && result?.data) {
-        const generated = {
-          id: generateId(),
-          type: 'content',
-          subType: type,
-          title: topic,
-          content: result.data,
-          topic,
-          audience,
-          tone,
-          goal,
-          generatedAt: now(),
-          approvalStatus: 'draft' as const,
-          confidence: null,
-        };
-        setAsset(generated);
-        onSave(generated);
-      } else {
-        setError('Content generation returned no data. Ensure analysis is complete first.');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate content. Check backend connection.');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const tones = ['professional', 'conversational', 'persuasive', 'educational', 'inspirational'];
-  const goals = ['inform', 'convert', 'engage', 'educate', 'inspire'];
-
-  return (
-    <div style={{ display: 'grid', gap: '16px' }}>
-      <div style={S.card}>
-        <div style={S.cardHeader}><BookOpen size={18} style={{ color: C.brand }} /><span style={S.cardTitle}>Content Generator</span></div>
-        <div style={{ display: 'grid', gap: '12px', gridTemplateColumns: '1fr 1fr' }}>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600, marginBottom: '4px', display: 'block' }}>Asset Type</label>
-            <select value={type} onChange={e => setType(e.target.value)} style={S.input}>
-              {contentTypes.map(ct => <option key={ct.value} value={ct.value}>{ct.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600, marginBottom: '4px', display: 'block' }}>Tone</label>
-            <select value={tone} onChange={e => setTone(e.target.value)} style={S.input}>
-              {tones.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
-            </select>
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600, marginBottom: '4px', display: 'block' }}>Topic *</label>
-            <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="e.g., How AI is transforming marketing automation" style={S.input} />
-          </div>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600, marginBottom: '4px', display: 'block' }}>Target Audience</label>
-            <input value={audience} onChange={e => setAudience(e.target.value)} placeholder="e.g., B2B marketers, SaaS founders" style={S.input} />
-          </div>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600, marginBottom: '4px', display: 'block' }}>Goal</label>
-            <select value={goal} onChange={e => setGoal(e.target.value)} style={S.input}>
-              {goals.map(g => <option key={g} value={g}>{g.charAt(0).toUpperCase() + g.slice(1)}</option>)}
-            </select>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap' }}>
-          <button onClick={handleGenerate} disabled={generating || !topic.trim()} style={{ ...S.btn(C.brand), padding: '8px 20px' }}>
-            {generating ? <><Loader2 className="spin" size={14} /> Generating...</> : <><Sparkles size={14} /> Generate Content</>}
-          </button>
-        </div>
-      </div>
-
-      {generating && <div style={S.card}><LoadingSkeleton type="card" count={2} /></div>}
-
-      {error && (
-        <div style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '11px', background: 'rgba(255,71,87,0.08)', border: '1px solid rgba(255,71,87,0.2)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <AlertTriangle size={14} style={{ color: C.critical }} /> {error}
-        </div>
-      )}
-
-      {asset && !generating && !error && (
-        <div style={S.card}>
-          <div style={{ fontSize: '16px', fontWeight: 700, color: C.text, marginBottom: '8px' }}>{asset.title}</div>
-          <div style={{ fontSize: '12px', color: C.muted, lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: '500px', overflow: 'auto', padding: '12px', background: C.bg, borderRadius: '8px' }}>
-            {JSON.stringify(asset.content, null, 2)}
-          </div>
-          <div style={{ marginTop: '8px', fontSize: '10px', color: C.dim }}>
-            Generated using {context?.sourceSummary?.sourcesCollected?.length || 0} evidence sources
-          </div>
-        </div>
-      )}
-
-      {!asset && !generating && !error && (
-        <div style={{ textAlign: 'center', padding: '40px', color: C.muted, fontSize: '13px', background: C.card, borderRadius: '12px', border: `1px solid ${C.border}` }}>
-          <BookOpen size={32} style={{ opacity: 0.3, marginBottom: '12px' }} />
-          <div>Enter a topic and click Generate to create content backed by product evidence.</div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================
-// EMAIL CAMPAIGN STUDIO
-// ============================================
-
-const emailTypes = [
-  { value: 'cold-outreach', label: 'Cold Outreach' },
-  { value: 'follow-up', label: 'Follow-Up Sequence' },
-  { value: 'demo-request', label: 'Demo Request' },
-  { value: 'onboarding', label: 'Customer Onboarding' },
-  { value: 'retention', label: 'Customer Retention' },
-  { value: 're-engagement', label: 'Re-engagement' },
-  { value: 'newsletter', label: 'Newsletter' },
-];
-
-export function EmailStudio({ context, onSave }: { context: any; onSave: (asset: any) => void }) {
-  const { selectedChatId } = useProject();
-  const [type, setType] = useState('cold-outreach');
-  const [persona, setPersona] = useState('');
-  const [tone, setTone] = useState('professional');
-  const [subject, setSubject] = useState('');
-  const [generating, setGenerating] = useState(false);
-  const [asset, setAsset] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleGenerate = async () => {
-    if (!selectedChatId) return;
-    setGenerating(true);
-    setError(null);
-    try {
-      const result = await generateExecutionModule(selectedChatId, 'email-campaigns');
-      if (result?.success && result?.data) {
-        const generated = {
-          id: generateId(),
-          type: 'email',
-          subType: type,
-          title: subject || `${type} Email`,
-          content: result.data,
-          targetAudience: persona,
-          tone,
-          generatedAt: now(),
-          approvalStatus: 'draft' as const,
-          confidence: null,
-        };
-        setAsset(generated);
-        onSave(generated);
-      } else {
-        setError('Email generation returned no data.');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate email.');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  return (
-    <div style={{ display: 'grid', gap: '16px' }}>
-      <div style={{ ...S.card, background: 'rgba(255,179,71,0.05)', border: '1px solid rgba(255,179,71,0.3)' }}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <Shield size={16} style={{ color: C.needsImprovement }} />
-          <div style={{ fontSize: '12px', color: C.needsImprovement }}>Email Compliance Notice: Review CAN-SPAM, GDPR, and CASL before sending. All emails are drafts requiring manual approval.</div>
-        </div>
-      </div>
-      <div style={S.card}>
-        <div style={S.cardHeader}><Mail size={18} style={{ color: C.brand }} /><span style={S.cardTitle}>Email Campaign Generator</span></div>
-        <div style={{ display: 'grid', gap: '12px', gridTemplateColumns: '1fr 1fr' }}>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600, marginBottom: '4px', display: 'block' }}>Email Type</label>
-            <select value={type} onChange={e => setType(e.target.value)} style={S.input}>
-              {emailTypes.map(et => <option key={et.value} value={et.value}>{et.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600, marginBottom: '4px', display: 'block' }}>Tone</label>
-            <select value={tone} onChange={e => setTone(e.target.value)} style={S.input}>
-              <option value="professional">Professional</option><option value="friendly">Friendly</option><option value="formal">Formal</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600, marginBottom: '4px', display: 'block' }}>Target Persona</label>
-            <input value={persona} onChange={e => setPersona(e.target.value)} placeholder="e.g., Marketing Director at SaaS company" style={S.input} />
-          </div>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600, marginBottom: '4px', display: 'block' }}>Subject Line</label>
-            <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Email subject" style={S.input} />
-          </div>
-        </div>
-        <button onClick={handleGenerate} disabled={generating} style={{ ...S.btn(C.brand), padding: '8px 20px', marginTop: '14px' }}>
-          {generating ? <><Loader2 className="spin" size={14} /> Generating...</> : <><Sparkles size={14} /> Generate Email</>}
-        </button>
-      </div>
-
-      {generating && <div style={S.card}><LoadingSkeleton type="card" count={2} /></div>}
-      {error && <div style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '11px', background: 'rgba(255,71,87,0.08)', border: '1px solid rgba(255,71,87,0.2)', display: 'flex', alignItems: 'center', gap: '6px' }}><AlertTriangle size={14} style={{ color: C.critical }} /> {error}</div>}
-
-      {asset && !generating && !error && (
-        <div style={S.card}>
-          <div style={{ fontSize: '15px', fontWeight: 700, color: C.text, marginBottom: '8px' }}>{asset.title}</div>
-          <div style={{ fontSize: '12px', color: C.muted, lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: '500px', overflow: 'auto', padding: '12px', background: C.bg, borderRadius: '8px' }}>
-            {JSON.stringify(asset.content, null, 2)}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================
-// SOCIAL MEDIA STUDIO
-// ============================================
-
-export function SocialStudio({ context, onSave }: { context: any; onSave: (asset: any) => void }) {
-  const { selectedChatId } = useProject();
-  const [platform, setPlatform] = useState('linkedin');
-  const [goal, setGoal] = useState('awareness');
-  const [topic, setTopic] = useState('');
-  const [generating, setGenerating] = useState(false);
-  const [assets, setAssets] = useState<any[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleGenerate = async () => {
-    if (!selectedChatId || !topic.trim()) return;
-    setGenerating(true);
-    setError(null);
-    try {
-      const result = await generateExecutionModule(selectedChatId, 'social-calendars');
-      if (result?.success && result?.data) {
-        const generated = {
-          id: generateId(),
-          type: 'social',
-          subType: platform,
-          title: `${platform} post: ${topic}`,
-          content: result.data,
-          goal,
-          generatedAt: now(),
-          approvalStatus: 'draft' as const,
-          confidence: null,
-        };
-        setAssets([generated]);
-        onSave(generated);
-      } else {
-        setError('Social content generation returned no data.');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate social content.');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  return (
-    <div style={{ display: 'grid', gap: '16px' }}>
-      <div style={S.card}>
-        <div style={S.cardHeader}><RadioTower size={18} style={{ color: C.brand }} /><span style={S.cardTitle}>Social Media Content Generator</span></div>
-        <div style={{ display: 'grid', gap: '12px', gridTemplateColumns: '1fr 1fr 1fr' }}>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600, marginBottom: '4px', display: 'block' }}>Platform</label>
-            <select value={platform} onChange={e => setPlatform(e.target.value)} style={S.input}>
-              <option value="linkedin">LinkedIn</option>
-              <option value="instagram">Instagram</option>
-              <option value="facebook">Facebook</option>
-              <option value="twitter">X / Twitter</option>
-              <option value="tiktok">TikTok Caption</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600, marginBottom: '4px', display: 'block' }}>Goal</label>
-            <select value={goal} onChange={e => setGoal(e.target.value)} style={S.input}>
-              <option value="awareness">Awareness</option>
-              <option value="engagement">Engagement</option>
-              <option value="conversion">Conversion</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600, marginBottom: '4px', display: 'block' }}>Topic</label>
-            <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="What's your post about?" style={S.input} />
-          </div>
-        </div>
-        <button onClick={handleGenerate} disabled={generating || !topic.trim()} style={{ ...S.btn(C.brand), padding: '8px 20px', marginTop: '14px' }}>
-          {generating ? <><Loader2 className="spin" size={14} /> Generating...</> : <><Sparkles size={14} /> Generate Social Post</>}
-        </button>
-      </div>
-
-      {generating && <div style={S.card}><LoadingSkeleton type="card" count={2} /></div>}
-      {error && <div style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '11px', background: 'rgba(255,71,87,0.08)', border: '1px solid rgba(255,71,87,0.2)', display: 'flex', alignItems: 'center', gap: '6px' }}><AlertTriangle size={14} style={{ color: C.critical }} /> {error}</div>}
-
-      {assets.length > 0 && !generating && !error && assets.map(a => (
-        <div key={a.id} style={S.card}>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: C.text, marginBottom: '8px' }}>{a.title}</div>
-          <div style={{ fontSize: '12px', color: C.muted, lineHeight: 1.6, whiteSpace: 'pre-wrap', padding: '8px', background: C.bg, borderRadius: '6px', maxHeight: '300px', overflow: 'auto' }}>
-            {JSON.stringify(a.content, null, 2)}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ============================================
-// CREATIVE STUDIO
-// ============================================
-
-export function CreativeStudio({ context, onSave }: { context: any; onSave: (asset: any) => void }) {
-  const { selectedChatId } = useProject();
-  const [type, setType] = useState('poster');
-  const [platform, setPlatform] = useState('social');
-  const [headline, setHeadline] = useState('');
-  const [generating, setGenerating] = useState(false);
-  const [asset, setAsset] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleGenerate = async () => {
-    if (!selectedChatId) return;
-    setGenerating(true);
-    setError(null);
-    try {
-      const result = await generateExecutionModule(selectedChatId, 'creative-studio');
-      if (result?.success && result?.data) {
-        const generated = {
-          id: generateId(),
-          type: 'creative',
-          subType: type,
-          title: `${type}: ${headline || 'Creative Asset'}`,
-          content: result.data,
-          generatedAt: now(),
-          approvalStatus: 'draft' as const,
-          confidence: null,
-        };
-        setAsset(generated);
-        onSave(generated);
-      } else {
-        setError('Creative brief generation returned no data.');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate creative brief.');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  return (
-    <div style={{ display: 'grid', gap: '16px' }}>
-      <div style={S.card}>
-        <div style={S.cardHeader}><PenTool size={18} style={{ color: C.brand }} /><span style={S.cardTitle}>Creative Brief Generator</span></div>
-        <div style={{ display: 'grid', gap: '12px', gridTemplateColumns: '1fr 1fr' }}>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600, marginBottom: '4px', display: 'block' }}>Creative Type</label>
-            <select value={type} onChange={e => setType(e.target.value)} style={S.input}>
-              <option value="poster">Poster Brief</option>
-              <option value="banner">Banner Ad</option>
-              <option value="carousel">Carousel</option>
-              <option value="social-graphic">Instagram Creative</option>
-              <option value="display-ad">Display Ad</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600, marginBottom: '4px', display: 'block' }}>Platform</label>
-            <select value={platform} onChange={e => setPlatform(e.target.value)} style={S.input}>
-              <option value="social">Social Media</option>
-              <option value="web">Web</option>
-              <option value="print">Print</option>
-            </select>
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600, marginBottom: '4px', display: 'block' }}>Headline</label>
-            <input value={headline} onChange={e => setHeadline(e.target.value)} placeholder="Main headline for the creative" style={S.input} />
-          </div>
-        </div>
-        <button onClick={handleGenerate} disabled={generating} style={{ ...S.btn(C.brand), padding: '8px 20px', marginTop: '14px' }}>
-          {generating ? <><Loader2 className="spin" size={14} /> Generating...</> : <><Sparkles size={14} /> Generate Creative Brief</>}
-        </button>
-      </div>
-
-      {generating && <div style={S.card}><LoadingSkeleton type="card" count={2} /></div>}
-      {error && <div style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '11px', background: 'rgba(255,71,87,0.08)', border: '1px solid rgba(255,71,87,0.2)', display: 'flex', alignItems: 'center', gap: '6px' }}><AlertTriangle size={14} style={{ color: C.critical }} /> {error}</div>}
-
-      {asset && !generating && !error && (
-        <div style={S.card}>
-          <div style={{ fontSize: '15px', fontWeight: 700, color: C.text, marginBottom: '8px' }}>{asset.title}</div>
-          <div style={{ fontSize: '12px', color: C.muted, lineHeight: 1.6, whiteSpace: 'pre-wrap', padding: '12px', background: C.bg, borderRadius: '8px', maxHeight: '500px', overflow: 'auto' }}>
-            {JSON.stringify(asset.content, null, 2)}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================
-// VIDEO STUDIO
-// ============================================
-
-export function VideoStudio({ context, onSave }: { context: any; onSave: (asset: any) => void }) {
-  const { selectedChatId } = useProject();
-  const [type, setType] = useState('30s-ad');
-  const [platform, setPlatform] = useState('youtube');
-  const [topic, setTopic] = useState('');
-  const [generating, setGenerating] = useState(false);
-  const [asset, setAsset] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleGenerate = async () => {
-    if (!selectedChatId || !topic.trim()) return;
-    setGenerating(true);
-    setError(null);
-    try {
-      const result = await generateExecutionModule(selectedChatId, 'video-studio');
-      if (result?.success && result?.data) {
-        const generated = {
-          id: generateId(),
-          type: 'video',
-          subType: type,
-          title: `${type} — ${topic}`,
-          content: result.data,
-          generatedAt: now(),
-          approvalStatus: 'draft' as const,
-          confidence: null,
-        };
-        setAsset(generated);
-        onSave(generated);
-      } else {
-        setError('Video script generation returned no data.');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate video script.');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  return (
-    <div style={{ display: 'grid', gap: '16px' }}>
-      <div style={S.card}>
-        <div style={S.cardHeader}><Video size={18} style={{ color: C.brand }} /><span style={S.cardTitle}>Video Script Generator</span></div>
-        <div style={{ display: 'grid', gap: '12px', gridTemplateColumns: '1fr 1fr 1fr' }}>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600 }}>Duration</label>
-            <select value={type} onChange={e => setType(e.target.value)} style={S.input}>
-              <option value="15s-short">15 sec Short Ad</option>
-              <option value="30s-ad">30 sec Ad</option>
-              <option value="60s-ad">60 sec Ad</option>
-              <option value="90s-explainer">90 sec Explainer</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600 }}>Platform</label>
-            <select value={platform} onChange={e => setPlatform(e.target.value)} style={S.input}>
-              <option value="youtube">YouTube</option>
-              <option value="instagram">Instagram</option>
-              <option value="tiktok">TikTok</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600 }}>Topic</label>
-            <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="What's the video about?" style={S.input} />
-          </div>
-        </div>
-        <button onClick={handleGenerate} disabled={generating || !topic.trim()} style={{ ...S.btn(C.brand), padding: '8px 20px', marginTop: '14px' }}>
-          {generating ? <><Loader2 className="spin" size={14} /> Generating Script...</> : <><Sparkles size={14} /> Generate Script</>}
-        </button>
-      </div>
-
-      {generating && <div style={S.card}><LoadingSkeleton type="card" count={2} /></div>}
-      {error && <div style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '11px', background: 'rgba(255,71,87,0.08)', border: '1px solid rgba(255,71,87,0.2)', display: 'flex', alignItems: 'center', gap: '6px' }}><AlertTriangle size={14} style={{ color: C.critical }} /> {error}</div>}
-
-      {asset && !generating && !error && (
-        <div style={S.card}>
-          <div style={{ fontSize: '15px', fontWeight: 700, color: C.text, marginBottom: '8px' }}>{asset.title}</div>
-          <div style={{ fontSize: '12px', color: C.muted, lineHeight: 1.6, whiteSpace: 'pre-wrap', padding: '12px', background: C.bg, borderRadius: '8px', maxHeight: '500px', overflow: 'auto' }}>
-            {JSON.stringify(asset.content, null, 2)}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================
-// CAMPAIGN PLANNER
-// ============================================
-
-export function CampaignPlanner({ context, onSave }: { context: any; onSave: (asset: any) => void }) {
-  const { selectedChatId } = useProject();
-  const [duration, setDuration] = useState('30d');
-  const [name, setName] = useState('');
-  const [goal, setGoal] = useState('');
-  const [generating, setGenerating] = useState(false);
-  const [asset, setAsset] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleGenerate = async () => {
-    if (!selectedChatId) return;
-    setGenerating(true);
-    setError(null);
-    try {
-      const result = await generateExecutionModule(selectedChatId, 'campaign-plans');
-      if (result?.success && result?.data) {
-        const generated = {
-          id: generateId(),
-          type: 'campaign',
-          subType: duration,
-          title: name || `${duration} Campaign Plan`,
-          content: result.data,
-          generatedAt: now(),
-          approvalStatus: 'draft' as const,
-          confidence: null,
-        };
-        setAsset(generated);
-        onSave(generated);
-      } else {
-        setError('Campaign plan generation returned no data.');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate campaign plan.');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  return (
-    <div style={{ display: 'grid', gap: '16px' }}>
-      <div style={S.card}>
-        <div style={S.cardHeader}><Megaphone size={18} style={{ color: C.brand }} /><span style={S.cardTitle}>Campaign Planner</span></div>
-        <div style={{ display: 'grid', gap: '12px', gridTemplateColumns: '1fr 1fr' }}>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600 }}>Campaign Type</label>
-            <select value={duration} onChange={e => setDuration(e.target.value)} style={S.input}>
-              <option value="30d">30-day campaign</option>
-              <option value="60d">60-day campaign</option>
-              <option value="90d">90-day campaign</option>
-              <option value="product-launch">Product launch</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600 }}>Campaign Name</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g., Q3 Product Launch" style={S.input} />
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ fontSize: '11px', color: C.muted, fontWeight: 600 }}>Goal</label>
-            <input value={goal} onChange={e => setGoal(e.target.value)} placeholder="e.g., Generate 100 qualified leads" style={S.input} />
-          </div>
-        </div>
-        <button onClick={handleGenerate} disabled={generating} style={{ ...S.btn(C.brand), padding: '8px 20px', marginTop: '14px' }}>
-          {generating ? <><Loader2 className="spin" size={14} /> Generating Plan...</> : <><Sparkles size={14} /> Generate Campaign Plan</>}
-        </button>
-      </div>
-
-      {generating && <div style={S.card}><LoadingSkeleton type="card" count={2} /></div>}
-      {error && <div style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '11px', background: 'rgba(255,71,87,0.08)', border: '1px solid rgba(255,71,87,0.2)', display: 'flex', alignItems: 'center', gap: '6px' }}><AlertTriangle size={14} style={{ color: C.critical }} /> {error}</div>}
-
-      {asset && !generating && !error && (
-        <div style={S.card}>
-          <div style={{ fontSize: '15px', fontWeight: 700, color: C.text, marginBottom: '8px' }}>{asset.title}</div>
-          <div style={{ fontSize: '12px', color: C.muted, lineHeight: 1.6, whiteSpace: 'pre-wrap', padding: '12px', background: C.bg, borderRadius: '8px', maxHeight: '500px', overflow: 'auto' }}>
-            {JSON.stringify(asset.content, null, 2)}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================
-// ASSET LIBRARY (unchanged - pure UI)
-// ============================================
-
-export function AssetLibrary({ assets, onUpdate, onDelete }: {
-  assets: any[]; onUpdate: (assets: any[]) => void; onDelete: (id: string) => void;
+function ContentGeneratorPanel({
+  brief, evidenceContext, onGenerated, selectedChatId, abortRef
+}: {
+  brief: any; evidenceContext: any; onGenerated: (result: any) => void;
+  selectedChatId: string; abortRef: React.MutableRefObject<AbortController | null>;
 }) {
-  const [searchQ, setSearchQ] = useState('');
-  const [filterType, setFilterType] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
+  const [selectedType, setSelectedType] = useState<ContentType>('blog_article');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activeGroup, setActiveGroup] = useState<string>('long-form');
 
-  const counts = {
-    content: assets.filter(a => a.type === 'content').length,
-    email: assets.filter(a => a.type === 'email').length,
-    social: assets.filter(a => a.type === 'social').length,
-    creative: assets.filter(a => a.type === 'creative').length,
-    video: assets.filter(a => a.type === 'video').length,
-    campaign: assets.filter(a => a.type === 'campaign').length,
-  };
+  const handleGenerate = useCallback(async () => {
+    if (!selectedChatId || loading) return;
+    setLoading(true);
+    setError(null);
+    onGenerated(null);
 
-  const filtered = assets.filter(a => {
-    if (filterType !== 'all' && a.type !== filterType) return false;
-    if (filterStatus !== 'all' && a.approvalStatus !== filterStatus) return false;
-    if (searchQ) { const q = searchQ.toLowerCase(); return a.title.toLowerCase().includes(q) || a.subType.toLowerCase().includes(q); }
-    return true;
-  }).sort((a, b) => new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime());
+    if (abortRef.current) abortRef.current.abort();
+    abortRef.current = new AbortController();
+    const signal = abortRef.current.signal;
 
-  const statusColor = (s: string) => s === 'draft' ? C.needsImprovement : s === 'approved' ? C.excellent : s === 'needs-review' ? C.accent : C.dim;
-  const typeColors: Record<string, string> = { content: C.brand, email: C.purple, social: C.excellent, creative: C.needsImprovement, video: C.critical, campaign: C.accent };
+    try {
+      const res = await generateContentItem(selectedChatId, selectedType, signal);
+      if (signal.aborted) return;
+      if (res?.success !== false && res?.data) {
+        onGenerated(res.data);
+      } else if (res?.success !== false && res?.content) {
+        onGenerated(res);
+      } else {
+        setError('Generation returned empty. Ensure product analysis is complete.');
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') return;
+      setError(err.message || 'Generation failed. Check server connection.');
+    } finally {
+      if (!abortRef.current?.signal.aborted) setLoading(false);
+    }
+  }, [selectedChatId, selectedType, loading, onGenerated, abortRef]);
+
+  const grouped = TYPE_GROUPS.map(group => ({
+    group,
+    label: CONTENT_GROUP_LABELS[group] || group,
+    types: CONTENT_TYPES.filter(t => t.group === group),
+  }));
 
   return (
-    <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: selectedAsset ? '1fr 380px' : '1fr' }}>
-      <div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '12px' }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: C.dim }} />
-            <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Search assets..." style={{ ...S.input, paddingLeft: '30px', fontSize: '12px' }} />
-          </div>
-          <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ ...S.input, width: 'auto' }}>
-            <option value="all">All Types ({assets.length})</option>
-            <option value="content">Content ({counts.content})</option>
-            <option value="email">Email ({counts.email})</option>
-            <option value="social">Social ({counts.social})</option>
-            <option value="creative">Creative ({counts.creative})</option>
-            <option value="video">Video ({counts.video})</option>
-            <option value="campaign">Campaign ({counts.campaign})</option>
-          </select>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ ...S.input, width: 'auto' }}>
-            <option value="all">All Status</option>
-            <option value="draft">Draft</option>
-            <option value="approved">Approved</option>
-            <option value="needs-review">Needs Review</option>
-          </select>
-        </div>
-
-        {assets.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: C.muted, fontSize: '13px', background: C.card, borderRadius: '12px', border: `1px solid ${C.border}` }}>
-            <FolderOpen size={36} style={{ opacity: 0.3, marginBottom: '12px' }} />
-            <div>No assets saved yet. Generate content and save it to build your library.</div>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: C.muted, fontSize: '13px' }}>No assets match your filters.</div>
-        ) : (
-          <div style={{ display: 'grid', gap: '8px' }}>
-            {filtered.map(a => (
-              <div key={a.id} onClick={() => setSelectedAsset(selectedAsset?.id === a.id ? null : a)} style={{ ...S.row, cursor: 'pointer', borderColor: selectedAsset?.id === a.id ? C.accent + '60' : '#1d2738', flexWrap: 'wrap' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: `${typeColors[a.type] || C.dim}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {a.type === 'content' ? <BookOpen size={14} style={{ color: typeColors[a.type] }} /> :
-                   a.type === 'email' ? <Mail size={14} style={{ color: typeColors[a.type] }} /> :
-                   a.type === 'social' ? <RadioTower size={14} style={{ color: typeColors[a.type] }} /> :
-                   a.type === 'creative' ? <PenTool size={14} style={{ color: typeColors[a.type] }} /> :
-                   a.type === 'video' ? <Video size={14} style={{ color: typeColors[a.type] }} /> :
-                   <Megaphone size={14} style={{ color: typeColors[a.type] }} />}
-                </div>
-                <div style={{ flex: 1, minWidth: '150px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{a.title}</div>
-                  <div style={{ fontSize: '11px', color: C.muted, display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <span style={S.tag(typeColors[a.type] || C.dim)}>{a.subType}</span>
-                    <span>{new Date(a.generatedAt).toLocaleDateString()}</span>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, background: `${statusColor(a.approvalStatus)}20`, color: statusColor(a.approvalStatus) }}>{a.approvalStatus}</span>
-                  <button onClick={(e) => { e.stopPropagation(); onDelete(a.id); }} style={{ background: 'none', border: 'none', color: C.dim, cursor: 'pointer', padding: '4px' }}><Trash2 size={13} /></button>
-                </div>
-              </div>
-            ))}
+    <div style={S.card}>
+      <div style={S.cardHeader}><Sparkles size={18} style={{ color: C.brand }} /><span style={S.cardTitle}>Generate Content</span></div>
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+        {grouped.map(g => (
+          <button
+            key={g.group}
+            onClick={() => setActiveGroup(g.group)}
+            style={{
+              padding: '4px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+              fontSize: '10px', fontWeight: 600, background: activeGroup === g.group ? `${C.accent}20` : 'transparent', color: activeGroup === g.group ? C.accent : C.muted,
+            }}
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gap: '6px', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', marginBottom: '14px' }}>
+        {grouped.find(g => g.group === activeGroup)?.types.map(ct => {
+          const isActive = selectedType === ct.value;
+          return (
+            <button
+              key={ct.value}
+              onClick={() => setSelectedType(ct.value)}
+              style={{
+                padding: '8px 10px', borderRadius: '8px', border: `1px solid ${isActive ? C.accent : C.border}`,
+                background: isActive ? `${C.accent}12` : C.bg, cursor: 'pointer', textAlign: 'left' as const,
+                color: isActive ? C.accent : C.muted, fontSize: '11px', fontWeight: isActive ? 600 : 400,
+                display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0,
+              }}
+            >
+              <ct.icon size={14} style={{ flexShrink: 0 }} />
+              <span style={{ overflowWrap: 'anywhere', minWidth: 0 }}>{ct.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <button
+          onClick={handleGenerate}
+          disabled={loading || !selectedChatId}
+          style={{
+            ...S.btn(C.brand), padding: '8px 20px', opacity: loading ? 0.6 : 1,
+            cursor: loading ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {loading ? <><Loader2 className="spin" size={14} /> Generating...</> : <><Sparkles size={14} /> Generate</>}
+        </button>
+        {error && (
+          <div style={{ fontSize: '11px', color: C.critical, display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
+            <AlertTriangle size={12} /> {error}
           </div>
         )}
       </div>
+    </div>
+  );
+}
 
-      {selectedAsset && (
-        <div style={{ ...S.card, maxHeight: '80vh', overflow: 'auto', position: 'sticky', top: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: C.text }}>{selectedAsset.title}</div>
-            <button onClick={() => setSelectedAsset(null)} style={{ background: 'none', border: 'none', color: C.dim, cursor: 'pointer' }}><X size={16} /></button>
+// ============================================
+// STAGE C — REVIEW PANEL (quality + claims)
+// ============================================
+
+function QualityBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = { passed: C.excellent, needs_review: C.needsImprovement, blocked: C.critical };
+  const labels: Record<string, string> = { passed: 'Passed', needs_review: 'Needs review', blocked: 'Blocked' };
+  const color = colors[status] || C.dim;
+  return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 700, background: `${color}20`, color, whiteSpace: 'nowrap' as const }}>{labels[status] || status}</span>;
+}
+
+function QualityPanel({ qualityScore }: { qualityScore: any }) {
+  if (!qualityScore || !qualityScore.checks) return null;
+  const { overall, checks, summary } = qualityScore;
+  return (
+    <div style={S.card}>
+      <div style={S.cardHeader}><Shield size={18} style={{ color: statusColor(overall) }} /><span style={S.cardTitle}>Quality Check</span>
+        <QualityBadge status={overall} />
+      </div>
+      <div style={{ display: 'grid', gap: '6px', marginBottom: '10px' }}>
+        {Object.entries(checks).map(([key, check]: [string, any]) => (
+          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', background: C.bg, borderRadius: '6px', fontSize: '11px', minWidth: 0 }}>
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: statusColor(check.status), flexShrink: 0 }} />
+            <span style={{ color: C.text, fontWeight: 500, flexShrink: 0 }}>{check.label || key.replace(/([A-Z])/g, ' $1').trim()}</span>
+            <span style={{ color: C.muted, minWidth: 0, overflowWrap: 'anywhere', flex: 1 }}>{check.detail}</span>
+            <QualityBadge status={check.status} />
           </div>
-          <div style={{ fontSize: '12px', color: C.muted, lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: '400px', overflow: 'auto', padding: '10px', background: C.bg, borderRadius: '6px' }}>
-            {typeof selectedAsset.content === 'string' ? selectedAsset.content : JSON.stringify(selectedAsset.content, null, 2)}
-          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: '10px', color: C.dim }}>{summary}</div>
+    </div>
+  );
+}
+
+function ClaimPanel({ content }: { content: any }) {
+  const claimFindings = content?._claimFindings || content?.claimsRequiringReview || [];
+  const claimStatus = content?._claimStatus || content?.claimValidation || 'passed';
+
+  if (!claimFindings || claimFindings.length === 0) {
+    return (
+      <div style={S.card}>
+        <div style={S.cardHeader}><Shield size={18} style={{ color: C.excellent }} /><span style={S.cardTitle}>Claim Validation</span>
+          <QualityBadge status={claimStatus} />
         </div>
+        <div style={{ fontSize: '11px', color: C.muted }}>No claims flagged — all content appears evidence-backed.</div>
+      </div>
+    );
+  }
+
+  const blockedCount = claimFindings.filter((f: any) => f.status === 'blocked').length;
+  return (
+    <div style={S.card}>
+      <div style={S.cardHeader}><Shield size={18} style={{ color: blockedCount > 0 ? C.critical : C.needsImprovement }} /><span style={S.cardTitle}>Claim Validation</span>
+        <QualityBadge status={claimStatus} />
+      </div>
+      {blockedCount > 0 && (
+        <div style={{ marginBottom: '10px', padding: '8px 10px', background: 'rgba(255,71,87,0.08)', borderRadius: '6px', border: '1px solid rgba(255,71,87,0.2)', fontSize: '11px', color: C.critical, display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+          <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '1px' }} />
+          <span>{blockedCount} blocked claim(s) — content cannot be marked publish-ready. Review and fix before publishing.</span>
+        </div>
+      )}
+      <div style={{ display: 'grid', gap: '6px' }}>
+        {claimFindings.map((f: any, i: number) => (
+          <div key={i} style={{ padding: '8px 10px', background: C.bg, borderRadius: '6px', border: `1px solid ${f.status === 'blocked' ? 'rgba(255,71,87,0.2)' : f.status === 'needs_review' ? 'rgba(255,179,71,0.2)' : 'rgba(16,225,139,0.15)'}`, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
+              <QualityBadge status={f.status || 'needs_review'} />
+              <span style={{ fontSize: '12px', fontWeight: 600, color: C.text, minWidth: 0, overflowWrap: 'anywhere', flex: 1 }}>{toText(f.claim || f.text || f.title)}</span>
+            </div>
+            {f.reason && <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>Reason: {toText(f.reason)}</div>}
+            {f.evidence && <div style={{ fontSize: '10px', color: C.dim, marginTop: '2px' }}>Evidence: {toText(f.evidence)}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EvidenceUsedPanel({ content }: { content: any }) {
+  const evidenceList = content?.evidenceUsed || content?._evidenceUsed || [];
+  if (!evidenceList.length) return null;
+  return (
+    <div style={S.card}>
+      <div style={S.cardHeader}><Info size={18} style={{ color: C.accent }} /><span style={S.cardTitle}>Evidence Sources Used</span></div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+        {evidenceList.map((e: string, i: number) => (
+          <span key={i} style={S.tag(C.accent)}>{e}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ContentPreview({ content }: { content: any }) {
+  if (!content) return null;
+  const title = toText(content.title || content.headline || content.subjectLine || content.caption || content.text);
+  const body = toText(content.article || content.body || content.description || content.executiveSummary || content.text);
+
+  return (
+    <div style={S.card}>
+      <div style={S.cardHeader}><Eye size={18} style={{ color: C.accent }} /><span style={S.cardTitle}>Preview</span></div>
+      {title && <div style={{ fontSize: '18px', fontWeight: 700, color: C.text, marginBottom: '12px', overflowWrap: 'anywhere', lineHeight: 1.3 }}>{title}</div>}
+      <div style={S.previewBox}>
+        {body || JSON.stringify(content, null, 2)}
+      </div>
+      <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        {content._type && <span style={S.tag(C.brand)}>{content._label || content._type}</span>}
+        {content._claimStatus && <QualityBadge status={content._claimStatus} />}
+        {content._generatedAt && <span style={{ fontSize: '10px', color: C.dim, display: 'flex', alignItems: 'center', gap: '3px' }}><Clock size={10} /> {new Date(content._generatedAt).toLocaleString()}</span>}
+      </div>
+    </div>
+  );
+}
+
+function ReviewPanel({ content, qualityScore }: { content: any; qualityScore: any }) {
+  if (!content) return null;
+  return (
+    <div style={{ display: 'grid', gap: '16px' }}>
+      <ContentPreview content={content} />
+      <EvidenceUsedPanel content={content} />
+      <QualityPanel qualityScore={qualityScore} />
+      <ClaimPanel content={content} />
+    </div>
+  );
+}
+
+// ============================================
+// ASSET LIBRARY
+// ============================================
+
+function AssetRow({ asset, onOpen, onRegenerate }: { asset: any; onOpen: (a: any) => void; onRegenerate: (a: any) => void }) {
+  const typeColors: Record<string, string> = {
+    content_blog_article: C.brand, content_faq_page: C.accent, content_landing_page: C.excellent,
+    content_product_page: C.good, content_comparison_page: C.purple, content_feature_announcement: C.orange,
+    content_whitepaper: C.pink, content_linkedin_post: C.brand, content_instagram_post: C.pink,
+    content_twitter_post: C.cyan, content_facebook_post: C.good, content_youtube_description: C.critical,
+    content_email_copy: C.purple, content_creative_brief: C.needsImprovement, content_video_script: C.critical,
+  };
+  const typeMatch = CONTENT_TYPES.find(t => t.value === asset.assetType?.replace('content_', ''));
+  const label = typeMatch?.label || asset.assetType?.replace('content_', '').replace(/_/g, ' ') || 'Content';
+  const color = typeColors[asset.assetType] || C.dim;
+  const Icon = typeMatch?.icon || FileText;
+  const version = asset.assetContent?.version || 1;
+  const created = asset.createdAt ? new Date(asset.createdAt).toLocaleDateString() : '';
+  const qs = asset.assetContent?.qualityScore?.overall || '';
+
+  return (
+    <div style={{ ...S.row, cursor: 'pointer', borderColor: C.border, flexWrap: 'wrap', gap: '8px' }}>
+      <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Icon size={13} style={{ color }} />
+      </div>
+      <div style={{ flex: 1, minWidth: '120px' }}>
+        <div style={{ fontSize: '13px', fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{asset.assetTitle || toText(asset.assetContent)}</div>
+        <div style={{ fontSize: '10px', color: C.muted, display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={S.tag(color)}>{label}</span>
+          <span>v{version}</span>
+          {created && <span>{created}</span>}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
+        {qs && <QualityBadge status={qs} />}
+        <span style={{ fontSize: '10px', color: C.dim, ...S.tag(statusColor(asset.status || 'draft')) }}>{asset.status || 'draft'}</span>
+        <button onClick={() => onOpen(asset)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: '4px', display: 'flex' }} title="View"><Eye size={13} /></button>
+        <button onClick={() => onRegenerate(asset)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: '4px', display: 'flex' }} title="Regenerate"><RefreshCw size={13} /></button>
+      </div>
+    </div>
+  );
+}
+
+function AssetDetailPanel({ asset, onClose, onRegenerate }: { asset: any; onClose: () => void; onRegenerate: (a: any) => void }) {
+  const [versions, setVersions] = useState<any[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!asset?.id) return;
+    setVersionsLoading(true);
+    getAssetVersionHistory(asset.id)
+      .then(res => {
+        if (res?.success !== false && res?.data) setVersions(Array.isArray(res.data) ? res.data : []);
+        else if (Array.isArray(res)) setVersions(res);
+      })
+      .catch(() => setVersions([]))
+      .finally(() => setVersionsLoading(false));
+  }, [asset?.id]);
+
+  const content = asset.assetContent || {};
+  const version = content.version || 1;
+  const typeMatch = CONTENT_TYPES.find(t => t.value === asset.assetType?.replace('content_', ''));
+  const Icon = typeMatch?.icon || FileText;
+
+  return (
+    <div style={{ ...S.card, position: 'sticky', top: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1 }}>
+          <Icon size={16} style={{ color: C.accent, flexShrink: 0 }} />
+          <span style={{ fontSize: '14px', fontWeight: 700, color: C.text, overflowWrap: 'anywhere', minWidth: 0 }}>{asset.assetTitle || 'Asset Detail'}</span>
+        </div>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.dim, cursor: 'pointer', flexShrink: 0 }}><X size={16} /></button>
+      </div>
+
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+        <span style={{ fontSize: '10px', color: C.dim }}>v{version}</span>
+        {asset.createdAt && <span style={{ fontSize: '10px', color: C.dim }}>Created: {new Date(asset.createdAt).toLocaleString()}</span>}
+        {asset.status && <span style={S.tag(statusColor(asset.status))}>{asset.status}</span>}
+      </div>
+
+      <div style={{ maxHeight: '400px', overflowY: 'auto', overflowX: 'hidden', fontSize: '12px', color: C.muted, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', padding: '10px', background: C.bg, borderRadius: '6px', marginBottom: '10px' }}>
+        {JSON.stringify(content, null, 2)}
+      </div>
+
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+        <button onClick={() => onRegenerate(asset)} style={S.btn(C.brand)}><RefreshCw size={12} /> Regenerate</button>
+      </div>
+
+      <div>
+        <div style={{ fontSize: '11px', fontWeight: 600, color: C.muted, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <History size={12} /> Version History{versionsLoading && <Loader2 className="spin" size={12} style={{ marginLeft: '4px' }} />}
+          {versions.length > 0 && <span style={{ color: C.dim, fontWeight: 400 }}>({versions.length})</span>}
+        </div>
+        {versions.length === 0 && !versionsLoading && (
+          <div style={{ fontSize: '11px', color: C.dim, padding: '8px', background: C.bg, borderRadius: '6px' }}>No version history available.</div>
+        )}
+        <div style={{ display: 'grid', gap: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+          {versions.map((v: any, i: number) => {
+            const vContent = v.assetContent || {};
+            const vNum = vContent.version || (versions.length - i);
+            const isCurrent = v.id === asset.id;
+            return (
+              <div key={v.id || i} style={{ padding: '6px 8px', background: isCurrent ? `${C.accent}08` : C.bg, borderRadius: '4px', border: `1px solid ${isCurrent ? C.accent + '30' : 'transparent'}`, fontSize: '10px', display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                <Layers size={10} style={{ color: C.dim, flexShrink: 0 }} />
+                <span style={{ color: isCurrent ? C.accent : C.text, fontWeight: isCurrent ? 600 : 400 }}>v{vNum}</span>
+                {v.createdAt && <span style={{ color: C.dim }}>{new Date(v.createdAt).toLocaleDateString()}</span>}
+                {isCurrent && <span style={S.tag(C.accent)}>current</span>}
+                {vContent.qualityScore?.overall && <QualityBadge status={vContent.qualityScore.overall} />}
+                {!isCurrent && <span style={{ color: C.dim }}>({v.status || 'draft'})</span>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AssetLibraryPanel({
+  selectedChatId, onRegenerate, onAssetOpen, selectedAsset, onCloseAsset, view
+}: {
+  selectedChatId: string; onRegenerate: (asset: any) => void;
+  onAssetOpen: (asset: any) => void; selectedAsset: any; onCloseAsset: () => void; view: string;
+}) {
+  const [assets, setAssets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [loaded, setLoaded] = useState(false);
+
+  const loadAssets = useCallback(async () => {
+    if (!selectedChatId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await getContentAssets(selectedChatId);
+      const list = res?.success !== false && res?.data ? res.data : Array.isArray(res) ? res : [];
+      setAssets(list);
+      setLoaded(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load assets');
+      setAssets([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedChatId]);
+
+  useEffect(() => {
+    setAssets([]);
+    setLoaded(false);
+    setSelectedAssetId(null);
+    onCloseAsset();
+    if (selectedChatId) loadAssets();
+  }, [selectedChatId, loadAssets, onCloseAsset]);
+
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+
+  const filtered = assets.filter(a => {
+    if (filterType !== 'all' && !a.assetType?.includes(filterType)) return false;
+    if (searchQ) {
+      const q = searchQ.toLowerCase();
+      const title = (a.assetTitle || '').toLowerCase();
+      const type = (a.assetType || '').toLowerCase();
+      return title.includes(q) || type.includes(q);
+    }
+    return true;
+  }).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+  const typeCounts: Record<string, number> = {};
+  assets.forEach(a => {
+    const t = a.assetType || 'unknown';
+    typeCounts[t] = (typeCounts[t] || 0) + 1;
+  });
+
+  const typeOptions = Object.keys(typeCounts).sort();
+
+  if (loading && !loaded) {
+    return (
+      <div style={S.card}>
+        <div style={S.cardHeader}><FolderOpen size={18} style={{ color: C.accent }} /><span style={S.cardTitle}>Asset Library</span></div>
+        <div style={{ padding: '20px', textAlign: 'center', color: C.muted, fontSize: '12px' }}><Loader2 className="spin" size={16} /> Loading assets...</div>
+      </div>
+    );
+  }
+
+  if (!loaded && error) {
+    return (
+      <div style={S.card}>
+        <div style={S.cardHeader}><FolderOpen size={18} style={{ color: C.critical }} /><span style={S.cardTitle}>Asset Library</span></div>
+        <div style={{ padding: '16px', color: C.critical, fontSize: '11px', background: 'rgba(255,71,87,0.08)', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}><AlertTriangle size={14} /> {error}</div>
+      </div>
+    );
+  }
+
+  if (assets.length === 0) {
+    return (
+      <div style={S.card}>
+        <div style={S.cardHeader}><FolderOpen size={18} style={{ color: C.dim }} /><span style={S.cardTitle}>Asset Library</span></div>
+        <div style={{ textAlign: 'center', padding: '32px 16px', color: C.muted, fontSize: '12px' }}>
+          <FolderOpen size={28} style={{ opacity: 0.3, marginBottom: '8px' }} />
+          <div>No content assets generated yet. Generate content to build your library.</div>
+        </div>
+      </div>
+    );
+  }
+
+  const showSideBySide = view === 'grid' && selectedAsset;
+
+  return (
+    <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: showSideBySide ? '1fr 380px' : '1fr' }}>
+      <div>
+        <div style={S.card}>
+          <div style={{ ...S.cardHeader, marginBottom: '12px' }}><FolderOpen size={18} style={{ color: C.accent }} /><span style={S.cardTitle}>Asset Library</span>
+            <span style={{ fontSize: '11px', color: C.muted }}>{assets.length} assets</span>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: '140px' }}>
+              <Search size={13} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: C.dim }} />
+              <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Search..." style={{ ...S.input, paddingLeft: '28px', fontSize: '11px' }} />
+            </div>
+            <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ ...S.input, width: 'auto', fontSize: '11px' }}>
+              <option value="all">All types</option>
+              {typeOptions.map(t => (
+                <option key={t} value={t}>{t.replace('content_', '').replace(/_/g, ' ')} ({typeCounts[t]})</option>
+              ))}
+            </select>
+          </div>
+          {filtered.length === 0 ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: C.dim, fontSize: '12px' }}>No assets match your filters.</div>
+          ) : (
+            <div style={{ display: 'grid', gap: '6px' }}>
+              {filtered.map(a => (
+                <AssetRow
+                  key={a.id}
+                  asset={a}
+                  onOpen={() => { setSelectedAssetId(a.id); onAssetOpen(a); }}
+                  onRegenerate={onRegenerate}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      {showSideBySide && selectedAsset && (
+        <AssetDetailPanel asset={selectedAsset} onClose={onCloseAsset} onRegenerate={onRegenerate} />
       )}
     </div>
   );
 }
 
 // ============================================
-// INTEGRATION HEALTH PANEL (unchanged)
+// INTEGRATION HEALTH
 // ============================================
 
 function IntegrationHealthPanel() {
@@ -833,36 +713,20 @@ function IntegrationHealthPanel() {
   if (loading) return <div style={{ fontSize: '11px', color: C.dim, padding: '8px 0' }}>Checking provider health...</div>;
   if (!health) return null;
   const { providers } = health;
-  const items = (() => {
-    const reasonMap: Record<string, string> = {
-      missing_api_key: 'Missing API key', missing_from_email: 'Missing from email', init_failed: 'Init failed',
-      missing_env_vars: 'Missing config', pollinations_only: 'Pollinations only', pollinations_fal_configured: 'Pollinations + Fal',
-      shotstack_configured: 'Shotstack', creatomate_configured: 'Creatomate', no_video_provider: 'No provider',
-    };
-    const emailDesc = providers.email.configured ? (providers.email.provider === 'gmail' ? 'Gmail SMTP' : providers.email.provider === 'resend' ? 'Resend' : providers.email.provider || 'Configured') : (reasonMap[providers.email.reason] || providers.email.reason || 'Not configured');
-    const imgPollinations = providers.image?.pollinations?.configured !== false;
-    const imgFal = providers.image?.fal?.configured === true;
-    const imgDesc = imgPollinations && imgFal ? 'Pollinations + Fal' : imgPollinations ? 'Pollinations' : imgFal ? 'Fal' : (reasonMap[providers.image.reason] || 'None');
-    const storageDesc = providers.storage.configured ? 'Cloudinary' : (reasonMap[providers.storage.reason] || 'Not configured');
-    const vidShotstack = providers.video?.shotstack?.configured === true;
-    const vidCreatomate = providers.video?.creatomate?.configured === true;
-    const videoDesc = vidShotstack ? 'Shotstack' : vidCreatomate ? 'Creatomate' : (reasonMap[providers.video.reason] || 'Not available');
-    return [
-      { label: 'Email', ok: providers.email.configured, detail: emailDesc, reason: providers.email.reason },
-      { label: 'Image', ok: imgPollinations || imgFal, detail: imgDesc, reason: providers.image.reason },
-      { label: 'Storage', ok: providers.storage.configured, detail: storageDesc, reason: providers.storage.reason },
-      { label: 'Video', ok: vidShotstack || vidCreatomate, detail: videoDesc, reason: providers.video.reason },
-      { label: 'AI', ok: providers.ai?.gemini || providers.ai?.groq, detail: `${providers.ai?.gemini ? 'Gemini' : ''}${providers.ai?.gemini && providers.ai?.groq ? ' + ' : ''}${providers.ai?.groq ? 'Groq' : ''}${!providers.ai?.gemini && !providers.ai?.groq ? 'None' : ''}` },
-    ];
-  })();
+  const items = [
+    { label: 'AI', ok: providers.ai?.gemini || providers.ai?.groq, detail: providers.ai?.gemini ? 'Gemini' : providers.ai?.groq ? 'Groq' : 'None' },
+    { label: 'Email', ok: providers.email?.configured, detail: providers.email?.provider || 'Not configured' },
+    { label: 'Image', ok: providers.image?.pollinations?.configured !== false || providers.image?.fal?.configured === true, detail: providers.image?.pollinations?.configured !== false ? 'Pollinations' : providers.image?.fal?.configured === true ? 'Fal' : 'None' },
+    { label: 'Video', ok: providers.video?.shotstack?.configured === true || providers.video?.creatomate?.configured === true, detail: providers.video?.shotstack?.configured === true ? 'Shotstack' : providers.video?.creatomate?.configured === true ? 'Creatomate' : 'None' },
+  ];
   return (
-    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', padding: '10px 14px', background: C.card, borderRadius: '8px', border: `1px solid ${C.border}`, marginBottom: '12px' }}>
-      <div style={{ fontSize: '11px', fontWeight: 600, color: C.muted, display: 'flex', alignItems: 'center', gap: '4px' }}><Wifi size={12} /> Integration Status:</div>
+    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '8px 12px', background: C.card, borderRadius: '8px', border: `1px solid ${C.border}`, marginBottom: '12px', alignItems: 'center' }}>
+      <span style={{ fontSize: '10px', fontWeight: 600, color: C.muted, display: 'flex', alignItems: 'center', gap: '3px' }}><Wifi size={11} /> Providers:</span>
       {items.map(item => (
-        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '4px', background: item.ok ? 'rgba(16,225,139,0.08)' : 'rgba(255,179,71,0.08)', border: `1px solid ${item.ok ? 'rgba(16,225,139,0.2)' : 'rgba(255,179,71,0.2)'}` }}>
-          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: item.ok ? C.excellent : C.needsImprovement }} />
-          <span style={{ fontSize: '10px', color: item.ok ? C.excellent : C.needsImprovement, fontWeight: 600 }}>{item.label}</span>
-          <span style={{ fontSize: '9px', color: C.dim }}>{item.detail}{item.reason ? ` (${item.reason})` : ''}</span>
+        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '2px 6px', borderRadius: '4px', background: item.ok ? 'rgba(16,225,139,0.08)' : 'rgba(255,179,71,0.08)', border: `1px solid ${item.ok ? 'rgba(16,225,139,0.2)' : 'rgba(255,179,71,0.2)'}` }}>
+          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: item.ok ? C.excellent : C.needsImprovement }} />
+          <span style={{ fontSize: '9px', color: item.ok ? C.excellent : C.needsImprovement, fontWeight: 600 }}>{item.label}</span>
+          <span style={{ fontSize: '8px', color: C.dim }}>{item.detail}</span>
         </div>
       ))}
     </div>
@@ -873,111 +737,183 @@ function IntegrationHealthPanel() {
 // MAIN CONTENT STUDIO PAGE
 // ============================================
 
-const studioTabs = [
-  { id: 'content', label: 'Content Studio', icon: BookOpen },
-  { id: 'email', label: 'Email Studio', icon: Mail },
-  { id: 'social', label: 'Social Studio', icon: RadioTower },
-  { id: 'creative', label: 'Creative Studio', icon: PenTool },
-  { id: 'video', label: 'Video Studio', icon: Video },
-  { id: 'campaign', label: 'Campaign Planner', icon: Megaphone },
-  { id: 'library', label: 'Asset Library', icon: FolderOpen },
-];
-
 export default function AIContentStudio() {
-  const { selectedChatId, fullResults } = useProject();
+  const { selectedChatId } = useProject();
   const [activeTab, setActiveTab] = useWorkspaceMemory('studio-activeTab', 'content');
-  const [assets, setAssets] = useWorkspaceMemory<any[]>('studio-assets', []);
+  const [brief, setBrief] = useState<any>(null);
+  const [briefLoading, setBriefLoading] = useState(false);
   const [evidenceContext, setEvidenceContext] = useState<any>(null);
   const [contextLoading, setContextLoading] = useState(true);
-  const [showHealth, setShowHealth] = useState(true);
+  const [generatedContent, setGeneratedContent] = useState<any>(null);
+  const [qualityScore, setQualityScore] = useState<any>(null);
+  const [showHealth, setShowHealth] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<any>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (!selectedChatId) return;
+    setBrief(null);
+    setGeneratedContent(null);
+    setQualityScore(null);
+    setSelectedAsset(null);
+
+    if (!selectedChatId) {
+      setContextLoading(false);
+      setBriefLoading(false);
+      return;
+    }
+
+    if (abortRef.current) abortRef.current.abort();
+    abortRef.current = new AbortController();
+
     setContextLoading(true);
+    setBriefLoading(true);
+
     getEvidenceContext(selectedChatId)
       .then(ctx => {
-        if (ctx?.success && ctx?.data) {
-          setEvidenceContext(ctx.data);
-        }
+        if (ctx?.success && ctx?.data) setEvidenceContext(ctx.data);
+        else setEvidenceContext(null);
       })
-      .catch(() => {
-        // Evidence context unavailable — fall back to empty state
-        setEvidenceContext(null);
-      })
+      .catch(() => setEvidenceContext(null))
       .finally(() => setContextLoading(false));
+
+    getContentBrief(selectedChatId)
+      .then(res => {
+        if (res?.success !== false && res?.data) setBrief(res.data);
+        else if (res && typeof res === 'object' && !res?.error) setBrief(res);
+      })
+      .catch(() => setBrief(null))
+      .finally(() => setBriefLoading(false));
+
+    return () => {
+      if (abortRef.current) abortRef.current.abort();
+    };
   }, [selectedChatId]);
 
-  const handleSave = (asset: any) => {
-    const existing = assets.find(a => a.id === asset.id);
-    if (existing) {
-      setAssets(assets.map(a => a.id === asset.id ? asset : a));
-    } else {
-      setAssets([asset, ...assets]);
+  const handleGenerated = useCallback((result: any) => {
+    if (!result) {
+      setGeneratedContent(null);
+      setQualityScore(null);
+      return;
     }
-  };
-
-  const handleDeleteAsset = (id: string) => {
-    setAssets(assets.filter(a => a.id !== id));
-  };
-
-  const handleUpdateAssets = (updated: any[]) => {
-    setAssets(updated);
-  };
-
-  const renderTab = () => {
-    const sharedProps = { context: evidenceContext, onSave: handleSave };
-    switch (activeTab) {
-      case 'content': return <ContentStudio {...sharedProps} />;
-      case 'email': return <EmailStudio {...sharedProps} />;
-      case 'social': return <SocialStudio {...sharedProps} />;
-      case 'creative': return <CreativeStudio {...sharedProps} />;
-      case 'video': return <VideoStudio {...sharedProps} />;
-      case 'campaign': return <CampaignPlanner {...sharedProps} />;
-      case 'library': return <AssetLibrary assets={assets} onUpdate={handleUpdateAssets} onDelete={handleDeleteAsset} />;
-      default: return <ContentStudio {...sharedProps} />;
+    setGeneratedContent(result.content || result);
+    setQualityScore(result.qualityScore || result?._qualityScore || null);
+    if (result.asset || result._assetId) {
+      setSelectedAsset(result.asset || null);
     }
+  }, []);
+
+  const handleRegenerate = useCallback((asset: any) => {
+    if (!asset?.id) return;
+    const abortC = new AbortController();
+    if (abortRef.current) abortRef.current.abort();
+    abortRef.current = abortC;
+
+    regenerateContentAsset(asset.id, abortC.signal)
+      .then(res => {
+        if (abortC.signal.aborted) return;
+        if (res?.success !== false && res?.data) {
+          setGeneratedContent(res.data.content || res.data);
+          setQualityScore(res.data.qualityScore || null);
+          setActiveTab('content');
+        }
+      })
+      .catch(err => {
+        if (err.name === 'AbortError') return;
+        console.warn('Regenerate failed:', err.message);
+      });
+  }, [setActiveTab]);
+
+  const hasEvidence = evidenceContext?.sourceSummary?.sourcesCollected?.length > 0 || brief?.product?.name;
+
+  const tabs = [
+    { id: 'content', label: 'Content Studio', icon: Sparkles },
+    { id: 'library', label: 'Asset Library', icon: FolderOpen },
+  ];
+
+  const renderContent = () => {
+    if (!selectedChatId) {
+      return (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: C.muted, fontSize: '13px', background: C.card, borderRadius: '12px', border: `1px solid ${C.border}` }}>
+          <FolderOpen size={36} style={{ opacity: 0.3, marginBottom: '12px' }} />
+          <div>Select a project to start creating content.</div>
+        </div>
+      );
+    }
+
+    if (activeTab === 'library') {
+      return (
+        <AssetLibraryPanel
+          selectedChatId={selectedChatId}
+          onRegenerate={handleRegenerate}
+          onAssetOpen={setSelectedAsset}
+          selectedAsset={selectedAsset}
+          onCloseAsset={() => setSelectedAsset(null)}
+          view="grid"
+        />
+      );
+    }
+
+    return (
+      <div style={{ display: 'grid', gap: '16px' }}>
+        <ContentBriefPanel brief={brief} loading={briefLoading} />
+        {brief?.product?.name && (
+          <ContentGeneratorPanel
+            brief={brief}
+            evidenceContext={evidenceContext}
+            onGenerated={handleGenerated}
+            selectedChatId={selectedChatId}
+            abortRef={abortRef}
+          />
+        )}
+        {!brief?.product?.name && !briefLoading && (
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: C.muted, fontSize: '12px', background: C.card, borderRadius: '12px', border: `1px solid ${C.border}` }}>
+            <AlertTriangle size={24} style={{ opacity: 0.4, marginBottom: '8px' }} />
+            <div>Run product analysis with a website URL first before generating content.</div>
+          </div>
+        )}
+        {generatedContent && (
+          <ReviewPanel content={generatedContent} qualityScore={qualityScore} />
+        )}
+      </div>
+    );
   };
 
   return (
-    <div>
-      <PageHeader eyebrow="AI Content & Campaign Studio" title="Content & Campaign Studio" subtitle="Generate, preview, and manage AI-powered marketing content across all channels. All content is evidence-based and requires manual approval before publishing." />
-      <div style={{ marginTop: '20px' }}>
+    <div style={{ minWidth: 0 }}>
+      <PageHeader eyebrow="AI Content Studio" title="Content & Campaign Studio" subtitle="Generate, preview, and manage AI-powered marketing content. All content is evidence-backed." />
+      <div style={{ marginTop: '20px', minWidth: 0 }}>
         {contextLoading ? (
-          <div style={{ marginBottom: '16px', padding: '10px 14px', background: C.card, borderRadius: '8px', border: `1px solid ${C.border}`, fontSize: '12px', color: C.muted }}>
-            Loading evidence context...
+          <div style={{ marginBottom: '16px', padding: '10px 14px', background: C.card, borderRadius: '8px', border: `1px solid ${C.border}`, fontSize: '12px', color: C.muted, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Loader2 className="spin" size={14} /> Loading evidence context...
           </div>
-        ) : !evidenceContext?.sourceSummary?.sourcesCollected?.length ? (
+        ) : !hasEvidence ? (
           <div style={{ marginBottom: '16px', padding: '10px 14px', background: 'rgba(255,179,71,0.08)', borderRadius: '8px', border: '1px solid rgba(255,179,71,0.2)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: C.needsImprovement }}>
             <AlertTriangle size={16} />
             <div>Evidence unavailable — run product analysis with a website URL first.</div>
           </div>
-        ) : (
-          <EvidencePanel context={evidenceContext} />
-        )}
+        ) : null}
 
-        <div style={{ marginBottom: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <button onClick={() => setShowHealth(!showHealth)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              {showHealth ? <ChevronUp size={12} /> : <ChevronDown size={12} />} Provider Health
-            </button>
-          </div>
+        <div style={{ marginBottom: '8px' }}>
+          <button onClick={() => setShowHealth(!showHealth)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {showHealth ? <ChevronUp size={12} /> : <ChevronDown size={12} />} Provider Health
+          </button>
           {showHealth && <IntegrationHealthPanel />}
         </div>
 
         <Card>
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', borderBottom: `1px solid ${C.border}`, paddingBottom: '8px', marginBottom: '16px' }}>
-            {studioTabs.map(t => (
+            {tabs.map(t => (
               <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
                 padding: '6px 12px', borderRadius: '6px', border: 'none',
                 background: activeTab === t.id ? `${C.accent}15` : 'transparent',
                 cursor: 'pointer', fontSize: '11px', color: activeTab === t.id ? C.accent : C.muted,
-                fontWeight: activeTab === t.id ? 600 : 400, display: 'flex', alignItems: 'center', gap: '4px'
+                fontWeight: activeTab === t.id ? 600 : 400, display: 'flex', alignItems: 'center', gap: '4px',
               }}>
-                <t.icon size={12} /> {t.label} {t.id === 'library' && assets.length > 0 && <span style={{ fontSize: '9px', background: C.accent, color: '#fff', borderRadius: '8px', padding: '0 5px', fontWeight: 700 }}>{assets.length}</span>}
+                <t.icon size={12} /> {t.label}
               </button>
             ))}
           </div>
-          {renderTab()}
+          {renderContent()}
         </Card>
       </div>
     </div>

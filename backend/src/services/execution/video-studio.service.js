@@ -28,7 +28,10 @@ export async function generateVideoScript(videoType, context) {
   if (evidence?.competitors?.weaknesses?.length) evidenceLines.push(`Competitor Weaknesses: ${evidence.competitors.weaknesses.slice(0, 3).join('; ')}`);
   if (evidence?.sourceSummary?.sourcesCollected?.length) evidenceLines.push(`Evidence Sources: ${evidence.sourceSummary.sourcesCollected.join(', ')}`);
 
-  const prompt = `Generate a ${typeConfig.label} (${typeConfig.duration}) video script for marketing execution. Use the verified company/product data below. CRITICAL: Every storyboard scene must reference actual product features, audience problems, and evidence-backed benefits. No generic filler scenes.
+  const providerVideoConfigured = !!(process.env.SHOTSTACK_API_KEY || process.env.CREATOMATE_API_KEY);
+  const providerStatus = providerVideoConfigured ? 'video_provider_configured' : 'storyboard_fallback_only';
+
+  const prompt = `Generate a ${typeConfig.label} (${typeConfig.duration}) video script for marketing execution. Use the verified company/product data below.
 
 CONTEXT:
 Product/Company: ${productName || 'N/A'}${companyName ? `\nCompany: ${companyName}` : ''}${targetAudience ? `\nTarget Audience: ${targetAudience}` : ''}${industry ? `\nIndustry: ${industry}` : ''}
@@ -36,6 +39,7 @@ ${evidenceLines.join('\n')}
 
 VIDEO TYPE: ${typeConfig.label}
 DURATION: ${typeConfig.duration}
+PROVIDER STATUS: ${providerStatus} (${providerVideoConfigured ? 'Video provider connected for rendering' : 'No video provider — storyboard fallback only'})
 
 REQUIRED OUTPUT FIELDS (return valid JSON):
 {
@@ -52,25 +56,26 @@ REQUIRED OUTPUT FIELDS (return valid JSON):
       "transitions": "Transition to next scene"
     }
   ],
-  "scenes": "Array of scene objects with descriptions, all product-specific",
-  "voiceover": "Voiceover direction (tone, speed, style)",
-  "camera": "Overall camera direction",
-  "music": "Music style and mood recommendations",
-  "transitions": "Transition style between scenes",
-  "cta": "Call to action text and visual using actual product CTA",
+  "audienceProblem": "Specific audience problem identified from evidence",
+  "solution": "Evidence-backed solution description",
+  "proofPoint": "Proof point from evidence where available, or null",
+  "cta": "Single call to action using actual product CTA",
+  "providerStatus": "${providerStatus}",
+  "isStoryboardFallback": ${!providerVideoConfigured},
   "duration": "${typeConfig.duration}",
   "format": "Aspect ratio and format recommendation",
-  "evidence": { "source": "video_studio", "confidence": null, "dataSource": "ai_generation" }
+  "evidence": { "source": "video_studio", "confidence": null, "evidenceLevel": "ai_inferred" }
 }
 
 RULES:
-1. Hook must capture attention in first 3 seconds referencing audience problem.
+1. Hook must reference audience problem from evidence.
 2. Script must fit within ${typeConfig.duration}.
-3. Every storyboard scene must be product-specific — no generic filler scenes.
+3. Every storyboard scene must be product-specific — no generic scenes.
 4. Do NOT invent fake statistics or testimonials.
-5. Use "Based on analysis" for claims without verified data.
-6. CTA must be specific to the product.
-7. Return ONLY valid JSON. No markdown code fences.`;
+5. proofPoint must be null unless available from evidence.
+6. isStoryboardFallback must be ${!providerVideoConfigured} — clearly labeled as fallback.
+7. CTA must be specific to the product.
+8. Return ONLY valid JSON. No markdown.`;
 
   try {
     const result = await callAI(prompt);
