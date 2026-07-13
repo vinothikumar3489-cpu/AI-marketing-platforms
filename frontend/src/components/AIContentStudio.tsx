@@ -231,9 +231,13 @@ function ContentGeneratorPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeGroup, setActiveGroup] = useState<string>('long-form');
+  const generatingRef = useRef(false);
 
   const handleGenerate = useCallback(async () => {
-    if (!selectedChatId || loading) return;
+    // PART 9: In-flight protection to prevent duplicate POSTs
+    if (!selectedChatId || loading || generatingRef.current) return;
+    
+    generatingRef.current = true;
     setLoading(true);
     setError(null);
     onGenerated(null);
@@ -256,6 +260,7 @@ function ContentGeneratorPanel({
       if (err.name === 'AbortError') return;
       setError(err.message || 'Generation failed. Check server connection.');
     } finally {
+      generatingRef.current = false;
       if (!abortRef.current?.signal.aborted) setLoading(false);
     }
   }, [selectedChatId, selectedType, loading, onGenerated, abortRef]);
@@ -791,6 +796,8 @@ export default function AIContentStudio() {
       .finally(() => setBriefLoading(false));
 
     // Source of truth for content readiness is the backend evidence-readiness endpoint.
+    // PART 10: Preserve previous readiness during refetch to prevent flicker
+    setReadinessLoading(true);
     api.get(`/chats/${selectedChatId}/evidence-readiness`)
       .then((res: any) => {
         console.info("[Content Studio] Evidence-readiness response", {
@@ -809,7 +816,7 @@ export default function AIContentStudio() {
       })
       .catch((err) => {
         console.error("[Content Studio] Evidence-readiness fetch failed", err);
-        setReadiness(null);
+        // Don't setReadiness(null) on error - preserve previous value
       })
       .finally(() => setReadinessLoading(false));
 

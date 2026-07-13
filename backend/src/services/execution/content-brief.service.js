@@ -1,4 +1,9 @@
 import { getLatestEvidenceSnapshot } from '../../modules/evidence/evidence.service.js';
+import { asArray, takeArray } from '../normalizers/array-helpers.js';
+import { normalizeSeoForExecution } from '../normalizers/seo-intelligence.normalizer.js';
+import { getSeoIntelligenceForChat } from '../loaders/seo-intelligence.loader.js';
+import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
+import { validateContentBrief } from '../validators/content-brief.schema.js';
 
 /**
  * Canonical ContentBrief — shared input for every content generator.
@@ -23,7 +28,7 @@ export async function buildContentBrief(prisma, userId, chatId) {
   const [productIntel, competitorIntel, seoIntel] = await Promise.all([
     prisma.productIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
     prisma.competitorIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
-    prisma.seoIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
+    getSeoIntelligenceForChat({ prisma, userId, chatId }),
   ]);
 
   console.info("[Content Brief] Evidence loaded", {
@@ -41,7 +46,38 @@ export async function buildContentBrief(prisma, userId, chatId) {
   const seoInfo = seoIntel || {};
   const website = raw.website || {};
 
-  const productName = chat.productName || productAnalysis.name || null;
+  // PART 2: Log actual SEO JSON shape before normalization
+  console.info("[Content Brief] SEO shape", {
+    keywordOpportunitiesType: Array.isArray(seoInfo?.keywordOpportunities) ? "array" : typeof seoInfo?.keywordOpportunities,
+    keywordOpportunityKeys: seoInfo?.keywordOpportunities && typeof seoInfo.keywordOpportunities === "object" ? Object.keys(seoInfo.keywordOpportunities).slice(0, 20) : [],
+    keywordIntelligenceKeys: seoInfo?.keywordIntelligence && typeof seoInfo.keywordIntelligence === "object" ? Object.keys(seoInfo.keywordIntelligence).slice(0, 20) : [],
+    contentGapsType: Array.isArray(seoInfo?.contentGaps) ? "array" : typeof seoInfo?.contentGaps,
+    contentOpportunitiesType: Array.isArray(seoInfo?.contentOpportunities) ? "array" : typeof seoInfo?.contentOpportunities
+  });
+
+  // PART 3: Use canonical SEO normalizer
+  const normalizedSeo = normalizeSeoForExecution(seoInfo);
+  console.info("[Content Brief] SEO normalized", {
+    available: normalizedSeo.available,
+    keywordsCount: normalizedSeo.keywords.length,
+    contentGapsCount: normalizedSeo.contentGaps.length,
+    warnings: normalizedSeo.warnings
+  });
+
+  // PART 5: Use canonical product identity resolver
+  const productIdentity = resolveProductIdentity({
+    chat,
+    productIntelligence: productIntel,
+    evidenceSnapshot,
+    website
+  });
+  console.info("[Content Brief] Product identity resolved", {
+    productName: productIdentity.productName,
+    brandName: productIdentity.brandName,
+    source: productIdentity.source,
+    domain: productIdentity.domain
+  });
+
   if (!productIntel) {
     console.warn("[Content Brief] ProductIntelligence missing", { chatId, userId });
     return { rejected: true, reason: 'Complete Growth Analysis before generating content.', code: 'EVIDENCE_MISSING' };
@@ -49,52 +85,48 @@ export async function buildContentBrief(prisma, userId, chatId) {
 
   const brief = {
     company: {
-      name: chat.title || null,
-      productName,
-      websiteUrl: chat.websiteUrl || null,
+      name: productIdentity.companyName || chat.title || null,
+      productName: productIdentity.productName,
+      brandName: productIdentity.brandName,
+      websiteUrl: productIdentity.websiteUrl || null,
+      domain: productIdentity.domain || null,
       industry: productAnalysis.industry || null,
     },
     product: {
-      name: productName,
+      name: productIdentity.productName,
+      brandName: productIdentity.brandName,
       summary: productAnalysis.summary || productAnalysis.productSummary || null,
-      features: (website.featuresText || productAnalysis.features || []).slice(0, 15),
-      benefits: (productAnalysis.benefits || productAnalysis.coreBenefits || []).slice(0, 10),
+      features: takeArray(website.featuresText || productAnalysis.features, 15),
+      benefits: takeArray(productAnalysis.benefits || productAnalysis.coreBenefits, 10),
       usp: productAnalysis.usp || null,
     },
     website: {
       title: website.title || null,
       metaDescription: website.metaDescription || null,
       heroText: website.heroText || null,
-      ctaTexts: (website.ctaTexts || []).slice(0, 5),
+      ctaTexts: takeArray(website.ctaTexts, 5),
       pageTypes: website.pageTypes || null,
-      technologyHints: (website.technologyHints || []).slice(0, 10),
+      technologyHints: takeArray(website.technologyHints, 10),
     },
-    targetPersonas: (audienceData.buyerPersonas || []).slice(0, 5).map(p => ({
+    targetPersonas: takeArray(audienceData.buyerPersonas, 5).map(p => ({
       name: p.name || p.title || null,
       role: p.role || null,
-      painPoints: (p.painPoints || []).slice(0, 5),
-      goals: (p.goals || []).slice(0, 5),
+      painPoints: takeArray(p.painPoints, 5),
+      goals: takeArray(p.goals, 5),
     })),
-    painPoints: (audienceData.painPoints || []).slice(0, 10),
-    objections: productAnalysis.objections || audienceData.objections || [],
-    validatedCompetitors: (competitorData.competitors || competitorData.directCompetitors || []).slice(0, 10).map(c => ({
+    painPoints: takeArray(audienceData.painPoints, 10),
+    objections: asArray(productAnalysis.objections || audienceData.objections),
+    validatedCompetitors: takeArray(competitorData.competitors || competitorData.directCompetitors, 10).map(c => ({
       name: c.name || c.url || null,
       domain: c.domain || c.url || null,
-      strengths: (c.strengths || []).slice(0, 5),
-      weaknesses: (c.weaknesses || []).slice(0, 5),
+      strengths: takeArray(c.strengths, 5),
+      weaknesses: takeArray(c.weaknesses, 5),
     })),
-    verifiedKeywords: (seoInfo.keywordOpportunities || seoInfo.keywordIntelligence?.primaryKeywords || []).slice(0, 20).map(k => ({
-      keyword: k.keyword || k.term || k,
-      volume: k.volume ?? k.searchVolume ?? null,
-      difficulty: k.difficulty ?? k.keywordDifficulty ?? null,
-    })),
-    topicIdeas: (seoInfo.contentOpportunities || seoInfo.contentGaps || []).slice(0, 10).map(o => ({
-      topic: o.opportunity || o.topic || o.title || null,
-      reason: o.reason || null,
-    })),
-    contentGaps: (seoInfo.contentGaps || []).slice(0, 10),
+    verifiedKeywords: normalizedSeo.keywords.slice(0, 20),
+    topicIdeas: normalizedSeo.blogIdeas.slice(0, 10),
+    contentGaps: normalizedSeo.contentGaps.slice(0, 10),
     tone: 'professional',
-    CTA: (website.ctaTexts || []).slice(0, 3),
+    CTA: takeArray(website.ctaTexts, 3),
     evidenceSources: {
       hasEvidenceSnapshot: !!evidenceSnapshot,
       hasProductIntel: !!productIntel,
@@ -102,19 +134,46 @@ export async function buildContentBrief(prisma, userId, chatId) {
       hasSeoIntel: !!seoIntel,
     },
     limitations: [],
+    warnings: [],
     _briefId: `brief_${chatId}_${Date.now()}`,
     _chatId: chatId,
     _userId: userId,
     _builtAt: new Date().toISOString(),
   };
 
+  // PART 6: Add warnings for missing optional data instead of failing
   if (!brief.product.usp) brief.limitations.push('No verified USP available');
   if (!brief.product.features.length) brief.limitations.push('No product features extracted from website');
-  if (!brief.targetPersonas.length) brief.limitations.push('No buyer personas defined');
-  if (!brief.painPoints.length) brief.limitations.push('No audience pain points from evidence');
-  if (!brief.validatedCompetitors.length) brief.limitations.push('No validated competitors');
+  if (!brief.targetPersonas.length) brief.warnings.push('No buyer personas defined - using generic audience');
+  if (!brief.painPoints.length) brief.warnings.push('No audience pain points from evidence');
+  if (!brief.validatedCompetitors.length) brief.warnings.push('No validated competitors - content may lack competitive context');
+  
+  // Add SEO warnings
+  if (normalizedSeo.warnings.length > 0) {
+    brief.warnings.push(...normalizedSeo.warnings);
+  }
+  if (brief.verifiedKeywords.length === 0) {
+    brief.warnings.push('No keyword data available - content may lack SEO optimization');
+  }
 
-  return brief;
+  // PART 7: Validate with Zod before returning
+  const validation = validateContentBrief({
+    success: true,
+    data: brief,
+    warnings: brief.warnings
+  });
+
+  if (!validation.valid) {
+    console.error('[Content Brief] Validation failed', validation.errors);
+    // Return the brief anyway but include validation errors as warnings
+    brief.warnings.push(...validation.errors.map(e => `Validation: ${e.path} - ${e.message}`));
+  }
+
+  return {
+    success: true,
+    data: brief,
+    warnings: brief.warnings
+  };
 }
 
 export default { buildContentBrief };

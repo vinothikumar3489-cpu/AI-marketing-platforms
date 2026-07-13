@@ -1,5 +1,50 @@
 import { callAI } from "../../ai/services/aiRouter.service.js";
 
+/**
+ * Safely extract JSON from AI response with repair logic
+ * Handles markdown code blocks, trailing commas, and common JSON errors
+ */
+function safeExtractJSON(data) {
+  if (!data) return null;
+  
+  let jsonString = data;
+  
+  // If already an object, return it
+  if (typeof data === 'object') {
+    return data;
+  }
+  
+  // If string, try to extract JSON
+  if (typeof data === 'string') {
+    // Remove markdown code blocks
+    jsonString = jsonString.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    
+    // Remove leading/trailing whitespace
+    jsonString = jsonString.trim();
+    
+    try {
+      return JSON.parse(jsonString);
+    } catch (e) {
+      // Try to repair common JSON errors
+      
+      // Remove trailing commas
+      jsonString = jsonString.replace(/,\s*([}\]])/g, '$1');
+      
+      // Fix unquoted keys (basic)
+      jsonString = jsonString.replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
+      
+      try {
+        return JSON.parse(jsonString);
+      } catch (e2) {
+        console.warn('[CampaignIntelligence] JSON repair failed', { error: e2.message });
+        return null;
+      }
+    }
+  }
+  
+  return null;
+}
+
 const POSSIBLE_CHANNELS = [
   "Google Search", "LinkedIn", "Meta", "Instagram", "Facebook",
   "YouTube", "Reddit", "Email", "Referral", "Content Marketing",
@@ -30,23 +75,70 @@ export async function generateCampaignIntelligence({ userId, chatId, evidenceCon
   const growth = ec.growth || {};
   const sources = ec.sourceSummary || {};
 
-  try {
-    const prompt = buildCampaignPrompt({
-      product, company, website, audience, competitors, seo, channels, growth, sources
-    });
+  let lastError = null;
+  let attempt = 0;
+  const maxAttempts = 2; // One retry on failure
 
-    const aiResult = await callAI(prompt);
+  // PART 11: Implement retry logic with JSON repair
+  while (attempt < maxAttempts) {
+    attempt++;
+    try {
+      const prompt = buildCampaignPrompt({
+        product, company, website, audience, competitors, seo, channels, growth, sources
+      });
 
-    if (aiResult.success && aiResult.data) {
-      return validateCampaignOutput(aiResult.data);
+      const aiResult = await callAI(prompt);
+
+      if (aiResult.success && aiResult.data) {
+        const parsed = safeExtractJSON(aiResult.data);
+        
+        if (parsed) {
+          const validated = validateCampaignOutput(parsed);
+          if (validated && !validated._noData) {
+            // Add metadata indicating successful AI generation
+            validated._metadata = {
+              generatedAt: new Date().toISOString(),
+              provider: "ai",
+              fallbackUsed: false,
+              generationStatus: "FULLY_GENERATED",
+              attempts: attempt
+            };
+            console.info("[CampaignIntelligence] AI generation succeeded", { userId, chatId, attempts: attempt });
+            return validated;
+          }
+        }
+        
+        lastError = "AI returned invalid or malformed JSON";
+        console.warn("[CampaignIntelligence] AI returned invalid JSON", { userId, chatId, attempt });
+      }
+    } catch (err) {
+      lastError = err.message;
+      console.warn("[CampaignIntelligence] AI generation attempt failed", { userId, chatId, attempt, error: err.message });
     }
-  } catch (err) {
-    console.warn("[CampaignIntelligence] AI generation failed:", err.message);
   }
 
-  return generateEvidenceBasedCampaign({
+  // PART 11: Use deterministic evidence-based fallback with proper metadata
+  console.warn("[CampaignIntelligence] Using fallback after AI failures", { userId, chatId, attempts: maxAttempts, lastError });
+  
+  const fallbackResult = generateEvidenceBasedCampaign({
     product, company, website, audience, competitors, seo, channels, growth, sources
   });
+
+  // Mark as partially generated with fallback
+  fallbackResult._metadata = {
+    generatedAt: new Date().toISOString(),
+    provider: "RULE_BASED_FALLBACK",
+    fallbackUsed: true,
+    generationStatus: "PARTIALLY_GENERATED",
+    attempts: maxAttempts,
+    warnings: [
+      `AI provider failed after ${maxAttempts} attempts`,
+      lastError || "Malformed provider output",
+      "Campaign generated using evidence-based rules"
+    ]
+  };
+
+  return fallbackResult;
 }
 
 function buildCampaignPrompt(context) {

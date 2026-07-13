@@ -244,9 +244,21 @@ export const generateAutomationDemo = async (req, res) => {
       console.error('[Automation Plan] Failed to persist plan after create');
       return res.status(500).json({
         success: false,
-        error: "Automation plan could not be persisted. Please retry."
+        error: {
+          code: "PERSISTENCE_FAILED",
+          message: "Automation plan was generated but could not be saved",
+          retryable: true,
+          stage: "PERSISTENCE"
+        }
       });
     }
+
+    console.info("[Automation Plan] Generation completed successfully", {
+      chatId,
+      userId,
+      automationPlanId: automationPlan.id,
+      campaignName: automationPlan.campaignName
+    });
 
     return res.status(201).json({
       success: true,
@@ -258,7 +270,12 @@ export const generateAutomationDemo = async (req, res) => {
     console.error('❌ [Automation] Error generating plan:', error);
     return res.status(500).json({
       success: false,
-      error: error.message || 'Failed to generate automation plan'
+      error: {
+        code: "AUTOMATION_GENERATION_ERROR",
+        message: error.message || 'Failed to generate automation plan',
+        retryable: true,
+        stage: "UNKNOWN"
+      }
     });
   }
 };
@@ -848,7 +865,15 @@ export const getContentBrief = async (req, res) => {
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
     if (!chat) {
       console.warn("[Content Brief API] Chat not found", { chatId, userId });
-      return res.status(404).json({ success: false, error: "Chat not found" });
+      return res.status(404).json({ 
+        success: false, 
+        error: {
+          code: "CHAT_NOT_FOUND",
+          message: "Chat not found",
+          retryable: false,
+          stage: "AUTHENTICATION"
+        }
+      });
     }
 
     const brief = await buildContentBrief(prisma, userId, chatId);
@@ -859,10 +884,35 @@ export const getContentBrief = async (req, res) => {
       isRejected: brief?.rejected,
       rejectionCode: brief?.code
     });
-    return res.json({ success: true, data: brief });
+    
+    // Handle new Content Brief response structure
+    const briefData = brief?.data || brief;
+    const briefWarnings = brief?.warnings || [];
+    
+    if (brief?.rejected) {
+      return res.status(422).json({
+        success: false,
+        error: {
+          code: brief.code || "EVIDENCE_MISSING",
+          message: brief.reason || "Complete Growth Analysis before generating content.",
+          retryable: false,
+          stage: "BRIEF_BUILDING"
+        }
+      });
+    }
+    
+    return res.json({ success: true, data: briefData, warnings: briefWarnings });
   } catch (error) {
     console.error('❌ [ContentBrief API] Error:', error);
-    return res.status(500).json({ success: false, error: error.message || 'Failed to build content brief' });
+    return res.status(500).json({ 
+      success: false, 
+      error: {
+        code: "CONTENT_BRIEF_BUILD_FAILED",
+        message: error.message || 'Failed to build content brief',
+        retryable: true,
+        stage: "UNKNOWN"
+      }
+    });
   }
 };
 
@@ -878,19 +928,39 @@ export const generateContentItem = async (req, res) => {
   if (!contentType || !CONTENT_TYPES.includes(contentType)) {
     return res.status(400).json({
       success: false,
-      error: `Invalid contentType. Must be one of: ${CONTENT_TYPES.join(', ')}`,
+      error: {
+        code: "INVALID_CONTENT_TYPE",
+        message: `Invalid contentType. Must be one of: ${CONTENT_TYPES.join(', ')}`,
+        retryable: false
+      }
     });
   }
 
   try {
     console.info("[Content Studio] Generating content", { chatId, userId, contentType });
+    
+    // Stage 1: Validate authentication and chat ownership
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
     if (!chat) {
       console.warn("[Content Studio] Chat not found", { chatId, userId });
-      return res.status(404).json({ success: false, error: "Chat not found" });
+      return res.status(404).json({ 
+        success: false, 
+        error: {
+          code: "CHAT_NOT_FOUND",
+          message: "Chat not found",
+          retryable: false,
+          stage: "AUTHENTICATION"
+        }
+      });
     }
 
-    const brief = await buildContentBrief(prisma, userId, chatId);
+    // Stage 2: Build Content Brief
+    const briefResult = await buildContentBrief(prisma, userId, chatId);
+    
+    // Handle new Content Brief response structure
+    const brief = briefResult?.data || briefResult;
+    const briefWarnings = briefResult?.warnings || [];
+    
     if (brief?.rejected) {
       console.warn("[Content Studio] Brief rejected", { chatId, userId, code: brief.code, reason: brief.reason });
       return res.status(422).json({
@@ -898,21 +968,37 @@ export const generateContentItem = async (req, res) => {
         error: {
           code: brief.code || "EVIDENCE_MISSING",
           message: brief.reason || "Complete Growth Analysis before generating content.",
-          retryable: false
+          retryable: false,
+          stage: "BRIEF_BUILDING"
         }
       });
     }
 
+    // Stage 3: Build evidence context
     const evidenceContext = await buildEvidenceContext(prisma, userId, chatId);
 
+    // Stage 4: Generate content
     const result = await generateContent(contentType, brief, evidenceContext, callAI, userId, chatId);
     const contentBody = result?.content || result;
     const meta = result?.metadata || {};
 
-    // Quality scoring (Phase 9)
+    if (!contentBody) {
+      console.error("[Content Studio] Generation returned no content", { chatId, userId, contentType });
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: "CONTENT_GENERATION_FAILED",
+          message: "AI provider returned no content",
+          retryable: true,
+          stage: "GENERATION"
+        }
+      });
+    }
+
+    // Stage 5: Quality scoring
     const qualityScore = scoreContentQuality(contentBody, brief, contentType);
 
-    // Save asset (Phase 10)
+    // Stage 6: Persist asset
     const asset = await saveContentAsset(prisma, {
       userId,
       chatId,
@@ -925,6 +1011,19 @@ export const generateContentItem = async (req, res) => {
       qualityScore,
     });
 
+    if (!asset || !asset.id) {
+      console.error("[Content Studio] Asset persistence failed", { chatId, userId, contentType });
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: "ASSET_PERSISTENCE_FAILED",
+          message: "Content was generated but could not be saved",
+          retryable: true,
+          stage: "PERSISTENCE"
+        }
+      });
+    }
+
     console.info("[Content Studio] Asset saved", {
       chatId,
       userId,
@@ -933,7 +1032,7 @@ export const generateContentItem = async (req, res) => {
       assetSaved: Boolean(asset)
     });
 
-    // Verify asset persistence
+    // Stage 7: Verify asset persistence
     const persistedAsset = await prisma.automationAsset.findFirst({
       where: { id: asset?.id }
     });
@@ -942,6 +1041,19 @@ export const generateContentItem = async (req, res) => {
       persisted: Boolean(persistedAsset)
     });
 
+    if (!persistedAsset) {
+      console.error("[Content Studio] Asset not persisted after save", { assetId: asset?.id });
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: "ASSET_VERIFICATION_FAILED",
+          message: "Asset was saved but could not be verified",
+          retryable: true,
+          stage: "VALIDATION"
+        }
+      });
+    }
+
     return res.status(201).json({
       success: true,
       data: {
@@ -949,11 +1061,20 @@ export const generateContentItem = async (req, res) => {
         metadata: meta,
         qualityScore,
         asset,
+        warnings: briefWarnings
       },
     });
   } catch (error) {
     console.error('❌ [Content Studio] Error:', error);
-    return res.status(500).json({ success: false, error: error.message || 'Failed to generate content' });
+    return res.status(500).json({ 
+      success: false, 
+      error: {
+        code: "CONTENT_GENERATION_ERROR",
+        message: error.message || 'Failed to generate content',
+        retryable: true,
+        stage: "UNKNOWN"
+      }
+    });
   }
 };
 
