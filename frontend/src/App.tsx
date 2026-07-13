@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import AppLayout from './components/AppLayout';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -30,24 +30,26 @@ console.info('[Frontend Build]', {
 });
 
 export default function App() {
+  const location = useLocation();
+  const resetKey = location.pathname.split('/').pop() || 'root';
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/app" element={<Protected><ProjectProvider><AppLayout /></ProjectProvider></Protected>}>
-        <Route index element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
-        <Route path="dashboard" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
-        <Route path="growth-workspace" element={<ErrorBoundary><GrowthWorkspacePage /></ErrorBoundary>} />
+        <Route index element={<ErrorBoundary resetKey={resetKey}><DashboardPage /></ErrorBoundary>} />
+        <Route path="dashboard" element={<ErrorBoundary resetKey={resetKey}><DashboardPage /></ErrorBoundary>} />
+        <Route path="growth-workspace" element={<ErrorBoundary resetKey={resetKey}><GrowthWorkspacePage /></ErrorBoundary>} />
         <Route path="product-intelligence" element={<Navigate to="/app/growth-workspace" replace />} />
-        <Route path="seo" element={<ErrorBoundary><SEOIntelligencePage /></ErrorBoundary>} />
-        <Route path="campaigns" element={<ErrorBoundary><CampaignIntelligencePage /></ErrorBoundary>} />
-        <Route path="executive-story" element={<ErrorBoundary><ExecutiveStoryPage /></ErrorBoundary>} />
-        <Route path="automation-center" element={<ErrorBoundary><AutomationCenterPage /></ErrorBoundary>} />
-        <Route path="content-studio" element={<ErrorBoundary><ContentStudioPage /></ErrorBoundary>} />
-        <Route path="chat-history" element={<ErrorBoundary><ChatHistoryPage /></ErrorBoundary>} />
-        <Route path="profile" element={<ErrorBoundary><ProfilePage /></ErrorBoundary>} />
-        <Route path="settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />
+        <Route path="seo" element={<ErrorBoundary resetKey={resetKey}><SEOIntelligencePage /></ErrorBoundary>} />
+        <Route path="campaigns" element={<ErrorBoundary resetKey={resetKey}><CampaignIntelligencePage /></ErrorBoundary>} />
+        <Route path="executive-story" element={<ErrorBoundary resetKey={resetKey}><ExecutiveStoryPage /></ErrorBoundary>} />
+        <Route path="automation-center" element={<ErrorBoundary resetKey={resetKey}><AutomationCenterPage /></ErrorBoundary>} />
+        <Route path="content-studio" element={<ErrorBoundary resetKey={resetKey}><ContentStudioPage /></ErrorBoundary>} />
+        <Route path="chat-history" element={<ErrorBoundary resetKey={resetKey}><ChatHistoryPage /></ErrorBoundary>} />
+        <Route path="profile" element={<ErrorBoundary resetKey={resetKey}><ProfilePage /></ErrorBoundary>} />
+        <Route path="settings" element={<ErrorBoundary resetKey={resetKey}><SettingsPage /></ErrorBoundary>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -4,6 +4,7 @@ interface Props {
   children: ReactNode;
   fallbackTitle?: string;
   fallbackMessage?: string;
+  resetKey?: string;
 }
 
 interface State {
@@ -23,6 +24,12 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.warn('[ErrorBoundary] Caught error:', error.message, errorInfo.componentStack);
+  }
+
+  componentDidUpdate(prevProps: Props) {
+    if (this.state.hasError && this.props.resetKey !== prevProps.resetKey) {
+      this.setState({ hasError: false, error: null });
+    }
   }
 
   render() {

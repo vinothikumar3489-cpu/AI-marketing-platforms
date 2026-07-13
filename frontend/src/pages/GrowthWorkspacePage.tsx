@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { api, downloadReport } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
 import { asArray, asNumber, asText, asInsight, renderSafeValue } from '../lib/normalizers';
@@ -32,11 +32,6 @@ const defaults: any = {
 const tabs = ['Executive Snapshot', 'Executive Story', 'Product DNA', 'Market Intelligence', 'Audience Intelligence', 'Competitor Intelligence', 'Intent Prediction', 'Positioning Strategy', 'Campaign Strategy', 'Channel Strategy', 'Action Plan', 'Report Preview'];
 
 export default function GrowthWorkspacePage() {
-  console.info("[Growth Route Component]", {
-    component: "GrowthWorkspacePage",
-    sourceFile: "src/pages/GrowthWorkspacePage.tsx",
-    buildSha: import.meta.env.VITE_COMMIT_SHA
-  });
   const { selectedChatId, createChat, loadFullResults, fullResults } = useProject();
   const [form, setForm] = useState(defaults);
   const [activeTab, setActiveTab] = useWorkspaceMemory('gw-activeTab', 'Executive Snapshot');
@@ -47,6 +42,14 @@ export default function GrowthWorkspacePage() {
   type Status = 'idle' | 'input_required' | 'running' | 'completed' | 'failed';
   const [status, setStatus] = useState<Status>('idle');
   const analysisRunningRef = useRef(false);
+
+  useEffect(() => {
+    console.info("[Growth Route Component]", {
+      component: "GrowthWorkspacePage",
+      sourceFile: "src/pages/GrowthWorkspacePage.tsx",
+      buildSha: import.meta.env.VITE_COMMIT_SHA
+    });
+  }, []);
 
   function hasRealContent(obj: any): boolean {
     return obj && typeof obj === 'object' && Object.keys(obj).length > 0;
