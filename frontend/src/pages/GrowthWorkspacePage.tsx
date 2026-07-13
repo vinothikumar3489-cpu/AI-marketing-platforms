@@ -32,6 +32,11 @@ const defaults: any = {
 const tabs = ['Executive Snapshot', 'Executive Story', 'Product DNA', 'Market Intelligence', 'Audience Intelligence', 'Competitor Intelligence', 'Intent Prediction', 'Positioning Strategy', 'Campaign Strategy', 'Channel Strategy', 'Action Plan', 'Report Preview'];
 
 export default function GrowthWorkspacePage() {
+  console.info("[Growth Route Component]", {
+    component: "GrowthWorkspacePage",
+    sourceFile: "src/pages/GrowthWorkspacePage.tsx",
+    buildSha: import.meta.env.VITE_COMMIT_SHA
+  });
   const { selectedChatId, createChat, loadFullResults, fullResults } = useProject();
   const [form, setForm] = useState(defaults);
   const [activeTab, setActiveTab] = useWorkspaceMemory('gw-activeTab', 'Executive Snapshot');
@@ -41,12 +46,14 @@ export default function GrowthWorkspacePage() {
   const [creatingChat, setCreatingChat] = useState(false);
   type Status = 'idle' | 'input_required' | 'running' | 'completed' | 'failed';
   const [status, setStatus] = useState<Status>('idle');
+  const analysisRunningRef = useRef(false);
 
   function hasRealContent(obj: any): boolean {
     return obj && typeof obj === 'object' && Object.keys(obj).length > 0;
   }
 
   useEffect(() => {
+    if (analysisRunningRef.current) return;
     let cancelled = false;
     const r = fullResults.growth || {};
     const hasGrowthData = fullResults.hasGrowthWorkspace === true ||
@@ -80,6 +87,7 @@ export default function GrowthWorkspacePage() {
     setError(''); 
     setLoading(true);
     setStatus('running');
+    analysisRunningRef.current = true;
     try {
       let chatId = selectedChatId;
       if (!chatId) {
@@ -88,16 +96,37 @@ export default function GrowthWorkspacePage() {
         setCreatingChat(false);
       }
       
+      console.info('[Growth UI Request]', {
+        chatId,
+        websiteUrl: form.websiteUrl,
+        method: 'POST',
+        path: `/chats/${chatId}/growth-workspace/run-full-analysis`,
+        apiBase: import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+      });
+      
       const res: any = await api.post(`/chats/${chatId}/growth-workspace/run-full-analysis`, form);
       
       await loadFullResults(chatId);
       
       setStatus('completed');
     } catch (e: any) {
-      setError(e.message || 'Analysis failed');
+      const status = e?.status || e?.response?.status || 0;
+      const msg = e.message || 'Analysis failed';
+      if (status === 0 || status === 502) {
+        setError(`Request failed: backend server unreachable. ${msg}`);
+      } else if (status === 401) {
+        setError('Session expired. Please log in again.');
+      } else if (status === 408 || status === 504) {
+        setError('Analysis timed out. The request took too long.');
+      } else if (status >= 500) {
+        setError(`Backend error (${status}): ${msg}`);
+      } else {
+        setError(msg);
+      }
       setStatus('failed');
     } finally {
       setLoading(false);
+      analysisRunningRef.current = false;
     }
   }
 

@@ -32,9 +32,11 @@ export const runFullAnalysisHandler = async (req, res) => {
   };
 
   try {
+    console.info('[Growth Stage]', { stage: 'START_PIPELINE', status: 'running', chatId });
     const result = await runFullGrowthAnalysis({ chatId, userId, input: mappedInput });
 
     if (!result.success) {
+      console.info('[Growth Stage]', { stage: 'PIPELINE_FAILED', status: 'failed', error: result.error, chatId });
       return res.status(500).json({
         success: false,
         error: result.error,
@@ -43,6 +45,7 @@ export const runFullAnalysisHandler = async (req, res) => {
       });
     }
 
+    console.info('[Growth Stage]', { stage: 'PIPELINE_COMPLETE', status: 'completed', chatId });
     console.log('✅ [Growth Workspace Controller] Analysis complete');
     
     return res.json({

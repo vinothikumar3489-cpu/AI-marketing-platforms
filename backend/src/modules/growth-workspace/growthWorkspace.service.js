@@ -809,6 +809,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     // Save to database using validated chat.id
     console.log('💾 [Growth Workspace] Saving core intelligence to database...');
+    console.info('[Growth Stage]', { stage: 'TRANSACTION_STARTED', status: 'running', chatId: validChatId });
     
     await prisma.$transaction([
       prisma.productIntelligence.upsert({
@@ -887,6 +888,8 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       })
     ]);
 
+    console.info('[Growth Stage]', { stage: 'TRANSACTION_COMMITTED', status: 'completed', chatId: validChatId });
+
     // Save optional derived data (executive story, action plan) separately
     try {
       await prisma.campaignIntelligence.update({
@@ -915,6 +918,34 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     console.log('💾 [Growth Workspace] Core intelligence saved to database');
     console.log(`✅ [Growth Workspace] hasActionPlan: ${!!normalizedResults.campaign.actionPlan}`);
+
+    // Verify database records
+    try {
+      const [product, audience, competitor, campaign] = await Promise.all([
+        prisma.productIntelligence.findFirst({ where: { userId, chatId: validChatId }, select: { id: true } }),
+        prisma.competitorIntelligence.findFirst({ where: { userId, chatId: validChatId }, select: { id: true } }),
+        prisma.campaignIntelligence.findFirst({ where: { userId, chatId: validChatId }, select: { id: true } }),
+      ]);
+      console.info('[Growth Stage]', {
+        stage: 'PERSISTENCE_VERIFIED',
+        status: 'completed',
+        chatId: validChatId,
+        persistence: {
+          hasProductIntelligence: !!product,
+          hasAudienceIntelligence: !!audience,
+          hasCompetitorIntelligence: !!competitor,
+          hasCampaignIntelligence: !!campaign,
+        }
+      });
+    } catch (verifyError) {
+      console.error('[Growth Stage]', {
+        stage: 'PERSISTENCE_VERIFY_FAILED',
+        status: 'warning',
+        chatId: validChatId,
+        errorName: verifyError.name,
+        errorMessage: verifyError.message,
+      });
+    }
 
     // Add message to chat
     await prisma.message.create({

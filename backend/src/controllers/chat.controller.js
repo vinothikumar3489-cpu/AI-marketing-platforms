@@ -1,6 +1,28 @@
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 
+export async function getChatIntelligenceReadiness({ userId, chatId }) {
+  const [productIntel, competitorIntel, campaignIntel, seoIntel, automationPlan] = await Promise.all([
+    prisma.productIntelligence.findUnique({ where: { chatId } }),
+    prisma.competitorIntelligence.findUnique({ where: { chatId } }),
+    prisma.campaignIntelligence.findUnique({ where: { chatId } }),
+    prisma.seoIntelligence.findUnique({ where: { chatId } }).catch(() => null),
+    prisma.automationPlan.findUnique({ where: { chatId } }).catch(() => null),
+  ]);
+
+  return {
+    hasProductIntelligence: !!productIntel,
+    hasAudienceIntelligence: !!(productIntel?.audienceIntelligence && Object.keys(productIntel.audienceIntelligence).length > 0),
+    hasCompetitorIntelligence: !!competitorIntel,
+    hasCampaignIntelligence: !!campaignIntel,
+    hasSeoIntelligence: !!seoIntel,
+    hasAutomationPlan: !!automationPlan,
+    contentGenerationReady: !!productIntel,
+    campaignGenerationReady: !!productIntel && !!(productIntel?.audienceIntelligence || competitorIntel),
+    automationGenerationReady: !!productIntel && !!campaignIntel,
+  };
+}
+
 const chatSchema = z.object({
   title: z.string().min(1),
   productName: z.string().optional(),
@@ -760,22 +782,8 @@ export const getEvidenceReadiness = async (req, res) => {
       return res.status(404).json({ success: false, error: "Chat not found" });
     }
 
-    const productIntel = await prisma.productIntelligence.findUnique({ where: { chatId } });
-    const audienceIntel = null; // AudienceIntelligence is stored within productIntel
-    const competitorIntel = await prisma.competitorIntelligence.findUnique({ where: { chatId } });
-    const campaignIntel = await prisma.campaignIntelligence.findUnique({ where: { chatId } });
-    const seoIntel = await prisma.seoIntelligence.findUnique({ where: { chatId } });
-    let automationPlan = null;
-    try {
-      automationPlan = await prisma.automationPlan.findUnique({ where: { chatId } });
-    } catch (e) { /* ignore schema mismatch */ }
-
-    const hasProductIntelligence = !!productIntel;
-    const hasAudienceIntelligence = !!(productIntel?.audienceIntelligence && Object.keys(productIntel.audienceIntelligence).length > 0);
-    const hasCompetitorIntelligence = !!competitorIntel;
-    const hasCampaignIntelligence = !!campaignIntel;
-    const hasSeoIntelligence = !!seoIntel;
-    const hasAutomationPlan = !!automationPlan;
+    const readiness = await getChatIntelligenceReadiness({ userId, chatId });
+    const { hasProductIntelligence, hasAudienceIntelligence, hasCompetitorIntelligence, hasCampaignIntelligence, hasSeoIntelligence, hasAutomationPlan } = readiness;
 
     return res.json({
       success: true,

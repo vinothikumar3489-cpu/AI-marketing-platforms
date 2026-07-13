@@ -211,17 +211,22 @@ function filterJunkKeywords(keywords, source = 'unknown') {
       'canva\'s', 'templates', 'designing', 'design',
       'undefined', 'account', 'semrush', 'general',
       'homepage', 'url', 'self link', 'page title', 'meta title',
-      'month', 'year', 'day', 'week'
+      'month', 'year', 'day', 'week',
+      'tiktok', 'shorts', 'trends', 'trending', 'viral', 'outlier',
+      'reels', 'instagram reels', 'youtube shorts', 'influencer',
+      'social media', 'content creator', 'viral content',
+      'tik tok', 'tick tock'
     ];
 
     if (/^\[/.test(lowerKeyword)) return false;
     if (junkPatterns.includes(lowerKeyword)) return false;
     if (lowerKeyword.includes(':') && lowerKeyword.split(':')[0].trim().length > 0) return false;
-    if (lowerKeyword.includes('homepage') || lowerKeyword.includes('url') ||
+      if (lowerKeyword.includes('homepage') || lowerKeyword.includes('url') ||
         lowerKeyword.includes('social profile') || lowerKeyword.includes('self link') ||
         lowerKeyword.includes('instagram') || lowerKeyword.includes('title') ||
         lowerKeyword.includes('facebook') || lowerKeyword.includes('twitter') ||
-        lowerKeyword.includes('linkedin') || lowerKeyword.includes('youtube')) return false;
+        lowerKeyword.includes('linkedin') || lowerKeyword.includes('youtube') ||
+        lowerKeyword.includes('app store') || lowerKeyword.includes('google play')) return false;
     if (lowerKeyword.includes("'s") || lowerKeyword.includes("'")) return false;
     if (lowerKeyword.includes('http') || lowerKeyword.includes('www.') || lowerKeyword.includes('.com') ||
         lowerKeyword.includes('.me/') || lowerKeyword.includes('.app') || lowerKeyword.includes('.io')) return false;
@@ -411,6 +416,7 @@ Return ONLY valid JSON:
 Rules:
 - DO NOT generate fake search volume, difficulty, CPC, or competition metrics
 - DO NOT return generic terms like "software", "business", "platform", "solution"
+- DO NOT return broad social media terms like "tiktok", "shorts", "trends", "trending", "viral", "outlier", "reels", "youtube shorts", "social media", "influencer"
 - DO NOT return the product name alone
 - Return topic ideas only — all metrics will be null
 - Max 5 per category`;

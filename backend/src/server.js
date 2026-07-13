@@ -292,6 +292,15 @@ app.get("/api/health", async (req, res) => {
     environment: process.env.NODE_ENV || "development",
     database: dbStatus,
     timestamp: new Date().toISOString(),
+    commitSha: process.env.APP_COMMIT_SHA || 'unknown',
+  });
+});
+
+app.get("/api/version", (req, res) => {
+  res.json({
+    commitSha: process.env.APP_COMMIT_SHA || 'unknown',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString(),
   });
 });
 

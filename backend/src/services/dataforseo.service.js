@@ -259,9 +259,12 @@ export async function getKeywordMetrics(keywords, location = 'United States', la
     };
   }
 
+  const successfulResults = normalized.filter(
+    item => typeof item.keyword === 'string' && item.keyword.length > 0
+  );
   console.log('🔍 [DataForSEO] Normalized keyword results:', {
-    total: response.data.tasks.length,
-    successful: normalized.length,
+    total: normalized.length,
+    successful: successfulResults.length,
     first3: normalized.slice(0, 3).map(k => ({ keyword: k.keyword, volume: k.volume }))
   });
 

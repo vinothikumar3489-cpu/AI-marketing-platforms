@@ -6,6 +6,16 @@ export const growthWorkspaceRouter = express.Router();
 
 growthWorkspaceRouter.use(requireAuth);
 
+// Route-entry logging middleware
+growthWorkspaceRouter.use('/:chatId/growth-workspace', (req, res, next) => {
+  console.info('[Growth Route Matched]', {
+    method: req.method,
+    path: req.originalUrl,
+    chatId: req.params.chatId,
+  });
+  next();
+});
+
 // POST /api/chats/:chatId/growth-workspace/run-full-analysis
 growthWorkspaceRouter.post('/:chatId/growth-workspace/run-full-analysis', runFullAnalysisHandler);
 

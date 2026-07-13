@@ -24,6 +24,11 @@ function Protected({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+console.info('[Frontend Build]', {
+  commitSha: import.meta.env.VITE_COMMIT_SHA || 'unknown',
+  mode: import.meta.env.MODE
+});
+
 export default function App() {
   return (
     <Routes>
