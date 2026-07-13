@@ -132,8 +132,8 @@ function extractSeoAudits(audits) {
     hasRobotsTxt: audits['robots-txt']?.score === 1,
     hasSitemap: audits['sitemap']?.score === 1,
     hasStructuredData: audits['structured-data']?.score === 1,
-    hasOpenGraph: audits['is-crawlable']?.score === 1,
-    hasTwitterCard: audits['is-crawlable']?.score === 1,
+    hasOpenGraph: audits['opengraph']?.score === 1,
+    hasTwitterCard: audits['twitter']?.score === 1,
     source: 'PageSpeed'
   };
 }

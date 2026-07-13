@@ -18,7 +18,7 @@ export const asText = (value: any, fallback: string = "Not available"): string =
   return fallback;
 };
 
-export const asNumber = (value: any, fallback: number = 60): number => {
+export const asNumber = (value: any, fallback: number | null = null): number | null => {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 };

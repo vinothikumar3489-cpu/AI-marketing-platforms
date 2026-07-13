@@ -69,13 +69,13 @@ export async function analyzeTechnicalSeo(scrapedData, websiteUrl) {
   const desktopLighthouse = pageSpeedData?.desktop?.lighthouseScores;
 
   const canonicalOutput = {
-    overallScore: audit.scores.overall || 0,
-    performanceScore: mobileLighthouse?.performance || desktopLighthouse?.performance || audit.scores.performance || 0,
-    seoScore: mobileLighthouse?.seo || desktopLighthouse?.seo || audit.scores.seo || 0,
-    accessibilityScore: mobileLighthouse?.accessibility || desktopLighthouse?.accessibility || audit.scores.accessibility || 0,
-    bestPracticesScore: mobileLighthouse?.bestPractices || desktopLighthouse?.bestPractices || audit.scores.bestPractices || 0,
-    mobileScore: mobileLighthouse?.performance || audit.scores.performance || 0,
-    desktopScore: desktopLighthouse?.performance || audit.scores.performance || 0,
+    overallScore: audit.scores.overall ?? null,
+    performanceScore: mobileLighthouse?.performance ?? desktopLighthouse?.performance ?? audit.scores.performance ?? null,
+    seoScore: mobileLighthouse?.seo ?? desktopLighthouse?.seo ?? audit.scores.seo ?? null,
+    accessibilityScore: mobileLighthouse?.accessibility ?? desktopLighthouse?.accessibility ?? audit.scores.accessibility ?? null,
+    bestPracticesScore: mobileLighthouse?.bestPractices ?? desktopLighthouse?.bestPractices ?? audit.scores.bestPractices ?? null,
+    mobileScore: mobileLighthouse?.performance ?? audit.scores.performance ?? null,
+    desktopScore: desktopLighthouse?.performance ?? audit.scores.performance ?? null,
     coreWebVitals: {
       fcp: pageSpeedData?.mobile?.coreWebVitals?.fcp || pageSpeedData?.desktop?.coreWebVitals?.fcp || null,
       lcp: pageSpeedData?.mobile?.coreWebVitals?.lcp || pageSpeedData?.desktop?.coreWebVitals?.lcp || null,

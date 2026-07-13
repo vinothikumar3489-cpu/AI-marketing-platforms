@@ -161,18 +161,19 @@ export async function getKeywordMetrics(keywords, location = 'United States', la
     return { success: false, error: 'No valid keywords after filtering' };
   }
 
-  const body = filteredKeywords.map(keyword => ({
-    keyword,
+  // DataForSEO v3 expects a single task with 'keywords' array
+  const body = [{
+    keywords: filteredKeywords,
     location_name: location,
     language_name: language
-  }));
+  }];
 
   const endpoint = '/keywords_data/google_ads/search_volume/live';
   
   console.log('🔍 [DataForSEO] Keywords sent to API:', {
     endpoint,
-    count: body.length,
-    keywords: body.map(b => b.keyword),
+    count: filteredKeywords.length,
+    keywords: filteredKeywords,
     location,
     language
   });
@@ -248,12 +249,12 @@ export async function getKeywordSuggestions(seedKeywords, location = 'United Sta
     return { success: false, error: 'No seed keywords provided' };
   }
 
-  const body = seedKeywords.map(keyword => ({
-    keyword,
+  const body = [{
+    keywords: seedKeywords,
     location_name: location,
     language_name: language,
     limit: 10
-  }));
+  }];
 
   const response = await dataforseoRequest('/keywords_data/google_ads/keyword_suggestions/live', 'POST', body);
 
@@ -298,7 +299,7 @@ export async function getRelatedKeywords(seedKeyword, location = 'United States'
   }
 
   const body = [{
-    keyword: seedKeyword,
+    keywords: [seedKeyword],
     location_name: location,
     language_name: language,
     limit: 20

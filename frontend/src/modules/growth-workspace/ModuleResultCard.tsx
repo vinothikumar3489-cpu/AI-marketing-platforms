@@ -21,7 +21,7 @@ export function ModuleResultCard({ title, description, data, renderContent }: Mo
             </CardTitle>
             <CardDescription className="mt-2">{description}</CardDescription>
           </div>
-          {data.confidenceScore && (
+          {data.confidenceScore != null && (
             <Badge variant="default" className="bg-green-500/20 text-green-400 border-green-500/30">
               Confidence: {data.confidenceScore}%
             </Badge>

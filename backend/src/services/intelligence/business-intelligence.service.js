@@ -506,7 +506,7 @@ export function synthesizeWithAI(evidence) {
       }
     },
     technologyIntelligence: {
-      technologies,
+      technologies: technology || [],
       frontend: technology.filter(t => t.category === 'frontend').map(t => ({ name: t.name, confidence: t.confidence, evidence: t.evidence })),
       backend: technology.filter(t => t.category === 'backend').map(t => ({ name: t.name, confidence: t.confidence, evidence: t.evidence })),
       cms: technology.filter(t => t.category === 'cms').map(t => ({ name: t.name, confidence: t.confidence, evidence: t.evidence })),

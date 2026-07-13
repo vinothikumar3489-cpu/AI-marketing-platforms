@@ -1502,8 +1502,8 @@ function normalizeGrowthResults(results, input) {
       risks: ensureArray(data.risks || data.marketRisks),
       growthSignals: ensureArray(data.growthSignals),
       entryStrategy: ensureString(data.entryStrategy, null),
-      demandScore: null,
-      confidenceScore: null,
+      demandScore: data.demandScore ?? data.demand ?? null,
+      confidenceScore: data.confidenceScore ?? null,
       provider: ensureString(data.provider, 'unknown')
     };
   }

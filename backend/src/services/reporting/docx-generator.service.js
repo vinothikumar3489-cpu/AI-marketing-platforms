@@ -12,7 +12,7 @@ export async function generateDocx(data) {
     const { company, market, audience, competitor, technology, pricing, scores, actionPlan, channelData, seo } = data || {};
     const name = company?.name || 'Company';
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const hasSeo = seo?.keywords?.length > 0 || seo?.scores?.overall;
+    const hasSeo = seo?.keywords?.length > 0 || (seo?.scores?.overall != null);
     const hasActionPlan = actionPlan && ['day7','day30','day60','day90','day180','day365'].some(k => arr(actionPlan[k]).length > 0);
     const isExecutive = !hasSeo;
 

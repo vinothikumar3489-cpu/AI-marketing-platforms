@@ -43,7 +43,7 @@ export async function collectPageSpeedEvidence(websiteUrl) {
     result.lcp = audits["largest-contentful-paint"]?.numericValue || null;
     result.cls = audits["cumulative-layout-shift"]?.numericValue || null;
     result.inp = audits["interaction-to-next-paint"]?.numericValue || null;
-    result.ttfb = audits["server-response-time"]?.numericValue || null;
+    result.ttfb = audits["time-to-first-byte"]?.numericValue || null;
 
     const opps = [];
     for (const [key, audit] of Object.entries(audits)) {

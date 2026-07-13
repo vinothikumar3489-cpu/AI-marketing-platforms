@@ -7,11 +7,11 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-const CEREBRAS_API_URL = "https://api.cerebras.net/v1/generate";
-const DEEPSEEK_API_URL = "https://api.deepseek.ai/v1/completions";
+const CEREBRAS_API_URL = "https://api.cerebras.ai/v1/chat/completions";
+const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
 const OPENROUTER_API_URL = "https://api.openrouter.ai/v1/chat/completions";
-const GROQ_API_URL = "https://api.groq.dev/v1/models";
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta2/models";
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
 const CEREBRAS_MODEL = process.env.CEREBRAS_MODEL || "cerebras-c1-mini";
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-business-intel";
@@ -322,9 +322,13 @@ async function parseProviderResponse(rawText) {
 async function generateWithCerebras(prompt, strict = false) {
   if (!CEREBRAS_API_KEY) return { success: false, error: friendlyStatus("cerebras", "missing_key"), code: "missing_key" };
 
+  const systemPrompt = buildSystemPrompt();
   const payload = {
     model: CEREBRAS_MODEL,
-    prompt: strict ? `${prompt}\n\nReturn raw JSON only with no markdown or explanation.` : prompt,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: strict ? `${prompt}\n\nReturn raw JSON only with no markdown or explanation.` : prompt },
+    ],
     max_tokens: 1500,
     temperature: 0.2,
   };
@@ -345,8 +349,8 @@ async function generateWithCerebras(prompt, strict = false) {
     }
 
     const data = await response.json();
-    const text = extractFirstText(data) || data?.text || data?.output;
-    const parsed = await parseProviderResponse(text);
+    const content = data.choices?.[0]?.message?.content || data.choices?.[0]?.text || extractFirstText(data);
+    const parsed = await parseProviderResponse(content);
 
     if (!parsed) {
       return { success: false, error: friendlyStatus("cerebras", "parse_error"), code: "parse_error" };
@@ -361,9 +365,13 @@ async function generateWithCerebras(prompt, strict = false) {
 async function generateWithDeepSeek(prompt, strict = false) {
   if (!DEEPSEEK_API_KEY) return { success: false, error: friendlyStatus("deepseek", "missing_key"), code: "missing_key" };
 
+  const systemPrompt = buildSystemPrompt();
   const payload = {
     model: DEEPSEEK_MODEL,
-    prompt: strict ? `${prompt}\n\nReturn raw JSON only with no markdown or explanation.` : prompt,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: strict ? `${prompt}\n\nReturn raw JSON only with no markdown or explanation.` : prompt },
+    ],
     max_tokens: 1500,
     temperature: 0.2,
   };
@@ -384,8 +392,8 @@ async function generateWithDeepSeek(prompt, strict = false) {
     }
 
     const data = await response.json();
-    const text = extractFirstText(data) || data?.text || data?.output;
-    const parsed = await parseProviderResponse(text);
+    const content = data.choices?.[0]?.message?.content || data.choices?.[0]?.text || extractFirstText(data);
+    const parsed = await parseProviderResponse(content);
 
     if (!parsed) {
       return { success: false, error: friendlyStatus("deepseek", "parse_error"), code: "parse_error" };
@@ -443,34 +451,32 @@ async function generateWithGroq(prompt, strict = false) {
   if (!GROQ_API_KEY) return { success: false, error: friendlyStatus("groq", "missing_key"), code: "missing_key" };
 
   const systemPrompt = buildSystemPrompt();
-  const url = `${GROQ_API_URL}/${GROQ_MODEL}/outputs`;
 
-  const makeRequest = async (userPrompt) => {
-    const response = await fetch(url, {
+  try {
+    const promptText = strict ? `${prompt}\n\nReturn raw JSON only with no markdown or explanation.` : prompt;
+    const response = await fetch(GROQ_API_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${GROQ_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        input: [systemPrompt, userPrompt],
+        model: GROQ_MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: promptText },
+        ],
         temperature: 0.2,
-        max_output_tokens: 1800,
+        max_tokens: 1800,
       }),
     });
-    return response;
-  };
-
-  try {
-    const promptText = strict ? `${prompt}\n\nReturn raw JSON only with no markdown or explanation.` : prompt;
-    const response = await makeRequest(promptText);
 
     if (!response.ok) {
       return { success: false, error: friendlyStatus("groq", "api_error"), code: "api_error" };
     }
 
     const data = await response.json();
-    const content = extractFirstText(data) || data?.output?.[0] || data?.output;
+    const content = data.choices?.[0]?.message?.content || data.choices?.[0]?.text || extractFirstText(data);
     const parsed = await parseProviderResponse(content);
 
     if (!parsed) {
@@ -487,11 +493,15 @@ async function generateWithGemini(prompt, strict = false) {
   if (!GEMINI_API_KEY) return { success: false, error: friendlyStatus("gemini", "missing_key"), code: "missing_key" };
 
   try {
-    const url = `${GEMINI_API_URL}/${GEMINI_MODEL}:generateText?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+    const url = `${GEMINI_API_URL}/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
     const body = {
-      prompt: { text: strict ? `${prompt}\n\nReturn raw JSON only with no markdown or explanation.` : prompt },
-      temperature: 0.2,
-      maxOutputTokens: 1400,
+      contents: [{
+        parts: [{ text: strict ? `${prompt}\n\nReturn raw JSON only with no markdown or explanation.` : prompt }]
+      }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 1400,
+      }
     };
     const response = await fetch(url, {
       method: "POST",
@@ -505,7 +515,7 @@ async function generateWithGemini(prompt, strict = false) {
     }
 
     const data = await response.json();
-    const text = extractFirstText(data);
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || extractFirstText(data);
     const parsed = await parseProviderResponse(text);
 
     if (!parsed) {

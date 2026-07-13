@@ -60,7 +60,7 @@ export async function generatePptx(data) {
     // ----------------------------------------------------------------
     addSectionSlide(pptx, 'Executive Summary & KPI Dashboard', 'Key Performance Indicators', C.primary);
     const kpiMetrics = [
-      { label: 'Overall Score', value: safeScore(scores?.overallGrowthScore || scores?.seoScore || scores?.overall), color: C.primary },
+      { label: 'Overall Score', value: safeScore(scores?.overallGrowthScore ?? scores?.seoScore ?? scores?.overall), color: C.primary },
       { label: 'Market Opportunity', value: safeScore(scores?.marketOpportunityScore), color: C.secondary },
       { label: 'Audience Clarity', value: safeScore(scores?.audienceClarityScore), color: '2563EB' },
       { label: 'Competitive Defens.', value: safeScore(scores?.competitiveDefensibilityScore), color: C.accent },

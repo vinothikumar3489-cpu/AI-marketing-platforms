@@ -120,7 +120,7 @@ function StepCard({ step, index }: { step: Step; index: number }) {
                 Provider: <span className="text-purple-400">{step.provider}</span>
               </div>
             )}
-            {step.confidenceScore !== undefined && (
+            {step.confidenceScore != null && (
               <div className="text-xs text-muted-foreground">
                 Confidence: <span className="text-green-400">{step.confidenceScore}%</span>
               </div>

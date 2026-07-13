@@ -770,7 +770,7 @@ export default function AIContentStudio() {
 
     getEvidenceContext(selectedChatId)
       .then(ctx => {
-        if (ctx?.success && ctx?.data) setEvidenceContext(ctx.data);
+        if (ctx && typeof ctx === 'object' && !ctx?.error) setEvidenceContext(ctx);
         else setEvidenceContext(null);
       })
       .catch(() => setEvidenceContext(null))
@@ -778,8 +778,8 @@ export default function AIContentStudio() {
 
     getContentBrief(selectedChatId)
       .then(res => {
-        if (res?.success !== false && res?.data) setBrief(res.data);
-        else if (res && typeof res === 'object' && !res?.error) setBrief(res);
+        if (res && typeof res === 'object' && !res?.error) setBrief(res);
+        else setBrief(null);
       })
       .catch(() => setBrief(null))
       .finally(() => setBriefLoading(false));
@@ -793,6 +793,18 @@ export default function AIContentStudio() {
     if (!result) {
       setGeneratedContent(null);
       setQualityScore(null);
+      return;
+    }
+    if (result._status === 'generation_failed' || result.metadata?.status === 'generation_failed') {
+      setError(result._error || result.metadata?.error || 'Content generation failed');
+      return;
+    }
+    if (result._status === 'blocked') {
+      setError(result._reason || 'Generation blocked: insufficient data');
+      return;
+    }
+    if (result.metadata?.status === 'schema_rejected') {
+      setError('Schema validation: ' + (result.metadata.schemaErrors || []).join('; '));
       return;
     }
     setGeneratedContent(result.content || result);
@@ -819,7 +831,7 @@ export default function AIContentStudio() {
       })
       .catch(err => {
         if (err.name === 'AbortError') return;
-        console.warn('Regenerate failed:', err.message);
+        setError('Regeneration failed: ' + (err.message || 'Unknown error'));
       });
   }, [setActiveTab]);
 

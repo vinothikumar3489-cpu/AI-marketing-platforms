@@ -49,10 +49,10 @@ export async function buildReportData(chatId, userId) {
   const seo = seoIntel ? normalizeSeoIntelligence(seoIntel) : null;
 
   const scores = {
-    overallGrowthScore: campaign?.growthSummary?.overallGrowthScore || campaign?.growthSummary?.dataCompletenessScore || null,
-    dataCompletenessScore: campaign?.growthSummary?.dataCompletenessScore || null,
-    evidenceBased: campaign?.growthSummary?.evidenceBased || false,
-    evidenceSourcesCount: campaign?.growthSummary?.evidenceSourcesCount || 0,
+    overallGrowthScore: campaign?.growthSummary?.overallGrowthScore ?? campaign?.growthSummary?.dataCompletenessScore ?? null,
+    dataCompletenessScore: campaign?.growthSummary?.dataCompletenessScore ?? null,
+    evidenceBased: campaign?.growthSummary?.evidenceBased ?? false,
+    evidenceSourcesCount: campaign?.growthSummary?.evidenceSourcesCount ?? 0,
     marketOpportunityScore: campaign?.growthSummary?.evidenceBased ? campaign?.growthSummary?.overallGrowthScore : null,
     audienceClarityScore: null,
     competitiveDefensibilityScore: null,
@@ -100,11 +100,14 @@ export async function buildReportData(chatId, userId) {
   };
 
   const marketData = {
+    tam: market?.tam ?? market?.marketSize?.tam ?? 'Not measured',
+    sam: market?.sam ?? market?.marketSize?.sam ?? 'Not measured',
+    som: market?.som ?? market?.marketSize?.som ?? 'Not measured',
+    growthRate: market?.growthRate ?? market?.marketGrowthRate ?? 'Not measured',
     trends: extractArray(market?.marketTrends || market?.trends),
     opportunities: extractArray(market?.growthOpportunities || market?.opportunities),
     risks: extractArray(market?.marketRisks || market?.risks),
     growthSignals: extractArray(market?.growthSignals),
-    dataNote: 'Market size data (TAM/SAM/SOM) not available without paid API sources'
   };
 
   const positioningData = {
@@ -332,15 +335,15 @@ function normalizeSeoIntelligence(seoIntel) {
     competitors: extractArray(competitorRecord?.competitors || competitorRecord?.competitorProfiles || competitorRecord),
     gaps: extractArray(gapRecord?.contentGaps || seoIntel.contentGaps),
     geo: {
-      chatgpt: geoRecord.chatGptScore ?? geoRecord.chatGpt ?? geoRecord.chatGptScore ?? geoRecord.chatGptScore,
+      ...geoRecord,
+      chatgpt: geoRecord.chatGptScore ?? geoRecord.chatGpt,
       gemini: geoRecord.geminiScore ?? geoRecord.gemini,
       claude: geoRecord.claudeScore ?? geoRecord.claude,
       perplexity: geoRecord.perplexityScore ?? geoRecord.perplexity,
       googleAiOverview: geoRecord.googleAiOverviewScore ?? geoRecord.googleAiOverview,
-      ...geoRecord
     },
     blogs: extractArray(blogRecord?.blogIdeas || seoIntel.blogIdeas),
-    backlinks: seoIntel.rawCrawlData?.[0]?.metadata?.backlinks || seoIntel.rawCrawlData?.metadata?.backlinks || {},
+    backlinks: seoIntel.rawCrawlData?.[0]?.metadata?.backlinks || {},
     actionPlan: seoIntel.actionPlan || {}
   };
 }

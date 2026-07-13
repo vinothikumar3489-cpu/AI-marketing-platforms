@@ -65,7 +65,7 @@ export function AnalysisSummary({ summary }: AnalysisSummaryProps) {
                 <Target className="w-3 h-3" />
                 Best Channel
               </div>
-              <div className="text-lg font-semibold text-white mb-1">{bestChannel}</div>
+              <div className="text-lg font-semibold text-white mb-1">{bestChannel || 'Not measured'}</div>
               <div className="text-xs text-muted-foreground">Highest fit for your audience</div>
             </CardContent>
           </Card>
@@ -77,7 +77,7 @@ export function AnalysisSummary({ summary }: AnalysisSummaryProps) {
                 <TrendingUp className="w-3 h-3" />
                 Top Opportunity
               </div>
-              <div className="text-sm font-semibold text-green-400 mb-1">{topOpportunity}</div>
+              <div className="text-sm font-semibold text-green-400 mb-1">{topOpportunity || 'Not measured'}</div>
               <div className="text-xs text-muted-foreground">Primary growth driver</div>
             </CardContent>
           </Card>
@@ -89,7 +89,7 @@ export function AnalysisSummary({ summary }: AnalysisSummaryProps) {
                 <AlertTriangle className="w-3 h-3" />
                 Top Risk
               </div>
-              <div className="text-sm font-semibold text-yellow-400 mb-1">{topRisk}</div>
+              <div className="text-sm font-semibold text-yellow-400 mb-1">{topRisk || 'Not measured'}</div>
               <div className="text-xs text-muted-foreground">Main challenge to address</div>
             </CardContent>
           </Card>
@@ -101,7 +101,7 @@ export function AnalysisSummary({ summary }: AnalysisSummaryProps) {
                 <Sparkles className="w-3 h-3" />
                 Next Action
               </div>
-              <div className="text-sm font-semibold text-purple-400 mb-1">{nextAction}</div>
+              <div className="text-sm font-semibold text-purple-400 mb-1">{nextAction || 'Not measured'}</div>
               <div className="text-xs text-muted-foreground">Recommended next step</div>
             </CardContent>
           </Card>

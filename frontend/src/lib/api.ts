@@ -4,6 +4,23 @@ import { normalizeDeep } from './normalizers';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
+export function hasToken(): boolean {
+  const token = getToken();
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('token');
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export class ApiError extends Error {
   status: number;
   data: any;
@@ -22,10 +39,19 @@ export function setToken(token: string) {
   localStorage.setItem('auth_token', token);
 }
 
+let isRedirecting = false;
+
 export function clearAuth() {
   localStorage.removeItem('auth_token');
   localStorage.removeItem('auth_user');
   localStorage.removeItem('selectedChatId');
+}
+
+function redirectToLogin() {
+  if (isRedirecting) return;
+  isRedirecting = true;
+  clearAuth();
+  window.location.href = '/login';
 }
 
 async function request<T>(method: Method, path: string, body?: any, signal?: AbortSignal): Promise<T> {
@@ -50,7 +76,7 @@ async function request<T>(method: Method, path: string, body?: any, signal?: Abo
   
   if (!res.ok) {
     if (res.status === 401) {
-      clearAuth();
+      redirectToLogin();
     }
     throw new ApiError(data?.error || data?.message || `Request failed: ${res.status}`, res.status, data);
   }
