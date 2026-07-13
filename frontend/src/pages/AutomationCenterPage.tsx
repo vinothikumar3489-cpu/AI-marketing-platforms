@@ -847,9 +847,9 @@ function WorkflowTabContent() {
     try {
       const res: any = await api.post(`/chats/${selectedChatId}/workflow/start`, {});
       setStatus(res);
-      if (!res.success && res.error) setError(res.error);
+      if (!res.success && res.error) setError(getApiErrorMessage(res.error));
     } catch (e: any) {
-      setError(e.message || 'Failed to start workflow');
+      setError(getApiErrorMessage(e));
     }
     setLoading(false);
   }
@@ -863,7 +863,7 @@ function WorkflowTabContent() {
       const newStatus: any = await api.get(`/chats/${selectedChatId}/workflow/status`);
       setStatus(newStatus);
     } catch (e: any) {
-      setError(e.message || 'Failed to execute step');
+      setError(getApiErrorMessage(e));
     }
     setLoading(false);
   }
@@ -1477,14 +1477,12 @@ export default function AutomationCenterPage() {
     try {
       const res: any = await api.post(`/automation/${selectedChatId}/generate`, {});
       if (res.success === false && res.error) {
-        const msg = typeof res.error === 'object' && res.error.message ? res.error.message : String(res.error);
-        setGenError(msg);
+        setGenError(getApiErrorMessage(res.error));
       } else {
         setData(res.automationPlan || res.data || res);
       }
     } catch (e: any) {
-      const msg = getApiErrorMessage(e);
-      setGenError(msg);
+      setGenError(getApiErrorMessage(e));
     }
     setGenLoading(false);
     clearPending('automation');
@@ -1509,13 +1507,13 @@ export default function AutomationCenterPage() {
     try {
       const res: any = await api.post(`/campaign/${selectedChatId}/generate`, {});
       if (res.success === false && res.error) {
-        const msg = typeof res.error === 'object' && res.error.message ? res.error.message : String(res.error);
-        setCampaignError(msg);
+        setCampaignError(getApiErrorMessage(res.error));
         setCampaignLoading(false);
+        return;
       }
+      await loadCampaignPlan();
     } catch (e: any) {
-      const msg = getApiErrorMessage(e);
-      setCampaignError(msg);
+      setCampaignError(getApiErrorMessage(e));
       setCampaignLoading(false);
     }
     clearPending('campaign');
@@ -1540,14 +1538,12 @@ export default function AutomationCenterPage() {
     try {
       const res: any = await api.post(`/automation/${selectedChatId}/execute`, {});
       if (res.success === false && res.error) {
-        const msg = typeof res.error === 'object' && res.error.message ? res.error.message : String(res.error);
-        setGenError(msg);
+        setGenError(getApiErrorMessage(res.error));
       } else {
         setExecData(res.data);
       }
     } catch (e: any) {
-      const msg = getApiErrorMessage(e);
-      setGenError(msg);
+      setGenError(getApiErrorMessage(e));
     }
     setExecLoading(false);
     clearPending('execute');

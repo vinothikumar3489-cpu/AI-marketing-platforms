@@ -9,23 +9,31 @@ export async function buildContentBrief(prisma, userId, chatId) {
     throw new Error('prisma, userId, and chatId required');
   }
 
+  console.info("[Content Brief] Building brief", { chatId, userId });
+
   const chat = await prisma.chat.findUnique({ where: { id: chatId } });
   if (!chat || chat.userId !== userId) {
+    console.warn("[Content Brief] Chat not found or owner mismatch", { chatId, userId });
     return { rejected: true, reason: 'Chat not found or owner mismatch', code: 'CHAT_ERROR' };
   }
 
   const evidenceSnapshot = await getLatestEvidenceSnapshot({ prisma, userId, chatId });
-  if (!evidenceSnapshot) {
-    return { rejected: true, reason: 'No evidence snapshot — run an analysis first', code: 'EVIDENCE_MISSING' };
-  }
-
-  const raw = evidenceSnapshot.evidence || {};
+  const raw = evidenceSnapshot?.evidence || {};
 
   const [productIntel, competitorIntel, seoIntel] = await Promise.all([
     prisma.productIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
     prisma.competitorIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
     prisma.seoIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
   ]);
+
+  console.info("[Content Brief] Evidence loaded", {
+    chatId,
+    userId,
+    hasProductIntel: Boolean(productIntel),
+    hasCompetitorIntel: Boolean(competitorIntel),
+    hasSeoIntel: Boolean(seoIntel),
+    hasEvidenceSnapshot: Boolean(evidenceSnapshot)
+  });
 
   const productAnalysis = productIntel?.productAnalysis || {};
   const audienceData = productIntel?.audienceIntelligence || {};
@@ -34,8 +42,9 @@ export async function buildContentBrief(prisma, userId, chatId) {
   const website = raw.website || {};
 
   const productName = chat.productName || productAnalysis.name || null;
-  if (!productName && !website.featuresText?.length) {
-    return { rejected: true, reason: 'Product identity missing — no name or features found', code: 'PRODUCT_IDENTITY_MISSING' };
+  if (!productIntel) {
+    console.warn("[Content Brief] ProductIntelligence missing", { chatId, userId });
+    return { rejected: true, reason: 'Complete Growth Analysis before generating content.', code: 'EVIDENCE_MISSING' };
   }
 
   const brief = {
@@ -87,7 +96,7 @@ export async function buildContentBrief(prisma, userId, chatId) {
     tone: 'professional',
     CTA: (website.ctaTexts || []).slice(0, 3),
     evidenceSources: {
-      hasEvidenceSnapshot: true,
+      hasEvidenceSnapshot: !!evidenceSnapshot,
       hasProductIntel: !!productIntel,
       hasCompetitorIntel: !!competitorIntel,
       hasSeoIntel: !!seoIntel,

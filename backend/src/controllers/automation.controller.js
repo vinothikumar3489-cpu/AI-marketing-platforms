@@ -4,6 +4,9 @@ import { callAI } from "../ai/services/aiRouter.service.js";
 import { generateAllExecutionModules, generateSingleModule } from "../services/execution/marketing-execution.service.js";
 import { buildEvidenceContext, buildReadinessChecklist } from "../services/execution/evidence-context-builder.service.js";
 import { buildContentBrief } from "../services/execution/content-brief.service.js";
+
+const inProgressAutomation = new Set();
+const inProgressCampaign = new Set();
 import { generateContent, generateContentStudioPlan, CONTENT_TYPES_LIST as CONTENT_TYPES } from "../services/execution/content-studio.service.js";
 import { scoreContentQuality } from "../services/execution/quality-scorer.service.js";
 import { saveContentAsset, getContentAssets, getAssetVersions, regenerateAsset as renewAssetInDb } from "../services/execution/content-asset.service.js";
@@ -17,7 +20,7 @@ export const getAutomationDemo = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    console.log('🤖 [Automation] Fetching demo for:', { chatId, userId });
+    console.log('[Automation Plan] Fetching plan for:', { chatId, userId });
 
     // Verify chat ownership
     const chat = await prisma.chat.findFirst({
@@ -49,7 +52,7 @@ export const getAutomationDemo = async (req, res) => {
       });
     }
 
-    console.log('✅ [Automation] Plan found with', automationPlan.assets.length, 'assets');
+    console.log('✅ [Automation Plan] Plan found with', automationPlan.assets.length, 'assets');
 
     return res.json({
       success: true,
@@ -58,24 +61,30 @@ export const getAutomationDemo = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ [Automation] Error fetching demo:', error);
+    console.error('❌ [Automation Plan] Error fetching plan:', error);
     return res.status(500).json({
       success: false,
-      error: error.message || 'Failed to fetch automation demo'
+      error: error.message || 'Failed to fetch automation plan'
     });
   }
 };
 
 /**
  * POST /api/automation/:chatId/generate-demo
- * Generate new automation demo plan
+ * Generate new automation plan
  */
 export const generateAutomationDemo = async (req, res) => {
   const { chatId } = req.params;
   const userId = req.user.id;
 
+  const dedupKey = `automation:${userId}:${chatId}`;
+  if (inProgressAutomation.has(dedupKey)) {
+    return res.status(409).json({ success: false, error: 'Automation generation already in progress' });
+  }
+  inProgressAutomation.add(dedupKey);
+
   try {
-    console.log('🚀 [Automation] Generating demo for:', { chatId, userId });
+    console.log('[Automation Plan] Generation started for:', { chatId, userId });
 
     // Verify chat ownership
     const chat = await prisma.chat.findFirst({
@@ -83,21 +92,51 @@ export const generateAutomationDemo = async (req, res) => {
     });
 
     if (!chat) {
+      console.warn('[Automation Plan] Chat not found', { chatId, userId });
       return res.status(404).json({
         success: false,
         error: "Chat not found"
       });
     }
 
+    console.info('[Automation Plan] Chat details', {
+      chatId,
+      userId,
+      productName: chat.productName,
+      title: chat.title,
+      hasProductName: !!(chat.productName || chat.title)
+    });
+
     // Fetch existing analysis data (scoped by userId)
     const evidenceContext = await buildEvidenceContext(prisma, userId, chatId);
 
+    console.info("[Automation Evidence]", {
+      chatId,
+      userId,
+      chatExists: evidenceContext.rejected ? (evidenceContext.code === 'CHAT_NOT_FOUND' ? false : true) : true,
+      productExists: Boolean(evidenceContext.checks?.productIntelligenceExists),
+      audienceExists: Boolean(evidenceContext.checks?.audienceIntelligenceExists),
+      competitorExists: Boolean(evidenceContext.checks?.competitorIntelligenceExists),
+      campaignIntelligenceExists: Boolean(evidenceContext.checks?.campaignIntelligenceExists),
+      campaignPlanExists: Boolean(evidenceContext.checks?.existingCampaignPlanExists),
+      seoExists: Boolean(evidenceContext.checks?.seoIntelligenceExists),
+      evidenceSnapshotExists: Boolean(evidenceContext.checks?.evidenceSnapshotExists),
+      missingEvidence: evidenceContext.missingEvidence || []
+    });
+
     // Handle rejection from evidence context
     if (evidenceContext.rejected) {
-      const missing = [];
+      const missing = evidenceContext.missingEvidence || [];
       if (evidenceContext.code === 'EVIDENCE_MISSING' || evidenceContext.code === 'PRODUCT_IDENTITY_MISSING') {
-        missing.push('ProductIntelligence', 'CampaignIntelligence');
+        missing.push('ProductIntelligence');
       }
+      console.warn("[Automation Plan] Evidence rejected", {
+        chatId,
+        userId,
+        code: evidenceContext.code,
+        reason: evidenceContext.reason,
+        missing
+      });
       return res.status(422).json({
         success: false,
         error: {
@@ -108,6 +147,8 @@ export const generateAutomationDemo = async (req, res) => {
         }
       });
     }
+
+    console.info("[Automation Plan] Evidence loaded successfully");
 
     const { _raw } = evidenceContext;
     const productIntelligence = _raw.productIntel;
@@ -152,13 +193,18 @@ export const generateAutomationDemo = async (req, res) => {
 
     // Create new automation plan (with strict field sanitization)
     const sanitizedData = sanitizeAutomationPlanData(automationData);
+    // campaignName is required by the schema — guarantee a value
+    const createData = {
+      ...sanitizedData,
+      campaignName: sanitizedData.campaignName || chat.productName || chat.title || 'Automation Plan',
+      readinessChecklist,
+      status: 'draft',
+    };
     const automationPlan = await prisma.automationPlan.create({
       data: {
         userId,
         chatId,
-        ...sanitizedData,
-        readinessChecklist,
-        status: 'draft',
+        ...createData,
       }
     });
 
@@ -186,19 +232,33 @@ export const generateAutomationDemo = async (req, res) => {
       }
     });
 
-    console.log('✅ [Automation] Plan generated with readiness:', readinessChecklist.status);
+    const persisted = await prisma.automationPlan.findFirst({ where: { userId, chatId } });
+    console.log('[Automation Plan] Persistence check', {
+      automationPlanSaved: Boolean(persisted),
+      automationPlanId: persisted?.id,
+      campaignName: persisted?.campaignName,
+      status: persisted?.status
+    });
 
-    return res.json({
+    if (!persisted) {
+      console.error('[Automation Plan] Failed to persist plan after create');
+      return res.status(500).json({
+        success: false,
+        error: "Automation plan could not be persisted. Please retry."
+      });
+    }
+
+    return res.status(201).json({
       success: true,
       automationPlan: completePlan,
       readinessChecklist,
     });
 
   } catch (error) {
-    console.error('❌ [Automation] Error generating demo:', error);
+    console.error('❌ [Automation] Error generating plan:', error);
     return res.status(500).json({
       success: false,
-      error: error.message || 'Failed to generate automation demo'
+      error: error.message || 'Failed to generate automation plan'
     });
   }
 };
@@ -784,13 +844,24 @@ export const getContentBrief = async (req, res) => {
   const userId = req.user.id;
 
   try {
+    console.info("[Content Brief API] Fetching brief", { chatId, userId });
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
-    if (!chat) return res.status(404).json({ success: false, error: "Chat not found" });
+    if (!chat) {
+      console.warn("[Content Brief API] Chat not found", { chatId, userId });
+      return res.status(404).json({ success: false, error: "Chat not found" });
+    }
 
     const brief = await buildContentBrief(prisma, userId, chatId);
+    console.info("[Content Brief API] Brief built successfully", {
+      chatId,
+      userId,
+      hasBrief: Boolean(brief),
+      isRejected: brief?.rejected,
+      rejectionCode: brief?.code
+    });
     return res.json({ success: true, data: brief });
   } catch (error) {
-    console.error('❌ [ContentBrief] Error:', error);
+    console.error('❌ [ContentBrief API] Error:', error);
     return res.status(500).json({ success: false, error: error.message || 'Failed to build content brief' });
   }
 };
@@ -812,10 +883,26 @@ export const generateContentItem = async (req, res) => {
   }
 
   try {
+    console.info("[Content Studio] Generating content", { chatId, userId, contentType });
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
-    if (!chat) return res.status(404).json({ success: false, error: "Chat not found" });
+    if (!chat) {
+      console.warn("[Content Studio] Chat not found", { chatId, userId });
+      return res.status(404).json({ success: false, error: "Chat not found" });
+    }
 
     const brief = await buildContentBrief(prisma, userId, chatId);
+    if (brief?.rejected) {
+      console.warn("[Content Studio] Brief rejected", { chatId, userId, code: brief.code, reason: brief.reason });
+      return res.status(422).json({
+        success: false,
+        error: {
+          code: brief.code || "EVIDENCE_MISSING",
+          message: brief.reason || "Complete Growth Analysis before generating content.",
+          retryable: false
+        }
+      });
+    }
+
     const evidenceContext = await buildEvidenceContext(prisma, userId, chatId);
 
     const result = await generateContent(contentType, brief, evidenceContext, callAI, userId, chatId);
@@ -838,6 +925,23 @@ export const generateContentItem = async (req, res) => {
       qualityScore,
     });
 
+    console.info("[Content Studio] Asset saved", {
+      chatId,
+      userId,
+      contentType,
+      assetId: asset?.id,
+      assetSaved: Boolean(asset)
+    });
+
+    // Verify asset persistence
+    const persistedAsset = await prisma.automationAsset.findFirst({
+      where: { id: asset?.id }
+    });
+    console.info("[Content Studio] Asset persistence check", {
+      assetId: asset?.id,
+      persisted: Boolean(persistedAsset)
+    });
+
     return res.status(201).json({
       success: true,
       data: {
@@ -848,7 +952,7 @@ export const generateContentItem = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ [ContentStudio] Error:', error);
+    console.error('❌ [Content Studio] Error:', error);
     return res.status(500).json({ success: false, error: error.message || 'Failed to generate content' });
   }
 };

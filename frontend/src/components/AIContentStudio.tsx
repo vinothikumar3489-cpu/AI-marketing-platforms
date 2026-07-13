@@ -749,6 +749,8 @@ export default function AIContentStudio() {
   const [showHealth, setShowHealth] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [readiness, setReadiness] = useState<any>(null);
+  const [readinessLoading, setReadinessLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -756,10 +758,12 @@ export default function AIContentStudio() {
     setGeneratedContent(null);
     setQualityScore(null);
     setSelectedAsset(null);
+    setReadiness(null);
 
     if (!selectedChatId) {
       setContextLoading(false);
       setBriefLoading(false);
+      setReadinessLoading(false);
       return;
     }
 
@@ -768,6 +772,7 @@ export default function AIContentStudio() {
 
     setContextLoading(true);
     setBriefLoading(true);
+    setReadinessLoading(true);
 
     getEvidenceContext(selectedChatId)
       .then(ctx => {
@@ -784,6 +789,29 @@ export default function AIContentStudio() {
       })
       .catch(() => setBrief(null))
       .finally(() => setBriefLoading(false));
+
+    // Source of truth for content readiness is the backend evidence-readiness endpoint.
+    api.get(`/chats/${selectedChatId}/evidence-readiness`)
+      .then((res: any) => {
+        console.info("[Content Studio] Evidence-readiness response", {
+          chatId: selectedChatId,
+          responseType: typeof res,
+          responseKeys: res ? Object.keys(res) : null,
+          contentGenerationReady: res?.contentGenerationReady,
+          hasProductIntelligence: res?.hasProductIntelligence,
+          fullResponse: res
+        });
+        // Handle both wrapped and unwrapped response shapes
+        const readinessData = res?.data || res;
+        if (readinessData && typeof readinessData === 'object') {
+          setReadiness(readinessData);
+        }
+      })
+      .catch((err) => {
+        console.error("[Content Studio] Evidence-readiness fetch failed", err);
+        setReadiness(null);
+      })
+      .finally(() => setReadinessLoading(false));
 
     return () => {
       if (abortRef.current) abortRef.current.abort();
@@ -836,7 +864,21 @@ export default function AIContentStudio() {
       });
   }, [setActiveTab]);
 
-  const hasEvidence = evidenceContext?.sourceSummary?.sourcesCollected?.length > 0 || brief?.product?.name || fullResults?.hasProductIntelligence === true;
+  const backendReady = readiness?.contentGenerationReady === true;
+  const hasEvidence = (
+    backendReady ||
+    evidenceContext?.sourceSummary?.sourcesCollected?.length > 0 ||
+    brief?.product?.name ||
+    fullResults?.hasProductIntelligence === true
+  );
+  console.info("[Content Studio Readiness]", {
+    chatId: selectedChatId,
+    hasProductIntelligence: fullResults?.hasProductIntelligence,
+    contentGenerationReady: backendReady,
+    readiness,
+    hasEvidence,
+    sourceComponent: "AIContentStudio.tsx"
+  });
 
   const tabs = [
     { id: 'content', label: 'Content Studio', icon: Sparkles },
@@ -869,7 +911,7 @@ export default function AIContentStudio() {
     return (
       <div style={{ display: 'grid', gap: '16px' }}>
         <ContentBriefPanel brief={brief} loading={briefLoading} />
-        {brief?.product?.name && (
+        {backendReady || brief?.product?.name ? (
           <ContentGeneratorPanel
             brief={brief}
             evidenceContext={evidenceContext}
@@ -877,12 +919,13 @@ export default function AIContentStudio() {
             selectedChatId={selectedChatId}
             abortRef={abortRef}
           />
-        )}
-        {!brief?.product?.name && !briefLoading && (
-          <div style={{ textAlign: 'center', padding: '40px 20px', color: C.muted, fontSize: '12px', background: C.card, borderRadius: '12px', border: `1px solid ${C.border}` }}>
-            <AlertTriangle size={24} style={{ opacity: 0.4, marginBottom: '8px' }} />
-            <div>Run product analysis with a website URL first before generating content.</div>
-          </div>
+        ) : (
+          !briefLoading && !readinessLoading && (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: C.muted, fontSize: '12px', background: C.card, borderRadius: '12px', border: `1px solid ${C.border}` }}>
+              <AlertTriangle size={24} style={{ opacity: 0.4, marginBottom: '8px' }} />
+              <div>Run product analysis with a website URL first before generating content.</div>
+            </div>
+          )
         )}
         {generatedContent && (
           <ReviewPanel content={generatedContent} qualityScore={qualityScore} />

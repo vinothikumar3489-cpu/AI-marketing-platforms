@@ -1,5 +1,21 @@
 import { getLatestEvidenceSnapshot } from '../../modules/evidence/evidence.service.js';
 
+// Build a partial checks object, defaulting all known checks to false
+function emptyChecks(partial = {}) {
+  return {
+    chatExists: false,
+    chatOwnedByUser: false,
+    productIntelligenceExists: false,
+    audienceIntelligenceExists: false,
+    competitorIntelligenceExists: false,
+    campaignIntelligenceExists: false,
+    evidenceSnapshotExists: false,
+    seoIntelligenceExists: false,
+    existingCampaignPlanExists: false,
+    ...partial,
+  };
+}
+
 // Source metadata wrapper: attaches provenance to every value
 function sourced(value, source, field) {
   return {
@@ -29,26 +45,42 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
   // --- Validate chat ownership ---
   const chat = await prisma.chat.findUnique({ where: { id: chatId } });
   if (!chat) {
-    return { rejected: true, reason: 'Chat not found', code: 'CHAT_NOT_FOUND' };
+    return { rejected: true, reason: 'Chat not found', code: 'CHAT_NOT_FOUND', checks: emptyChecks({ chatExists: false }) };
   }
   if (chat.userId !== userId) {
-    return { rejected: true, reason: 'Context belongs to another chat', code: 'CHAT_OWNER_MISMATCH' };
+    return { rejected: true, reason: 'Context belongs to another chat', code: 'CHAT_OWNER_MISMATCH', checks: emptyChecks({ chatExists: true, chatOwnedByUser: false }) };
   }
 
   const hasProductName = !!(chat.productName || chat.title);
 
+  console.info("[Evidence Context] Chat details", {
+    chatId,
+    userId,
+    productName: chat.productName,
+    title: chat.title,
+    hasProductName,
+    productIntelligenceExists: !!(chat.productIntelligence)
+  });
+
   if (!hasProductName) {
-    return { rejected: true, reason: 'Product identity is missing. Set a product name first.', code: 'PRODUCT_IDENTITY_MISSING' };
+    console.warn("[Evidence Context] Product identity missing", {
+      chatId,
+      userId,
+      productName: chat.productName,
+      title: chat.title,
+      hasProductName
+    });
+    return {
+      rejected: true,
+      reason: 'Product identity is missing. Set a product name first.',
+      code: 'PRODUCT_IDENTITY_MISSING',
+      checks: emptyChecks({ chatExists: true, chatOwnedByUser: true, productIntelligenceExists: false }),
+    };
   }
 
-  // --- Gather evidence ---
+  // --- Gather evidence (snapshot is optional, fall back to intelligence records) ---
   const evidenceSnapshot = await getLatestEvidenceSnapshot({ prisma, userId, chatId });
-
-  if (!evidenceSnapshot) {
-    return { rejected: true, reason: 'Current chat evidence is missing. Run an analysis first.', code: 'EVIDENCE_MISSING' };
-  }
-
-  const raw = evidenceSnapshot.evidence || {};
+  const raw = evidenceSnapshot?.evidence || {};
 
   // --- Fetch intelligence records in parallel ---
   const [productIntel, competitorIntel, campaignIntel, seoIntel] = await Promise.all([
@@ -60,6 +92,40 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
       include: { scoreBreakdown: true, technicalSeoAudit: true, keywordIntelligence: true },
     }).catch(() => null),
   ]);
+
+  const checks = {
+    chatExists: true,
+    chatOwnedByUser: true,
+    productIntelligenceExists: Boolean(productIntel),
+    audienceIntelligenceExists: Boolean(productIntel?.audienceIntelligence || productIntel?.marketDiscovery),
+    competitorIntelligenceExists: Boolean(competitorIntel),
+    campaignIntelligenceExists: Boolean(campaignIntel),
+    evidenceSnapshotExists: Boolean(evidenceSnapshot),
+    seoIntelligenceExists: Boolean(seoIntel),
+    existingCampaignPlanExists: false,
+  };
+
+  console.info("[Evidence Context] Intelligence records", {
+    chatId,
+    userId,
+    productIntelExists: Boolean(productIntel),
+    competitorIntelExists: Boolean(competitorIntel),
+    campaignIntelExists: Boolean(campaignIntel),
+    seoIntelExists: Boolean(seoIntel),
+    evidenceSnapshotExists: Boolean(evidenceSnapshot),
+    checks
+  });
+
+  // ProductIntelligence is the minimum requirement — evidence snapshot is optional
+  if (!productIntel) {
+    console.warn("[Evidence Context] ProductIntelligence missing", {
+      chatId,
+      userId,
+      checks,
+      missing: ['ProductIntelligence']
+    });
+    return { rejected: true, reason: 'Complete Growth Analysis before generating this module.', code: 'EVIDENCE_MISSING', missing: ['ProductIntelligence'], checks };
+  }
 
   let growthWs = null;
   try {
@@ -207,6 +273,24 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
       hasSeoIntel: !!seoIntel,
       hasGrowthWs: !!growthWs,
     },
+
+    checks,
+    readiness: {
+      product: Boolean(productIntel),
+      audience: Boolean(audienceData?.primaryAudience || audienceData?.buyerPersonas?.length),
+      competitor: Boolean(competitorIntel),
+      campaign: Boolean(campaignIntel),
+      seo: Boolean(seoIntel),
+      snapshot: Boolean(evidenceSnapshot),
+    },
+    missingEvidence: Object.entries({
+      ProductIntelligence: productIntel,
+      AudienceIntelligence: audienceData?.primaryAudience || audienceData?.buyerPersonas?.length,
+      CompetitorIntelligence: competitorIntel,
+      CampaignIntelligence: campaignIntel,
+      SeoIntelligence: seoIntel,
+      EvidenceSnapshot: evidenceSnapshot,
+    }).filter(([, v]) => !v).map(([k]) => k),
 
     _raw: {
       productIntel,

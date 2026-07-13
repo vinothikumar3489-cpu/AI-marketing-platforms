@@ -2,6 +2,39 @@ import { prisma } from "../config/prisma.js";
 import { buildEvidenceContext } from "../services/execution/evidence-context-builder.service.js";
 import { generateCampaignIntelligence } from "../services/automation/campaign-intelligence.service.js";
 
+const inProgressCampaign = new Set();
+
+// Canonical evidence loader for Campaign generation
+async function loadCampaignEvidence({ userId, chatId }) {
+  const [chat, product, audience, competitor, campaign, seo, evidenceSnapshot] = await Promise.all([
+    prisma.chat.findFirst({ where: { id: chatId, userId } }),
+    prisma.productIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
+    prisma.productIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
+    prisma.competitorIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
+    prisma.campaignIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
+    prisma.seoIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
+    prisma.evidenceSnapshot.findFirst({ where: { chatId, userId } }).catch(() => null),
+  ]);
+
+  return {
+    chat,
+    product,
+    audience,
+    competitor,
+    campaign,
+    seo,
+    evidenceSnapshot,
+    readiness: {
+      product: Boolean(product),
+      audience: Boolean(audience),
+      competitor: Boolean(competitor),
+      campaign: Boolean(campaign),
+      seo: Boolean(seo),
+      snapshot: Boolean(evidenceSnapshot)
+    }
+  };
+}
+
 /**
  * POST /api/campaign/:chatId/generate
  * Generate campaign intelligence from evidence context
@@ -10,24 +43,86 @@ export const generateCampaignPlan = async (req, res) => {
   const { chatId } = req.params;
   const userId = req.user.id;
 
+  const dedupKey = `campaign:${userId}:${chatId}`;
+  if (inProgressCampaign.has(dedupKey)) {
+    return res.status(409).json({ success: false, error: 'Campaign generation already in progress' });
+  }
+  inProgressCampaign.add(dedupKey);
+
   try {
     console.log("[Campaign] Generating intelligence for:", { chatId, userId });
 
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
     if (!chat) {
+      console.warn("[Campaign] Chat not found", { chatId, userId });
       return res.status(404).json({ success: false, error: "Chat not found" });
     }
+
+    console.info("[Campaign] Chat details", {
+      chatId,
+      userId,
+      productName: chat.productName,
+      title: chat.title,
+      hasProductName: !!(chat.productName || chat.title),
+      hasProductIntelligence: !!(chat.productIntelligence)
+    });
+
+    const evidence = await loadCampaignEvidence({ userId, chatId });
+    console.info("[Campaign] Evidence loaded", {
+      chatId,
+      userId,
+      readiness: evidence.readiness,
+      hasChat: Boolean(evidence.chat),
+      hasProduct: Boolean(evidence.product),
+      hasAudience: Boolean(evidence.audience),
+      hasCompetitor: Boolean(evidence.competitor),
+      hasCampaign: Boolean(evidence.campaign),
+      hasSeo: Boolean(evidence.seo),
+      hasSnapshot: Boolean(evidence.evidenceSnapshot)
+    });
+
+    const existingPlan = await prisma.campaignPlan.findFirst({ where: { userId, chatId } });
 
     const evidenceContext = await buildEvidenceContext(prisma, userId, chatId);
 
     if (evidenceContext.rejected) {
+      const code = evidenceContext.code || "PRODUCT_INTELLIGENCE_REQUIRED";
+      const missing = evidenceContext.missing || [evidenceContext.code === 'EVIDENCE_MISSING' ? 'ProductIntelligence' : 'EvidenceSnapshot'];
+      const checks = { ...(evidenceContext.checks || {}), existingCampaignPlanExists: Boolean(existingPlan) };
+
+      console.warn("[Campaign Prerequisite Failure]", {
+        chatId,
+        userId,
+        code,
+        missing,
+        checks
+      });
+
       return res.status(422).json({
         success: false,
         error: {
-          code: evidenceContext.code || "PRODUCT_INTELLIGENCE_REQUIRED",
+          code,
           message: evidenceContext.reason || "Complete Growth Analysis before generating this module.",
           retryable: false,
-          missing: evidenceContext.rejected === 'no_product_intelligence' ? ['ProductIntelligence', 'CampaignIntelligence'] : ['EvidenceSnapshot']
+          missing
+        }
+      });
+    }
+
+    // Only ProductIntelligence is required - other evidence enhances but doesn't block
+    if (!evidence.product) {
+      console.warn("[Campaign] ProductIntelligence missing", {
+        chatId,
+        userId,
+        checks: evidence.readiness
+      });
+      return res.status(422).json({
+        success: false,
+        error: {
+          code: "PRODUCT_INTELLIGENCE_REQUIRED",
+          message: "Complete Growth Analysis before generating Campaign Intelligence.",
+          retryable: false,
+          missing: ["ProductIntelligence"]
         }
       });
     }
@@ -39,6 +134,13 @@ export const generateCampaignPlan = async (req, res) => {
     });
 
     if (campaignData._noData) {
+      console.warn("[Campaign Prerequisite Failure]", {
+        chatId,
+        userId,
+        code: "GENERATION_FAILED",
+        missing: ['CampaignIntelligence'],
+        checks: evidenceContext.checks || {}
+      });
       return res.status(422).json({
         success: false,
         error: {
@@ -112,9 +214,26 @@ export const generateCampaignPlan = async (req, res) => {
 
     console.log("[Campaign] Intelligence generated successfully");
 
-    return res.json({
+    const savedPlan = await prisma.campaignPlan.findFirst({
+      where: { userId, chatId },
+    });
+
+    console.log("[Campaign] Persistence check", {
+      campaignPlanSaved: Boolean(savedPlan),
+      campaignPlanId: savedPlan?.id,
+    });
+
+    if (!savedPlan) {
+      console.error("[Campaign] Failed to persist plan after upsert");
+      return res.status(500).json({
+        success: false,
+        error: "Campaign plan could not be persisted. Please retry.",
+      });
+    }
+
+    return res.status(201).json({
       success: true,
-      campaignPlan: plan,
+      data: savedPlan,
     });
   } catch (error) {
     console.error("[Campaign] Error generating intelligence:", error);
@@ -122,6 +241,8 @@ export const generateCampaignPlan = async (req, res) => {
       success: false,
       error: error.message || "Failed to generate campaign intelligence",
     });
+  } finally {
+    inProgressCampaign.delete(dedupKey);
   }
 };
 
