@@ -134,8 +134,8 @@ export function BusinessHealthScore({ data }: { data?: HealthScoreData }) {
   return (
     <div style={{ background: C.card, borderRadius: '12px', border: `1px solid ${C.border}`, padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
-        <div><div style={{ fontSize: '11px', color: C.dim, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Business Health</div><div style={{ fontSize: '28px', fontWeight: 700, color: gradeColor }}>{grade}</div></div>
-        <div style={{ textAlign: 'right' }}><div style={{ fontSize: '36px', fontWeight: 700, color: gradeColor }}>{overall != null ? `${Math.round(overall)}%` : 'Not measured'}</div><div style={{ fontSize: '11px', color: C.dim }}>Composite Score</div></div>
+        <div><div style={{ fontSize: '11px', color: C.dim, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Business Health</div><div style={{ fontSize: '28px', fontWeight: 700, color: gradeColor }}>{overall != null ? grade : 'Not measured'}</div></div>
+        <div style={{ textAlign: 'right' }}><div style={{ fontSize: '36px', fontWeight: 700, color: gradeColor }}>{overall != null ? `${Math.round(overall)}%` : null}</div><div style={{ fontSize: '11px', color: C.dim }}>{overall != null ? 'Composite Score' : 'Insufficient data'}</div></div>
       </div>
       <div style={{ display: 'grid', gap: '8px' }}>
         {data.components.map((c, i) => {

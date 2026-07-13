@@ -1,5 +1,5 @@
 import express from "express";
-import { createChat, listChats, getChat, getFullChat, getFullResults, updateChat, deleteChat, clearHistory } from "../controllers/chat.controller.js";
+import { createChat, listChats, getChat, getFullChat, getFullResults, getEvidenceReadiness, updateChat, deleteChat, clearHistory } from "../controllers/chat.controller.js";
 import { addMessage, getMessages } from "../controllers/message.controller.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 
@@ -11,6 +11,7 @@ chatRouter.get("/", listChats);
 chatRouter.get("/:chatId", getChat);
 chatRouter.get("/:chatId/full", getFullChat);
 chatRouter.get("/:chatId/full-results", getFullResults);
+chatRouter.get("/:chatId/evidence-readiness", getEvidenceReadiness);
 chatRouter.put("/:chatId", updateChat);
 chatRouter.delete("/clear-history", clearHistory);
 chatRouter.delete("/:chatId", deleteChat);

@@ -1072,8 +1072,11 @@ model ExecutiveSeoDashboard {
   // Executive Action Plan
   executiveActionPlan Json // { immediateActions, day30Plan, day60Plan, day90Plan, summary }
 
-  // ROI Forecast
-  roiForecast Json // { trafficGrowthPotential, keywordGrowthPotential, aiVisibilityGrowthPotential, contentImpact, competitiveGains, summary }
+  // Measurement Readiness (replaces ROI Forecast)
+  measurementReadiness Json? // { analyticsConnected, searchConsoleConnected, conversionTrackingConnected, revenueDataConnected, status, message }
+
+  // ROI Forecast (nullable for backward compatibility)
+  roiForecast Json?
 
   // Metadata
   metadata Json? // { generatedAt, dataCompleteness }

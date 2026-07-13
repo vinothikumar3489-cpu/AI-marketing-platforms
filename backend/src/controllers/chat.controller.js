@@ -610,6 +610,9 @@ export const getFullResults = async (req, res) => {
       scoreBreakdown: normalizedSeoIntelligence.scoreBreakdown || {},
     } : {},
     hasGrowthWorkspace,
+    hasProductIntelligence: !!productIntelligence,
+    hasCompetitorIntelligence: !!competitorIntelligence,
+    hasCampaignIntelligence: !!campaignIntelligence,
     hasSeoIntelligence,
     // Backward compatibility fields
     productIntelligence,
@@ -740,6 +743,58 @@ export const deleteChat = async (req, res) => {
       success: false,
       error: 'Failed to delete chat. Please try again.' 
     });
+  }
+};
+
+/**
+ * GET /api/chats/:chatId/evidence-readiness
+ * Returns evidence readiness for all modules
+ */
+export const getEvidenceReadiness = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.user.id;
+
+    const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
+    if (!chat) {
+      return res.status(404).json({ success: false, error: "Chat not found" });
+    }
+
+    const productIntel = await prisma.productIntelligence.findUnique({ where: { chatId } });
+    const audienceIntel = null; // AudienceIntelligence is stored within productIntel
+    const competitorIntel = await prisma.competitorIntelligence.findUnique({ where: { chatId } });
+    const campaignIntel = await prisma.campaignIntelligence.findUnique({ where: { chatId } });
+    const seoIntel = await prisma.seoIntelligence.findUnique({ where: { chatId } });
+    let automationPlan = null;
+    try {
+      automationPlan = await prisma.automationPlan.findUnique({ where: { chatId } });
+    } catch (e) { /* ignore schema mismatch */ }
+
+    const hasProductIntelligence = !!productIntel;
+    const hasAudienceIntelligence = !!(productIntel?.audienceIntelligence && Object.keys(productIntel.audienceIntelligence).length > 0);
+    const hasCompetitorIntelligence = !!competitorIntel;
+    const hasCampaignIntelligence = !!campaignIntel;
+    const hasSeoIntelligence = !!seoIntel;
+    const hasAutomationPlan = !!automationPlan;
+
+    return res.json({
+      success: true,
+      data: {
+        chatId,
+        hasProductIntelligence,
+        hasAudienceIntelligence,
+        hasCompetitorIntelligence,
+        hasCampaignIntelligence,
+        hasSeoIntelligence,
+        hasAutomationPlan,
+        contentGenerationReady: hasProductIntelligence,
+        campaignGenerationReady: hasProductIntelligence && (hasAudienceIntelligence || hasCompetitorIntelligence),
+        automationGenerationReady: hasProductIntelligence && hasCampaignIntelligence,
+      }
+    });
+  } catch (error) {
+    console.error('[Evidence Readiness] Error:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Internal server error' });
   }
 };
 

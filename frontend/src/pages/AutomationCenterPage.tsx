@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
+import { getApiErrorMessage } from '../lib/error-utils';
 import { useProject } from '../context/ProjectContext';
 import { asArray, asText, renderSafeValue } from '../lib/normalizers';
 import SafeValue from '../components/SafeValue';
@@ -1450,22 +1451,43 @@ export default function AutomationCenterPage() {
     return () => { cancelled = true; };
   }, [selectedChatId]);
 
+  const pendingKeys = useRef<Set<string>>(new Set());
+
+  function getGenerationKey(module: string) {
+    return `${module}:${selectedChatId || 'none'}`;
+  }
+
+  function isPending(module: string) {
+    return pendingKeys.current.has(getGenerationKey(module));
+  }
+
+  function markPending(module: string) {
+    pendingKeys.current.add(getGenerationKey(module));
+  }
+
+  function clearPending(module: string) {
+    pendingKeys.current.delete(getGenerationKey(module));
+  }
+
   async function generate() {
-    if (!selectedChatId) return;
+    if (!selectedChatId || isPending('automation')) return;
+    markPending('automation');
     setGenLoading(true);
     setGenError(null);
     try {
       const res: any = await api.post(`/automation/${selectedChatId}/generate`, {});
       if (res.success === false && res.error) {
-        setGenError(res.error);
+        const msg = typeof res.error === 'object' && res.error.message ? res.error.message : String(res.error);
+        setGenError(msg);
       } else {
         setData(res.automationPlan || res.data || res);
       }
     } catch (e: any) {
-      const msg = e?.response?.data?.error || e.message || 'Failed to generate automation plan';
+      const msg = getApiErrorMessage(e);
       setGenError(msg);
     }
     setGenLoading(false);
+    clearPending('automation');
   }
 
   async function loadCampaignPlan() {
@@ -1479,21 +1501,24 @@ export default function AutomationCenterPage() {
   }
 
   async function generateCampaign() {
-    if (!selectedChatId) return;
+    if (!selectedChatId || isPending('campaign')) return;
+    markPending('campaign');
     setCampaignLoading(true);
     setCampaignError(null);
     setCampaignPlan(null);
     try {
       const res: any = await api.post(`/campaign/${selectedChatId}/generate`, {});
       if (res.success === false && res.error) {
-        setCampaignError(res.error);
+        const msg = typeof res.error === 'object' && res.error.message ? res.error.message : String(res.error);
+        setCampaignError(msg);
         setCampaignLoading(false);
       }
     } catch (e: any) {
-      const msg = e?.response?.data?.error || e.message || 'Failed to generate campaign intelligence';
+      const msg = getApiErrorMessage(e);
       setCampaignError(msg);
       setCampaignLoading(false);
     }
+    clearPending('campaign');
   }
 
   function handleCampaignComplete(plan: any) {
@@ -1508,21 +1533,24 @@ export default function AutomationCenterPage() {
   }
 
   async function executeAll() {
-    if (!selectedChatId) return;
+    if (!selectedChatId || isPending('execute')) return;
+    markPending('execute');
     setExecLoading(true);
     setGenError(null);
     try {
       const res: any = await api.post(`/automation/${selectedChatId}/execute`, {});
       if (res.success === false && res.error) {
-        setGenError(res.error);
+        const msg = typeof res.error === 'object' && res.error.message ? res.error.message : String(res.error);
+        setGenError(msg);
       } else {
         setExecData(res.data);
       }
     } catch (e: any) {
-      const msg = e?.response?.data?.error || e.message || 'Failed to generate execution modules';
+      const msg = getApiErrorMessage(e);
       setGenError(msg);
     }
     setExecLoading(false);
+    clearPending('execute');
   }
 
   const planData = data ? { ...data, logs, ...execData } : { logs, ...execData };

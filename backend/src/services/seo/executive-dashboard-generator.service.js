@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma.js';
 
 /**
@@ -109,6 +110,44 @@ function safeString(value) {
 }
 
 // ============================================
+// TECHNICAL SCORES HELPER
+// ============================================
+
+/**
+ * Safely extracts PageSpeed scores from all supported paths (mobile + desktop).
+ * Returns null for each metric when input is unavailable.
+ */
+function getTechnicalScores(seoData) {
+  const technicalAudit = seoData.technicalAudit || seoData.technicalAuditDetail || {};
+  const scoreBreakdown = seoData.scoreBreakdown || {};
+  const auditData = technicalAudit.auditData || technicalAudit.lighthouseResult || {};
+
+  // Try multiple paths for mobile/desktop scores
+  const mobileResult = auditData.mobileResult || auditData.mobile || {};
+  const desktopResult = auditData.desktopResult || auditData.desktop || {};
+
+  const performance = mobileResult.performanceScore ?? desktopResult.performanceScore ?? scoreBreakdown.performanceScore ?? null;
+  const seo = mobileResult.seoScore ?? desktopResult.seoScore ?? scoreBreakdown.seoScore ?? scoreBreakdown.onPageScore ?? null;
+  const accessibility = mobileResult.accessibilityScore ?? desktopResult.accessibilityScore ?? scoreBreakdown.accessibilityScore ?? null;
+  const bestPractices = mobileResult.bestPracticesScore ?? desktopResult.bestPracticesScore ?? scoreBreakdown.bestPracticesScore ?? null;
+  const mobilePerformance = mobileResult.performanceScore ?? null;
+  const desktopPerformance = desktopResult.performanceScore ?? null;
+
+  const hasAnyScore = performance !== null || seo !== null;
+
+  return {
+    performance,
+    seo,
+    accessibility,
+    bestPractices,
+    mobilePerformance,
+    desktopPerformance,
+    source: hasAnyScore ? 'GOOGLE_PAGESPEED' : null,
+    measuredAt: technicalAudit.analyzedAt ?? scoreBreakdown.analyzedAt ?? null
+  };
+}
+
+// ============================================
 // MAIN EXECUTIVE DASHBOARD GENERATOR
 // ============================================
 
@@ -207,6 +246,7 @@ export async function generateExecutiveDashboard(input = {}) {
         contentStrategySummary,
         executiveActionPlan,
         measurementReadiness,
+        roiForecast: Prisma.JsonNull,
         metadata: {
           generatedAt: new Date().toISOString(),
           dataCompleteness: calculateDataCompleteness(seoData),
@@ -222,6 +262,7 @@ export async function generateExecutiveDashboard(input = {}) {
         contentStrategySummary,
         executiveActionPlan,
         measurementReadiness,
+        roiForecast: Prisma.JsonNull,
         metadata: {
           generatedAt: new Date().toISOString(),
           dataCompleteness: calculateDataCompleteness(seoData),
@@ -341,11 +382,12 @@ function generateExecutiveOverview(seoData) {
   // Define all score variables FIRST to avoid TDZ issues
   const technicalHealthValue = hasTechnicalData
     ? Math.round(((scoreBreakdown.onPageScore ?? scoreBreakdown.onPage ?? null) + (scoreBreakdown.performanceScore ?? scoreBreakdown.technical ?? null)) / 2)
-    : 50;
+    : null;
 
   const technicalHealth = {
     value: technicalHealthValue,
-    source: hasTechnicalData ? 'Technical SEO Audit' : 'Unavailable',
+    status: hasTechnicalData ? null : 'NOT_MEASURED',
+    source: hasTechnicalData ? 'Technical SEO Audit' : 'NOT_MEASURED',
     calculationMethod: hasTechnicalData ? 'Average of on-page and performance scores' : 'No technical data available',
     inputsUsed: hasTechnicalData ? ['onPageScore', 'performanceScore'] : [],
     confidence: null,
@@ -358,11 +400,12 @@ function generateExecutiveOverview(seoData) {
 
   const contentAuthorityValue = hasContentData || blogIdeasCount > 0
     ? Math.max(0, Math.min(100, (blogIdeasCount * 10) + (hasContentData ? Math.max(30, 100 - (contentGapsCount * 5)) : 30)))
-    : 50;
+    : null;
 
   const contentAuthority = {
     value: contentAuthorityValue,
-    source: hasContentData ? 'Content Gap + Blog Intelligence' : 'Unavailable',
+    status: hasContentData || blogIdeasCount > 0 ? null : 'NOT_MEASURED',
+    source: hasContentData ? 'Content Gap + Blog Intelligence' : 'NOT_MEASURED',
     calculationMethod: hasContentData ? 'Base 100 minus gaps penalty plus blog ideas bonus' : 'No content data available',
     inputsUsed: hasContentData ? ['contentGaps', 'blogIdeas'] : [],
     confidence: null,
@@ -371,12 +414,16 @@ function generateExecutiveOverview(seoData) {
   };
 
   const authorityScoreValue = hasCompetitorData
-    ? Math.round(competitorIntel.competitorProfiles.reduce((sum, c) => sum + (c.domainAuthority || 50), 0) / competitorIntel.competitorProfiles.length)
-    : 50;
+    ? (() => {
+        const authorities = competitorIntel.competitorProfiles.map(c => c.domainAuthority).filter(v => v != null);
+        return authorities.length > 0 ? Math.round(authorities.reduce((a, b) => a + b, 0) / authorities.length) : null;
+      })()
+    : null;
 
   const authorityScore = {
     value: authorityScoreValue,
-    source: hasCompetitorData ? 'Competitor SEO Intelligence' : 'Unavailable',
+    status: hasCompetitorData ? null : 'NOT_MEASURED',
+    source: hasCompetitorData ? 'Competitor SEO Intelligence' : 'NOT_MEASURED',
     calculationMethod: hasCompetitorData ? 'Average domain authority from competitor analysis' : 'No competitor data available',
     inputsUsed: hasCompetitorData ? ['competitorProfiles', 'domainAuthority'] : [],
     confidence: null,
@@ -384,11 +431,13 @@ function generateExecutiveOverview(seoData) {
     lastUpdated: competitorIntel.analyzedAt || new Date().toISOString()
   };
 
-  const aiVisibilityValue = hasGeoData ? Math.round(geoIntel.aiVisibilityScore) : 50;
+  const aiVisibilityValue = hasGeoData ? Math.round(geoIntel.aiVisibilityScore) : null;
 
   const aiVisibility = {
     value: aiVisibilityValue,
-    source: hasGeoData ? 'GEO Intelligence' : 'Unavailable',
+    status: hasGeoData ? null : 'NOT_MEASURED',
+    section: 'AI Search Readiness',
+    source: hasGeoData ? 'GEO Intelligence' : 'NOT_MEASURED',
     calculationMethod: hasGeoData ? 'AI search visibility score from entity analysis' : 'No GEO data available',
     inputsUsed: hasGeoData ? ['aiVisibilityScore', 'citationReadinessScore', 'answerabilityScore'] : [],
     confidence: null,
@@ -399,11 +448,12 @@ function generateExecutiveOverview(seoData) {
   const keywordCount = hasKeywordData ? asArray(keywordIntel.primaryKeywords).length : 0;
   const opportunityScoreValue = hasKeywordData
     ? Math.min(100, Math.round((keywordCount / Math.max(1, keywordCount + 5)) * 100))
-    : 50;
+    : null;
 
   const opportunityScore = {
     value: opportunityScoreValue,
-    source: hasKeywordData ? 'Keyword Intelligence' : 'Unavailable',
+    status: hasKeywordData ? null : 'NOT_MEASURED',
+    source: hasKeywordData ? 'Keyword Intelligence' : 'NOT_MEASURED',
     calculationMethod: hasKeywordData ? 'Percentage of available keywords vs target' : 'No keyword data available',
     inputsUsed: hasKeywordData ? ['primaryKeywords'] : [],
     confidence: null,
@@ -416,11 +466,12 @@ function generateExecutiveOverview(seoData) {
 
   const riskScoreValue = (hasTechnicalData || hasCompetitorData)
     ? Math.min(100, Math.round((technicalIssues * 10) + (competitorThreats * 5)))
-    : 50;
+    : null;
 
   const riskScore = {
     value: riskScoreValue,
-    source: (hasTechnicalData || hasCompetitorData) ? 'Technical Audit + Competitor Intelligence' : 'Unavailable',
+    status: (hasTechnicalData || hasCompetitorData) ? null : 'NOT_MEASURED',
+    source: (hasTechnicalData || hasCompetitorData) ? 'Technical Audit + Competitor Intelligence' : 'NOT_MEASURED',
     calculationMethod: (hasTechnicalData || hasCompetitorData) ? 'Technical issues penalty plus competitor threat penalty' : 'No risk data available',
     inputsUsed: (hasTechnicalData || hasCompetitorData) ? ['criticalIssues', 'competitorProfiles'] : [],
     confidence: null,
@@ -443,27 +494,39 @@ function generateExecutiveOverview(seoData) {
         ((100 - riskScoreValue) * 0.15)
       );
     } else {
-      baseOverallScore = 30;
+      baseOverallScore = null;
     }
   }
 
-  const completenessPenalty = Math.round((100 - dataCompletenessPercentage) * 0.2);
-  const penalizedOverallScore = Math.max(30, baseOverallScore - completenessPenalty);
+  let overallSeoScoreValue;
+  let overallSeoScoreSource;
+  if (hasTechnicalData) {
+    overallSeoScoreValue = baseOverallScore;
+    overallSeoScoreSource = 'Technical SEO Audit';
+  } else if (baseOverallScore !== null) {
+    const completenessPenalty = Math.round((100 - dataCompletenessPercentage) * 0.2);
+    overallSeoScoreValue = Math.max(30, baseOverallScore - completenessPenalty);
+    overallSeoScoreSource = 'Weighted Module Average';
+  } else {
+    overallSeoScoreValue = null;
+    overallSeoScoreSource = 'NOT_MEASURED';
+  }
   
-  const baseConfidence = hasTechnicalData ? 85 : 60;
-  const confidencePenalty = Math.round((100 - dataCompletenessPercentage) * 0.5);
+  const baseConfidence = hasTechnicalData ? 85 : baseOverallScore !== null ? 60 : null;
+  const confidencePenalty = baseConfidence !== null ? Math.round((100 - dataCompletenessPercentage) * 0.5) : 0;
   
   let qualityPenalty = 0;
-  if (!hasKeywordData || keywordCount === 0) {
+  if (baseConfidence !== null && (!hasKeywordData || keywordCount === 0)) {
     qualityPenalty += 10;
     console.log('⚠️ [Executive Dashboard] Confidence penalty: no keyword data (-10)');
   }
 
-  const finalConfidence = Math.max(30, baseConfidence - confidencePenalty - qualityPenalty);
+  const finalConfidence = baseConfidence !== null ? Math.max(30, baseConfidence - confidencePenalty - qualityPenalty) : null;
 
   const overallSeoScore = {
-    value: hasTechnicalData ? baseOverallScore : penalizedOverallScore,
-    source: hasTechnicalData ? 'Technical SEO Audit' : 'Weighted Module Average',
+    value: overallSeoScoreValue,
+    status: overallSeoScoreValue !== null ? null : 'NOT_MEASURED',
+    source: overallSeoScoreSource,
     calculationMethod: hasTechnicalData
       ? 'Technical SEO audit score with data completeness adjustment'
       : 'Weighted average of available modules (content, authority, AI visibility, opportunity, risk)',

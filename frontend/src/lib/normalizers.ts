@@ -400,7 +400,10 @@ export function normalizeFullResults(data: any) {
       agents: asArray(root.agentRuns || []),
       automation: root.automationPlan || {},
       hasGrowthWorkspace: root.hasGrowthWorkspace === false ? false : hasRealGrowthContent,
-      hasSeoIntelligence: root.hasSeoIntelligence || !!root.seoIntelligence || !!root.seoData || !!root.seoAnalysis,
+      hasSeoIntelligence: root.hasSeoIntelligence === true || !!root.seoIntelligence || !!root.seoData || !!root.seoAnalysis,
+      hasProductIntelligence: root.hasProductIntelligence === true,
+      hasCompetitorIntelligence: root.hasCompetitorIntelligence === true,
+      hasCampaignIntelligence: root.hasCampaignIntelligence === true,
     };
   }
 
@@ -442,6 +445,9 @@ export function normalizeFullResults(data: any) {
     automation: root.automationPlan || root.automationPlans || root.automation || {},
     hasGrowthWorkspace: !!(productIntel?.productAnalysis || competitorIntel?.competitorAnalysis || campaignIntel?.campaignGenerator),
     hasSeoIntelligence: !!root.seoIntelligence || !!root.seoData || !!root.seoAnalysis,
+    hasProductIntelligence: root.hasProductIntelligence === true,
+    hasCompetitorIntelligence: root.hasCompetitorIntelligence === true,
+    hasCampaignIntelligence: root.hasCampaignIntelligence === true,
   };
 }
 
