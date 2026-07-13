@@ -13,15 +13,32 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
+// In-memory Gemini quota cooldown
+const GEMINI_QUOTA_COOLDOWN_MS = 300000; // 5 minutes
+let geminiQuotaExhaustedUntil = 0;
+
 function extractJsonFromText(text) {
   if (!text || typeof text !== "string") return null;
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) return null;
+  let raw = jsonMatch[0];
+  // Repair common JSON issues
   try {
-    return JSON.parse(jsonMatch[0]);
+    return JSON.parse(raw);
   } catch (e) {
-    console.warn("Failed to parse JSON from AI response:", e.message);
-    return null;
+    // Try repairing
+    try {
+      // Remove trailing commas before closing braces/brackets
+      raw = raw.replace(/,\s*([}\]])/g, '$1');
+      // Remove unescaped newlines inside strings
+      raw = raw.replace(/(?<!\\)\n/g, ' ');
+      // Remove trailing comma at end of object
+      raw = raw.replace(/,\s*$/, '');
+      return JSON.parse(raw);
+    } catch (e2) {
+      console.warn("Failed to parse JSON from AI response:", e2.message);
+      return null;
+    }
   }
 }
 
@@ -82,6 +99,11 @@ async function callGemini(prompt) {
     console.log("⚠️ GEMINI_API_KEY not found");
     return { success: false };
   }
+  // Check quota cooldown
+  if (Date.now() < geminiQuotaExhaustedUntil) {
+    console.log("⏳ Gemini quota exhausted, skipping (cooldown active)");
+    return { success: false };
+  }
   try {
     console.log("🤖 Calling Gemini API...");
     const response = await fetch(`${GEMINI_API_URL}/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
@@ -96,6 +118,12 @@ async function callGemini(prompt) {
       }),
       signal: AbortSignal.timeout(45000)
     });
+
+    if (response.status === 429) {
+      console.warn("❌ Gemini quota exhausted (429). Activating cooldown.");
+      geminiQuotaExhaustedUntil = Date.now() + GEMINI_QUOTA_COOLDOWN_MS;
+      return { success: false };
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
@@ -212,15 +240,26 @@ async function callOpenAI(prompt) {
   }
 }
 
+async function tryWithRetry(providerFn, providerName, prompt) {
+  const result = await providerFn(prompt);
+  if (result.success) return result;
+  // Retry once with strict JSON-only instruction
+  const retryPrompt = prompt + "\n\nReturn only a valid compact JSON object matching the requested schema. No markdown, no explanation.";
+  const retryResult = await providerFn(retryPrompt);
+  if (retryResult.success) return retryResult;
+  return result;
+}
+
 /**
- * Generic AI caller: tries Gemini → Groq → OpenAI → returns { success, data?, provider? }
+ * Generic AI caller: tries Groq → Gemini → OpenAI → returns { success, data?, provider? }
+ * Gemini is skipped during quota cooldown (429 resets 5-min timer).
  */
 export async function callAI(prompt) {
-  let result = await callGemini(prompt);
+  let result = await tryWithRetry(callGroq, "groq", prompt);
   if (result.success) return result;
-  result = await callGroq(prompt);
+  result = await tryWithRetry(callGemini, "gemini", prompt);
   if (result.success) return result;
-  result = await callOpenAI(prompt);
+  result = await tryWithRetry(callOpenAI, "openai", prompt);
   if (result.success) return result;
   return { success: false };
 }

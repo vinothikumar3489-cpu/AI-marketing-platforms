@@ -60,9 +60,9 @@ export async function generateExecutiveDashboard({ seoIntelligenceId, chatId }) 
     console.log('📋 [Executive Dashboard] Step 7: Creating action plan...');
     const executiveActionPlan = generateExecutiveActionPlan(seoData);
 
-    // Step 8: Calculate ROI forecast
-    console.log('💰 [Executive Dashboard] Step 8: Forecasting ROI...');
-    const roiForecast = generateRoiForecast(seoData);
+    // Step 8: Assess measurement readiness
+    console.log('📊 [Executive Dashboard] Step 8: Assessing measurement readiness...');
+    const measurementReadiness = generateMeasurementReadiness(seoData);
 
     // Compile dashboard
     const dashboard = {
@@ -73,7 +73,7 @@ export async function generateExecutiveDashboard({ seoIntelligenceId, chatId }) 
       aiSearchVisibility,
       contentStrategySummary,
       executiveActionPlan,
-      roiForecast,
+      measurementReadiness,
       metadata: {
         generatedAt: new Date().toISOString(),
         dataCompleteness: calculateDataCompleteness(seoData)
@@ -851,41 +851,29 @@ function generateExecutiveActionPlan(seoData) {
 }
 
 // ============================================
-// ROI FORECAST
+// MEASUREMENT READINESS (replaces fabricated ROI forecast)
 // ============================================
 
-function generateRoiForecast(seoData) {
-  console.log('💰 [ROI] Forecasting ROI from verified data...');
-
-  const keywordIntelligence = seoData.keywordIntelligence || {};
-  const hasKeywordData = keywordIntelligence.primaryKeywords && keywordIntelligence.primaryKeywords.length > 0;
-
-  if (!hasKeywordData) {
-    return {
-      potentialTrafficGain: null,
-      estimatedRevenueImpact: null,
-      timeToResults: null,
-      hasSufficientData: false,
-      message: 'Keyword data unavailable for ROI calculation'
-    };
-  }
-
-  const totalSearchVolume = keywordIntelligence.primaryKeywords.reduce((sum, k) => sum + (k.searchVolume || 0), 0);
-  const highOpportunityVolume = keywordIntelligence.primaryKeywords
-    .filter(k => k.opportunity === 'high' && k.difficulty < 50)
-    .reduce((sum, k) => sum + (k.searchVolume || 0), 0);
-
-  const potentialTrafficGain = Math.round(highOpportunityVolume * 0.15); // Assume 15% CTR for top positions
-  const estimatedRevenueImpact = potentialTrafficGain * 0.02; // Assume $2 per visitor
-  const timeToResults = '3-6 months';
+function generateMeasurementReadiness(seoData) {
+  const analyticsConnected = !!(process.env.GA_API_KEY || process.env.GA_MEASUREMENT_ID);
+  const searchConsoleConnected = !!(process.env.GSC_CLIENT_EMAIL || process.env.SEARCH_CONSOLE_CREDENTIALS);
+  const conversionTrackingConnected = !!(process.env.GA_API_KEY);
+  const revenueDataConnected = false; // Requires ecommerce integration
 
   return {
-    potentialTrafficGain,
-    estimatedRevenueImpact: Math.round(estimatedRevenueImpact),
-    timeToResults,
-    hasSufficientData: true,
-    source: 'Keyword Intelligence',
-    evidence: `Based on ${keywordIntelligence.primaryKeywords.length} keywords with ${totalSearchVolume.toLocaleString()} total monthly searches`
+    potentialTrafficGain: null,
+    estimatedRevenueImpact: null,
+    timeToResults: null,
+    status: 'NOT_MEASURED',
+    measurementReadiness: {
+      analyticsConnected,
+      searchConsoleConnected,
+      conversionTrackingConnected,
+      revenueDataConnected
+    },
+    message: analyticsConnected
+      ? 'Analytics connected. Connect revenue data for ROI measurement.'
+      : 'Connect analytics, Search Console, and revenue data before ROI can be measured.'
   };
 }
 

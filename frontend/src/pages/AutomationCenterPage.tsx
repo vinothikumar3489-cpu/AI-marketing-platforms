@@ -1422,6 +1422,9 @@ export default function AutomationCenterPage() {
   const [emailResult, setEmailResult] = useState<any>(null);
   const [posterGenerating, setPosterGenerating] = useState<string | null>(null);
   const [posterResult, setPosterResult] = useState<any>(null);
+  const hasProductIntel = fullResults?.hasProductIntelligence === true;
+  const hasCampaignIntel = fullResults?.hasCampaignIntelligence === true;
+  const hasGrowthIntel = hasProductIntel || hasCampaignIntel;
   const [videoRendering, setVideoRendering] = useState<string | null>(null);
   const [videoResult, setVideoResult] = useState<any>(null);
   const [campaignPlan, setCampaignPlan] = useState<any>(null);
@@ -1611,16 +1614,21 @@ export default function AutomationCenterPage() {
             )}
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button className="primary-btn" onClick={generate} disabled={genLoading || !selectedChatId}>
+            <button className="primary-btn" onClick={generate} disabled={genLoading || !selectedChatId || !hasProductIntel} title={!hasProductIntel ? 'Complete Growth Analysis before generating Automation Plan' : ''}>
               {genLoading ? 'Generating...' : 'Generate Automation Plan'}
             </button>
-            <button className="secondary-btn" onClick={executeAll} disabled={execLoading || !selectedChatId} style={{ borderColor: '#a855f7', color: '#a855f7' }}>
+            <button className="secondary-btn" onClick={executeAll} disabled={execLoading || !selectedChatId || !hasProductIntel} title={!hasProductIntel ? 'Complete Growth Analysis before executing modules' : ''} style={{ borderColor: '#a855f7', color: '#a855f7' }}>
               {execLoading ? 'Generating...' : 'Execute All Modules'}
             </button>
-            <button className="secondary-btn" onClick={generateCampaign} disabled={campaignLoading || !selectedChatId} style={{ borderColor: '#10e18b', color: '#10e18b' }}>
+            <button className="secondary-btn" onClick={generateCampaign} disabled={campaignLoading || !selectedChatId || !hasProductIntel} title={!hasProductIntel ? 'Complete Growth Analysis before generating Campaign Intelligence' : ''} style={{ borderColor: '#10e18b', color: '#10e18b' }}>
               {campaignLoading ? 'Planning...' : 'Campaign Intelligence'}
             </button>
           </div>
+          {!hasProductIntel && selectedChatId && (
+            <div style={{ marginTop: '8px', fontSize: '12px', color: '#ffb347' }}>
+              Complete Growth Analysis before generating Campaign or Automation modules.
+            </div>
+          )}
         </div>
         {genError && (
           <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(255, 71, 87, 0.1)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

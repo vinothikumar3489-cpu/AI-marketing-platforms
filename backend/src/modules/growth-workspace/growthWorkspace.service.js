@@ -669,56 +669,75 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     ).join(' ');
     
     let growthExecutiveStory;
-    if (synthesizedIntel) {
-      growthExecutiveStory = generateExecutiveStory(synthesizedIntel);
-      growthExecutiveStory.companyOverview.website = input.websiteUrl || '';
-      growthExecutiveStory.evidenceReferences = {
-        totalSources: (synthesizedIntel.evidence?.sources || []).length,
-        dataQuality: synthesizedIntel.evidence?.sources?.length > 5 ? 'High - Multiple verified sources' : synthesizedIntel.evidence?.sources?.length > 0 ? 'Medium - Some verified sources' : 'Low - Limited verified sources',
-        confidence: synthesizedIntel.evidence?.sources?.length > 5 ? 85 : synthesizedIntel.evidence?.sources?.length > 0 ? 65 : 40
-      };
-      logReportGenerated(growthExecutiveStory);
-      console.log('[Business Intelligence] Enterprise BI 2.0 executive story generated with verified intelligence');
-    } else {
+    try {
+      if (synthesizedIntel) {
+        growthExecutiveStory = generateExecutiveStory(synthesizedIntel);
+        growthExecutiveStory.companyOverview.website = input.websiteUrl || '';
+        growthExecutiveStory.evidenceReferences = {
+          totalSources: (synthesizedIntel.evidence?.sources || []).length,
+          dataQuality: synthesizedIntel.evidence?.sources?.length > 5 ? 'High - Multiple verified sources' : synthesizedIntel.evidence?.sources?.length > 0 ? 'Medium - Some verified sources' : 'Low - Limited verified sources',
+          confidence: synthesizedIntel.evidence?.sources?.length > 5 ? 85 : synthesizedIntel.evidence?.sources?.length > 0 ? 65 : 40
+        };
+        logReportGenerated(growthExecutiveStory);
+        console.log('[Business Intelligence] Enterprise BI 2.0 executive story generated with verified intelligence');
+      } else {
+        growthExecutiveStory = {
+          executiveSummary: {
+            title: `Enterprise Business Intelligence Report: ${formattedCompanyName}`,
+            company: formattedCompanyName,
+            industry: input.industry || 'Not specified',
+            assessmentDate: new Date().toISOString().split('T')[0],
+            methodology: 'Standard analysis via Growth Workspace modules',
+            confidenceLevel: 'Low',
+            evidenceSourcesUsed: 0,
+            dataGaps: 1,
+            reportType: 'Enterprise Business Intelligence 2.0',
+            version: '2.0.0'
+          },
+          companyOverview: {
+            name: formattedCompanyName,
+            website: input.websiteUrl || '',
+            industry: input.industry || 'Not specified',
+            domain: input.websiteUrl ? extractDomainSimple(input.websiteUrl) : '',
+            evidence: { source: 'User input', confidence: null, collectedAt: new Date().toISOString() }
+          },
+          businessModel: { type: input.businessModel || 'Unknown', evidence: { source: 'User input', confidence: null, collectedAt: new Date().toISOString() } },
+          revenueModel: { pricingTiers: [], evidence: { source: 'Not collected', confidence: 0, collectedAt: new Date().toISOString() } },
+          growthStage: { fundingStage: 'Unknown', evidence: { source: 'Not collected', confidence: 0, collectedAt: new Date().toISOString() } },
+          productMaturity: { stage: 'Unknown', evidence: { source: 'Not collected', confidence: 0, collectedAt: new Date().toISOString() } },
+          marketPosition: { tam: normalizedResults.market?.tam || 'Unknown', competitiveIntensity: 'Unknown', evidence: { source: 'Growth Workspace modules', confidence: null, collectedAt: new Date().toISOString() } },
+          swot: {
+            strengths: [{ value: 'Insufficient evidence to determine strengths', confidence: 0, impact: 'Low' }],
+            weaknesses: [{ value: 'Business intelligence layer unavailable - data may be incomplete', confidence: 100, impact: 'High' }],
+            opportunities: [{ value: 'Run full analysis with website URL for complete intelligence', confidence: 90, impact: 'High' }],
+            threats: [{ value: 'Insufficient evidence to determine threats', confidence: 0, impact: 'Low' }]
+          },
+          keyFindings: [{ finding: 'Limited data available without website scraping and intelligence collection.', confidence: 100, evidence: 'Analysis mode', impact: 'High' }],
+          topPriorities: [{ priority: 1, action: 'Re-run analysis with website URL and complete product details', rationale: 'Full intelligence requires website data', roi: 'Complete enterprise intelligence', timeline: 'Immediate', owner: 'User', kpi: 'Complete intelligence report', evidence: 'Current analysis ran without business intelligence layer', confidence: 100 }],
+          executiveRecommendation: {
+            recommendation: `Data quality is insufficient for a definitive recommendation. Run a full analysis with website URL and complete product details to generate an enterprise-grade business intelligence report for ${formattedCompanyName}.`,
+            confidenceLevel: 'Low',
+            evidenceReferences: { dataQuality: 'Limited - Business intelligence layer unavailable' }
+          },
+          evidenceReferences: { totalSources: 0, dataQuality: 'Limited - Business intelligence layer unavailable', confidence: 0 }
+        };
+      }
+    } catch (storyError) {
+      console.error('[Growth Workspace] Executive story generation failed (non-fatal):', storyError.message);
+      warnings.push({ code: 'EXECUTIVE_STORY_GENERATION_FAILED', message: 'Core intelligence was saved, but the executive narrative could not be completed.' });
       growthExecutiveStory = {
         executiveSummary: {
           title: `Enterprise Business Intelligence Report: ${formattedCompanyName}`,
           company: formattedCompanyName,
           industry: input.industry || 'Not specified',
           assessmentDate: new Date().toISOString().split('T')[0],
-          methodology: 'Standard analysis via Growth Workspace modules',
           confidenceLevel: 'Low',
           evidenceSourcesUsed: 0,
-          dataGaps: 1,
-          reportType: 'Enterprise Business Intelligence 2.0',
-          version: '2.0.0'
+          dataGaps: 0
         },
-        companyOverview: {
-          name: formattedCompanyName,
-          website: input.websiteUrl || '',
-          industry: input.industry || 'Not specified',
-          domain: input.websiteUrl ? extractDomainSimple(input.websiteUrl) : '',
-          evidence: { source: 'User input', confidence: null, collectedAt: new Date().toISOString() }
-        },
-        businessModel: { type: input.businessModel || 'Unknown', evidence: { source: 'User input', confidence: null, collectedAt: new Date().toISOString() } },
-        revenueModel: { pricingTiers: [], evidence: { source: 'Not collected', confidence: 0, collectedAt: new Date().toISOString() } },
-        growthStage: { fundingStage: 'Unknown', evidence: { source: 'Not collected', confidence: 0, collectedAt: new Date().toISOString() } },
-        productMaturity: { stage: 'Unknown', evidence: { source: 'Not collected', confidence: 0, collectedAt: new Date().toISOString() } },
-        marketPosition: { tam: normalizedResults.market?.tam || 'Unknown', competitiveIntensity: 'Unknown', evidence: { source: 'Growth Workspace modules', confidence: null, collectedAt: new Date().toISOString() } },
-        swot: {
-          strengths: [{ value: 'Insufficient evidence to determine strengths', confidence: 0, impact: 'Low' }],
-          weaknesses: [{ value: 'Business intelligence layer unavailable - data may be incomplete', confidence: 100, impact: 'High' }],
-          opportunities: [{ value: 'Run full analysis with website URL for complete intelligence', confidence: 90, impact: 'High' }],
-          threats: [{ value: 'Insufficient evidence to determine threats', confidence: 0, impact: 'Low' }]
-        },
-        keyFindings: [{ finding: 'Limited data available without website scraping and intelligence collection.', confidence: 100, evidence: 'Analysis mode', impact: 'High' }],
-        topPriorities: [{ priority: 1, action: 'Re-run analysis with website URL and complete product details', rationale: 'Full intelligence requires website data', roi: 'Complete enterprise intelligence', timeline: 'Immediate', owner: 'User', kpi: 'Complete intelligence report', evidence: 'Current analysis ran without business intelligence layer', confidence: 100 }],
-        executiveRecommendation: {
-          recommendation: `Data quality is insufficient for a definitive recommendation. Run a full analysis with website URL and complete product details to generate an enterprise-grade business intelligence report for ${formattedCompanyName}.`,
-          confidenceLevel: 'Low',
-          evidenceReferences: { dataQuality: 'Limited - Business intelligence layer unavailable' }
-        },
-        evidenceReferences: { totalSources: 0, dataQuality: 'Limited - Business intelligence layer unavailable', confidence: 0 }
+        companyOverview: { name: formattedCompanyName, domain: '' },
+        evidenceReferences: { totalSources: 0, dataQuality: 'Unavailable', confidence: 0 },
+        _error: storyError.message
       };
     }
 
@@ -789,88 +808,112 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     console.log('[Growth Save] actionPlan keys', Object.keys(growthActionPlan || {}));
 
     // Save to database using validated chat.id
-    console.log('💾 [Growth Workspace] Saving results to database...');
+    console.log('💾 [Growth Workspace] Saving core intelligence to database...');
     
-    await prisma.productIntelligence.upsert({
-      where: { chatId: validChatId },
-      create: {
-        chatId: validChatId,
-        userId,
-        productAnalysis: normalizedResults.product,
-        marketDiscovery: normalizedResults.market,
-        audienceIntelligence: normalizedResults.audience,
-        status: 'completed',
-        inputJson: input
-      },
-      update: {
-        productAnalysis: normalizedResults.product,
-        marketDiscovery: normalizedResults.market,
-        audienceIntelligence: normalizedResults.audience,
-        status: 'completed',
-        inputJson: input,
-        updatedAt: new Date()
-      }
-    });
+    await prisma.$transaction([
+      prisma.productIntelligence.upsert({
+        where: { chatId: validChatId },
+        create: {
+          chatId: validChatId,
+          userId,
+          productAnalysis: normalizedResults.product,
+          marketDiscovery: normalizedResults.market,
+          audienceIntelligence: normalizedResults.audience,
+          status: 'completed',
+          inputJson: input
+        },
+        update: {
+          productAnalysis: normalizedResults.product,
+          marketDiscovery: normalizedResults.market,
+          audienceIntelligence: normalizedResults.audience,
+          status: 'completed',
+          inputJson: input,
+          updatedAt: new Date()
+        }
+      }),
 
-    await prisma.competitorIntelligence.upsert({
-      where: { chatId: validChatId },
-      create: {
-        chatId: validChatId,
-        userId,
-        competitorAnalysis: normalizedResults.competitor,
-        intentPrediction: normalizedResults.intent,
-        positioningEngine: normalizedResults.positioning,
-        status: 'completed',
-        inputJson: input
-      },
-      update: {
-        competitorAnalysis: normalizedResults.competitor,
-        intentPrediction: normalizedResults.intent,
-        positioningEngine: normalizedResults.positioning,
-        status: 'completed',
-        inputJson: input,
-        updatedAt: new Date()
-      }
-    });
+      prisma.competitorIntelligence.upsert({
+        where: { chatId: validChatId },
+        create: {
+          chatId: validChatId,
+          userId,
+          competitorAnalysis: normalizedResults.competitor,
+          intentPrediction: normalizedResults.intent,
+          positioningEngine: normalizedResults.positioning,
+          status: 'completed',
+          inputJson: input
+        },
+        update: {
+          competitorAnalysis: normalizedResults.competitor,
+          intentPrediction: normalizedResults.intent,
+          positioningEngine: normalizedResults.positioning,
+          status: 'completed',
+          inputJson: input,
+          updatedAt: new Date()
+        }
+      }),
 
-    // Store growth summary inside campaignGenerator metadata
-    const campaignGeneratorWithMetadata = {
-      ...normalizedResults.campaign,
-      growthSummary,
-      executiveStory: growthExecutiveStory,
-      actionPlan: growthActionPlan,
-      metadata: {
-        growthSummary,
-        executiveStory: growthExecutiveStory,
-        actionPlan: growthActionPlan,
-        generatedAt: new Date().toISOString()
-      }
-    };
+      prisma.campaignIntelligence.upsert({
+        where: { chatId: validChatId },
+        create: {
+          chatId: validChatId,
+          userId,
+          campaignGenerator: {
+            ...normalizedResults.campaign,
+            growthSummary,
+            metadata: {
+              growthSummary,
+              generatedAt: new Date().toISOString()
+            }
+          },
+          channelRecommendation: normalizedResults.channel,
+          status: 'completed',
+          inputJson: input
+        },
+        update: {
+          campaignGenerator: {
+            ...normalizedResults.campaign,
+            growthSummary,
+            metadata: {
+              growthSummary,
+              generatedAt: new Date().toISOString()
+            }
+          },
+          channelRecommendation: normalizedResults.channel,
+          status: 'completed',
+          inputJson: input,
+          updatedAt: new Date()
+        }
+      })
+    ]);
 
-    await prisma.campaignIntelligence.upsert({
-      where: { chatId: validChatId },
-      create: {
-        chatId: validChatId,
-        userId,
-        campaignGenerator: campaignGeneratorWithMetadata,
-        channelRecommendation: normalizedResults.channel,
-        executiveStory: growthExecutiveStory,
-        actionPlan: growthActionPlan,
-        status: 'completed',
-        inputJson: input
-      },
-      update: {
-        campaignGenerator: campaignGeneratorWithMetadata,
-        channelRecommendation: normalizedResults.channel,
-        executiveStory: growthExecutiveStory,
-        actionPlan: growthActionPlan,
-        status: 'completed',
-        inputJson: input,
-        updatedAt: new Date()
-      }
-    });
+    // Save optional derived data (executive story, action plan) separately
+    try {
+      await prisma.campaignIntelligence.update({
+        where: { chatId: validChatId },
+        data: {
+          executiveStory: growthExecutiveStory,
+          actionPlan: growthActionPlan,
+          campaignGenerator: {
+            ...normalizedResults.campaign,
+            growthSummary,
+            executiveStory: growthExecutiveStory,
+            actionPlan: growthActionPlan,
+            metadata: {
+              growthSummary,
+              executiveStory: growthExecutiveStory,
+              actionPlan: growthActionPlan,
+              generatedAt: new Date().toISOString()
+            }
+          }
+        }
+      });
+    } catch (derivedError) {
+      console.error('[Growth Workspace] Derived data save failed (non-fatal):', derivedError.message);
+      warnings.push({ code: 'DERIVED_DATA_SAVE_FAILED', message: 'Core intelligence was saved, but narrative data could not be persisted.' });
+    }
 
-    console.log('💾 [Growth Workspace] Results saved to database');
+    console.log('💾 [Growth Workspace] Core intelligence saved to database');
     console.log(`✅ [Growth Workspace] hasActionPlan: ${!!normalizedResults.campaign.actionPlan}`);
 
     // Add message to chat

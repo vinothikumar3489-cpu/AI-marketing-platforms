@@ -738,7 +738,7 @@ function IntegrationHealthPanel() {
 // ============================================
 
 export default function AIContentStudio() {
-  const { selectedChatId } = useProject();
+  const { selectedChatId, fullResults } = useProject();
   const [activeTab, setActiveTab] = useWorkspaceMemory('studio-activeTab', 'content');
   const [brief, setBrief] = useState<any>(null);
   const [briefLoading, setBriefLoading] = useState(false);
@@ -748,6 +748,7 @@ export default function AIContentStudio() {
   const [qualityScore, setQualityScore] = useState<any>(null);
   const [showHealth, setShowHealth] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -770,7 +771,7 @@ export default function AIContentStudio() {
 
     getEvidenceContext(selectedChatId)
       .then(ctx => {
-        if (ctx && typeof ctx === 'object' && !ctx?.error) setEvidenceContext(ctx);
+        if (ctx && typeof ctx === 'object') setEvidenceContext(ctx);
         else setEvidenceContext(null);
       })
       .catch(() => setEvidenceContext(null))
@@ -778,7 +779,7 @@ export default function AIContentStudio() {
 
     getContentBrief(selectedChatId)
       .then(res => {
-        if (res && typeof res === 'object' && !res?.error) setBrief(res);
+        if (res && typeof res === 'object') setBrief(res);
         else setBrief(null);
       })
       .catch(() => setBrief(null))
@@ -835,7 +836,7 @@ export default function AIContentStudio() {
       });
   }, [setActiveTab]);
 
-  const hasEvidence = evidenceContext?.sourceSummary?.sourcesCollected?.length > 0 || brief?.product?.name;
+  const hasEvidence = evidenceContext?.sourceSummary?.sourcesCollected?.length > 0 || brief?.product?.name || fullResults?.hasProductIntelligence === true;
 
   const tabs = [
     { id: 'content', label: 'Content Studio', icon: Sparkles },
@@ -912,6 +913,13 @@ export default function AIContentStudio() {
           {showHealth && <IntegrationHealthPanel />}
         </div>
 
+        {error && (
+          <div style={{ marginBottom: '12px', padding: '10px 14px', background: 'rgba(255,71,87,0.1)', borderRadius: '8px', border: '1px solid rgba(255,71,87,0.3)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#ff8a8a' }}>
+            <AlertTriangle size={16} />
+            <div style={{ flex: 1 }}>{error}</div>
+            <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '10px' }}>Dismiss</button>
+          </div>
+        )}
         <Card>
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', borderBottom: `1px solid ${C.border}`, paddingBottom: '8px', marginBottom: '16px' }}>
             {tabs.map(t => (

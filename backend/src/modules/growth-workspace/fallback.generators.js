@@ -147,19 +147,33 @@ export function generatePositioningFallback(input, productData, competitorData) 
  * Returns Unknown when AI fails
  */
 export function generateCampaignFallback(input, websiteData, allResults) {
+  const name = input?.productName || 'the product';
   return {
+    status: 'PARTIALLY_GENERATED',
     campaignObjective: 'Insufficient Data - Campaign objective unavailable from verified sources',
+    campaignAngles: [],
+    hooks: [],
     campaignIdeas: [],
     adHooks: [],
-    actionPlan: {
-      day7: [],
-      day30: [],
-      day60: [],
-      day90: []
-    },
+    actionPlan: null,
     ctaSuggestions: [],
     confidenceScore: null,
-    provider: 'fallback_unavailable'
+    provider: 'fallback_unavailable',
+    availableRecommendations: [
+      `Run complete Growth Analysis for ${name} to generate campaign angles`,
+      'Configure website URL for audience and competitor evidence',
+      'Complete Product Analysis for feature-based messaging'
+    ],
+    missingEvidence: [
+      'Product features and USP analysis',
+      'Audience persona definitions',
+      'Competitor positioning data',
+      'Market trend signals'
+    ],
+    generationWarnings: [
+      'AI providers unavailable or returned empty results',
+      'Fallback used - campaign not generated from evidence'
+    ]
   };
 }
 

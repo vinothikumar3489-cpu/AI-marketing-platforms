@@ -162,9 +162,9 @@ export async function generateExecutiveDashboard(input = {}) {
     console.log('📋 [Executive Dashboard] Creating action plan...');
     const executiveActionPlan = generateExecutiveActionPlan(seoData);
 
-    // Step 9: Generate ROI Forecast
-    console.log('💰 [Executive Dashboard] Forecasting ROI...');
-    const roiForecast = generateRoiForecast(seoData);
+    // Step 9: Assess measurement readiness
+    console.log('📊 [Executive Dashboard] Assessing measurement readiness...');
+    const measurementReadiness = generateMeasurementReadiness(seoData);
 
     // Step 10: Generate Executive Story (pass executiveOverview for verified scores)
     console.log('📖 [Executive Dashboard] Generating executive story...');
@@ -182,14 +182,14 @@ export async function generateExecutiveDashboard(input = {}) {
       aiSearchVisibility: Object.keys(aiSearchVisibility || {}),
       contentStrategySummary: Object.keys(contentStrategySummary || {}),
       executiveActionPlan: Object.keys(executiveActionPlan || {}),
-      roiForecast: Object.keys(roiForecast || {}),
+      measurementReadiness: Object.keys(measurementReadiness || {}),
       executiveStory: Object.keys(executiveStory || {}),
       dataCompleteness: Object.keys(calculateDataCompleteness(seoData) || {})
     });
 
     console.log('[SEO Exec Save] executiveDashboard keys', Object.keys({
       executiveOverview, seoHealthSummary, keyOpportunities, competitorSnapshot,
-      aiSearchVisibility, contentStrategySummary, executiveActionPlan, roiForecast
+      aiSearchVisibility, contentStrategySummary, executiveActionPlan, measurementReadiness
     }));
     console.log('[SEO Exec Save] executiveActionPlan keys', Object.keys(executiveActionPlan || {}));
     console.log('[SEO Exec Save] metadata keys', Object.keys({ generatedAt: new Date().toISOString(), dataCompleteness: calculateDataCompleteness(seoData), executiveStory }));
@@ -206,7 +206,7 @@ export async function generateExecutiveDashboard(input = {}) {
         aiSearchVisibility,
         contentStrategySummary,
         executiveActionPlan,
-        roiForecast,
+        measurementReadiness,
         metadata: {
           generatedAt: new Date().toISOString(),
           dataCompleteness: calculateDataCompleteness(seoData),
@@ -221,7 +221,7 @@ export async function generateExecutiveDashboard(input = {}) {
         aiSearchVisibility,
         contentStrategySummary,
         executiveActionPlan,
-        roiForecast,
+        measurementReadiness,
         metadata: {
           generatedAt: new Date().toISOString(),
           dataCompleteness: calculateDataCompleteness(seoData),
@@ -1389,10 +1389,10 @@ function generateExecutiveActionPlan(seoData) {
 }
 
 // ============================================
-// ROI FORECAST GENERATOR
+// MEASUREMENT READINESS (ROI forecast replaced)
 // ============================================
 
-function generateRoiForecast(seoData) {
+function generateMeasurementReadiness(seoData) {
   const keywordIntel = seoData.keywordIntelligence || {};
   
   const hasValidKeywordData = keywordIntel.primaryKeywords && keywordIntel.primaryKeywords.length > 0;

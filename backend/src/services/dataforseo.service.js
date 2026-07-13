@@ -13,13 +13,45 @@ const DATAFORSEO_API_URL = 'https://api.dataforseo.com/v3';
 console.log("[DataForSEO] login loaded", !!DATAFORSEO_LOGIN);
 console.log("[DataForSEO] password loaded", !!DATAFORSEO_PASSWORD);
 
-// Generic junk keywords to filter out
+// Generic junk keywords to filter out (must be multi-word real topics)
 const GENERIC_KEYWORDS = new Set([
   'business', 'custom', 'systems', 'built', 'everything', 'right', 'before',
   'https', 'apple', 'services', 'customer', 'product', 'all', 'software',
   'company', 'free', 'best', 'premium', 'plan', 'month', 'features',
-  'get', 'make', 'use', 'work', 'time', 'new', 'good', 'great', 'top'
+  'get', 'make', 'use', 'work', 'time', 'new', 'good', 'great', 'top',
+  'started', 'alerts', 'content', 'research', 'home', 'page', 'login',
+  'signup', 'pricing', 'blog', 'about', 'contact', 'faq', 'help', 'support',
+  'download', 'sign', 'learn', 'watch', 'read', 'view', 'click', 'search'
 ]);
+
+export function sanitizeKeywords(keywords) {
+  if (!Array.isArray(keywords)) return [];
+  const seen = new Set();
+  return keywords
+    .map(kw => {
+      if (typeof kw !== 'string') return null;
+      let cleaned = kw.normalize('NFKC').trim();
+      // Replace ampersands with "and"
+      cleaned = cleaned.replace(/&/g, ' and ');
+      // Remove unsupported punctuation (keep hyphens, apostrophes, spaces)
+      cleaned = cleaned.replace(/[^\w\s\-'&]/g, ' ');
+      // Collapse multiple spaces
+      cleaned = cleaned.replace(/\s+/g, ' ').trim();
+      return cleaned;
+    })
+    .filter(kw => {
+      if (!kw) return false;
+      if (kw.length < 3) return false;
+      // Reject single-word generic terms
+      const words = kw.split(' ');
+      if (words.length === 1 && GENERIC_KEYWORDS.has(words[0].toLowerCase())) return false;
+      // Deduplicate case-insensitively
+      const lower = kw.toLowerCase();
+      if (seen.has(lower)) return false;
+      seen.add(lower);
+      return true;
+    });
+}
 
 // Directory and research sites to classify separately
 const DIRECTORY_SITES = new Set([
@@ -147,18 +179,11 @@ export async function getKeywordMetrics(keywords, location = 'United States', la
     return { success: false, error: 'No keywords provided' };
   }
 
-  // Filter out generic keywords
-  const filteredKeywords = keywords.filter(kw => {
-    const lowerKw = kw.toLowerCase().trim();
-    // Filter single-word junk keywords
-    if (lowerKw.split(' ').length === 1 && GENERIC_KEYWORDS.has(lowerKw)) {
-      return false;
-    }
-    return true;
-  });
+  // Sanitize keywords (normalize, replace &, remove punctuation, deduplicate)
+  const filteredKeywords = sanitizeKeywords(keywords);
 
   if (filteredKeywords.length === 0) {
-    return { success: false, error: 'No valid keywords after filtering' };
+    return { success: false, error: 'No valid keywords after sanitization' };
   }
 
   // DataForSEO v3 expects a single task with 'keywords' array
@@ -202,20 +227,22 @@ export async function getKeywordMetrics(keywords, location = 'United States', la
 
   const normalized = response.data.tasks
     .filter(task => task.status_code === 20000)
-    .map(task => {
-      if (!task.result) return null;
-      const result = Array.isArray(task.result) ? task.result[0] : task.result;
-      return {
+    .flatMap(task => {
+      if (!task.result) return [];
+      const results = Array.isArray(task.result) ? task.result : [task.result];
+      return results.map(result => ({
         keyword: result.keyword,
-        volume: result.search_volume || null,
-        keywordDifficulty: result.keyword_difficulty || null,
-        cpc: result.cpc || null,
-        competition: result.competition || null,
+        volume: result.search_volume ?? null,
+        keywordDifficulty: null,
+        cpc: result.cpc ?? null,
+        competition: result.competition ?? null,
+        competitionIndex: result.competition_index ?? null,
+        monthlySearches: result.monthly_searches ?? null,
         intent: result.keyword_info?.intent || null,
         source: 'DataForSEO',
         confidence: 100,
         evidence: 'Retrieved from DataForSEO Keyword Data API'
-      };
+      }));
     })
     .filter(item => item !== null);
 

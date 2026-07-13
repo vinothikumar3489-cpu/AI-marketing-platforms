@@ -94,11 +94,18 @@ export const generateAutomationDemo = async (req, res) => {
 
     // Handle rejection from evidence context
     if (evidenceContext.rejected) {
-      return res.status(400).json({
+      const missing = [];
+      if (evidenceContext.code === 'EVIDENCE_MISSING' || evidenceContext.code === 'PRODUCT_IDENTITY_MISSING') {
+        missing.push('ProductIntelligence', 'CampaignIntelligence');
+      }
+      return res.status(422).json({
         success: false,
-        rejected: true,
-        code: evidenceContext.code,
-        error: evidenceContext.reason,
+        error: {
+          code: evidenceContext.code || "PRODUCT_INTELLIGENCE_REQUIRED",
+          message: evidenceContext.reason || "Complete Growth Analysis before generating this module.",
+          retryable: false,
+          missing
+        }
       });
     }
 
@@ -127,9 +134,14 @@ export const generateAutomationDemo = async (req, res) => {
 
     // Check for insufficient data
     if (automationData._noData) {
-      return res.status(400).json({
+      return res.status(422).json({
         success: false,
-        error: "No verified automation data available. Run Growth Workspace and SEO Intelligence first."
+        error: {
+          code: "PRODUCT_INTELLIGENCE_REQUIRED",
+          message: "Complete Growth Analysis before generating this module.",
+          retryable: true,
+          missing: ['ProductIntelligence', 'CampaignIntelligence']
+        }
       });
     }
 

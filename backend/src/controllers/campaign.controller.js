@@ -21,11 +21,14 @@ export const generateCampaignPlan = async (req, res) => {
     const evidenceContext = await buildEvidenceContext(prisma, userId, chatId);
 
     if (evidenceContext.rejected) {
-      return res.status(400).json({
+      return res.status(422).json({
         success: false,
-        rejected: true,
-        code: evidenceContext.code,
-        error: evidenceContext.reason,
+        error: {
+          code: evidenceContext.code || "PRODUCT_INTELLIGENCE_REQUIRED",
+          message: evidenceContext.reason || "Complete Growth Analysis before generating this module.",
+          retryable: false,
+          missing: evidenceContext.rejected === 'no_product_intelligence' ? ['ProductIntelligence', 'CampaignIntelligence'] : ['EvidenceSnapshot']
+        }
       });
     }
 
@@ -36,9 +39,14 @@ export const generateCampaignPlan = async (req, res) => {
     });
 
     if (campaignData._noData) {
-      return res.status(400).json({
+      return res.status(422).json({
         success: false,
-        error: campaignData.reason || "Failed to generate campaign intelligence",
+        error: {
+          code: "GENERATION_FAILED",
+          message: campaignData.reason || "Failed to generate campaign intelligence",
+          retryable: true,
+          missing: ['CampaignIntelligence']
+        }
       });
     }
 

@@ -478,7 +478,20 @@ export function synthesizeWithAI(evidence) {
 
   const now = new Date().toISOString();
 
+  const evidenceSources = (evidence.sources || []).map(s => ({
+    type: s.type || 'unknown',
+    source: s.source || 'unknown',
+    field: s.field || null,
+    collectedAt: s.collectedAt || now,
+    url: s.url || null
+  }));
+
   return {
+    evidence: {
+      sources: evidenceSources,
+      warnings: evidence.warnings || [],
+      count: evidenceSources.length
+    },
     companyIntelligence: {
       name: company.name || 'Unknown',
       domain: company.domain || '',

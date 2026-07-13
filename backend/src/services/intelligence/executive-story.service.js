@@ -8,8 +8,9 @@ export function generateExecutiveStory(intelligence) {
 
   const companyName = company.name || 'Unknown';
   const industry = company.industry || 'Unknown';
-  const evidenceSources = intelligence.evidence?.sources || [];
-  const evidenceWarnings = intelligence.evidence?.warnings || [];
+  const evidence = intelligence.evidence || {};
+  const evidenceSources = evidence.sources || [];
+  const evidenceWarnings = evidence.warnings || [];
 
   const confidenceLevel = evidenceSources.length > 5 ? 'High' : evidenceSources.length > 0 ? 'Medium' : 'Low';
 
@@ -127,7 +128,16 @@ export function generateExecutiveStory(intelligence) {
     },
     keyFindings: generateKeyFindings(company, competitors, market, technology, audience, pricing, evidenceWarnings),
     topPriorities: generateTopPriorities(company, competitors, market, technology, audience, pricing),
-    executiveRecommendation: generateExecutiveRecommendation(company, competitors, market, technology, audience, pricing, confidenceLevel)
+    executiveRecommendation: generateExecutiveRecommendation({
+      company,
+      competitors,
+      market,
+      technology,
+      audience,
+      pricing,
+      confidenceLevel,
+      evidenceSources
+    })
   };
 }
 
@@ -420,7 +430,16 @@ function generateTopPriorities(company, competitors, market, technology, audienc
   return priorities;
 }
 
-function generateExecutiveRecommendation(company, competitors, market, technology, audience, pricing, confidenceLevel) {
+function generateExecutiveRecommendation({
+  company,
+  competitors,
+  market,
+  technology,
+  audience,
+  pricing,
+  confidenceLevel,
+  evidenceSources = []
+}) {
   const directCount = (competitors.direct || []).length;
   const hasMarket = market.tam !== 'Unknown' && market.tam !== null;
   const hasPersonas = (audience.personas || []).length > 0;
