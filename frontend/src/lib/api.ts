@@ -76,6 +76,7 @@ export const api = {
   get: <T = any>(path: string, signal?: AbortSignal) => request<T>('GET', path, undefined, signal),
   post: <T = any>(path: string, body?: any, signal?: AbortSignal) => request<T>('POST', path, body, signal),
   put: <T = any>(path: string, body?: any, signal?: AbortSignal) => request<T>('PUT', path, body, signal),
+  patch: <T = any>(path: string, body?: any, signal?: AbortSignal) => request<T>('PATCH', path, body, signal),
   del: <T = any>(path: string, signal?: AbortSignal) => request<T>('DELETE', path, undefined, signal),
 };
 
@@ -271,6 +272,10 @@ export async function getExecutionData(chatId: string) {
   return api.get<{ success: boolean; exists: boolean; data: any }>(`/automation/${chatId}/execution`);
 }
 
+export async function getCampaignPlan(chatId: string) {
+  return api.get<any>(`/automation/${chatId}/plan`);
+}
+
 // ============================================
 // CONTENT STUDIO API (Phases 1–10)
 // ============================================
@@ -298,4 +303,343 @@ export async function getAssetVersionHistory(assetId: string, signal?: AbortSign
 
 export async function regenerateContentAsset(assetId: string, signal?: AbortSignal) {
   return api.post<any>(`/automation/content/assets/${assetId}/regenerate`, {}, signal);
+}
+
+// ============================================
+// EMAIL CAMPAIGN MODULE (Phase 16)
+// ============================================
+
+export async function generateEmailCampaign(chatId: string, campaignPlanId: string) {
+  return api.post<{
+    campaign: any;
+    items: any[];
+    channelFit: any;
+    aiProvider: string | null;
+    validationIssues: any[];
+  }>(`/chats/${chatId}/email-campaign/generate`, { campaignPlanId });
+}
+
+export async function getEmailCampaign(chatId: string, campaignId: string) {
+  return api.get<any>(`/chats/${chatId}/email-campaign/${campaignId}`);
+}
+
+export async function listEmailCampaigns(chatId: string) {
+  return api.get<any[]>(`/chats/${chatId}/email-campaign`);
+}
+
+export async function updateEmailItem(chatId: string, campaignId: string, itemId: string, updates: any) {
+  return api.patch<any>(`/chats/${chatId}/email-campaign/${campaignId}/items/${itemId}`, updates);
+}
+
+export async function regenerateEmailItem(chatId: string, campaignId: string, itemId: string, customPrompt?: string) {
+  return api.post<any>(`/chats/${chatId}/email-campaign/${campaignId}/items/${itemId}/regenerate`, { customPrompt });
+}
+
+export async function submitCampaignForReview(chatId: string, campaignId: string) {
+  return api.post<any>(`/chats/${chatId}/email-campaign/${campaignId}/submit-review`);
+}
+
+export async function approveEmailCampaign(chatId: string, campaignId: string) {
+  return api.post<any>(`/chats/${chatId}/email-campaign/${campaignId}/approve`);
+}
+
+export async function requestCampaignChanges(chatId: string, campaignId: string, feedback: string) {
+  return api.post<any>(`/chats/${chatId}/email-campaign/${campaignId}/request-changes`, { feedback });
+}
+
+export async function createEmailCampaignVersion(chatId: string, campaignId: string, reason: string) {
+  return api.post<any>(`/chats/${chatId}/email-campaign/${campaignId}/versions`, { reason });
+}
+
+export async function restoreEmailCampaignVersion(chatId: string, campaignId: string, versionId: string) {
+  return api.post<any>(`/chats/${chatId}/email-campaign/${campaignId}/versions/${versionId}/restore`);
+}
+
+// ============================================
+// CRM MODULE (Phase 17)
+// ============================================
+
+export async function getCRMDashboard(chatId: string) {
+  return api.get<any>(`/chats/${chatId}/crm/dashboard`);
+}
+
+export async function listCRMContacts(chatId: string, params?: any) {
+  const q = params ? '?' + new URLSearchParams(params).toString() : '';
+  return api.get<any[]>(`/chats/${chatId}/crm/contacts${q}`);
+}
+
+export async function getCRMContact(chatId: string, contactId: string) {
+  return api.get<any>(`/chats/${chatId}/crm/contacts/${contactId}`);
+}
+
+export async function createCRMContact(chatId: string, data: any) {
+  return api.post<any>(`/chats/${chatId}/crm/contacts`, data);
+}
+
+export async function updateCRMContact(chatId: string, contactId: string, data: any) {
+  return api.patch<any>(`/chats/${chatId}/crm/contacts/${contactId}`, data);
+}
+
+export async function archiveCRMContact(chatId: string, contactId: string) {
+  return api.del<any>(`/chats/${chatId}/crm/contacts/${contactId}`);
+}
+
+export async function deleteCRMCompany(chatId: string, companyId: string) {
+  return api.del<any>(`/chats/${chatId}/crm/companies/${companyId}`);
+}
+
+export async function deleteCRMDeal(chatId: string, dealId: string) {
+  return api.del<any>(`/chats/${chatId}/crm/deals/${dealId}`);
+}
+
+export async function cancelCRMTask(chatId: string, taskId: string) {
+  return api.post<any>(`/chats/${chatId}/crm/tasks/${taskId}/cancel`);
+}
+
+export async function assignCRMTask(chatId: string, taskId: string, assignedTo: string) {
+  return api.post<any>(`/chats/${chatId}/crm/tasks/${taskId}/assign`, { assignedTo });
+}
+
+export async function listCRMCompanies(chatId: string, params?: any) {
+  const q = params ? '?' + new URLSearchParams(params).toString() : '';
+  return api.get<any[]>(`/chats/${chatId}/crm/companies${q}`);
+}
+
+export async function getCRMCompany(chatId: string, companyId: string) {
+  return api.get<any>(`/chats/${chatId}/crm/companies/${companyId}`);
+}
+
+export async function createCRMCompany(chatId: string, data: any) {
+  return api.post<any>(`/chats/${chatId}/crm/companies`, data);
+}
+
+export async function updateCRMCompany(chatId: string, companyId: string, data: any) {
+  return api.patch<any>(`/chats/${chatId}/crm/companies/${companyId}`, data);
+}
+
+export async function listCRMDeals(chatId: string, params?: any) {
+  const q = params ? '?' + new URLSearchParams(params).toString() : '';
+  return api.get<any[]>(`/chats/${chatId}/crm/deals${q}`);
+}
+
+export async function getCRMDeal(chatId: string, dealId: string) {
+  return api.get<any>(`/chats/${chatId}/crm/deals/${dealId}`);
+}
+
+export async function createCRMDeal(chatId: string, data: any) {
+  return api.post<any>(`/chats/${chatId}/crm/deals`, data);
+}
+
+export async function updateCRMDeal(chatId: string, dealId: string, data: any) {
+  return api.patch<any>(`/chats/${chatId}/crm/deals/${dealId}`, data);
+}
+
+export async function moveDealStage(chatId: string, dealId: string, stageId: string) {
+  return api.post<any>(`/chats/${chatId}/crm/deals/${dealId}/move-stage`, { stageId });
+}
+
+export async function listCRMPipelines(chatId: string) {
+  return api.get<any[]>(`/chats/${chatId}/crm/pipelines`);
+}
+
+export async function getCRMPipeline(chatId: string, pipelineId: string) {
+  return api.get<any>(`/chats/${chatId}/crm/pipelines/${pipelineId}`);
+}
+
+export async function createCRMPipeline(chatId: string, data: any) {
+  return api.post<any>(`/chats/${chatId}/crm/pipelines`, data);
+}
+
+export async function getDefaultCRMPipeline(chatId: string) {
+  return api.get<any>(`/chats/${chatId}/crm/pipelines/default`);
+}
+
+export async function createCRMPipelineStage(chatId: string, pipelineId: string, data: any) {
+  return api.post<any>(`/chats/${chatId}/crm/pipelines/${pipelineId}/stages`, data);
+}
+
+export async function renameCRMPipelineStage(chatId: string, pipelineId: string, stageId: string, data: any) {
+  return api.patch<any>(`/chats/${chatId}/crm/pipelines/${pipelineId}/stages/${stageId}`, data);
+}
+
+export async function deleteCRMPipelineStage(chatId: string, pipelineId: string, stageId: string) {
+  return api.del<any>(`/chats/${chatId}/crm/pipelines/${pipelineId}/stages/${stageId}`);
+}
+
+export async function reorderCRMPipelineStages(chatId: string, pipelineId: string, stageIds: string[]) {
+  return api.post<any>(`/chats/${chatId}/crm/pipelines/${pipelineId}/reorder-stages`, { stageIds });
+}
+
+export async function deleteCRMPipeline(chatId: string, pipelineId: string) {
+  return api.del<any>(`/chats/${chatId}/crm/pipelines/${pipelineId}`);
+}
+
+export async function listCRMTasks(chatId: string, params?: any) {
+  const q = params ? '?' + new URLSearchParams(params).toString() : '';
+  return api.get<any[]>(`/chats/${chatId}/crm/tasks${q}`);
+}
+
+export async function createCRMTask(chatId: string, data: any) {
+  return api.post<any>(`/chats/${chatId}/crm/tasks`, data);
+}
+
+export async function updateCRMTask(chatId: string, taskId: string, data: any) {
+  return api.patch<any>(`/chats/${chatId}/crm/tasks/${taskId}`, data);
+}
+
+export async function completeCRMTask(chatId: string, taskId: string) {
+  return api.post<any>(`/chats/${chatId}/crm/tasks/${taskId}/complete`);
+}
+
+export async function listCRMActivities(chatId: string, params?: any) {
+  const q = params ? '?' + new URLSearchParams(params).toString() : '';
+  return api.get<any[]>(`/chats/${chatId}/crm/activities${q}`);
+}
+
+export async function createCRMActivity(chatId: string, data: any) {
+  return api.post<any>(`/chats/${chatId}/crm/activities`, data);
+}
+
+export async function generateLeadJourney(chatId: string, contactId: string) {
+  return api.post<any>(`/chats/${chatId}/crm/lead-journey/${contactId}/generate`);
+}
+
+export async function getLeadJourney(chatId: string, contactId: string) {
+  return api.get<any>(`/chats/${chatId}/crm/lead-journey/${contactId}`);
+}
+
+export async function listCRMWorkflows(chatId: string, params?: any) {
+  const q = params ? '?' + new URLSearchParams(params).toString() : '';
+  return api.get<any[]>(`/chats/${chatId}/crm/workflows${q}`);
+}
+
+export async function getCRMWorkflow(chatId: string, workflowId: string) {
+  return api.get<any>(`/chats/${chatId}/crm/workflows/${workflowId}`);
+}
+
+export async function createCRMWorkflow(chatId: string, data: any) {
+  return api.post<any>(`/chats/${chatId}/crm/workflows`, data);
+}
+
+export async function updateCRMWorkflow(chatId: string, workflowId: string, data: any) {
+  return api.patch<any>(`/chats/${chatId}/crm/workflows/${workflowId}`, data);
+}
+
+export async function submitWorkflowForReview(chatId: string, workflowId: string) {
+  return api.post<any>(`/chats/${chatId}/crm/workflows/${workflowId}/submit-review`);
+}
+
+export async function approveCRMWorkflow(chatId: string, workflowId: string) {
+  return api.post<any>(`/chats/${chatId}/crm/workflows/${workflowId}/approve`);
+}
+
+export async function requestWorkflowChanges(chatId: string, workflowId: string, feedback: string) {
+  return api.post<any>(`/chats/${chatId}/crm/workflows/${workflowId}/request-changes`, { feedback });
+}
+
+export async function activateCRMWorkflow(chatId: string, workflowId: string) {
+  return api.post<any>(`/chats/${chatId}/crm/workflows/${workflowId}/activate`);
+}
+
+export async function pauseCRMWorkflow(chatId: string, workflowId: string) {
+  return api.post<any>(`/chats/${chatId}/crm/workflows/${workflowId}/pause`);
+}
+
+export async function executeCRMWorkflow(chatId: string, workflowId: string, triggerContext?: any) {
+  return api.post<any>(`/chats/${chatId}/crm/workflows/${workflowId}/run`, { triggerContext });
+}
+
+export async function testCRMWorkflow(chatId: string, workflowId: string, testData?: any) {
+  return api.post<any>(`/chats/${chatId}/crm/workflows/${workflowId}/test`, { testData });
+}
+
+export async function getCRMWorkflowLogs(chatId: string, workflowId: string) {
+  return api.get<any[]>(`/chats/${chatId}/crm/workflows/${workflowId}/logs`);
+}
+
+export async function getCRMWorkflowVersions(chatId: string, workflowId: string) {
+  return api.get<any[]>(`/chats/${chatId}/crm/workflows/${workflowId}/versions`);
+}
+
+export async function restoreCRMWorkflowVersion(chatId: string, workflowId: string, versionId: string) {
+  return api.post<any>(`/chats/${chatId}/crm/workflows/${workflowId}/restore/${versionId}`);
+}
+
+export async function uploadCRMImport(chatId: string, csvText: string, fileName: string) {
+  return api.post<any>(`/chats/${chatId}/crm/import/upload`, { csvText, fileName });
+}
+
+export async function mapCRMImportColumns(chatId: string, importId: string, columnMapping: any, importType: string) {
+  return api.post<any>(`/chats/${chatId}/crm/import/${importId}/map`, { columnMapping, importType });
+}
+
+export async function validateCRMImport(chatId: string, importId: string) {
+  return api.post<any>(`/chats/${chatId}/crm/import/${importId}/validate`);
+}
+
+export async function confirmCRMImport(chatId: string, importId: string) {
+  return api.post<any>(`/chats/${chatId}/crm/import/${importId}/confirm`);
+}
+
+export async function getCRMImportJob(chatId: string, importId: string) {
+  return api.get<any>(`/chats/${chatId}/crm/import/${importId}`);
+}
+
+// ============================================
+// SALES COPILOT (Phase 18 — FleetNimble AI Sales Copilot)
+// ============================================
+
+export async function getCopilotDashboard(chatId: string) {
+  return api.get<any>(`/chats/${chatId}/copilot/dashboard`);
+}
+
+export async function getDealInsights(chatId: string, dealId: string) {
+  return api.get<any>(`/chats/${chatId}/copilot/deals/${dealId}/insights`);
+}
+
+export async function generateFollowUp(chatId: string, dealId: string, channel: string) {
+  return api.post<any>(`/chats/${chatId}/copilot/deals/${dealId}/follow-up`, { channel });
+}
+
+export async function getNextBestAction(chatId: string, contactId: string) {
+  return api.get<any>(`/chats/${chatId}/copilot/contacts/${contactId}/nba`);
+}
+
+export async function scoreOpportunity(chatId: string, dealId: string) {
+  return api.get<any>(`/chats/${chatId}/copilot/deals/${dealId}/score`);
+}
+
+export async function getSalesTimeline(chatId: string, params?: any) {
+  const q = params ? '?' + new URLSearchParams(params).toString() : '';
+  return api.get<any>(`/chats/${chatId}/copilot/timeline${q}`);
+}
+
+export async function getConversationMemory(chatId: string, params?: any) {
+  const q = params ? '?' + new URLSearchParams(params).toString() : '';
+  return api.get<any>(`/chats/${chatId}/copilot/memory${q}`);
+}
+
+export async function getMeetingPrep(chatId: string, contactId: string) {
+  return api.get<any>(`/chats/${chatId}/copilot/contacts/${contactId}/meeting-prep`);
+}
+
+export async function generateProposal(chatId: string, dealId: string) {
+  return api.post<any>(`/chats/${chatId}/copilot/deals/${dealId}/proposals`);
+}
+
+export async function listProposals(chatId: string, dealId?: string) {
+  const q = dealId ? `?dealId=${dealId}` : '';
+  return api.get<any>(`/chats/${chatId}/copilot/proposals${q}`);
+}
+
+export async function getCustomerHealth(chatId: string) {
+  return api.get<any>(`/chats/${chatId}/copilot/health`);
+}
+
+export async function runCopilotAutomation(chatId: string, action: string, config: any) {
+  return api.post<any>(`/chats/${chatId}/copilot/automation`, { action, config });
+}
+
+export async function getCopilotNotifications(chatId: string) {
+  return api.get<any>(`/chats/${chatId}/copilot/notifications`);
 }

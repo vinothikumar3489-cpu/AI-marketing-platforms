@@ -30,6 +30,20 @@ model User {
   automationLogs         AutomationLog[]
   executionRecords       ExecutionRecord[]
   evidenceSnapshots      EvidenceSnapshot[]
+  campaignPlans          CampaignPlan[]
+  emailCampaigns         EmailCampaign[]
+  crmContacts            CRMContact[]
+  crmCompanies           CRMCompany[]
+  crmDeals               CRMDeal[]
+  crmActivities          CRMActivity[]
+  crmTasks               CRMTask[]
+  crmPipelines           CRMPipeline[]
+  crmWorkflows           CRMWorkflow[]
+  crmImportJobs          CRMImportJob[]
+  salesCopilotMemories   SalesCopilotMemory[]
+  dealInsights           DealInsight[]
+  proposals              Proposal[]
+  customerHealthSnapshots CustomerHealthSnapshot[]
 
   // Growth Execution Layer relations
   growthSprints GrowthSprint[]
@@ -65,6 +79,20 @@ model Chat {
   growthTasks       GrowthTask[]
   executionRecords  ExecutionRecord[]
   evidenceSnapshots EvidenceSnapshot[]
+  campaignPlans     CampaignPlan[]
+  emailCampaigns    EmailCampaign[]
+  crmContacts       CRMContact[]
+  crmCompanies      CRMCompany[]
+  crmDeals          CRMDeal[]
+  crmActivities     CRMActivity[]
+  crmTasks          CRMTask[]
+  crmPipelines      CRMPipeline[]
+  crmWorkflows      CRMWorkflow[]
+  crmImportJobs     CRMImportJob[]
+  salesCopilotMemories   SalesCopilotMemory[]
+  dealInsights           DealInsight[]
+  proposals              Proposal[]
+  customerHealthSnapshots CustomerHealthSnapshot[]
 
   @@index([userId])
 }
@@ -269,6 +297,43 @@ model CampaignIntelligence {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model CampaignPlan {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId String @unique
+
+  // Campaign Intelligence (all derived from evidence, never fabricated)
+  executiveSummary        Json? // campaignName, campaignTheme, campaignGoal, duration, primaryAudience, primaryChannels, topOpportunities, topRisks, nextActions
+  businessGoal            Json? // goal, confidence, reason, evidence
+  campaignObjective       Json? // primary, secondary, successDefinition, targetAudience, idealCustomer, timeline, priority, dependencies
+  audienceSelection       Json? // primary, secondary, buyingStage, painPoints, decisionDrivers, objections, contentPreferences
+  channelRecommendations  Json? // [{ channel, fit, priority, reason, evidence, recommendedContent, recommendedCTA, organicOrPaid }]
+  timeline                Json? // week1, week2, week3, week4, month2, month3 — each with tasks
+  marketingFunnel         Json? // awareness, interest, consideration, conversion, retention, advocacy
+  kpiFramework            Json? // [{ kpi, howToMeasure, tool, frequency, status }]
+  riskAssessment          Json? // [{ risk, cause, evidence, severity, mitigation }]
+  opportunityAssessment   Json? // [{ opportunity, reason, evidence, effort, priority, expectedBusinessImpact }]
+  nextActions             Json? // [{ action, owner, priority, evidence }]
+
+  // Metadata
+  status       String?  @default("draft")
+  provider     String?
+  fallbackUsed Boolean? @default(false)
+  inputJson    Json?
+
+  emailCampaigns EmailCampaign[]
+  crmDeals       CRMDeal[]
+  crmWorkflows   CRMWorkflow[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([chatId])
+  @@index([userId])
 }
 
 // ============================================
@@ -1017,4 +1082,639 @@ model ExecutiveSeoDashboard {
   updatedAt DateTime @updatedAt
 
   @@index([seoIntelligenceId])
+}
+
+// ============================================
+// EMAIL CAMPAIGN MODULE (Phase 16)
+// ============================================
+
+model EmailCampaign {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId String
+  campaignPlan CampaignPlan? @relation(fields: [campaignPlanId], references: [id], onDelete: SetNull)
+  campaignPlanId String?
+
+  name              String
+  objective         String?
+  audienceSummary   String?
+  funnelStage       String?
+  sequenceType      String?
+  senderName        String?
+  senderEmail       String?
+  replyToEmail      String?
+  totalEmails       Int      @default(0)
+
+  status            String   @default("DRAFT")
+  approvalStatus    String   @default("NOT_SUBMITTED")
+  generationStatus  String   @default("pending")
+
+  evidenceSummary   Json?
+  missingEvidence   Json?
+
+  sequenceItems EmailSequenceItem[]
+  versions      EmailCampaignVersion[]
+  logs          EmailCampaignLog[]
+  crmDeals      CRMDeal[]
+  crmWorkflows  CRMWorkflow[]
+
+  approvedAt  DateTime?
+  scheduledAt DateTime?
+  submittedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([chatId])
+  @@index([userId])
+  @@index([campaignPlanId])
+  @@index([status])
+  @@index([approvalStatus])
+}
+
+model EmailSequenceItem {
+  id     String        @id @default(cuid())
+  campaign EmailCampaign @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
+  emailCampaignId String
+
+  sequenceOrder          Int
+  emailName              String
+  purpose                String?
+  funnelStage            String?
+  delayAfterPreviousDays Int?     @default(0)
+
+  subjectLine            String?
+  alternativeSubjectLines Json?
+  previewText            String?
+  greetingStrategy       String?
+  emailBodyText          String?  @db.Text
+  emailBodyHtml          String?  @db.Text
+  primaryCta             String?
+  secondaryCta           String?
+  personalizationFields  Json?
+
+  evidenceUsed           Json?
+  inferenceStatus        String?
+  complianceNotes        String?  @db.Text
+
+  status                 String   @default("draft")
+
+  logEntries EmailCampaignLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([emailCampaignId, sequenceOrder])
+}
+
+model EmailCampaignVersion {
+  id     String        @id @default(cuid())
+  campaign EmailCampaign @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
+  emailCampaignId String
+
+  versionNumber Int
+  snapshot      Json
+  changeReason  String?  @db.Text
+  createdBy     String?
+
+  createdAt DateTime @default(now())
+
+  @@index([emailCampaignId, versionNumber])
+}
+
+model EmailCampaignLog {
+  id     String        @id @default(cuid())
+  campaign EmailCampaign @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
+  emailCampaignId String
+  sequenceItem   EmailSequenceItem? @relation(fields: [emailSequenceItemId], references: [id], onDelete: SetNull)
+  emailSequenceItemId String?
+
+  action   String
+  status   String?
+  message  String?  @db.Text
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([emailCampaignId, action])
+}
+
+// ============================================
+// CRM MODULE (Phase 17 — CRM Workflow & Lead Journey Automation)
+// ============================================
+
+model CRMContact {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId String
+  company CRMCompany? @relation("ContactCompany", fields: [companyId], references: [id], onDelete: SetNull)
+  companyId String?
+
+  firstName       String
+  lastName        String?
+  email           String?
+  phone           String?
+  jobTitle        String?
+  lifecycleStage  String   @default("NOT_MEASURED")
+  source          String?
+  consentStatus   String   @default("NOT_MEASURED")
+  ownerId         String?
+  status          String   @default("ACTIVE")
+  customFields    Json?
+
+  deals      CRMDeal[]
+  activities CRMActivity[]
+  tasks      CRMTask[]
+  workflowExecutions CRMWorkflowExecution[]
+  salesCopilotMemories SalesCopilotMemory[]
+  proposals Proposal[]
+  healthSnapshots CustomerHealthSnapshot[]
+
+  archivedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([chatId])
+  @@index([userId])
+  @@index([email])
+  @@index([status])
+  @@index([lifecycleStage])
+  @@index([companyId])
+}
+
+model CRMCompany {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId String
+
+  name           String
+  website        String?
+  industry       String?
+  employeeRange  String?
+  location       String?
+  description    String?
+  source         String?
+  customFields   Json?
+
+  contacts   CRMContact[]    @relation("ContactCompany")
+  deals      CRMDeal[]
+  activities CRMActivity[]
+  tasks      CRMTask[]
+  workflowExecutions CRMWorkflowExecution[]
+  salesCopilotMemories SalesCopilotMemory[]
+  proposals Proposal[]
+  healthSnapshots CustomerHealthSnapshot[]
+
+  archivedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([chatId])
+  @@index([userId])
+  @@index([name])
+}
+
+model CRMPipeline {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId String
+
+  name        String
+  description String?
+  status      String   @default("ACTIVE")
+
+  stages CRMPipelineStage[]
+  deals  CRMDeal[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([chatId])
+  @@index([userId])
+}
+
+model CRMPipelineStage {
+  id     String       @id @default(cuid())
+  pipeline CRMPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  pipelineId String
+
+  name        String
+  order       Int
+  description String?
+  stageType   String?  // lead, qualified, contacted, meeting, proposal, won, lost
+  isClosed    Boolean  @default(false)
+
+  deals CRMDeal[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pipelineId, order])
+}
+
+model CRMDeal {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId String
+  company  CRMCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  companyId String?
+  contact  CRMContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contactId String?
+  pipeline CRMPipeline? @relation(fields: [pipelineId], references: [id], onDelete: SetNull)
+  pipelineId String?
+  stage    CRMPipelineStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  stageId String?
+  campaignPlan   CampaignPlan? @relation(fields: [campaignPlanId], references: [id], onDelete: SetNull)
+  campaignPlanId String?
+  emailCampaign  EmailCampaign? @relation(fields: [emailCampaignId], references: [id], onDelete: SetNull)
+  emailCampaignId String?
+
+  name              String
+  description       String?
+  currency          String?  @default("USD")
+  value             Float?
+  expectedCloseDate DateTime?
+  status            String   @default("OPEN")
+  source            String?
+  ownerId           String?
+  metadata          Json?
+
+  activities CRMActivity[]
+  tasks      CRMTask[]
+  workflowExecutions CRMWorkflowExecution[]
+  salesCopilotMemories SalesCopilotMemory[]
+  dealInsights DealInsight[]
+  proposals Proposal[]
+  healthSnapshots CustomerHealthSnapshot[]
+
+  archivedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([chatId])
+  @@index([userId])
+  @@index([pipelineId, stageId])
+  @@index([status])
+  @@index([contactId])
+  @@index([companyId])
+  @@index([campaignPlanId])
+  @@index([expectedCloseDate])
+  @@index([ownerId])
+  @@index([updatedAt])
+}
+
+model CRMActivity {
+  id     String     @id @default(cuid())
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  chat   Chat       @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId String
+  contact  CRMContact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contactId String?
+  company  CRMCompany?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  companyId String?
+  deal     CRMDeal?     @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  dealId String?
+
+  activityType String   // note, call, meeting, email, stage_change, task_completion, campaign_association, workflow_execution
+  title        String
+  description  String?  @db.Text
+  activityDate DateTime @default(now())
+  outcome      String?
+  source       String?  // MANUALLY_RECORDED, PROVIDER_DELIVERED, IMPORTED, SYSTEM
+  createdBy    String?
+
+  provider          String? // email provider name if provider-delivered
+  providerMessageId String? // provider's tracking ID if provider-delivered
+  deliveryStatus    String? // sent, delivered, bounced, failed — only for provider-delivered
+  metadata          Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([chatId])
+  @@index([userId])
+  @@index([contactId])
+  @@index([companyId])
+  @@index([dealId])
+  @@index([activityType])
+  @@index([activityDate])
+  @@index([chatId, activityDate])
+}
+
+model CRMTask {
+  id     String     @id @default(cuid())
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  chat   Chat       @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId String
+  contact  CRMContact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contactId String?
+  company  CRMCompany?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  companyId String?
+  deal     CRMDeal?     @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  dealId String?
+
+  assignedTo String?
+  title      String
+  description String? @db.Text
+  priority   String   @default("MEDIUM")  // LOW, MEDIUM, HIGH, URGENT
+  status     String   @default("TODO")     // TODO, IN_PROGRESS, COMPLETED, CANCELLED
+  dueAt      DateTime?
+  completedAt DateTime?
+  source     String?  // MANUAL, WORKFLOW, IMPORT, AI_RECOMMENDATION
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([chatId])
+  @@index([userId])
+  @@index([contactId])
+  @@index([dealId])
+  @@index([status])
+  @@index([assignedTo])
+  @@index([dueAt])
+  @@index([chatId, status, dueAt])
+}
+
+model CRMWorkflow {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId String
+  campaignPlan   CampaignPlan? @relation(fields: [campaignPlanId], references: [id], onDelete: SetNull)
+  campaignPlanId String?
+  emailCampaign  EmailCampaign? @relation(fields: [emailCampaignId], references: [id], onDelete: SetNull)
+  emailCampaignId String?
+
+  name        String
+  description String?  @db.Text
+  triggerType String   // CONTACT_CREATED, CONTACT_UPDATED, DEAL_CREATED, DEAL_STAGE_CHANGED, TASK_COMPLETED, EMAIL_CAMPAIGN_APPROVED, DATE_REACHED, MANUAL_TRIGGER
+  triggerConfig Json?  // { field, operator, value }
+  conditions   Json?   // [{ field, operator, value }]
+  actions      Json?   // [{ type, config }]
+
+  status         String @default("DRAFT")    // DRAFT, READY_FOR_REVIEW, APPROVED, ACTIVE, PAUSED, COMPLETED, FAILED, ARCHIVED
+  approvalStatus String @default("NOT_SUBMITTED") // NOT_SUBMITTED, PENDING_REVIEW, CHANGES_REQUESTED, APPROVED, REJECTED
+  executionStatus String @default("never_run") // never_run, running, completed, failed, paused
+
+  versionNumber   Int      @default(1)
+  maxDepth        Int      @default(10)
+  maxActions      Int      @default(20)
+  idempotencyKey  String?
+
+  approvedAt  DateTime?
+  pausedAt    DateTime?
+  activatedAt DateTime?
+
+  versions CRMWorkflowVersion[]
+  executions CRMWorkflowExecution[]
+  logs      CRMWorkflowLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([chatId])
+  @@index([userId])
+  @@index([campaignPlanId])
+  @@index([status])
+  @@index([approvalStatus])
+}
+
+model CRMWorkflowVersion {
+  id     String       @id @default(cuid())
+  workflow CRMWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflowId String
+
+  versionNumber Int
+  snapshot      Json   // full workflow + conditions + actions
+  changeReason  String? @db.Text
+  createdBy     String?
+
+  createdAt DateTime @default(now())
+
+  @@index([workflowId, versionNumber])
+}
+
+model CRMWorkflowExecution {
+  id     String       @id @default(cuid())
+  workflow CRMWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflowId String
+  contact  CRMContact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contactId String?
+  company  CRMCompany?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  companyId String?
+  deal     CRMDeal?     @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  dealId String?
+
+  status        String   @default("pending")  // pending, running, completed, failed, cancelled
+  currentStep   Int      @default(0)
+  maxSteps      Int      @default(10)
+  executionData Json?    // { triggerResult, conditionResults, actionResults }
+  errorMessage  String?  @db.Text
+  idempotencyKey String?
+
+  workflowLogs CRMWorkflowLog[]
+
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workflowId])
+  @@index([status])
+  @@index([idempotencyKey])
+}
+
+model CRMWorkflowLog {
+  id     String       @id @default(cuid())
+  workflow CRMWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflowId String
+  execution CRMWorkflowExecution? @relation(fields: [executionId], references: [id], onDelete: SetNull)
+  executionId String?
+
+  action   String   // workflow_created, submitted_review, approved, changes_requested, activated, paused, completed, failed, execution_started, execution_step, execution_completed, execution_failed, cancelled, version_created, version_restored
+  status   String?
+  message  String?  @db.Text
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([workflowId, action])
+}
+
+model CRMImportJob {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId String
+
+  fileName  String
+  fileType  String   // csv
+  status    String   @default("UPLOADED")  // UPLOADED, PARSED, MAPPED, VALIDATED, CONFIRMED, IMPORTING, COMPLETED, FAILED, CANCELLED
+  totalRows Int      @default(0)
+  validRows Int      @default(0)
+  invalidRows Int    @default(0)
+  importedRows Int   @default(0)
+  duplicateRows Int  @default(0)
+  errorRows  Int     @default(0)
+
+  columnMapping    Json?  // { sourceColumn -> targetField }
+  validationSummary Json? // [{ row, errors }]
+  errorDetails     Json?  // [{ row, field, message }]
+  duplicateStrategy String @default("SKIP_EXISTING") // SKIP_EXISTING, UPDATE_EMPTY_FIELDS, UPDATE_ALL_MAPPED_FIELDS, CREATE_DUPLICATE
+
+  importType  String   // contact, company
+  parsedData  Json?    // raw parsed rows for preview
+  mappedData  Json?    // rows after column mapping
+
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+
+  @@index([chatId])
+  @@index([userId])
+  @@index([status])
+}
+
+// ============================================
+// SALES COPILOT MODULE (Phase 18 — FleetNimble AI Sales Copilot)
+// ============================================
+
+model SalesCopilotMemory {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId String
+  contact  CRMContact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contactId String?
+  company  CRMCompany?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  companyId String?
+  deal     CRMDeal?     @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  dealId String?
+
+  interactionType String   // deal_insight, follow_up, nba, meeting_prep, proposal, health_check, scoring, timeline
+  summary         String?  @db.Text
+  intent          String?
+  recommendations Json?    // [{ action, reason, priority }]
+  nextAction      Json?    // { action, dueDate, owner }
+  metadata        Json?    // provider used, tokens, model version
+  source          String   // AI_GENERATED, USER_ENTERED, SYSTEM
+
+  createdAt DateTime @default(now())
+
+  @@index([chatId, interactionType])
+  @@index([contactId])
+  @@index([companyId])
+  @@index([dealId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model DealInsight {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId String
+  deal   CRMDeal? @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId String
+
+  // AI Summary
+  aiSummary      String?  @db.Text
+  buyingSignals  Json?    // [{ signal, evidence, inferenceStatus }]
+  riskFactors    Json?    // [{ risk, severity, evidence, inferenceStatus }]
+  recommendedNextStep Json? // { action, reason, evidence, inferenceStatus }
+  competitorMention   String?
+  fleetSizeEstimate   Json?    // { estimate, evidence, inferenceStatus }
+  decisionMakerConfidence Json? // { confidence, evidence, inferenceStatus }
+  timelinePrediction  Json?    // { predictedCloseDate, probability, inferenceStatus }
+
+  generationStatus String  @default("pending") // pending, completed, failed
+  provider         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dealId])
+  @@index([chatId])
+}
+
+model Proposal {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId String
+  deal   CRMDeal? @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  dealId String?
+  contact CRMContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contactId String?
+  company CRMCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  companyId String?
+
+  title              String
+  proposalType       String   // standard, fleet_recommendation, pricing, implementation
+  executiveSummary   String?  @db.Text
+  pricingSummary     Json?    // [{ item, description, unitPrice, quantity, total }]
+  fleetRecommendations Json?  // [{ vehicleType, quantity, reason, estimatedCost }]
+  implementationTimeline Json? // [{ phase, duration, milestones }]
+  status             String   @default("DRAFT") // DRAFT, FINALIZED, SENT, ACCEPTED, REJECTED
+  content            Json?    // full proposal body
+
+  generatedBy String? // AI_GENERATED, MANUAL
+  provider     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dealId])
+  @@index([chatId])
+  @@index([status])
+}
+
+model CustomerHealthSnapshot {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId String
+  contact  CRMContact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId String?
+  company  CRMCompany? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId String?
+  deal     CRMDeal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId String?
+
+  healthStatus       String    // HEALTHY, AT_RISK, CRITICAL, NOT_MEASURED
+  riskFlags          Json?     // [{ flag, reason, severity }]
+  inactivityDays     Int?
+  daysSinceLastActivity Int?
+  daysSinceLastTask  Int?
+  daysSinceLastMeeting Int?
+  openDealCount      Int       @default(0)
+  overdueTaskCount   Int       @default(0)
+  hasUpcomingRenewal Boolean   @default(false)
+  missingOwner       Boolean   @default(false)
+  staleDeal          Boolean   @default(false)
+
+  calculatedAt DateTime @default(now())
+
+  @@index([chatId, healthStatus])
+  @@index([contactId])
+  @@index([companyId])
+  @@index([dealId])
+  @@index([calculatedAt])
 }

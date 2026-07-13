@@ -5,10 +5,14 @@ import { asArray, asText, renderSafeValue } from '../lib/normalizers';
 import SafeValue from '../components/SafeValue';
 import { Badge, Card, EmptyState, Loading, PageHeader } from '../components/UI';
 import { KPIDashboard, SmartNavigation, SearchBar, LoadingSkeleton, EnterpriseEmptyState, ProgressBar, StatusBadge } from '../components/EnterpriseComponents';
-import { Zap, Target, TrendingUp, Activity, Map, Clock, AlertTriangle, FileText, Code, Users, Building, Eye, Star, Layers, Info, Sliders, GripHorizontal, Wifi, ChevronUp, ChevronDown, Image, Video, Send, Download, Copy, CheckCircle2, Loader2, FileDown } from 'lucide-react';
+import { Zap, Target, TrendingUp, Activity, Map, Clock, AlertTriangle, FileText, Code, Users, Building, Eye, Star, Layers, Info, Sliders, GripHorizontal, Wifi, ChevronUp, ChevronDown, Image, Video, Send, Download, Copy, CheckCircle2, Loader2, FileDown, Brain } from 'lucide-react';
 import { ExecutiveSummaryCards, BusinessHealthScore, AIDecisionPanel, RecommendationPriorities, CrossModuleInsights, CompareResults, OpportunityMatrix, RiskMatrix, ConfidenceVisualization, InteractiveFilters, SmartSearch, EnterpriseReportPreview, ProductivityBar, ExecutiveCommandCenter, StoryDrivenResults, AIBusinessAdvisor, DecisionSimulator, CompetitorPositioningMap, MarketOpportunityHeatmap, BusinessTimeline, ExecutiveKPIDashboard, InsightRelationships, EvidenceExplorer, ReportPreview20, PresentationMode, useWorkspaceMemory, SmartEmptyState } from '../components/EnterpriseDecisionSuite';
 import { EnterpriseActionWorkspace } from '../components/EnterpriseActionWorkspace';
 import { getIntegrationHealth, sendTestEmail, generatePosterImage, renderVideo } from '../lib/api';
+import { CampaignPlanPage } from '../modules/campaign-planning/CampaignPlanPage';
+import { CampaignPlanLoadingPage } from '../modules/campaign-planning/CampaignPlanLoadingPage';
+import { EmailAutomationWorkspace } from '../modules/email-automation/EmailAutomationWorkspace';
+import { CRMWorkspace } from '../modules/crm-automation/CRMWorkspace';
 
 function formatValue(v: any): string {
   if (v === null || v === undefined) return '—';
@@ -1352,7 +1356,10 @@ function renderAnalyticsTab(data: any) {
 }
 
 const tabs = [
+  { id: 'EmailAutomation', label: 'Email Automation' },
+  { id: 'CRM', label: 'CRM Workflow' },
   { id: 'Plan', label: 'Automation Overview' },
+  { id: 'CampaignIntel', label: 'Campaign Intelligence' },
   { id: 'Email', label: 'Cold Email Drafts' },
   { id: 'LinkedIn', label: 'LinkedIn Outreach' },
   { id: 'Instagram', label: 'Instagram Content' },
@@ -1360,7 +1367,6 @@ const tabs = [
   { id: 'Creative', label: 'Poster/Creative Prompts' },
   { id: 'Video', label: 'Video Ad Scripts' },
   { id: 'Calendar', label: 'Content Calendar' },
-  { id: 'CRM', label: 'CRM Workflow' },
   { id: 'KPI', label: 'KPI Dashboard' },
   { id: 'Workflow', label: 'Automation Workflow' },
   { id: 'Logs', label: 'Logs' },
@@ -1376,7 +1382,10 @@ const tabs = [
 ];
 
 const tabRenderers: Record<string, (d: any) => JSX.Element> = {
+  EmailAutomation: () => <EmailAutomationWorkspace />,
+  CRM: () => <CRMWorkspace />,
   Plan: (d: any) => <PlanTabContent data={d} />,
+  CampaignIntel: (d: any) => d,
   Email: renderEmailTab,
   LinkedIn: renderLinkedInTab,
   Instagram: renderInstagramTab,
@@ -1384,7 +1393,6 @@ const tabRenderers: Record<string, (d: any) => JSX.Element> = {
   Creative: renderPosterTab,
   Video: renderVideoTab,
   Calendar: renderContentCalendarTab,
-  CRM: renderCrmTab,
   KPI: renderKpiTab,
   Workflow: () => <WorkflowTabContent />,
   Logs: renderLogsTab,
@@ -1416,10 +1424,13 @@ export default function AutomationCenterPage() {
   const [posterResult, setPosterResult] = useState<any>(null);
   const [videoRendering, setVideoRendering] = useState<string | null>(null);
   const [videoResult, setVideoResult] = useState<any>(null);
+  const [campaignPlan, setCampaignPlan] = useState<any>(null);
+  const [campaignLoading, setCampaignLoading] = useState(false);
+  const [campaignError, setCampaignError] = useState<string | null>(null);
 
   useEffect(() => {
     getIntegrationHealth().then(d => setHealth(d)).catch(() => {});
-    if (!selectedChatId) { setData(null); setExecData(null); return; }
+    if (!selectedChatId) { setData(null); setExecData(null); setCampaignPlan(null); return; }
     let cancelled = false;
     api.get(`/automation/${selectedChatId}/plan`)
       .then((r: any) => { if (!cancelled) setData(r.automationPlan || r.data || r); })
@@ -1430,6 +1441,9 @@ export default function AutomationCenterPage() {
     api.get(`/automation/${selectedChatId}/execution`)
       .then((r: any) => { if (!cancelled && r.exists) setExecData(r.data); })
       .catch(() => {});
+    api.get(`/campaign/${selectedChatId}/plan`)
+      .then((r: any) => { if (!cancelled && r.exists) setCampaignPlan(r.campaignPlan); })
+      .catch(() => { if (!cancelled) setCampaignPlan(null); });
     return () => { cancelled = true; };
   }, [selectedChatId]);
 
@@ -1449,6 +1463,45 @@ export default function AutomationCenterPage() {
       setGenError(msg);
     }
     setGenLoading(false);
+  }
+
+  async function loadCampaignPlan() {
+    if (!selectedChatId) return;
+    try {
+      const res: any = await api.get(`/campaign/${selectedChatId}/plan`);
+      if (res.exists) {
+        setCampaignPlan(res.campaignPlan);
+      }
+    } catch {}
+  }
+
+  async function generateCampaign() {
+    if (!selectedChatId) return;
+    setCampaignLoading(true);
+    setCampaignError(null);
+    setCampaignPlan(null);
+    try {
+      const res: any = await api.post(`/campaign/${selectedChatId}/generate`, {});
+      if (res.success === false && res.error) {
+        setCampaignError(res.error);
+        setCampaignLoading(false);
+      }
+    } catch (e: any) {
+      const msg = e?.response?.data?.error || e.message || 'Failed to generate campaign intelligence';
+      setCampaignError(msg);
+      setCampaignLoading(false);
+    }
+  }
+
+  function handleCampaignComplete(plan: any) {
+    setCampaignPlan(plan);
+    setCampaignLoading(false);
+    setCampaignError(null);
+  }
+
+  function handleCampaignError(error: string) {
+    setCampaignError(error);
+    setCampaignLoading(false);
   }
 
   async function executeAll() {
@@ -1544,6 +1597,12 @@ export default function AutomationCenterPage() {
                 Execution ready
               </div>
             )}
+            {selectedChatId && campaignPlan && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10e18b' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10e18b', display: 'inline-block' }} />
+                Campaign intelligence ready
+              </div>
+            )}
             {selectedChatId && !data && !genLoading && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#9aa7bd' }}>
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#9aa7bd', display: 'inline-block' }} />
@@ -1557,6 +1616,9 @@ export default function AutomationCenterPage() {
             </button>
             <button className="secondary-btn" onClick={executeAll} disabled={execLoading || !selectedChatId} style={{ borderColor: '#a855f7', color: '#a855f7' }}>
               {execLoading ? 'Generating...' : 'Execute All Modules'}
+            </button>
+            <button className="secondary-btn" onClick={generateCampaign} disabled={campaignLoading || !selectedChatId} style={{ borderColor: '#10e18b', color: '#10e18b' }}>
+              {campaignLoading ? 'Planning...' : 'Campaign Intelligence'}
             </button>
           </div>
         </div>
@@ -1613,7 +1675,41 @@ export default function AutomationCenterPage() {
             ))}
           </div>
           <div>
-            {tabRenderers[active] ? tabRenderers[active](planData) : <PlanTabContent data={planData} />}
+            {active === 'CampaignIntel' ? (
+              campaignLoading ? (
+                selectedChatId ? (
+                  <CampaignPlanLoadingPage
+                    chatId={selectedChatId}
+                    onComplete={handleCampaignComplete}
+                    onError={handleCampaignError}
+                  />
+                ) : (
+                  <EnterpriseEmptyState title="No Project Selected" message="Select a project first." icon={Brain} />
+                )
+              ) : campaignError ? (
+                <div style={{ padding: '20px', textAlign: 'center' }}>
+                  <AlertTriangle size={32} style={{ color: '#ff4757', marginBottom: '12px' }} />
+                  <p style={{ color: '#ff8a8a', margin: '0 0 16px 0' }}>{campaignError}</p>
+                  <button className="primary-btn" onClick={generateCampaign}>Retry</button>
+                </div>
+              ) : !selectedChatId ? (
+                <EnterpriseEmptyState title="No Project Selected" message="Select a project first." icon={Brain} />
+              ) : !campaignPlan ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                  <Brain size={48} style={{ color: '#293245', marginBottom: '16px' }} />
+                  <h3 style={{ color: '#6b7280', margin: '0 0 8px 0' }}>Campaign Intelligence</h3>
+                  <p style={{ color: '#9aa7bd', fontSize: '13px', maxWidth: '500px', margin: '0 auto 20px' }}>
+                    Generate an evidence-based campaign plan derived from your Growth Workspace, SEO Intelligence,
+                    Product Intelligence, Competitor Intelligence, and Audience Intelligence.
+                  </p>
+                  <button className="primary-btn" onClick={generateCampaign} style={{ fontSize: '14px', padding: '12px 28px' }}>
+                    Generate Campaign Intelligence
+                  </button>
+                </div>
+              ) : (
+                <CampaignPlanPage plan={campaignPlan} />
+              )
+            ) : tabRenderers[active] ? tabRenderers[active](planData) : <PlanTabContent data={planData} />}
           </div>
         </Card>
       )}
