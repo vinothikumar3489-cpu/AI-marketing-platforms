@@ -1585,9 +1585,16 @@ export default function AutomationCenterPage() {
       if (res.success === false && res.error) {
         setCampaignError(getApiErrorMessage(res.error));
         setCampaignLoading(false);
+        clearPending('campaign');
         return;
       }
-      await loadCampaignPlan();
+      // Use the returned campaign plan directly if available
+      if (res.campaignPlan) {
+        setCampaignPlan(res.campaignPlan);
+      } else {
+        await loadCampaignPlan();
+      }
+      setCampaignLoading(false);
     } catch (e: any) {
       setCampaignError(getApiErrorMessage(e));
       setCampaignLoading(false);

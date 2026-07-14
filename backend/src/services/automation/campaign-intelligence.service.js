@@ -1,4 +1,5 @@
 import { callAI } from "../../ai/services/aiRouter.service.js";
+import { resolveProductIdentity } from "../resolvers/product-identity.resolver.js";
 
 /**
  * Safely extract JSON from AI response with repair logic
@@ -75,6 +76,21 @@ export async function generateCampaignIntelligence({ userId, chatId, evidenceCon
   const growth = ec.growth || {};
   const sources = ec.sourceSummary || {};
 
+  // PART 13: Use canonical product identity resolver for product-specific campaigns
+  const productIdentity = resolveProductIdentity({
+    chat: ec.chatId ? { id: ec.chatId, title: company.name?.value || company.productName?.value, websiteUrl: company.websiteUrl?.value } : null,
+    productIntelligence: product.name?.value ? { productName: product.name.value, brandName: product.brandName?.value, companyName: company.name?.value } : null,
+    evidenceSnapshot: ec._raw?.evidence || null,
+    website: website
+  });
+
+  console.info("[CampaignIntelligence] Product identity resolved for campaign", {
+    userId, chatId,
+    productName: productIdentity.productName,
+    brandName: productIdentity.brandName,
+    source: productIdentity.source
+  });
+
   // PART 12: Reconcile evidence before generation
   const evidenceReconciliation = reconcileEvidence({
     product, company, website, audience, competitors, seo, channels, growth, sources
@@ -96,7 +112,7 @@ export async function generateCampaignIntelligence({ userId, chatId, evidenceCon
     attempt++;
     try {
       const prompt = buildCampaignPrompt({
-        product, company, website, audience, competitors, seo, channels, growth, sources
+        product, company, website, audience, competitors, seo, channels, growth, sources, productIdentity
       });
 
       const aiResult = await callAI(prompt);
@@ -105,17 +121,11 @@ export async function generateCampaignIntelligence({ userId, chatId, evidenceCon
         const parsed = safeExtractJSON(aiResult.data);
         
         if (parsed) {
-          const validated = validateCampaignOutput(parsed);
+          const validated = validateCampaignOutput(parsed, evidenceReconciliation);
           if (validated && !validated._noData) {
-            // Add metadata indicating successful AI generation
-            validated._metadata = {
-              generatedAt: new Date().toISOString(),
-              provider: "ai",
-              fallbackUsed: false,
-              generationStatus: "FULLY_GENERATED",
-              attempts: attempt,
-              evidenceReconciliation
-            };
+            // Override metadata with attempt info
+            validated._metadata.attempts = attempt;
+            validated._metadata.evidenceReconciliation = evidenceReconciliation;
             console.info("[CampaignIntelligence] AI generation succeeded", { userId, chatId, attempts: attempt });
             return validated;
           }
@@ -134,7 +144,7 @@ export async function generateCampaignIntelligence({ userId, chatId, evidenceCon
   console.warn("[CampaignIntelligence] Using fallback after AI failures", { userId, chatId, attempts: maxAttempts, lastError });
   
   const fallbackResult = generateEvidenceBasedCampaign({
-    product, company, website, audience, competitors, seo, channels, growth, sources
+    product, company, website, audience, competitors, seo, channels, growth, sources, productIdentity
   });
 
   // Mark as partially generated with fallback
@@ -156,14 +166,16 @@ export async function generateCampaignIntelligence({ userId, chatId, evidenceCon
 }
 
 function buildCampaignPrompt(context) {
-  const { product, company, website, audience, competitors, seo, channels, growth, sources } = context;
+  const { product, company, website, audience, competitors, seo, channels, growth, sources, productIdentity } = context;
 
   const evidenceLines = [];
 
-  if (company.name?.value) evidenceLines.push(`Company Name: ${company.name.value}`);
+  // PART 13: Use canonical product identity for product-specific campaigns
+  if (productIdentity?.productName) evidenceLines.push(`Product Name: ${productIdentity.productName}`);
+  if (productIdentity?.brandName) evidenceLines.push(`Brand Name: ${productIdentity.brandName}`);
+  if (productIdentity?.companyName) evidenceLines.push(`Company Name: ${productIdentity.companyName}`);
   if (company.industry?.value) evidenceLines.push(`Industry: ${company.industry.value}`);
   if (company.websiteUrl?.value) evidenceLines.push(`Website: ${company.websiteUrl.value}`);
-  if (product.name?.value) evidenceLines.push(`Product Name: ${product.name.value}`);
   if (product.usp?.value) evidenceLines.push(`USP: ${product.usp.value}`);
   if (product.description?.value) evidenceLines.push(`Description: ${product.description.value}`);
   if (product.features?.value?.length) evidenceLines.push(`Features: ${product.features.value.slice(0, 8).join(", ")}`);
@@ -297,11 +309,15 @@ Return valid JSON with this exact structure (no markdown, no code fences):
 Return ONLY valid JSON. No markdown. No code fences. No explanations.`;
 }
 
-function validateCampaignOutput(data) {
+function validateCampaignOutput(data, evidenceReconciliation) {
   if (!data || typeof data !== "object") {
     return { _noData: true, reason: "Invalid AI output" };
   }
 
+  // PART 12: Post-generation consistency validator to remove contradictions
+  const contradictions = detectCampaignContradictions(data, evidenceReconciliation);
+  
+  // PART 10: Add versioning metadata
   const validated = {
     executiveSummary: data.executiveSummary || null,
     businessGoal: data.businessGoal || null,
@@ -316,12 +332,152 @@ function validateCampaignOutput(data) {
     nextActions: data.executiveSummary?.nextActions || null,
     _metadata: {
       generatedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       provider: "ai",
       fallbackUsed: false,
+      generationStatus: "FULLY_GENERATED",
+      versionNumber: 1,
+      evidenceHash: generateEvidenceHash(evidenceReconciliation),
+      contradictionsDetected: contradictions.length,
+      contradictions: contradictions
     }
   };
 
   return validated;
+}
+
+/**
+ * Detect contradictions in generated campaign output
+ * PART 12: Post-generation consistency validator
+ */
+function detectCampaignContradictions(campaign, evidenceReconciliation) {
+  const contradictions = [];
+  const evidenceStatus = evidenceReconciliation?.evidenceStatus || {};
+  
+  // Check: Primary audience says TBD while audienceSelection has real persona
+  if (campaign.audienceSelection?.primaryAudience?.value?.toLowerCase().includes('tbd') && 
+      campaign.audienceSelection?.primaryAudience?.value !== 'TBD') {
+    contradictions.push({
+      type: 'audience_tbd_contradiction',
+      message: 'Primary audience marked as TBD but real persona data exists',
+      severity: 'medium'
+    });
+  }
+  
+  // Check: Risks say competitor intelligence missing while competitor data exists
+  if (evidenceStatus.hasCompetitorData) {
+    const competitorMissingRisk = campaign.riskAssessment?.find(r => 
+      r.risk?.toLowerCase().includes('competitor') && 
+      r.cause?.toLowerCase().includes('missing')
+    );
+    if (competitorMissingRisk) {
+      contradictions.push({
+        type: 'competitor_intelligence_contradiction',
+        message: 'Risk states competitor intelligence missing but competitor data exists',
+        severity: 'medium'
+      });
+    }
+  }
+  
+  // Check: Risks say SEO intelligence missing while SeoIntelligence exists
+  if (evidenceStatus.hasSeoData) {
+    const seoMissingRisk = campaign.riskAssessment?.find(r => 
+      r.risk?.toLowerCase().includes('seo') && 
+      r.cause?.toLowerCase().includes('missing')
+    );
+    if (seoMissingRisk) {
+      contradictions.push({
+        type: 'seo_intelligence_contradiction',
+        message: 'Risk states SEO intelligence missing but SEO data exists',
+        severity: 'medium'
+      });
+    }
+  }
+  
+  // Check: Next Actions say run SEO when SEO is already complete
+  if (evidenceStatus.hasSeoData) {
+    const seoAction = campaign.nextActions?.find(a => 
+      a.action?.toLowerCase().includes('seo') && 
+      a.action?.toLowerCase().includes('run')
+    );
+    if (seoAction) {
+      contradictions.push({
+        type: 'seo_already_complete_contradiction',
+        message: 'Next action says run SEO but SEO intelligence already exists',
+        severity: 'low'
+      });
+    }
+  }
+  
+  // Check: Next Actions say run competitor analysis when it already exists
+  if (evidenceStatus.hasCompetitorData) {
+    const competitorAction = campaign.nextActions?.find(a => 
+      a.action?.toLowerCase().includes('competitor') && 
+      a.action?.toLowerCase().includes('analysis')
+    );
+    if (competitorAction) {
+      contradictions.push({
+        type: 'competitor_already_complete_contradiction',
+        message: 'Next action says run competitor analysis but competitor data exists',
+        severity: 'low'
+      });
+    }
+  }
+  
+  // Check: Website evidence says missing while product evidence is available
+  if (evidenceStatus.hasProductData && !evidenceStatus.hasWebsiteData) {
+    const websiteMissingRisk = campaign.riskAssessment?.find(r => 
+      r.risk?.toLowerCase().includes('website') && 
+      r.cause?.toLowerCase().includes('missing')
+    );
+    if (websiteMissingRisk) {
+      contradictions.push({
+        type: 'website_evidence_contradiction',
+        message: 'Risk states website evidence missing but product evidence is available',
+        severity: 'low'
+      });
+    }
+  }
+  
+  // Check: Business goal says insufficient evidence while objective claims it was detected
+  if (campaign.businessGoal?.confidence === 'low' && 
+      campaign.businessGoal?.reason?.toLowerCase().includes('insufficient') &&
+      campaign.campaignObjective?.primary?.value) {
+    contradictions.push({
+      type: 'evidence_confidence_contradiction',
+      message: 'Business goal states insufficient evidence but campaign objective was detected',
+      severity: 'medium'
+    });
+  }
+  
+  return contradictions;
+}
+
+/**
+ * Generate evidence hash for versioning
+ * PART 10: Campaign versioning
+ */
+function generateEvidenceHash(evidenceReconciliation) {
+  if (!evidenceReconciliation) return 'no-evidence';
+  
+  const evidenceString = JSON.stringify({
+    hasProductData: evidenceReconciliation.evidenceStatus?.hasProductData,
+    hasAudienceData: evidenceReconciliation.evidenceStatus?.hasAudienceData,
+    hasCompetitorData: evidenceReconciliation.evidenceStatus?.hasCompetitorData,
+    hasSeoData: evidenceReconciliation.evidenceStatus?.hasSeoData,
+    hasChannelData: evidenceReconciliation.evidenceStatus?.hasChannelData,
+    hasWebsiteData: evidenceReconciliation.evidenceStatus?.hasWebsiteData,
+    hasGrowthData: evidenceReconciliation.evidenceStatus?.hasGrowthData,
+  });
+  
+  // Simple hash function
+  let hash = 0;
+  for (let i = 0; i < evidenceString.length; i++) {
+    const char = evidenceString.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(36);
 }
 
 /**
@@ -574,9 +730,12 @@ function applyCampaignSafety(campaignResult, evidenceStatus) {
 }
 
 function generateEvidenceBasedCampaign(context) {
-  const { product, company, website, audience, competitors, seo, channels, growth, sources } = context;
+  const { product, company, website, audience, competitors, seo, channels, growth, sources, productIdentity } = context;
 
-  const companyName = company.name?.value || product.name?.value || "Project";
+  // PART 13: Use canonical product identity for product-specific campaigns
+  const companyName = productIdentity?.companyName || company.name?.value || product.name?.value || "Project";
+  const productName = productIdentity?.productName || product.name?.value || companyName;
+  const brandName = productIdentity?.brandName || productName;
   const industry = company.industry?.value || product.industry?.value || "Unknown";
   const websiteTitle = website.title?.value || companyName;
 
@@ -590,10 +749,10 @@ function generateEvidenceBasedCampaign(context) {
   const goal = determineBusinessGoal(context);
   const channelRecs = determineChannels(context);
 
-  // PART 13: Add evidence status labels to all inferences
+  // PART 13: Add evidence status labels to all inferences and make product-specific
   const labelledResult = {
     executiveSummary: {
-      campaignName: `${companyName} Evidence-Based Campaign`,
+      campaignName: `${productName} Evidence-Based Campaign`,
       campaignTheme: `Growth through ${goal.goal || "strategic marketing"}`,
       campaignGoal: goal.goal || "Brand Awareness",
       recommendedDuration: "90 days",
@@ -746,19 +905,19 @@ function determineBusinessGoal(context) {
     evidence = "seo_technical_audit";
   } else if (industry.includes("saas") || industry.includes("software")) {
     goal = "Product Adoption";
-    confidence = "medium";
-    reason = "Industry pattern suggests product adoption as primary goal";
-    evidence = "industry_pattern_analysis";
+    confidence = "low";
+    reason = "Industry pattern suggests product adoption as primary goal (requires approval)";
+    evidence = "industry_pattern_assumption";
   } else if (industry.includes("ecommerce") || industry.includes("retail")) {
     goal = "Increase Sales";
-    confidence = "medium";
-    reason = "Industry pattern suggests sales as primary goal";
-    evidence = "industry_pattern_analysis";
+    confidence = "low";
+    reason = "Industry pattern suggests sales as primary goal (requires approval)";
+    evidence = "industry_pattern_assumption";
   } else if (text.includes("enterprise") || text.includes("for teams") || text.includes("business")) {
     goal = "Enterprise Sales";
-    confidence = "medium";
-    reason = "Language targets enterprise audience";
-    evidence = "website_content_language";
+    confidence = "low";
+    reason = "Language targets enterprise audience (requires approval)";
+    evidence = "content_language_assumption";
   } else if (hasProductData && hasCompetitorData) {
     goal = "Increase Leads";
     confidence = "medium";

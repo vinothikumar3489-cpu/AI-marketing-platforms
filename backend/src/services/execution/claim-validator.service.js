@@ -112,7 +112,20 @@ export function validateBriefContent(brief) {
   if (!brief.product) issues.push('No product data in brief');
   if (!brief.product?.name) issues.push('No product name');
   if (!brief.product?.summary && !brief.product?.usp) issues.push('No product summary or USP');
-  if (!brief.product?.features?.length && !brief.product?.benefits?.length) issues.push('No features or benefits');
+  
+  // PART 17: Handle normalized features and benefits (objects with feature/benefit fields)
+  const features = brief.product?.features || [];
+  const benefits = brief.product?.benefits || [];
+  const hasFeatures = Array.isArray(features) && features.length > 0;
+  const hasBenefits = Array.isArray(benefits) && benefits.length > 0;
+  
+  // Check for normalized feature objects
+  const hasNormalizedFeatures = hasFeatures && features.some(f => typeof f === 'object' && (f.feature || f.name));
+  const hasNormalizedBenefits = hasBenefits && benefits.some(b => typeof b === 'object' && (b.benefit || b.name));
+  
+  if (!hasNormalizedFeatures && !hasNormalizedBenefits && !hasFeatures && !hasBenefits) {
+    issues.push('No features or benefits');
+  }
 
   return {
     valid: issues.length === 0,

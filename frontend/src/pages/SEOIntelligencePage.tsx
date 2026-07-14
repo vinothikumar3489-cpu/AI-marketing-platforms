@@ -1431,10 +1431,10 @@ function KeywordIntelligence({ data }: { data: any }) {
   };
   
   const tables = [
-    { title: 'Primary Keywords', data: asArray(data.primaryKeywords).filter(isRelevantKeyword) },
-    { title: 'Secondary Keywords', data: asArray(data.secondaryKeywords).filter(isRelevantKeyword) },
-    { title: 'Long-Tail Keywords', data: asArray(data.longTailKeywords).filter(isRelevantKeyword) },
-    { title: 'Question / FAQ Keywords', data: asArray(data.questionKeywords).filter(isRelevantKeyword) },
+    { title: 'Primary Keywords', data: asArray(data.primaryKeywords || data.keywordOpportunities?.primaryKeywords).filter(isRelevantKeyword) },
+    { title: 'Secondary Keywords', data: asArray(data.secondaryKeywords || data.keywordOpportunities?.secondaryKeywords).filter(isRelevantKeyword) },
+    { title: 'Long-Tail Keywords', data: asArray(data.longTailKeywords || data.keywordOpportunities?.longTailKeywords).filter(isRelevantKeyword) },
+    { title: 'Question / FAQ Keywords', data: asArray(data.questionKeywords || data.keywordOpportunities?.questionKeywords).filter(isRelevantKeyword) },
   ];
 
   return (
@@ -1483,20 +1483,31 @@ function KeywordIntelligence({ data }: { data: any }) {
             <thead>
               <tr style={{ borderBottom: '1px solid #293245', color: '#9aa7bd', fontSize: '12px', textTransform: 'uppercase' }}>
                 <th style={{ padding: '12px' }}>Keyword</th>
+                <th style={{ padding: '12px' }}>Category</th>
+                <th style={{ padding: '12px' }}>Search Volume</th>
+                <th style={{ padding: '12px' }}>CPC</th>
+                <th style={{ padding: '12px' }}>Competition</th>
+                <th style={{ padding: '12px' }}>Competition Index</th>
+                <th style={{ padding: '12px' }}>Keyword Difficulty</th>
                 <th style={{ padding: '12px' }}>Intent</th>
-                <th style={{ padding: '12px' }}>Volume</th>
-                <th style={{ padding: '12px' }}>KD %</th>
-                <th style={{ padding: '12px' }}>CPC ($)</th>
-                <th style={{ padding: '12px' }}>Content Type</th>
-                <th style={{ padding: '12px' }}>Opportunity</th>
+                <th style={{ padding: '12px' }}>Source</th>
               </tr>
             </thead>
             <tbody>
               {table.data.map((k: any, i: number) => {
-                const kd = asNumber(k.difficulty, null);
+                const kd = asNumber(k.keywordDifficulty || k.difficulty || k.kd, null);
+                const kdDisplay = kd !== null ? kd : 'Not measured';
                 const kdColor = kd > 70 ? '#ff4757' : kd > 40 ? '#ffa502' : kd !== null ? '#10e18b' : '#9aa7bd';
-                const volume = k.searchVolume !== null ? k.searchVolume : null;
+                const volume = k.volume !== null ? k.volume : k.searchVolume !== null ? k.searchVolume : null;
+                const volumeDisplay = volume !== null ? formatNumber(volume) : 'Not measured';
                 const cpc = k.cpc !== null ? k.cpc : null;
+                const cpcDisplay = cpc !== null ? formatMoney(cpc) : 'Not measured';
+                const competition = k.competition !== null ? k.competition : null;
+                const competitionDisplay = competition !== null ? (competition * 100).toFixed(0) + '%' : 'Not measured';
+                const competitionIndex = k.competitionIndex !== null ? k.competitionIndex : null;
+                const competitionIndexDisplay = competitionIndex !== null ? competitionIndex : 'Not measured';
+                const intent = k.intent || k.searchIntent || 'Not measured';
+                const source = k.source || k.dataSource || 'Not specified';
                 const hasDataForSEO = k.source === 'DataForSEO';
                 
                 return (
@@ -1506,34 +1517,39 @@ function KeywordIntelligence({ data }: { data: any }) {
                       {hasDataForSEO && (
                         <Badge className="green" style={{ fontSize: '10px', marginLeft: '8px' }}>DataForSEO</Badge>
                       )}
-                      <div style={{ fontSize: '11px', color: '#9aa7bd', marginTop: '4px', fontWeight: 'normal' }}>
-                        URL: {asText(k?.suggestedUrl || '/')}
-                      </div>
                     </td>
                     <td style={{ padding: '12px' }}>
-                      <Badge className={(asText(k?.intent) || '').toLowerCase().includes('commercial') ? 'blue' : 'dark'}>
-                        {asText(k?.intent || k?.searchIntent, 'Informational')}
-                      </Badge>
+                      <Badge className="dark">{asText(k?.category || 'General')}</Badge>
                     </td>
                     <td style={{ padding: '12px', color: volume !== null ? '#fff' : '#9aa7bd' }}>
-                      {formatNumber(volume)}
+                      {volumeDisplay}
+                    </td>
+                    <td style={{ padding: '12px', color: cpc !== null ? '#fff' : '#9aa7bd' }}>
+                      {cpcDisplay}
+                    </td>
+                    <td style={{ padding: '12px', color: competition !== null ? '#fff' : '#9aa7bd' }}>
+                      {competitionDisplay}
+                    </td>
+                    <td style={{ padding: '12px', color: competitionIndex !== null ? '#fff' : '#9aa7bd' }}>
+                      {competitionIndexDisplay}
                     </td>
                     <td style={{ padding: '12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ color: kdColor, fontWeight: 'bold' }}>{kd !== null ? kd : 'N/A'}</span>
+                        <span style={{ color: kdColor, fontWeight: 'bold' }}>{kdDisplay}</span>
                         {kd !== null && (
                           <div style={{ width: '40px', height: '4px', background: '#1d2738', borderRadius: '2px', overflow: 'hidden' }}>
-                            <div style={{ width: `${kd}%`, height: '100%', background: kdColor }}></div>
+                            <div style={{ width: `${Math.min(kd, 100)}%`, height: '100%', background: kdColor }}></div>
                           </div>
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: '12px', color: cpc !== null ? '#9aa7bd' : '#9aa7bd' }}>
-                      {formatMoney(cpc)}
-                    </td>
-                    <td style={{ padding: '12px', color: '#53a7ff' }}>{asText(k?.contentType || 'Blog Post')}</td>
                     <td style={{ padding: '12px' }}>
-                      <Badge className="green">{asNumber(k.opportunity) != null ? `${asNumber(k.opportunity)}/100` : '—'}</Badge>
+                      <Badge className={(intent || '').toLowerCase().includes('commercial') ? 'blue' : 'dark'}>
+                        {intent}
+                      </Badge>
+                    </td>
+                    <td style={{ padding: '12px', color: '#9aa7bd', fontSize: '12px' }}>
+                      {source}
                     </td>
                   </tr>
                 );
