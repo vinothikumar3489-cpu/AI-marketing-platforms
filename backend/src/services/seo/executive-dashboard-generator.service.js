@@ -100,6 +100,41 @@ function safeNumber(value) {
   return 0;
 }
 
+// ============================================
+// DATA COMPLETENESS ADJUSTMENT HELPER
+// Separates measured technical score from data completeness.
+// Never subtracts arbitrary points from measured PageSpeed values.
+// ============================================
+
+function calculateCompletenessAdjustment({
+  technicalAvailable,
+  keywordAvailable,
+  geoAvailable,
+  competitorAvailable,
+  contentAvailable
+}) {
+  const availableCount = [
+    technicalAvailable,
+    keywordAvailable,
+    geoAvailable,
+    competitorAvailable,
+    contentAvailable
+  ].filter(Boolean).length;
+
+  const completenessPercentage =
+    Math.round((availableCount / 5) * 100);
+
+  return {
+    completenessPercentage,
+    status:
+      availableCount === 5
+        ? 'COMPLETE'
+        : availableCount >= 3
+          ? 'PARTIAL'
+          : 'INSUFFICIENT'
+  };
+}
+
 /**
  * Safely convert to string
  */
@@ -359,25 +394,7 @@ function generateExecutiveOverview(seoData) {
     competitorIntel.competitorProfiles.length > 0;
   const hasContentData = contentGaps.contentGaps && contentGaps.contentGaps.length > 0;
 
-  const dataCompleteness = {
-    technical: hasTechnicalData,
-    keyword: hasKeywordData,
-    geo: hasGeoData,
-    competitor: hasCompetitorData,
-    content: hasContentData
-  };
-
-  const dataCompletenessPercentage = Math.round(
-    (Object.values(dataCompleteness).filter(Boolean).length / Object.keys(dataCompleteness).length) * 100
-  );
-
-  const hasSufficientData = dataCompletenessPercentage >= 20;
-
-  console.log('🔍 [Executive Dashboard] Data completeness:', {
-    percentage: dataCompletenessPercentage,
-    breakdown: dataCompleteness,
-    hasSufficientData
-  });
+  // Data completeness calculated below via calculateCompletenessAdjustment
 
   // Define all score variables FIRST to avoid TDZ issues
   const technicalHealthValue = hasTechnicalData
@@ -479,7 +496,34 @@ function generateExecutiveOverview(seoData) {
     lastUpdated: technicalAudit.analyzedAt || competitorIntel.analyzedAt || new Date().toISOString()
   };
 
-  // Calculate base overall score from all available modules
+  // Separate measured technical score from data completeness assessment
+  const completeness = calculateCompletenessAdjustment({
+    technicalAvailable: hasTechnicalData,
+    keywordAvailable: hasKeywordData,
+    geoAvailable: hasGeoData,
+    competitorAvailable: hasCompetitorData,
+    contentAvailable: hasContentData
+  });
+  const dataCompletenessPercentage = completeness.completenessPercentage;
+
+  const dataCompleteness = {
+    technical: hasTechnicalData,
+    keyword: hasKeywordData,
+    geo: hasGeoData,
+    competitor: hasCompetitorData,
+    content: hasContentData
+  };
+
+  const hasSufficientData = dataCompletenessPercentage >= 20;
+
+  console.log('🔍 [Executive Dashboard] Data completeness:', {
+    percentage: dataCompletenessPercentage,
+    status: completeness.status,
+    breakdown: dataCompleteness,
+    hasSufficientData
+  });
+
+  // Calculate base overall score from all available modules (measured values only)
   let baseOverallScore;
   if (hasTechnicalData) {
     baseOverallScore = Math.round(scoreBreakdown.overallScore ?? scoreBreakdown.overall);
@@ -498,23 +542,24 @@ function generateExecutiveOverview(seoData) {
     }
   }
 
+  // Overall SEO score: never subtract completeness penalty from measured values
   let overallSeoScoreValue;
   let overallSeoScoreSource;
   if (hasTechnicalData) {
     overallSeoScoreValue = baseOverallScore;
     overallSeoScoreSource = 'Technical SEO Audit';
   } else if (baseOverallScore !== null) {
-    const completenessPenalty = Math.round((100 - dataCompletenessPercentage) * 0.2);
-    overallSeoScoreValue = Math.max(30, baseOverallScore - completenessPenalty);
+    overallSeoScoreValue = baseOverallScore;
     overallSeoScoreSource = 'Weighted Module Average';
   } else {
     overallSeoScoreValue = null;
     overallSeoScoreSource = 'NOT_MEASURED';
   }
-  
+
+  // Confidence reflects data completeness without contaminating measured scores
   const baseConfidence = hasTechnicalData ? 85 : baseOverallScore !== null ? 60 : null;
   const confidencePenalty = baseConfidence !== null ? Math.round((100 - dataCompletenessPercentage) * 0.5) : 0;
-  
+
   let qualityPenalty = 0;
   if (baseConfidence !== null && (!hasKeywordData || keywordCount === 0)) {
     qualityPenalty += 10;
@@ -528,16 +573,16 @@ function generateExecutiveOverview(seoData) {
     status: overallSeoScoreValue !== null ? null : 'NOT_MEASURED',
     source: overallSeoScoreSource,
     calculationMethod: hasTechnicalData
-      ? 'Technical SEO audit score with data completeness adjustment'
+      ? 'Technical SEO audit score (measured)'
       : 'Weighted average of available modules (content, authority, AI visibility, opportunity, risk)',
     inputsUsed: hasTechnicalData ? ['onPageScore', 'performanceScore', 'mobileScore', 'securityScore'] : [],
-    confidence: null,
-    evidence: hasTechnicalData 
-      ? `Based on ${Object.keys(scoreBreakdown).length} technical SEO factors. Data completeness: ${dataCompletenessPercentage}%. Penalty applied: -${completenessPenalty} points.` 
+    confidence: finalConfidence,
+    evidence: hasTechnicalData
+      ? `Based on ${Object.keys(scoreBreakdown).length} technical SEO factors. Measured score: ${overallSeoScoreValue}. Data completeness: ${dataCompletenessPercentage}%.`
       : 'Weighted from available module data. Data completeness: ' + dataCompletenessPercentage + '%',
     dataCompleteness: dataCompletenessPercentage,
+    completenessStatus: completeness.status,
     baseScore: baseOverallScore,
-    penalty: completenessPenalty,
     lastUpdated: technicalAudit.analyzedAt || new Date().toISOString(),
     warning: dataCompletenessPercentage < 70
       ? 'Low data completeness - score may not reflect true SEO performance'

@@ -961,10 +961,26 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
   }
 
   // Return successful analysis data with canonical structure
+  const executiveDashboardFailed = executiveDashboardStatus === 'failed' || executiveDashboardStatus === 'no_data';
+  const seoResponseStatus = executiveDashboardFailed ? 'completed_with_warnings' : 'completed';
+
+  const warnings = [];
+  if (executiveDashboardFailed) {
+    warnings.push({
+      code: 'SEO_EXECUTIVE_DASHBOARD_FAILED',
+      message: 'Core SEO intelligence was saved, but the executive dashboard could not be generated.'
+    });
+  }
+
   return {
     success: true,
+    status: seoResponseStatus,
+    seoSaved: true,
+    executiveDashboardSaved: !executiveDashboardFailed,
+    warnings,
     data: {
       id: saved.id,
+      status: seoResponseStatus,
       identity: {
         brandName: identity.brandName || identity.productName,
         companyName: identity.companyName,
@@ -998,6 +1014,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
       scoreBreakdown: safeSeoScores,
       executiveDashboardStatus,
       executiveDashboardError,
+      warnings,
       scrapingProvider: 'orchestrator'
     }
   };

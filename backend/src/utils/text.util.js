@@ -117,3 +117,128 @@ export function extractDomain(url) {
     return url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
   }
 }
+
+// ============================================
+// CANONICAL KEYWORD NORMALIZER
+// Single source of truth for keyword counting across all consumers.
+// ============================================
+
+/**
+ * Extract the keyword text from various object shapes
+ * @param {string|Object} item - Keyword item
+ * @returns {string|null} - Normalized keyword text
+ */
+function extractKeywordText(item) {
+  if (typeof item === 'string') return item;
+  if (!item || typeof item !== 'object') return null;
+  return item.keyword || item.term || item.name || item.topic || item.value || item.text || null;
+}
+
+/**
+ * Normalize a keyword item into a canonical shape
+ * @param {string|Object} item - Raw keyword item
+ * @returns {Object|null} - Normalized keyword object
+ */
+function normalizeKeywordItem(item) {
+  const text = extractKeywordText(item);
+  if (!text || typeof text !== 'string') return null;
+  
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return null;
+
+  return {
+    keyword: trimmed,
+    searchVolume: typeof item === 'object' ? (item.searchVolume ?? item.volume ?? null) : null,
+    keywordDifficulty: typeof item === 'object' ? (item.keywordDifficulty ?? item.difficulty ?? null) : null,
+    cpc: typeof item === 'object' ? (item.cpc ?? null) : null,
+    competition: typeof item === 'object' ? (item.competition ?? null) : null,
+    competitionIndex: typeof item === 'object' ? (item.competitionIndex ?? null) : null,
+    monthlySearches: typeof item === 'object' ? (item.monthlySearches ?? null) : null,
+    source: typeof item === 'object' ? (item.source ?? null) : null,
+    intent: typeof item === 'object' ? (item.intent ?? null) : null,
+    confidence: typeof item === 'object' ? (item.confidence ?? null) : null,
+    metricType: typeof item === 'object' ? (item.metricType ?? null) : null,
+  };
+}
+
+/**
+ * Canonical keyword normalizer - single source of truth for all keyword consumers.
+ * Supports stored data in multiple field paths and item shapes.
+ * Deduplicates by normalized lowercase keyword text.
+ * 
+ * @param {Object} seoIntelligence - SEO intelligence record or keyword data
+ * @returns {Object} - Normalized keyword buckets with canonical structure
+ */
+export function normalizeSeoKeywords(seoIntelligence) {
+  const si = seoIntelligence || {};
+
+  // Try canonical paths first, then legacy paths
+  const kwData = si.keywordOpportunities || si.keywordIntelligence || si.keywordIntelligenceRecord || si.keywords || si;
+
+  // Extract from canonical paths
+  let primaryRaw = kwData.primaryKeywords || kwData.primary || [];
+  let secondaryRaw = kwData.secondaryKeywords || kwData.secondary || [];
+  let longTailRaw = kwData.longTailKeywords || kwData.longTail || [];
+  let questionRaw = kwData.questionKeywords || kwData.questions || kwData.questionKeywords || [];
+  let geoRaw = kwData.geoKeywords || [];
+  let competitorRaw = kwData.competitorKeywords || [];
+  let contentOppRaw = kwData.contentOpportunities || [];
+
+  // Also check nested metadata paths
+  if (kwData.keywordOpportunities) {
+    primaryRaw = kwData.keywordOpportunities.primaryKeywords || primaryRaw;
+    secondaryRaw = kwData.keywordOpportunities.secondaryKeywords || secondaryRaw;
+    longTailRaw = kwData.keywordOpportunities.longTailKeywords || longTailRaw;
+    questionRaw = kwData.keywordOpportunities.questionKeywords || questionRaw;
+    geoRaw = kwData.keywordOpportunities.geoKeywords || geoRaw;
+    competitorRaw = kwData.keywordOpportunities.competitorKeywords || competitorRaw;
+    contentOppRaw = kwData.keywordOpportunities.contentOpportunities || contentOppRaw;
+  }
+
+  // Normalize each bucket
+  const normalize = (items) => {
+    const seen = new Set();
+    return asArray(items)
+      .map(normalizeKeywordItem)
+      .filter(kw => {
+        if (!kw) return false;
+        const key = kw.keyword.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  };
+
+  const primaryKeywords = normalize(primaryRaw);
+  const secondaryKeywords = normalize(secondaryRaw);
+  const longTailKeywords = normalize(longTailRaw);
+  const questionKeywords = normalize(questionRaw);
+  const geoKeywords = normalize(geoRaw);
+  const competitorKeywords = normalize(competitorRaw);
+  const contentOpportunities = normalize(contentOppRaw);
+
+  // Build allKeywords (deduplicated across all buckets)
+  const allSeen = new Set();
+  const allKeywords = [];
+  for (const bucket of [primaryKeywords, secondaryKeywords, longTailKeywords, questionKeywords, geoKeywords, competitorKeywords, contentOpportunities]) {
+    for (const kw of bucket) {
+      const key = kw.keyword.toLowerCase();
+      if (!allSeen.has(key)) {
+        allSeen.add(key);
+        allKeywords.push(kw);
+      }
+    }
+  }
+
+  return {
+    primaryKeywords,
+    secondaryKeywords,
+    longTailKeywords,
+    questionKeywords,
+    geoKeywords,
+    competitorKeywords,
+    contentOpportunities,
+    allKeywords,
+    keywordCount: allKeywords.length,
+  };
+}

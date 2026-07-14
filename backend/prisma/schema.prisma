@@ -324,6 +324,7 @@ model CampaignPlan {
   provider     String?
   fallbackUsed Boolean? @default(false)
   inputJson    Json?
+  version      Int?     @default(1)
 
   emailCampaigns EmailCampaign[]
   crmDeals       CRMDeal[]
@@ -921,6 +922,11 @@ model AutomationPlan {
   status             String   @default("draft") // draft, approved, scheduled, running, paused, completed
   provider           String?
   fallbackUsed       Boolean? @default(false)
+
+  // Campaign Plan Synchronization
+  campaignPlanId      String?   // Reference to the CampaignPlan used
+  campaignPlanVersion Int?      // Version of CampaignPlan at generation time
+  generatedAt         DateTime? // When this automation plan was generated
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

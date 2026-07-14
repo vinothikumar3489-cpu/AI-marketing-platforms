@@ -196,8 +196,22 @@ function buildEvidenceSection(brief) {
   if (brief.product?.name) lines.push(`Product: ${brief.product.name}`);
   if (brief.product?.summary) lines.push(`Product Summary: ${brief.product.summary}`);
   if (brief.product?.usp) lines.push(`USP: ${brief.product.usp}`);
-  if (brief.product?.features?.length) lines.push(`Features: ${brief.product.features.slice(0, 8).join('; ')}`);
-  if (brief.product?.benefits?.length) lines.push(`Benefits: ${brief.product.benefits.slice(0, 5).join('; ')}`);
+  if (brief.product?.features?.length) {
+    const featureTexts = brief.product.features.map(f => {
+      if (typeof f === 'string') return f;
+      if (f && typeof f === 'object') return f.name || f.description || f.label || JSON.stringify(f);
+      return String(f);
+    }).filter(Boolean);
+    if (featureTexts.length) lines.push(`Features: ${featureTexts.slice(0, 8).join('; ')}`);
+  }
+  if (brief.product?.benefits?.length) {
+    const benefitTexts = brief.product.benefits.map(b => {
+      if (typeof b === 'string') return b;
+      if (b && typeof b === 'object') return b.text || b.description || b.benefit || JSON.stringify(b);
+      return String(b);
+    }).filter(Boolean);
+    if (benefitTexts.length) lines.push(`Benefits: ${benefitTexts.slice(0, 5).join('; ')}`);
+  }
   if (brief.company?.industry) lines.push(`Industry: ${brief.company.industry}`);
   if (brief.targetPersonas?.length) lines.push(`Target Personas: ${brief.targetPersonas.map(p => p.name).filter(Boolean).join(', ')}`);
   if (brief.painPoints?.length) lines.push(`Pain Points: ${brief.painPoints.slice(0, 5).join('; ')}`);
@@ -471,7 +485,7 @@ async function generateSocialPost(postType, brief) {
     instagram_post: '{"caption": "string", "hook": "first line max 125 chars", "hashtags": ["max 5"], "cta": "string", "evidenceUsed": []}',
     twitter_post: '{"text": "string max 280 chars", "cta": "string or null", "evidenceUsed": []}',
     facebook_post: '{"text": "string", "hook": "string", "cta": "string", "evidenceUsed": []}',
-    youtube_description: '{"title": "max 70 chars", "description": "string", "timestamps": [], "links": [], "cta": "string", "evidenceUsed": []}',
+    youtube_description: '{"title": "max 70 chars", "description": "string", "timestamps": [], "links": [], "cta": "string", "evidenceUsed": [], "claimsRequiringReview": []}',
   };
 
   const prompt = `Write a ${postType} for the product below.
@@ -544,7 +558,9 @@ SCHEMA (return valid JSON):
   "requiredText": "text that must appear (overlaid, not burned into image)",
   "cta": "single CTA",
   "format": "poster / banner / social / display",
-  "evidenceLimitations": ["what cannot be claimed in the creative"]
+  "evidenceLimitations": ["what cannot be claimed in the creative"],
+  "evidenceUsed": [],
+  "claimsRequiringReview": []
 }
 
 RULES:

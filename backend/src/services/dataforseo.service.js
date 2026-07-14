@@ -229,22 +229,27 @@ export async function getKeywordMetrics(keywords, location = 'United States', la
     .filter(task => task.status_code === 20000)
     .flatMap(task => {
       if (!task.result) return [];
-      const results = Array.isArray(task.result) ? task.result : [task.result];
-      return results.map(result => ({
-        keyword: result.keyword,
-        volume: result.search_volume ?? null,
-        keywordDifficulty: null,
-        cpc: result.cpc ?? null,
-        competition: result.competition ?? null,
-        competitionIndex: result.competition_index ?? null,
-        monthlySearches: result.monthly_searches ?? null,
-        intent: result.keyword_info?.intent || null,
-        source: 'DataForSEO',
-        confidence: 100,
-        evidence: 'Retrieved from DataForSEO Keyword Data API'
-      }));
+      // Flatten all task result records - handle nested arrays
+      const taskResults = Array.isArray(task.result) ? task.result : [task.result];
+      return taskResults.flatMap(result => {
+        // Handle nested result arrays (some endpoints return arrays of arrays)
+        const items = Array.isArray(result) ? result : [result];
+        return items.map(item => ({
+          keyword: item.keyword || '',
+          volume: item.search_volume ?? null,
+          keywordDifficulty: null,
+          cpc: item.cpc ?? null,
+          competition: item.competition ?? null,
+          competitionIndex: item.competition_index ?? null,
+          monthlySearches: item.monthly_searches ?? null,
+          intent: item.keyword_info?.intent || null,
+          source: 'DataForSEO',
+          confidence: 100,
+          evidence: 'Retrieved from DataForSEO Keyword Data API'
+        }));
+      });
     })
-    .filter(item => item !== null);
+    .filter(item => item !== null && item.keyword && item.keyword.length > 0);
 
   // Log first 3 normalized results
   console.log('🔍 [DataForSEO] First 3 normalized results:', normalized.slice(0, 3));
