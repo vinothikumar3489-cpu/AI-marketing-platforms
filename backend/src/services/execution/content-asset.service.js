@@ -3,6 +3,7 @@
  * Persists generated assets with version history.
  * Never overwrites — creates new version on regenerate.
  * Content and metadata are stored separately.
+ * Stores full generation metadata: prompt, model, evidence, SEO score, timestamps.
  */
 
 export async function saveContentAsset(prisma, { userId, chatId, contentType, briefSnapshot, evidenceSnapshot, provider, content, metadata, qualityScore }) {
@@ -33,6 +34,32 @@ export async function saveContentAsset(prisma, { userId, chatId, contentType, br
 
   const version = existing ? (existing.assetContent?.version || 0) + 1 : 1;
 
+  // Extract SEO keywords from evidence snapshot for storage
+  const seoKeywords = evidenceSnapshot?.keywords || evidenceSnapshot?.verifiedKeywords || [];
+  const seoScore = qualityScore?.checks?.seoAlignment?.detail || null;
+
+  // Extract brief summary for quick reference
+  const briefSummary = briefSnapshot ? {
+    productName: briefSnapshot.product?.name || briefSnapshot.company?.productName,
+    brandName: briefSnapshot.product?.brandName || briefSnapshot.company?.brandName,
+    industry: briefSnapshot.company?.industry,
+    targetPersona: briefSnapshot.targetPersonas?.[0]?.name || briefSnapshot.targetPersonas?.[0]?.role,
+    usp: briefSnapshot.product?.usp,
+    featuresCount: briefSnapshot.product?.features?.length || 0,
+    benefitsCount: briefSnapshot.product?.benefits?.length || 0,
+    competitorCount: briefSnapshot.competitors?.length || 0,
+  } : null;
+
+  // Extract evidence summary for quick reference
+  const evidenceSummary = evidenceSnapshot ? {
+    sourcesCount: evidenceSnapshot.evidenceSources ? Object.values(evidenceSnapshot.evidenceSources).filter(Boolean).length : 0,
+    personaCount: evidenceSnapshot.personas?.length || 0,
+    painPointsCount: evidenceSnapshot.painPoints?.length || 0,
+    featureCount: evidenceSnapshot.features?.length || 0,
+    competitorCount: evidenceSnapshot.competitors?.length || 0,
+    topicCount: evidenceSnapshot.topicIdeas?.length || 0,
+  } : null;
+
   const asset = await prisma.automationAsset.create({
     data: {
       automationPlanId: plan.id,
@@ -46,6 +73,17 @@ export async function saveContentAsset(prisma, { userId, chatId, contentType, br
           qualityScore: qualityScore?.overall || null,
           qualityChecks: qualityScore?.checks || null,
         },
+        generationMetadata: {
+          provider: provider || 'unknown',
+          model: metadata?.model || null,
+          generatedAt: new Date().toISOString(),
+          prompt: metadata?.prompt || null,
+          tokensUsed: metadata?.tokensUsed || null,
+        },
+        briefSnapshot: briefSummary,
+        evidenceSnapshot: evidenceSummary,
+        seoKeywords: seoKeywords.slice(0, 10).map(k => typeof k === 'string' ? k : k.keyword),
+        seoScore,
         version,
         prevVersionId: existing?.id || null,
       },
@@ -67,6 +105,8 @@ export async function saveContentAsset(prisma, { userId, chatId, contentType, br
         version,
         claimStatus,
         qualityScore: qualityScore?.overall || null,
+        provider: provider || 'unknown',
+        model: metadata?.model || null,
       },
     },
   });
@@ -117,6 +157,18 @@ export async function regenerateAsset(prisma, assetId, newResult) {
   const newContent = newResult.content || newResult;
   const newMetadata = newResult.metadata || {};
 
+  // Preserve generation metadata from previous version, update provider/model
+  const prevGenMetadata = existing.assetContent?.generationMetadata || {};
+  const newGenMetadata = {
+    ...prevGenMetadata,
+    provider: newMetadata.provider || prevGenMetadata.provider || 'unknown',
+    model: newMetadata.model || prevGenMetadata.model,
+    generatedAt: new Date().toISOString(),
+    prompt: newMetadata.prompt || prevGenMetadata.prompt,
+    tokensUsed: newMetadata.tokensUsed || prevGenMetadata.tokensUsed,
+    regeneratedFrom: existing.id,
+  };
+
   const newAsset = await prisma.automationAsset.create({
     data: {
       automationPlanId: existing.automationPlanId,
@@ -124,10 +176,18 @@ export async function regenerateAsset(prisma, assetId, newResult) {
       assetTitle: existing.assetTitle,
       assetContent: {
         content: newContent,
-        metadata: newMetadata,
+        metadata: {
+          ...newMetadata,
+          qualityScore: newResult.qualityScore?.overall || null,
+          qualityChecks: newResult.qualityScore?.checks || null,
+        },
+        generationMetadata: newGenMetadata,
+        briefSnapshot: existing.assetContent?.briefSnapshot || null,
+        evidenceSnapshot: existing.assetContent?.evidenceSnapshot || null,
+        seoKeywords: existing.assetContent?.seoKeywords || [],
+        seoScore: existing.assetContent?.seoScore || null,
         version,
         prevVersionId: existing.id,
-        regeneratedFrom: existing.id,
       },
       channel: existing.channel,
       status: 'draft',
@@ -141,7 +201,12 @@ export async function regenerateAsset(prisma, assetId, newResult) {
       assetId: newAsset.id,
       action: 'regenerated',
       message: `${existing.assetType} regenerated to v${version}`,
-      metadata: { prevVersionId: existing.id, version },
+      metadata: {
+        prevVersionId: existing.id,
+        version,
+        provider: newGenMetadata.provider,
+        model: newGenMetadata.model,
+      },
     },
   });
 

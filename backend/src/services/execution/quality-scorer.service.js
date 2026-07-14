@@ -226,21 +226,16 @@ const QUALITY_CHECKS = {
   seoAlignment: {
     label: 'SEO alignment',
     check: (content, brief, assetType) => {
-      // SEO-oriented content types
       const seoContentTypes = ['blog_article', 'landing_page', 'product_page', 'comparison_page', 'faq', 'youtube_description'];
-      
-      // Non-SEO content types where SEO alignment is informational or not applicable
       const nonSeoContentTypes = ['email_copy', 'creative_brief', 'short_social_post', 'linkedin_post', 'instagram_post', 'twitter_post', 'facebook_post'];
       
       const keywords = brief?.verifiedKeywords || [];
       const hasSeoData = keywords.length > 0 && brief?.evidenceSources?.hasSeoIntel;
       
-      // If no SEO data available, mark as not applicable
       if (!hasSeoData) {
         return { status: 'not_applicable', detail: 'SEO data not available' };
       }
       
-      // If content type is non-SEO oriented, mark as informational
       if (nonSeoContentTypes.includes(assetType)) {
         const title = (content.metaTitle || content.title || '').toLowerCase();
         const desc = (content.metaDescription || '').toLowerCase();
@@ -251,7 +246,6 @@ const QUALITY_CHECKS = {
         return { status: 'not_applicable', detail: 'SEO alignment informational for this content type' };
       }
       
-      // For SEO-oriented content types, check keyword alignment
       if (seoContentTypes.includes(assetType)) {
         const title = (content.metaTitle || content.title || '').toLowerCase();
         const desc = (content.metaDescription || '').toLowerCase();
@@ -275,7 +269,6 @@ const QUALITY_CHECKS = {
         return { status: 'passed', detail: `SEO alignment: ${evidence.join(', ')}` };
       }
       
-      // For other content types, informational check
       const title = (content.metaTitle || content.title || '').toLowerCase();
       const desc = (content.metaDescription || '').toLowerCase();
       const matchCount = keywords.filter(k => title.includes((k.keyword || '').toLowerCase()) || desc.includes((k.keyword || '').toLowerCase())).length;
@@ -290,10 +283,159 @@ const QUALITY_CHECKS = {
     check: (content) => {
       const article = content.article || content.body || content.text || content.description || '';
       if (!article || article.length < 100) return { status: 'needs_review', detail: 'Content too short for readability assessment' };
+      
       const sentences = article.split(/[.!?]+/).filter(Boolean);
-      const avgWords = sentences.reduce((sum, s) => sum + s.trim().split(/\s+/).length, 0) / sentences.length;
+      const words = article.split(/\s+/).filter(w => w.length > 0);
+      const avgWords = sentences.length > 0 ? words.length / sentences.length : 0;
+      
+      // Check for passive voice indicators
+      const passiveIndicators = /\b(is|are|was|were|been|be|being)\s+(being\s+)?\w+ed\b/gi;
+      const passiveMatches = article.match(passiveIndicators) || [];
+      const passiveRatio = sentences.length > 0 ? passiveMatches.length / sentences.length : 0;
+      
+      // Check for paragraph length
+      const paragraphs = article.split(/\n\n+/).filter(p => p.trim().length > 0);
+      const longParagraphs = paragraphs.filter(p => p.split(/\s+/).length > 150).length;
+      
       if (avgWords > 30) return { status: 'needs_review', detail: `Average sentence length ${Math.round(avgWords)} words — may be hard to read` };
-      return { status: 'passed', detail: `Average sentence length ${Math.round(avgWords)} words` };
+      if (passiveRatio > 0.2) return { status: 'needs_review', detail: `${Math.round(passiveRatio * 100)}% passive voice — aim for active voice` };
+      if (longParagraphs > 0) return { status: 'needs_review', detail: `${longParagraphs} paragraph(s) over 150 words — consider breaking up` };
+      
+      return { status: 'passed', detail: `Readability OK: avg ${Math.round(avgWords)} words/sentence, ${Math.round(passiveRatio * 100)}% passive, ${paragraphs.length} paragraphs` };
+    },
+  },
+  brandConsistency: {
+    label: 'Brand consistency',
+    check: (content, brief) => {
+      const brandName = brief?.company?.brandName || brief?.product?.brandName;
+      const productName = brief?.company?.productName || brief?.product?.name;
+      const usp = brief?.product?.usp;
+      
+      if (!brandName && !productName) return { status: 'not_applicable', detail: 'No brand/product name to check against' };
+      
+      const contentStr = JSON.stringify(content).toLowerCase();
+      
+      // Check for competing brand names (competitors mentioned more than the product)
+      const competitors = brief?.competitors || [];
+      let competitorMentions = 0;
+      competitors.forEach(c => {
+        if (c.name && contentStr.includes(c.name.toLowerCase())) {
+          competitorMentions++;
+        }
+      });
+      
+      const productMentions = productName ? (contentStr.match(new RegExp(productName.toLowerCase(), 'g')) || []).length : 0;
+      
+      if (competitorMentions > productMentions && productMentions > 0) {
+        return { status: 'needs_review', detail: `Competitor brands mentioned ${competitorMentions} times vs product ${productMentions} times` };
+      }
+      
+      // Check for inconsistent brand name usage (different capitalizations)
+      if (brandName) {
+        const variations = contentStr.match(new RegExp(brandName.toLowerCase(), 'g')) || [];
+        if (variations.length > 0 && !contentStr.includes(brandName.toLowerCase())) {
+          return { status: 'needs_review', detail: 'Brand name capitalization inconsistent' };
+        }
+      }
+      
+      // Check USP alignment if present
+      if (usp) {
+        const uspWords = usp.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+        const uspHits = uspWords.filter(w => contentStr.includes(w)).length;
+        if (uspHits > 0 && uspHits < uspWords.length * 0.3) {
+          return { status: 'needs_review', detail: `Only ${Math.round(uspHits / uspWords.length * 100)}% of USP language reflected` };
+        }
+      }
+      
+      return { status: 'passed', detail: `Brand consistency OK — product mentioned ${productMentions}x` };
+    },
+  },
+  engagement: {
+    label: 'Engagement potential',
+    check: (content, brief, assetType) => {
+      const contentStr = JSON.stringify(content);
+      
+      // Questions engage readers — check for question marks
+      const questionMarks = (contentStr.match(/\?/g) || []).length;
+      
+      // Numbers/data build trust
+      const numbers = contentStr.match(/\b\d+(\.\d+)?[%xkKmM]?\b/g) || [];
+      
+      // Check for subheadings in long-form content
+      const hasSubheadings = content.subheadings || content.sections || content.bulletPoints;
+      
+      // Social proof indicators
+      const socialProof = ['customer', 'client', 'user', 'review', 'testimonial', 'case study', 'result'];
+      const proofHits = socialProof.filter(term => contentStr.toLowerCase().includes(term)).length;
+      
+      const evidence = [];
+      if (questionMarks > 0) evidence.push(`${questionMarks} question(s)`);
+      if (numbers.length > 0) evidence.push(`${numbers.length} data point(s)`);
+      if (hasSubheadings) evidence.push('structured with sections');
+      if (proofHits > 0) evidence.push(`${proofHits} social proof term(s)`);
+      
+      const score = evidence.length;
+      
+      if (score === 0) {
+        return { status: 'needs_review', detail: 'No engagement indicators found — consider adding questions, data, or structure' };
+      }
+      if (score >= 3) {
+        return { status: 'passed', detail: `Strong engagement: ${evidence.join(', ')}` };
+      }
+      return { status: 'passed', detail: `Engagement: ${evidence.join(', ')}` };
+    },
+  },
+  originality: {
+    label: 'Originality',
+    check: (content) => {
+      const contentStr = JSON.stringify(content).toLowerCase();
+      
+      // Check for generic filler phrases
+      const fillerPhrases = [
+        'in today\'s fast-paced',
+        'in today\'s world',
+        'as we all know',
+        'it\'s no secret',
+        'when it comes to',
+        'in the realm of',
+        'it\'s important to note',
+        'it goes without saying',
+        'needless to say',
+        'at the end of the day',
+        'it\'s worth mentioning',
+        'in conclusion',
+        'to sum up',
+        'in summary',
+      ];
+      
+      const foundFillers = fillerPhrases.filter(phrase => contentStr.includes(phrase));
+      
+      // Check for repeated phrases (potential copy-paste)
+      const sentences = contentStr.split(/[.!?]+/).filter(Boolean);
+      const phraseCount = {};
+      sentences.forEach(s => {
+        const words = s.trim().split(/\s+/);
+        for (let i = 0; i < words.length - 2; i++) {
+          const trigram = words.slice(i, i + 3).join(' ');
+          phraseCount[trigram] = (phraseCount[trigram] || 0) + 1;
+        }
+      });
+      const repeatedPhrases = Object.entries(phraseCount).filter(([_, count]) => count > 2).map(([phrase]) => phrase);
+      
+      const evidence = [];
+      if (foundFillers.length > 0) evidence.push(`${foundFillers.length} filler phrase(s)`);
+      if (repeatedPhrases.length > 0) evidence.push(`${repeatedPhrases.length} repeated phrase(s)`);
+      
+      if (foundFillers.length > 3) {
+        return { status: 'needs_review', detail: `${foundFillers.length} generic filler phrases detected — rewrite for specificity` };
+      }
+      if (repeatedPhrases.length > 5) {
+        return { status: 'needs_review', detail: `${repeatedPhrases.length} phrases repeated 3+ times — reduce repetition` };
+      }
+      if (evidence.length > 0) {
+        return { status: 'passed', detail: `Minor originality concerns: ${evidence.join(', ')}` };
+      }
+      return { status: 'passed', detail: 'No generic filler or repetition issues detected' };
     },
   },
 };

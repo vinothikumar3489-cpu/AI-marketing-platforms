@@ -983,13 +983,18 @@ export const generateContentItem = async (req, res) => {
     const contentBody = result?.content || result;
     const meta = result?.metadata || {};
 
-    if (!contentBody) {
-      console.error("[Content Studio] Generation returned no content", { chatId, userId, contentType });
+    // Check for generation failures (returned as status objects, not content)
+    if (!contentBody || contentBody._status === 'generation_failed' || contentBody._status === 'blocked') {
+      console.error("[Content Studio] Generation failed", {
+        chatId, userId, contentType,
+        status: contentBody?._status || 'null',
+        reason: contentBody?._reason,
+      });
       return res.status(500).json({
         success: false,
         error: {
-          code: "CONTENT_GENERATION_FAILED",
-          message: "AI provider returned no content",
+          code: contentBody?._status === 'blocked' ? "BRIEF_BLOCKED" : "CONTENT_GENERATION_FAILED",
+          message: contentBody?._reason || "AI provider returned no content. Check that API keys are configured in .env",
           retryable: true,
           stage: "GENERATION"
         }
@@ -1103,13 +1108,21 @@ export const generateAllContent = async (req, res) => {
     const planResult = await generateContentStudioPlan(types, brief, evidenceContext, callAI, userId, chatId);
     const generatedItems = planResult?.assets || [];
 
-    // Score each, save each
+    // Score each, save each (skip failed generations)
     const assets = [];
     const qualityScores = [];
+    const skipped = [];
 
     for (const item of generatedItems) {
       const contentBody = item.content || item;
       const meta = item.metadata || {};
+
+      // Skip items that failed generation or were blocked
+      if (!contentBody || contentBody._status === 'generation_failed' || contentBody._status === 'blocked') {
+        skipped.push({ type: item.type, status: contentBody?._status || 'null', reason: contentBody?._reason });
+        continue;
+      }
+
       const score = scoreContentQuality(contentBody, brief, item.type);
       qualityScores.push({ type: item.type, ...score });
 
@@ -1119,7 +1132,7 @@ export const generateAllContent = async (req, res) => {
         contentType: item.type,
         briefSnapshot: brief,
         evidenceSnapshot: evidenceContext,
-      provider: meta?.provider || 'content_studio_ai',
+        provider: meta?.provider || 'content_studio_ai',
         content: contentBody,
         metadata: meta,
         qualityScore: score,
@@ -1129,7 +1142,12 @@ export const generateAllContent = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      data: { results: planResult, qualityScores: qualityScores.reduce((a, s) => ({ ...a, [s.type]: s }), {}), assets },
+      data: {
+        results: planResult,
+        qualityScores: qualityScores.reduce((a, s) => ({ ...a, [s.type]: s }), {}),
+        assets,
+        skipped: skipped.length > 0 ? skipped : undefined,
+      },
     });
   } catch (error) {
     console.error('❌ [ContentStudioPlan] Error:', error);
