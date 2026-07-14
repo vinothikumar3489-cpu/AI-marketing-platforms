@@ -1356,31 +1356,56 @@ function renderAnalyticsTab(data: any) {
   );
 }
 
-const tabs = [
-  { id: 'EmailAutomation', label: 'Email Automation' },
-  { id: 'CRM', label: 'CRM Workflow' },
-  { id: 'Plan', label: 'Automation Overview' },
-  { id: 'CampaignIntel', label: 'Campaign Intelligence' },
-  { id: 'Email', label: 'Cold Email Drafts' },
-  { id: 'LinkedIn', label: 'LinkedIn Outreach' },
-  { id: 'Instagram', label: 'Instagram Content' },
-  { id: 'GoogleAds', label: 'Google Ads' },
-  { id: 'Creative', label: 'Poster/Creative Prompts' },
-  { id: 'Video', label: 'Video Ad Scripts' },
-  { id: 'Calendar', label: 'Content Calendar' },
-  { id: 'KPI', label: 'KPI Dashboard' },
-  { id: 'Workflow', label: 'Automation Workflow' },
-  { id: 'Logs', label: 'Logs' },
-  // Phase 6 — Marketing Execution Platform
-  { id: 'ContentStudio', label: 'Content Studio' },
-  { id: 'EmailCampaigns', label: 'Email Campaigns' },
-  { id: 'CreativeStudio', label: 'Creative Studio' },
-  { id: 'VideoStudio', label: 'Video Studio' },
-  { id: 'CampaignPlans', label: 'Campaign Planner' },
-  { id: 'SocialCalendar', label: 'Social Calendar' },
-  { id: 'AssetLibrary', label: 'Asset Library' },
-  { id: 'Analytics', label: 'Analytics' },
+// PART 15: Consolidated tab structure with grouping and visibility rules
+const tabGroups = [
+  {
+    group: 'Core Automation',
+    tabs: [
+      { id: 'Plan', label: 'Automation Overview', priority: 1 },
+      { id: 'CampaignIntel', label: 'Campaign Intelligence', priority: 2 },
+      { id: 'Workflow', label: 'Automation Workflow', priority: 3 },
+    ]
+  },
+  {
+    group: 'Content Generation',
+    tabs: [
+      { id: 'ContentStudio', label: 'Content Studio', priority: 1 },
+      { id: 'EmailCampaigns', label: 'Email Campaigns', priority: 2 },
+      { id: 'CreativeStudio', label: 'Creative Studio', priority: 3 },
+      { id: 'VideoStudio', label: 'Video Studio', priority: 4 },
+      { id: 'CampaignPlans', label: 'Campaign Planner', priority: 5 },
+    ]
+  },
+  {
+    group: 'Social & Outreach',
+    tabs: [
+      { id: 'Email', label: 'Cold Email Drafts', priority: 1 },
+      { id: 'LinkedIn', label: 'LinkedIn Outreach', priority: 2 },
+      { id: 'Instagram', label: 'Instagram Content', priority: 3 },
+      { id: 'GoogleAds', label: 'Google Ads', priority: 4 },
+      { id: 'SocialCalendar', label: 'Social Calendar', priority: 5 },
+    ]
+  },
+  {
+    group: 'Integrations',
+    tabs: [
+      { id: 'EmailAutomation', label: 'Email Automation', priority: 1 },
+      { id: 'CRM', label: 'CRM Workflow', priority: 2 },
+    ]
+  },
+  {
+    group: 'Analytics & Assets',
+    tabs: [
+      { id: 'AssetLibrary', label: 'Asset Library', priority: 1 },
+      { id: 'Analytics', label: 'Analytics', priority: 2 },
+      { id: 'KPI', label: 'KPI Dashboard', priority: 3 },
+      { id: 'Logs', label: 'Logs', priority: 4 },
+    ]
+  }
 ];
+
+// Legacy tabs for backward compatibility (mapped to consolidated structure)
+const tabs = tabGroups.flatMap(g => g.tabs);
 
 const tabRenderers: Record<string, (d: any) => JSX.Element> = {
   EmailAutomation: () => <EmailAutomationWorkspace />,
@@ -1397,7 +1422,6 @@ const tabRenderers: Record<string, (d: any) => JSX.Element> = {
   KPI: renderKpiTab,
   Workflow: () => <WorkflowTabContent />,
   Logs: renderLogsTab,
-  // Phase 6 — Marketing Execution Platform
   ContentStudio: renderContentStudioTab,
   EmailCampaigns: renderEmailCampaignStudioTab,
   CreativeStudio: renderCreativeStudioTab,
@@ -1407,6 +1431,58 @@ const tabRenderers: Record<string, (d: any) => JSX.Element> = {
   AssetLibrary: renderAssetLibraryTab,
   Analytics: renderAnalyticsTab,
 };
+
+/**
+ * Filter tabs based on data availability and quality rules
+ * Hides tabs with no data or low-quality content
+ */
+function filterVisibleTabs(allTabs: typeof tabs, data: any, execData: any, campaignPlan: any) {
+  const tabHasData: Record<string, boolean> = {
+    Plan: !!(data && Object.keys(data).length > 0),
+    CampaignIntel: !!(campaignPlan && Object.keys(campaignPlan).length > 0),
+    Workflow: true, // Always visible for execution control
+    ContentStudio: !!(execData?.contentStudio?.assets && Object.keys(execData.contentStudio.assets).length > 0),
+    EmailCampaigns: !!(execData?.emailCampaigns?.campaigns && Object.keys(execData.emailCampaigns.campaigns).length > 0),
+    CreativeStudio: !!(execData?.creativeStudio?.briefs && Object.keys(execData.creativeStudio.briefs).length > 0),
+    VideoStudio: !!(execData?.videoStudio?.scripts && Object.keys(execData.videoStudio.scripts).length > 0),
+    CampaignPlans: !!(execData?.campaignPlans?.plans && Object.keys(execData.campaignPlans.plans).length > 0),
+    Email: !!(data?.emailSequence?.length || data?.emailSubjects?.length),
+    LinkedIn: !!(data?.linkedInPosts?.length || data?.linkedInDmTemplates?.length),
+    Instagram: !!(data?.instagramCaptions?.length || data?.instagramReelIdeas?.length),
+    GoogleAds: !!(data?.googleAds?.length || data?.imageAdIdeas?.length),
+    SocialCalendar: !!(data?.contentCalendar?.length),
+    EmailAutomation: true, // Integration workspace always visible
+    CRM: true, // Integration workspace always visible
+    AssetLibrary: true, // Asset library consolidates all assets
+    Analytics: true, // Analytics always visible for overview
+    KPI: !!(data?.kpis || data?.metrics || data?.readinessScore),
+    Logs: !!(data?.logs?.length),
+  };
+  
+  // PART 16: Tab quality rule enforcement - hide low-quality tabs
+  const tabQuality: Record<string, boolean> = {
+    Email: tabHasData.Email && data.emailSequence?.length > 0, // Only show if has actual sequence
+    LinkedIn: tabHasData.LinkedIn && (data.linkedInPosts?.length > 2 || data.linkedInDmTemplates?.length > 0), // Only show if substantial content
+    Instagram: tabHasData.Instagram && (data.instagramCaptions?.length > 2 || data.instagramReelIdeas?.length > 0), // Only show if substantial content
+    GoogleAds: tabHasData.GoogleAds && data.googleAds?.length > 0, // Only show if has ads
+    SocialCalendar: tabHasData.SocialCalendar && data.contentCalendar?.length > 5, // Only show if has meaningful calendar
+  };
+  
+  return allTabs.filter(tab => {
+    // Always show core tabs
+    if (['Plan', 'Workflow', 'AssetLibrary', 'Analytics', 'EmailAutomation', 'CRM'].includes(tab.id)) {
+      return true;
+    }
+    
+    // Apply quality rules for content tabs
+    if (tabQuality[tab.id] !== undefined) {
+      return tabQuality[tab.id];
+    }
+    
+    // Default to data availability
+    return tabHasData[tab.id] || false;
+  });
+}
 
 export default function AutomationCenterPage() {
   const { selectedChatId, fullResults } = useProject();

@@ -75,6 +75,18 @@ export async function generateCampaignIntelligence({ userId, chatId, evidenceCon
   const growth = ec.growth || {};
   const sources = ec.sourceSummary || {};
 
+  // PART 12: Reconcile evidence before generation
+  const evidenceReconciliation = reconcileEvidence({
+    product, company, website, audience, competitors, seo, channels, growth, sources
+  });
+  
+  console.info("[CampaignIntelligence] Evidence reconciliation", {
+    userId, chatId,
+    contradictions: evidenceReconciliation.contradictions.length,
+    warnings: evidenceReconciliation.warnings.length,
+    quality: evidenceReconciliation.overallQuality
+  });
+
   let lastError = null;
   let attempt = 0;
   const maxAttempts = 2; // One retry on failure
@@ -101,7 +113,8 @@ export async function generateCampaignIntelligence({ userId, chatId, evidenceCon
               provider: "ai",
               fallbackUsed: false,
               generationStatus: "FULLY_GENERATED",
-              attempts: attempt
+              attempts: attempt,
+              evidenceReconciliation
             };
             console.info("[CampaignIntelligence] AI generation succeeded", { userId, chatId, attempts: attempt });
             return validated;
@@ -135,7 +148,8 @@ export async function generateCampaignIntelligence({ userId, chatId, evidenceCon
       `AI provider failed after ${maxAttempts} attempts`,
       lastError || "Malformed provider output",
       "Campaign generated using evidence-based rules"
-    ]
+    ],
+    evidenceReconciliation
   };
 
   return fallbackResult;
@@ -310,6 +324,255 @@ function validateCampaignOutput(data) {
   return validated;
 }
 
+/**
+ * Reconcile evidence across sources and detect contradictions
+ * Returns evidence status and warnings about data quality
+ */
+function reconcileEvidence(context) {
+  const { product, company, website, audience, competitors, seo, channels, growth, sources } = context;
+  
+  const contradictions = [];
+  const warnings = [];
+  const evidenceStatus = {
+    hasProductData: !!(product.usp?.value || product.features?.value?.length),
+    hasAudienceData: !!(audience?.primary?.value || audience?.personas?.value?.length),
+    hasCompetitorData: !!(competitors?.list?.value?.length),
+    hasSeoData: !!(seo?.keywords?.value?.length || seo?.issues?.value?.length),
+    hasChannelData: !!(channels?.length),
+    hasWebsiteData: !!(website.title?.value || website.heroText?.value),
+    hasGrowthData: growth?.overallScore?.value != null,
+  };
+  
+  // Check for contradictions between product name sources
+  const productNameSources = [
+    { source: 'product.name', value: product.name?.value },
+    { source: 'company.productName', value: company.productName?.value },
+    { source: 'website.title', value: website.title?.value },
+  ].filter(s => s.value);
+  
+  if (productNameSources.length > 1) {
+    const uniqueNames = [...new Set(productNameSources.map(s => s.value))];
+    if (uniqueNames.length > 1) {
+      contradictions.push({
+        type: 'product_name_mismatch',
+        sources: productNameSources.map(s => s.source).join(', '),
+        values: uniqueNames.join(', '),
+        severity: 'medium'
+      });
+    }
+  }
+  
+  // Check for contradictions between industry sources
+  const industrySources = [
+    { source: 'company.industry', value: company.industry?.value },
+    { source: 'product.industry', value: product.industry?.value },
+  ].filter(s => s.value);
+  
+  if (industrySources.length > 1) {
+    const uniqueIndustries = [...new Set(industrySources.map(s => s.value))];
+    if (uniqueIndustries.length > 1) {
+      contradictions.push({
+        type: 'industry_mismatch',
+        sources: industrySources.map(s => s.source).join(', '),
+        values: uniqueIndustries.join(', '),
+        severity: 'low'
+      });
+    }
+  }
+  
+  // Check for audience data consistency
+  if (evidenceStatus.hasAudienceData) {
+    const primaryAudience = audience?.primary?.value;
+    const personaNames = audience?.personas?.value?.map(p => p.name || p.title || p.role).filter(Boolean);
+    
+    if (primaryAudience && personaNames.length > 0) {
+      const personaMatches = personaNames.some(p => 
+        primaryAudience.toLowerCase().includes(p.toLowerCase()) || 
+        p.toLowerCase().includes(primaryAudience.toLowerCase())
+      );
+      if (!personaMatches) {
+        warnings.push({
+          type: 'audience_mismatch',
+          message: 'Primary audience does not match persona names',
+          primaryAudience,
+          personaNames: personaNames.join(', ')
+        });
+      }
+    }
+  }
+  
+  // Check for competitor data consistency
+  if (evidenceStatus.hasCompetitorData) {
+    const competitorCount = competitors?.list?.value?.length || 0;
+    if (competitorCount === 0) {
+      warnings.push({
+        type: 'competitor_data_incomplete',
+        message: 'Competitor intelligence exists but no competitors listed'
+      });
+    }
+  }
+  
+  // Check for SEO data consistency
+  if (evidenceStatus.hasSeoData) {
+    const keywordCount = seo?.keywords?.value?.length || 0;
+    const issueCount = seo?.issues?.value?.length || 0;
+    
+    if (keywordCount === 0 && issueCount === 0) {
+      warnings.push({
+        type: 'seo_data_incomplete',
+        message: 'SEO intelligence exists but no keywords or issues found'
+      });
+    }
+  }
+  
+  // Check for evidence source completeness
+  const availableSources = sources?.sourcesCollected || [];
+  const expectedSources = ['productIntelligence', 'competitorIntelligence', 'seoIntelligence', 'evidenceSnapshot'];
+  const missingSources = expectedSources.filter(s => !availableSources.includes(s));
+  
+  if (missingSources.length > 0) {
+    warnings.push({
+      type: 'missing_evidence_sources',
+      message: 'Some expected evidence sources not collected',
+      missing: missingSources.join(', ')
+    });
+  }
+  
+  return {
+    contradictions,
+    warnings,
+    evidenceStatus,
+    overallQuality: contradictions.length === 0 && warnings.length <= 2 ? 'good' : 
+                   contradictions.length === 0 ? 'acceptable' : 'needs_review'
+  };
+}
+
+/**
+ * Filter campaign recommendations to exclude those requiring unavailable proof
+ * Ensures campaign safety by only recommending actions with available evidence
+ */
+function applyCampaignSafety(campaignResult, evidenceStatus) {
+  const safeResult = JSON.parse(JSON.stringify(campaignResult));
+  
+  // Filter channel recommendations
+  if (safeResult.channelRecommendations) {
+    safeResult.channelRecommendations = safeResult.channelRecommendations.filter(channel => {
+      // Keep channels that don't require specific evidence or have evidence available
+      const requiresSeo = channel.evidence === 'seo_intelligence';
+      const requiresCompetitor = channel.evidence === 'competitor_intelligence';
+      const requiresProduct = channel.evidence === 'product_intelligence';
+      const requiresAudience = channel.evidence === 'audience_intelligence';
+      
+      if (requiresSeo && !evidenceStatus.hasSeoData) {
+        console.warn('[Campaign Safety] Filtering channel requiring unavailable SEO evidence', { channel: channel.channel });
+        return false;
+      }
+      if (requiresCompetitor && !evidenceStatus.hasCompetitorData) {
+        console.warn('[Campaign Safety] Filtering channel requiring unavailable competitor evidence', { channel: channel.channel });
+        return false;
+      }
+      if (requiresProduct && !evidenceStatus.hasProductData) {
+        console.warn('[Campaign Safety] Filtering channel requiring unavailable product evidence', { channel: channel.channel });
+        return false;
+      }
+      if (requiresAudience && !evidenceStatus.hasAudienceData) {
+        console.warn('[Campaign Safety] Filtering channel requiring unavailable audience evidence', { channel: channel.channel });
+        return false;
+      }
+      
+      return true;
+    });
+    
+    // Add warning if channels were filtered
+    if (safeResult.channelRecommendations.length < campaignResult.channelRecommendations.length) {
+      const filteredCount = campaignResult.channelRecommendations.length - safeResult.channelRecommendations.length;
+      if (!safeResult._metadata.warnings) safeResult._metadata.warnings = [];
+      safeResult._metadata.warnings.push(
+        `${filteredCount} channel recommendation(s) filtered due to unavailable evidence`
+      );
+    }
+  }
+  
+  // Filter timeline tasks that require unavailable evidence
+  const filterTimelineTasks = (tasks) => {
+    return tasks.filter(task => {
+      const requiresAudience = task.evidence === 'audience_intelligence' || task.evidence === 'needs_audience_analysis';
+      const requiresSeo = task.evidence === 'seo_keyword_analysis';
+      const requiresProduct = task.evidence === 'product_intelligence';
+      
+      if (requiresAudience && !evidenceStatus.hasAudienceData) {
+        return false;
+      }
+      if (requiresSeo && !evidenceStatus.hasSeoData) {
+        return false;
+      }
+      if (requiresProduct && !evidenceStatus.hasProductData) {
+        return false;
+      }
+      
+      return true;
+    });
+  };
+  
+  if (safeResult.timeline) {
+    if (safeResult.timeline.week1) safeResult.timeline.week1 = filterTimelineTasks(safeResult.timeline.week1);
+    if (safeResult.timeline.week2) safeResult.timeline.week2 = filterTimelineTasks(safeResult.timeline.week2);
+    if (safeResult.timeline.week3) safeResult.timeline.week3 = filterTimelineTasks(safeResult.timeline.week3);
+    if (safeResult.timeline.week4) safeResult.timeline.week4 = filterTimelineTasks(safeResult.timeline.week4);
+    if (safeResult.timeline.month2) safeResult.timeline.month2 = filterTimelineTasks(safeResult.timeline.month2);
+    if (safeResult.timeline.month3) safeResult.timeline.month3 = filterTimelineTasks(safeResult.timeline.month3);
+  }
+  
+  // Filter KPIs that require unavailable measurement infrastructure
+  if (safeResult.kpiFramework) {
+    safeResult.kpiFramework = safeResult.kpiFramework.filter(kpi => {
+      // Keep KPIs that don't require specific data or have data available
+      const requiresSeo = kpi.tool === 'Google Search Console';
+      const requiresEmail = kpi.tool === 'Email Marketing Platform';
+      const requiresProduct = kpi.tool === 'Product Analytics';
+      
+      if (requiresSeo && !evidenceStatus.hasSeoData) {
+        return false;
+      }
+      if (requiresEmail && !evidenceStatus.hasAudienceData) {
+        return false;
+      }
+      if (requiresProduct && !evidenceStatus.hasProductData) {
+        return false;
+      }
+      
+      return true;
+    });
+  }
+  
+  // Filter funnel stages that require unavailable channels
+  if (safeResult.marketingFunnel) {
+    const availableChannels = safeResult.channelRecommendations.map(c => c.channel);
+    
+    Object.keys(safeResult.marketingFunnel).forEach(stage => {
+      const stageData = safeResult.marketingFunnel[stage];
+      if (stageData.channels && Array.isArray(stageData.channels)) {
+        stageData.channels = stageData.channels.filter(channel => {
+          // Keep if channel is available or is a general channel type
+          return availableChannels.includes(channel) || 
+                 ['Email', 'Direct', 'In-App', 'Referral'].includes(channel);
+        });
+      }
+    });
+  }
+  
+  // Add safety metadata
+  safeResult._metadata.safetyApplied = true;
+  safeResult._metadata.safetyFilter = {
+    channelsFiltered: campaignResult.channelRecommendations.length - safeResult.channelRecommendations.length,
+    timelineTasksFiltered: 'applied',
+    kpisFiltered: campaignResult.kpiFramework.length - safeResult.kpiFramework.length,
+    evidenceStatus
+  };
+  
+  return safeResult;
+}
+
 function generateEvidenceBasedCampaign(context) {
   const { product, company, website, audience, competitors, seo, channels, growth, sources } = context;
 
@@ -327,7 +590,8 @@ function generateEvidenceBasedCampaign(context) {
   const goal = determineBusinessGoal(context);
   const channelRecs = determineChannels(context);
 
-  return {
+  // PART 13: Add evidence status labels to all inferences
+  const labelledResult = {
     executiveSummary: {
       campaignName: `${companyName} Evidence-Based Campaign`,
       campaignTheme: `Growth through ${goal.goal || "strategic marketing"}`,
@@ -336,40 +600,104 @@ function generateEvidenceBasedCampaign(context) {
       primaryAudience: {
         value: audience?.primary?.value || "TBD from audience intelligence",
         reason: hasAudienceData ? "Derived from audience intelligence analysis" : "Audience intelligence not yet available",
-        evidence: hasAudienceData ? "audience_intelligence" : "insufficient_evidence"
+        evidence: hasAudienceData ? "audience_intelligence" : "insufficient_evidence",
+        _evidenceStatus: hasAudienceData ? "EVIDENCE_BACKED" : "NOT_MEASURED"
       },
       primaryChannels: channelRecs.slice(0, 3).map(c => ({
         channel: c.channel,
         reason: c.reason,
-        evidence: c.evidence
+        evidence: c.evidence,
+        _evidenceStatus: c.evidence !== "channel_best_practices" ? "EVIDENCE_BACKED" : "BEST_PRACTICE"
       })),
       topOpportunities: buildOpportunities(context).slice(0, 3).map(o => ({
         title: o.opportunity,
         reason: o.reason,
-        evidence: o.evidence
+        evidence: o.evidence,
+        _evidenceStatus: o.evidence !== "best_practice" ? "EVIDENCE_BACKED" : "BEST_PRACTICE"
       })),
       topRisks: buildRisks(context).slice(0, 3).map(r => ({
         risk: r.risk,
         reason: r.cause,
-        evidence: r.evidence
+        evidence: r.evidence,
+        _evidenceStatus: r.evidence !== "best_practice" ? "EVIDENCE_BACKED" : "BEST_PRACTICE"
       })),
-      nextActions: buildNextActions(context).slice(0, 5)
+      nextActions: buildNextActions(context).slice(0, 5).map(a => ({
+        action: a.action,
+        owner: a.owner,
+        priority: a.priority,
+        evidence: a.evidence,
+        _evidenceStatus: a.evidence !== "best_practice" ? "EVIDENCE_BACKED" : "BEST_PRACTICE"
+      }))
     },
-    businessGoal: goal,
+    businessGoal: {
+      ...goal,
+      _evidenceStatus: goal.evidence !== "best_practice" && goal.evidence !== "insufficient_evidence" ? "EVIDENCE_BACKED" : goal.evidence === "insufficient_evidence" ? "NOT_MEASURED" : "BEST_PRACTICE"
+    },
     campaignObjective: buildCampaignObjective(context, goal),
     audienceSelection: buildAudienceSelection(context),
-    channelRecommendations: channelRecs,
+    channelRecommendations: channelRecs.map(c => ({
+      ...c,
+      _evidenceStatus: c.evidence !== "channel_best_practices" ? "EVIDENCE_BACKED" : "BEST_PRACTICE"
+    })),
     timeline: buildTimeline(context, channelRecs),
     marketingFunnel: buildFunnel(context, channelRecs),
-    kpiFramework: buildKPIs(context),
-    riskAssessment: buildRisks(context),
-    opportunityAssessment: buildOpportunities(context),
+    kpiFramework: buildKPIs(context).map(k => ({
+      ...k,
+      _evidenceStatus: k.status === "Measured" ? "EVIDENCE_BACKED" : k.status === "Estimated" ? "AI_INFERRED" : "NOT_MEASURED"
+    })),
+    riskAssessment: buildRisks(context).map(r => ({
+      ...r,
+      _evidenceStatus: r.evidence !== "best_practice" && r.evidence.includes("missing") ? "NOT_MEASURED" : "EVIDENCE_BACKED"
+    })),
+    opportunityAssessment: buildOpportunities(context).map(o => ({
+      ...o,
+      _evidenceStatus: o.evidence !== "best_practice" ? "EVIDENCE_BACKED" : "BEST_PRACTICE"
+    })),
     _metadata: {
       generatedAt: new Date().toISOString(),
       provider: "evidence-based",
       fallbackUsed: true,
+      evidenceQuality: {
+        hasProductData,
+        hasAudienceData,
+        hasCompetitorData,
+        hasSeoData,
+        hasChannelData,
+        hasGrowthData,
+        overallQuality: hasProductData && hasAudienceData ? "good" : "acceptable"
+      }
     }
   };
+  
+  // Add evidence status to nested objects
+  labelledResult.campaignObjective.primary._evidenceStatus = labelledResult.campaignObjective.primary.evidence !== "insufficient_evidence" ? "EVIDENCE_BACKED" : "NOT_MEASURED";
+  labelledResult.campaignObjective.secondary._evidenceStatus = labelledResult.campaignObjective.secondary.evidence !== "insufficient_evidence" ? "EVIDENCE_BACKED" : "NOT_MEASURED";
+  labelledResult.campaignObjective.successDefinition._evidenceStatus = "BEST_PRACTICE";
+  labelledResult.campaignObjective.targetAudience._evidenceStatus = labelledResult.campaignObjective.targetAudience.evidence !== "insufficient_evidence" ? "EVIDENCE_BACKED" : "NOT_MEASURED";
+  labelledResult.campaignObjective.idealCustomer._evidenceStatus = "NOT_MEASURED";
+  labelledResult.campaignObjective.timeline._evidenceStatus = "BEST_PRACTICE";
+  
+  labelledResult.audienceSelection.primaryAudience._evidenceStatus = hasAudienceData ? "EVIDENCE_BACKED" : "NOT_MEASURED";
+  labelledResult.audienceSelection.secondaryAudience._evidenceStatus = hasAudienceData ? "EVIDENCE_BACKED" : "NOT_MEASURED";
+  labelledResult.audienceSelection.buyingStage._evidenceStatus = "BEST_PRACTICE";
+  labelledResult.audienceSelection.painPoints.forEach(p => p._evidenceStatus = hasAudienceData ? "EVIDENCE_BACKED" : "NOT_MEASURED");
+  labelledResult.audienceSelection.decisionDrivers.forEach(d => d._evidenceStatus = hasAudienceData ? "EVIDENCE_BACKED" : "NOT_MEASURED");
+  labelledResult.audienceSelection.objections.forEach(o => o._evidenceStatus = hasAudienceData ? "EVIDENCE_BACKED" : "NOT_MEASURED");
+  labelledResult.audienceSelection.contentPreferences.forEach(c => c._evidenceStatus = hasAudienceData ? "EVIDENCE_BACKED" : "NOT_MEASURED");
+  
+  // PART 14: Apply campaign safety filter
+  const evidenceStatus = {
+    hasProductData,
+    hasAudienceData,
+    hasCompetitorData,
+    hasSeoData,
+    hasChannelData,
+    hasGrowthData
+  };
+  
+  const safeResult = applyCampaignSafety(labelledResult, evidenceStatus);
+  
+  return safeResult;
 }
 
 function determineBusinessGoal(context) {
