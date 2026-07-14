@@ -5,6 +5,9 @@
 
 import { z } from 'zod';
 
+// Inference status enum
+const InferenceStatusSchema = z.enum(['EVIDENCE_BACKED', 'AI_INFERRED', 'USER_PROVIDED', 'NOT_MEASURED']);
+
 // Keyword schema
 const KeywordSchema = z.object({
   keyword: z.string().nullable(),
@@ -54,13 +57,29 @@ const CompanySchema = z.object({
   industry: z.string().nullable()
 });
 
-// Product schema
+// Feature schema (structured object)
+const FeatureSchema = z.object({
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  benefit: z.string().nullable().optional(),
+  evidence: z.string().nullable().optional(),
+  inferenceStatus: InferenceStatusSchema.optional()
+});
+
+// Benefit schema (structured object)
+const BenefitSchema = z.object({
+  text: z.string(),
+  evidence: z.string().nullable().optional(),
+  inferenceStatus: InferenceStatusSchema.optional()
+});
+
+// Product schema with structured features and benefits
 const ProductSchema = z.object({
   name: z.string().nullable(),
   brandName: z.string().nullable(),
   summary: z.string().nullable(),
-  features: z.array(z.string()).default([]),
-  benefits: z.array(z.string()).default([]),
+  features: z.array(FeatureSchema).default([]),
+  benefits: z.array(BenefitSchema).default([]),
   usp: z.string().nullable()
 });
 
@@ -113,16 +132,26 @@ const ContentBriefResponseSchema = z.object({
 });
 
 /**
- * Validate Content Brief
+ * Validate Content Brief without normalization
+ * Normalization is done in content-brief.service.js before validation
  */
 export function validateContentBrief(brief) {
+  const validationWarnings = [];
+  
   try {
     const validated = ContentBriefResponseSchema.parse(brief);
-    return { valid: true, data: validated };
+    return { 
+      valid: true, 
+      data: validated,
+      validationStatus: 'VALID',
+      validationWarnings
+    };
   } catch (error) {
     console.error('[Content Brief Validation] Error:', error.errors);
     return { 
       valid: false, 
+      validationStatus: 'INVALID',
+      validationWarnings,
       errors: error.errors.map(e => ({
         path: e.path.join('.'),
         message: e.message

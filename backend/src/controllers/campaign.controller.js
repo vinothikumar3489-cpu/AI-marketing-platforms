@@ -1,20 +1,24 @@
 import { prisma } from "../config/prisma.js";
 import { buildEvidenceContext } from "../services/execution/evidence-context-builder.service.js";
 import { generateCampaignIntelligence } from "../services/automation/campaign-intelligence.service.js";
+import { getSeoIntelligenceForChat } from "../services/loaders/seo-intelligence.loader.js";
+import { getProductIntelligenceForChat } from "../services/loaders/product-intelligence.loader.js";
 
 const inProgressCampaign = new Set();
 
 // Canonical evidence loader for Campaign generation
 async function loadCampaignEvidence({ userId, chatId }) {
-  const [chat, product, audience, competitor, campaign, seo, evidenceSnapshot] = await Promise.all([
+  const [chat, product, competitor, campaign, seo, evidenceSnapshot] = await Promise.all([
     prisma.chat.findFirst({ where: { id: chatId, userId } }),
-    prisma.productIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
-    prisma.productIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
+    getProductIntelligenceForChat({ prisma, userId, chatId }),
     prisma.competitorIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
     prisma.campaignIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
-    prisma.seoIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
+    getSeoIntelligenceForChat({ prisma, userId, chatId }),
     prisma.evidenceSnapshot.findFirst({ where: { chatId, userId } }).catch(() => null),
   ]);
+
+  // Extract audience from product intelligence
+  const audience = product?.audienceIntelligence || product?.marketDiscovery || null;
 
   return {
     chat,
@@ -169,6 +173,10 @@ export const generateCampaignPlan = async (req, res) => {
         status: "draft",
         provider: campaignData._metadata?.provider || "ai",
         fallbackUsed: campaignData._metadata?.fallbackUsed || false,
+        versionNumber: campaignData._metadata?.versionNumber || 1,
+        generatedAt: campaignData._metadata?.generatedAt,
+        evidenceHash: campaignData._metadata?.evidenceHash,
+        contradictionsDetected: campaignData._metadata?.contradictionsDetected || 0,
       },
       create: {
         userId,
@@ -187,6 +195,10 @@ export const generateCampaignPlan = async (req, res) => {
         status: "draft",
         provider: campaignData._metadata?.provider || "ai",
         fallbackUsed: campaignData._metadata?.fallbackUsed || false,
+        versionNumber: campaignData._metadata?.versionNumber || 1,
+        generatedAt: campaignData._metadata?.generatedAt,
+        evidenceHash: campaignData._metadata?.evidenceHash,
+        contradictionsDetected: campaignData._metadata?.contradictionsDetected || 0,
       },
     });
 

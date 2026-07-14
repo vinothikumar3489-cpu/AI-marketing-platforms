@@ -161,6 +161,7 @@ export const youtubeDescriptionSchema = z.object({
   })).default([]),
   cta: z.string().optional(),
   evidenceUsed,
+  claimsRequiringReview,
 });
 
 export const emailCopySchema = z.object({
@@ -182,6 +183,8 @@ export const creativeBriefSchema = z.object({
   cta: z.string().optional(),
   format: z.string().optional(),
   evidenceLimitations: z.array(z.string()).default([]),
+  evidenceUsed,
+  claimsRequiringReview,
 });
 
 export const videoScriptSchema = z.object({

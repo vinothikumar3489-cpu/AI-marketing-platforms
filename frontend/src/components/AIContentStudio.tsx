@@ -157,15 +157,16 @@ function ContentBriefPanel({ brief, loading }: { brief: any; loading: boolean })
         { key: 'Product', val: toText(brief.product?.name) },
         { key: 'Summary', val: toText(brief.product?.summary) },
         { key: 'USP', val: toText(brief.product?.usp) },
-        { key: 'Features', val: (brief.product?.features || []).slice(0, 6).join(', ') },
+        { key: 'Features', val: (brief.product?.features || []).map((f: any) => typeof f === 'string' ? f : f.feature || f.name).filter(Boolean).slice(0, 6).join(', ') },
+        { key: 'Benefits', val: (brief.product?.benefits || []).map((b: any) => typeof b === 'string' ? b : b.benefit || b.name).filter(Boolean).slice(0, 5).join(', ') },
       ],
     },
     {
       label: 'Audience',
       items: [
         { key: 'Personas', val: (brief.targetPersonas || []).map((p: any) => p.name).filter(Boolean).join(', ') },
-        { key: 'Pain Points', val: (brief.painPoints || []).slice(0, 5).join(', ') },
-        { key: 'Objections', val: (brief.objections || []).slice(0, 3).join(', ') },
+        { key: 'Pain Points', val: (brief.painPoints || []).map((p: any) => typeof p === 'string' ? p : p.painPoint || p.name).filter(Boolean).slice(0, 5).join(', ') },
+        { key: 'Objections', val: (brief.objections || []).map((o: any) => typeof o === 'string' ? o : o.objection || o.name).filter(Boolean).slice(0, 3).join(', ') },
       ],
     },
     {
@@ -423,8 +424,61 @@ function EvidenceUsedPanel({ content }: { content: any }) {
 
 function ContentPreview({ content }: { content: any }) {
   if (!content) return null;
-  const title = toText(content.title || content.headline || content.subjectLine || content.caption || content.text);
-  const body = toText(content.article || content.body || content.description || content.executiveSummary || content.text);
+  
+  // Canonical preview extractor - prevents duplicate content in title and body
+  const extractPreview = (c: any) => {
+    const contentType = c._type || c.assetType || 'unknown';
+    
+    // Extract title/headline
+    let title = toText(c.title || c.headline || c.subjectLine || c.caption);
+    
+    // Extract body/content
+    let body = toText(c.article || c.body || c.description || c.executiveSummary || c.content || c.message || c.script);
+    
+    // For social posts, use post/text as primary content
+    if (contentType.includes('linkedin') || contentType.includes('instagram') || contentType.includes('twitter') || contentType.includes('facebook')) {
+      body = toText(c.post || c.text || c.content || body);
+      if (!title) title = toText(c.headline || c.caption);
+    }
+    
+    // For email, use subject as title, body as body
+    if (contentType.includes('email')) {
+      title = toText(c.subject || c.subjectLine || title);
+      body = toText(c.body || c.content || c.message || body);
+    }
+    
+    // For creative brief, use campaignObjective as title
+    if (contentType.includes('creative_brief')) {
+      title = toText(c.campaignObjective || c.objective || title);
+      body = toText(c.coreMessage || c.keyBenefits || c.deliverables || body);
+    }
+    
+    // For YouTube description, use title as title, description as body
+    if (contentType.includes('youtube')) {
+      title = toText(c.title || c.videoTitle || title);
+      body = toText(c.description || c.body || body);
+    }
+    
+    // For video script, use title as title, script as body
+    if (contentType.includes('video')) {
+      title = toText(c.title || c.videoTitle || title);
+      body = toText(c.script || c.body || body);
+    }
+    
+    // Prevent duplicate: if title and body are the same, only show body
+    if (title === body) {
+      title = null;
+    }
+    
+    // Fallback: if no structured content, use text field only once
+    if (!title && !body && c.text) {
+      body = toText(c.text);
+    }
+    
+    return { title, body };
+  };
+  
+  const { title, body } = extractPreview(content);
 
   return (
     <div style={S.card}>

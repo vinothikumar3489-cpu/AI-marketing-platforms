@@ -1,4 +1,7 @@
 import { getLatestEvidenceSnapshot } from '../../modules/evidence/evidence.service.js';
+import { getSeoIntelligenceForChat } from '../loaders/seo-intelligence.loader.js';
+import { getProductIntelligenceForChat } from '../loaders/product-intelligence.loader.js';
+import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
 
 // Build a partial checks object, defaulting all known checks to false
 function emptyChecks(partial = {}) {
@@ -58,8 +61,7 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
     userId,
     productName: chat.productName,
     title: chat.title,
-    hasProductName,
-    productIntelligenceExists: !!(chat.productIntelligence)
+    hasProductName
   });
 
   if (!hasProductName) {
@@ -82,15 +84,12 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
   const evidenceSnapshot = await getLatestEvidenceSnapshot({ prisma, userId, chatId });
   const raw = evidenceSnapshot?.evidence || {};
 
-  // --- Fetch intelligence records in parallel ---
+  // --- Fetch intelligence records in parallel using canonical loaders ---
   const [productIntel, competitorIntel, campaignIntel, seoIntel] = await Promise.all([
-    prisma.productIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
+    getProductIntelligenceForChat({ prisma, userId, chatId }),
     prisma.competitorIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
     prisma.campaignIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
-    prisma.seoIntelligence.findFirst({
-      where: { chatId, userId },
-      include: { scoreBreakdown: true, technicalSeoAudit: true, keywordIntelligence: true },
-    }).catch(() => null),
+    getSeoIntelligenceForChat({ prisma, userId, chatId }),
   ]);
 
   const checks = {
@@ -162,13 +161,25 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
   const channelData = campaignIntel?.channelRecommendation || {};
   const seoInfo = seoIntel || {};
 
-  // Product identity
-  const productName = chat.productName || productAnalysis.name || null;
+  // Use canonical product identity resolver
+  const productIdentity = resolveProductIdentity({
+    chat,
+    productIntelligence: productIntel,
+    evidenceSnapshot,
+    website: websiteRaw
+  });
+
+  console.info("[Evidence Context] Product identity resolved", {
+    productName: productIdentity.productName,
+    brandName: productIdentity.brandName,
+    source: productIdentity.source,
+    domain: productIdentity.domain
+  });
 
   // Validate legacy SEO — if only generic SEO topics without product data, reject
   const seoKeywords = seoInfo?.keywordOpportunities || seoInfo?.keywordIntelligence?.primaryKeywords || [];
   const hasValidSeo = Array.isArray(seoKeywords) && seoKeywords.length > 0;
-  if (!productName && !productAnalysis?.usp && !websiteRaw?.featuresText?.length && !audienceData?.primaryAudience && hasValidSeo) {
+  if (!productIdentity.productName && !productAnalysis?.usp && !websiteRaw?.featuresText?.length && !audienceData?.primaryAudience && hasValidSeo) {
     return { rejected: true, reason: 'Only legacy SEO topics available — no product identity or evidence. Run Growth Workspace first.', code: 'LEGACY_SEO_ONLY' };
   }
 
@@ -178,14 +189,17 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
     userId: sourced(userId, 'chat', 'userId'),
 
     company: {
-      name: sourcedOpt(chat.title || raw.website?.title || null, chat.title ? 'chat' : 'evidenceSnapshot', 'title'),
-      productName: sourcedOpt(productName, productName === chat.productName ? 'chat' : 'productIntelligence', 'productName'),
-      websiteUrl: sourcedOpt(chat.websiteUrl || raw.website?.url || null, chat.websiteUrl ? 'chat' : 'evidenceSnapshot', 'websiteUrl'),
+      name: sourcedOpt(productIdentity.companyName || chat.title || raw.website?.title || null, productIdentity.companyName ? 'productIdentity' : 'chat', 'name'),
+      productName: sourcedOpt(productIdentity.productName, 'productIdentity', 'productName'),
+      brandName: sourcedOpt(productIdentity.brandName, 'productIdentity', 'brandName'),
+      websiteUrl: sourcedOpt(productIdentity.websiteUrl || chat.websiteUrl || raw.website?.url || null, productIdentity.websiteUrl ? 'productIdentity' : 'chat', 'websiteUrl'),
+      domain: sourcedOpt(productIdentity.domain, 'productIdentity', 'domain'),
       industry: sourcedOpt(productAnalysis.industry || null, 'productIntelligence', 'industry'),
     },
 
     product: {
-      name: sourcedOpt(productName, productName === chat.productName ? 'chat' : 'productIntelligence', 'productName'),
+      name: sourcedOpt(productIdentity.productName, 'productIdentity', 'productName'),
+      brandName: sourcedOpt(productIdentity.brandName, 'productIdentity', 'brandName'),
       usp: sourcedOpt(productAnalysis.usp || null, 'productIntelligence', 'usp'),
       description: sourcedOpt(productAnalysis.description || null, 'productIntelligence', 'description'),
       features: sourcedOpt(
