@@ -112,7 +112,7 @@ async function callGemini(prompt) {
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          maxOutputTokens: 1500,
+          maxOutputTokens: 4000,
           temperature: 0.4
         }
       }),
@@ -165,7 +165,7 @@ async function callGroq(prompt) {
       body: JSON.stringify({
         model: GROQ_MODEL,
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 1500,
+        max_tokens: 4000,
         temperature: 0.4
       }),
       signal: AbortSignal.timeout(45000)
@@ -210,7 +210,7 @@ async function callOpenAI(prompt) {
       body: JSON.stringify({
         model: OPENAI_MODEL,
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 1500,
+        max_tokens: 4000,
         temperature: 0.4,
         response_format: { type: "json_object" }
       }),

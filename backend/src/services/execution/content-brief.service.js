@@ -108,10 +108,21 @@ export async function buildContentBrief(prisma, userId, chatId) {
       summary: productAnalysis.summary || productAnalysis.productSummary || null,
       features: normalizedProduct.features.length > 0
         ? normalizedProduct.features
-        : normalizeFeatures(takeArray(website.featuresText || productAnalysis.features, 15)),
+        : normalizeFeatures(takeArray(
+            website.featuresText
+            || productAnalysis.features
+            || productAnalysis.capabilities
+            || productAnalysis.keyFeatures
+            || productAnalysis.productFeatures
+            || [], 15)),
       benefits: normalizedProduct.benefits.length > 0
         ? normalizedProduct.benefits
-        : normalizeBenefits(takeArray(productAnalysis.benefits || productAnalysis.coreBenefits, 10)),
+        : normalizeBenefits(takeArray(
+            productAnalysis.benefits
+            || productAnalysis.coreBenefits
+            || productAnalysis.valuePropositions
+            || productAnalysis.advantages
+            || [], 10)),
       usp: productAnalysis.usp || null,
     },
     website: {
@@ -178,16 +189,10 @@ export async function buildContentBrief(prisma, userId, chatId) {
   });
 
   if (!validation.valid) {
-    console.error('[Content Brief] Validation failed', validation.errors);
-    return {
-      success: false,
-      error: {
-        code: "CONTENT_BRIEF_SCHEMA_INVALID",
-        message: "The product evidence could not be normalized into a valid content brief.",
-        retryable: false,
-        validationErrors: validation.errors
-      }
-    };
+    console.warn('[Content Brief] Validation warnings (non-blocking)', validation.errors);
+    for (const err of validation.errors) {
+      brief.warnings.push(`Schema: ${err.path} — ${err.message}`);
+    }
   }
 
   return {

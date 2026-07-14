@@ -123,7 +123,8 @@ function traverseAndClean(obj, path = '', findings = []) {
 }
 
 export function validateContentClaims(content, assetType) {
-  const findings = traverseAndClean(content, assetType);
+  const cleanCopy = JSON.parse(JSON.stringify(content));
+  const findings = traverseAndClean(cleanCopy, assetType);
   const hasRejections = findings.some(f => f.action === 'removed');
   const hasFlags = findings.some(f => f.action === 'flagged_for_review');
 
@@ -148,23 +149,22 @@ export function validateBriefContent(brief) {
   if (!brief.product?.name) issues.push('No product name');
   if (!brief.product?.summary && !brief.product?.usp) issues.push('No product summary or USP');
   
-  // PART 17: Handle normalized features and benefits (objects with feature/benefit fields)
   const features = brief.product?.features || [];
   const benefits = brief.product?.benefits || [];
   const hasFeatures = Array.isArray(features) && features.length > 0;
   const hasBenefits = Array.isArray(benefits) && benefits.length > 0;
   
-  // Check for normalized feature objects
-  const hasNormalizedFeatures = hasFeatures && features.some(f => typeof f === 'object' && (f.feature || f.name));
-  const hasNormalizedBenefits = hasBenefits && benefits.some(b => typeof b === 'object' && (b.benefit || b.name));
-  
-  if (!hasNormalizedFeatures && !hasNormalizedBenefits && !hasFeatures && !hasBenefits) {
+  if (!hasFeatures && !hasBenefits) {
     issues.push('No features or benefits');
   }
 
+  // Only block if there is truly no product identity at all
+  const blocked = !brief.product?.name;
+  const status = blocked ? 'blocked' : issues.length === 0 ? 'passed' : 'needs_review';
+
   return {
-    valid: issues.length === 0,
-    status: issues.length === 0 ? 'passed' : issues.length <= 2 ? 'needs_review' : 'blocked',
+    valid: !blocked,
+    status,
     issues,
   };
 }

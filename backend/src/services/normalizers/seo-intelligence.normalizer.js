@@ -21,14 +21,29 @@ function extractKeywordText(k) {
  */
 function normalizeKeywordItem(k) {
   const keyword = extractKeywordText(k);
+  const difficulty = k.keywordDifficulty ?? k.difficulty ?? k.kd ?? null;
+  const competition = k.competition ?? k.paidCompetition ?? k.competitionIndex ?? null;
   
+  // Derive opportunity score: low difficulty + decent volume = high opportunity
+  let opportunity = k.opportunity ?? null;
+  if (opportunity === null && difficulty !== null) {
+    const vol = k.volume ?? k.searchVolume ?? k.monthlyVolume ?? k.searches ?? 0;
+    if (difficulty <= 30 && vol > 100) opportunity = 90;
+    else if (difficulty <= 50 && vol > 50) opportunity = 70;
+    else if (difficulty <= 70) opportunity = 50;
+    else opportunity = 30;
+  }
+
   return {
     keyword: keyword || 'unknown',
     volume: k.volume ?? k.searchVolume ?? k.monthlyVolume ?? k.searches ?? null,
+    difficulty,
+    opportunity,
+    trend: k.trend ?? k.trendDirection ?? null,
     cpc: k.cpc ?? k.costPerClick ?? null,
-    competition: k.competition ?? k.paidCompetition ?? null,
+    competition,
     competitionIndex: k.competitionIndex ?? null,
-    keywordDifficulty: k.keywordDifficulty ?? k.difficulty ?? k.kd ?? null,
+    keywordDifficulty: difficulty,
     intent: k.intent ?? k.searchIntent ?? null,
     source: k.source ?? k.dataSource ?? null,
     evidence: k.evidence ?? null

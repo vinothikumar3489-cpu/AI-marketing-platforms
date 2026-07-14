@@ -4,6 +4,7 @@ import { callAI } from "../ai/services/aiRouter.service.js";
 import { generateAllExecutionModules, generateSingleModule } from "../services/execution/marketing-execution.service.js";
 import { buildEvidenceContext, buildReadinessChecklist } from "../services/execution/evidence-context-builder.service.js";
 import { buildContentBrief } from "../services/execution/content-brief.service.js";
+import { getSeoIntelligenceForChat } from "../services/loaders/seo-intelligence.loader.js";
 
 const inProgressAutomation = new Set();
 const inProgressCampaign = new Set();
@@ -1118,7 +1119,7 @@ export const generateAllContent = async (req, res) => {
         contentType: item.type,
         briefSnapshot: brief,
         evidenceSnapshot: evidenceContext,
-        provider: 'groq',
+      provider: meta?.provider || 'content_studio_ai',
         content: contentBody,
         metadata: meta,
         qualityScore: score,
