@@ -1,7 +1,9 @@
 import { getLatestEvidenceSnapshot } from '../../modules/evidence/evidence.service.js';
 import { asArray, takeArray } from '../normalizers/array-helpers.js';
 import { normalizeSeoForExecution } from '../normalizers/seo-intelligence.normalizer.js';
+import { normalizeProductIntelligence, normalizeFeatures, normalizeBenefits, featureToText, benefitToText } from '../normalizers/product-intelligence.normalizer.js';
 import { getSeoIntelligenceForChat } from '../loaders/seo-intelligence.loader.js';
+import { getProductIntelligenceForChat } from '../loaders/product-intelligence.loader.js';
 import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
 import { validateContentBrief } from '../validators/content-brief.schema.js';
 
@@ -26,7 +28,7 @@ export async function buildContentBrief(prisma, userId, chatId) {
   const raw = evidenceSnapshot?.evidence || {};
 
   const [productIntel, competitorIntel, seoIntel] = await Promise.all([
-    prisma.productIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
+    getProductIntelligenceForChat({ prisma, userId, chatId }),
     prisma.competitorIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
     getSeoIntelligenceForChat({ prisma, userId, chatId }),
   ]);
@@ -83,6 +85,14 @@ export async function buildContentBrief(prisma, userId, chatId) {
     return { rejected: true, reason: 'Complete Growth Analysis before generating content.', code: 'EVIDENCE_MISSING' };
   }
 
+  // PART 2: Normalize product features and benefits
+  const normalizedProduct = normalizeProductIntelligence(productIntel);
+  console.info("[Content Brief] Product normalized", {
+    featuresCount: normalizedProduct.features.length,
+    benefitsCount: normalizedProduct.benefits.length,
+    warnings: normalizedProduct.warnings
+  });
+
   const brief = {
     company: {
       name: productIdentity.companyName || chat.title || null,
@@ -96,8 +106,12 @@ export async function buildContentBrief(prisma, userId, chatId) {
       name: productIdentity.productName,
       brandName: productIdentity.brandName,
       summary: productAnalysis.summary || productAnalysis.productSummary || null,
-      features: takeArray(website.featuresText || productAnalysis.features, 15),
-      benefits: takeArray(productAnalysis.benefits || productAnalysis.coreBenefits, 10),
+      features: normalizedProduct.features.length > 0
+        ? normalizedProduct.features
+        : normalizeFeatures(takeArray(website.featuresText || productAnalysis.features, 15)),
+      benefits: normalizedProduct.benefits.length > 0
+        ? normalizedProduct.benefits
+        : normalizeBenefits(takeArray(productAnalysis.benefits || productAnalysis.coreBenefits, 10)),
       usp: productAnalysis.usp || null,
     },
     website: {
@@ -165,8 +179,15 @@ export async function buildContentBrief(prisma, userId, chatId) {
 
   if (!validation.valid) {
     console.error('[Content Brief] Validation failed', validation.errors);
-    // Return the brief anyway but include validation errors as warnings
-    brief.warnings.push(...validation.errors.map(e => `Validation: ${e.path} - ${e.message}`));
+    return {
+      success: false,
+      error: {
+        code: "CONTENT_BRIEF_SCHEMA_INVALID",
+        message: "The product evidence could not be normalized into a valid content brief.",
+        retryable: false,
+        validationErrors: validation.errors
+      }
+    };
   }
 
   return {
