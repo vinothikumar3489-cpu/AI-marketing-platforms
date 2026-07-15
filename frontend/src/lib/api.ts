@@ -381,6 +381,10 @@ export async function restoreEmailCampaignVersion(chatId: string, campaignId: st
   return api.post<any>(`/chats/${chatId}/email-campaign/${campaignId}/versions/${versionId}/restore`);
 }
 
+export async function fromAssetToEmailCampaign(chatId: string, automationAssetId: string, options?: { campaignPlanId?: string; sequenceOrder?: number; purpose?: string; delayAfterPreviousDays?: number }) {
+  return api.post<any>(`/chats/${chatId}/email-campaign/from-asset`, { automationAssetId, ...options });
+}
+
 export async function sendTestCampaignEmail(chatId: string, campaignId: string, recipientEmail: string, itemId?: string) {
   return api.post<any>(`/chats/${chatId}/email-campaign/${campaignId}/test-send`, { recipientEmail, itemId });
 }

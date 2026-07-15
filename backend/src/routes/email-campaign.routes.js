@@ -16,6 +16,7 @@ import {
   handleSendCampaign,
   handleBrevoWebhookEndpoint,
   handleGetDeliveryLogs,
+  handleFromAsset,
 } from "../controllers/email-campaign.controller.js";
 
 export const emailCampaignRouter = Router();
@@ -23,6 +24,7 @@ export const brevoWebhookRouter = Router();
 
 emailCampaignRouter.use(requireAuth);
 
+emailCampaignRouter.post("/:chatId/email-campaign/from-asset", handleFromAsset);
 emailCampaignRouter.post("/:chatId/email-campaign/generate", handleGenerateEmailCampaign);
 emailCampaignRouter.get("/:chatId/email-campaign", handleListEmailCampaigns);
 emailCampaignRouter.get("/:chatId/email-campaign/:campaignId", handleGetEmailCampaign);

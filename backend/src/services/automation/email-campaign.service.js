@@ -1125,3 +1125,136 @@ export async function getDeliveryLogs(campaignId) {
   });
   return logs;
 }
+
+export async function fromAssetToEmailCampaign({ chatId, userId, automationAssetId, campaignPlanId, sequenceOrder, purpose, delayAfterPreviousDays }) {
+  const asset = await prisma.automationAsset.findFirst({
+    where: { id: automationAssetId, automationPlan: { chatId } },
+    include: { automationPlan: { select: { chatId: true, userId: true } } },
+  });
+
+  if (!asset) {
+    return { success: false, error: "Asset not found" };
+  }
+  if (asset.automationPlan.userId !== userId) {
+    return { success: false, error: "Asset does not belong to user" };
+  }
+  if (asset.assetType !== "email_copy") {
+    return { success: false, error: "Asset type must be email_copy" };
+  }
+
+  const content = typeof asset.assetContent === "object" ? asset.assetContent : {};
+  const subject = content.subject || content.subjectLine || "";
+  const previewText = content.previewText || "";
+  const greeting = content.greeting || "Hi there,";
+  const opening = content.opening || "";
+  const bodyParagraphs = Array.isArray(content.bodyParagraphs) ? content.bodyParagraphs : [];
+  const bulletPoints = Array.isArray(content.bulletPoints) ? content.bulletPoints : [];
+  const ctaText = content.ctaText || content.cta?.text || "";
+  const ctaUrl = content.ctaUrl || content.cta?.url || "";
+  const closing = content.closing || "";
+  const signature = content.signature || "";
+  const personalizationFields = content.personalizationFields || [];
+  const evidenceUsed = content.evidenceUsed || [];
+  const claimsRequiringReview = content.claimsRequiringReview || [];
+  const inferenceStatus = content.inferenceStatus || "ai_generated";
+
+  let campaignPlan;
+  if (campaignPlanId) {
+    campaignPlan = await prisma.campaignPlan.findFirst({
+      where: { id: campaignPlanId, chatId, userId },
+    });
+    if (!campaignPlan) {
+      return { success: false, error: "CampaignPlan not found or does not belong to user" };
+    }
+  }
+
+  const productIntel = await prisma.productIntelligence.findFirst({
+    where: { chatId, userId },
+    select: { inputJson: true, productAnalysis: true, id: true },
+  });
+
+  const emailCampaign = await prisma.emailCampaign.create({
+    data: {
+      userId,
+      chatId,
+      campaignPlanId: campaignPlanId || null,
+      name: campaignPlan?.campaignName || `${asset.assetTitle || "Email"} Campaign`,
+      objective: purpose || subject || null,
+      status: "DRAFT",
+      approvalStatus: "NOT_SUBMITTED",
+      generationStatus: "completed",
+      evidenceSummary: { assetId: asset.id, assetTitle: asset.assetTitle, evidenceUsed },
+    },
+  });
+
+  const fullHtml = renderEmailHtml({
+    subject,
+    previewText,
+    greeting,
+    opening,
+    bodyParagraphs,
+    bulletPoints,
+    ctaText,
+    ctaUrl,
+    closing,
+    signature,
+  });
+
+  const plainText = renderPlainText({
+    subject,
+    previewText,
+    greeting,
+    opening,
+    bodyParagraphs,
+    bulletPoints,
+    ctaText,
+    ctaUrl,
+    closing,
+    signature,
+  });
+
+  const sequenceItem = await prisma.emailSequenceItem.create({
+    data: {
+      emailCampaignId: emailCampaign.id,
+      sequenceOrder: sequenceOrder || 1,
+      emailName: asset.assetTitle || `${purpose || "Email"} ${sequenceOrder || 1}`,
+      purpose: purpose || null,
+      delayAfterPreviousDays: delayAfterPreviousDays ?? 0,
+      subjectLine: subject || null,
+      previewText: previewText || null,
+      emailBodyText: plainText,
+      emailBodyHtml: fullHtml,
+      primaryCta: ctaText || null,
+      personalizationFields: personalizationFields,
+      evidenceUsed: evidenceUsed,
+      inferenceStatus: inferenceStatus,
+      status: "draft",
+    },
+  });
+
+  await prisma.emailCampaignLog.create({
+    data: {
+      emailCampaignId: emailCampaign.id,
+      emailSequenceItemId: sequenceItem.id,
+      action: "from_asset",
+      status: "created",
+      message: `Email campaign created from Content Studio asset: ${asset.assetTitle || asset.id}`,
+      metadata: { assetId: asset.id, contentType: "email_copy" },
+    },
+  });
+
+  const version = await prisma.emailCampaignVersion.create({
+    data: {
+      emailCampaignId: emailCampaign.id,
+      versionNumber: 1,
+      snapshot: { campaign: emailCampaign, items: [sequenceItem] },
+      changeReason: "Created from Content Studio asset",
+      createdBy: userId,
+    },
+  });
+
+  return {
+    success: true,
+    data: { campaign: emailCampaign, items: [sequenceItem], version },
+  };
+}

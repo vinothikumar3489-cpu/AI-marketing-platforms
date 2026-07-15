@@ -14,6 +14,7 @@ import {
   sendCampaignEmails,
   handleBrevoWebhook,
   getDeliveryLogs,
+  fromAssetToEmailCampaign,
 } from "../services/automation/email-campaign.service.js";
 
 export async function handleGenerateEmailCampaign(req, res) {
@@ -154,4 +155,30 @@ export async function handleGetDeliveryLogs(req, res) {
 export async function handleBrevoWebhookEndpoint(req, res) {
   const result = await handleBrevoWebhook(req.body);
   res.status(result.success ? 200 : 400).json(result);
+}
+
+export async function handleFromAsset(req, res) {
+  const { chatId } = req.params;
+  const userId = req.user?.id;
+  const { automationAssetId, campaignPlanId, sequenceOrder, purpose, delayAfterPreviousDays } = req.body;
+
+  if (!automationAssetId) {
+    return res.status(400).json({ success: false, error: "automationAssetId is required" });
+  }
+
+  const result = await fromAssetToEmailCampaign({
+    chatId,
+    userId,
+    automationAssetId,
+    campaignPlanId: campaignPlanId || null,
+    sequenceOrder: sequenceOrder || 1,
+    purpose: purpose || null,
+    delayAfterPreviousDays: delayAfterPreviousDays ?? 0,
+  });
+
+  if (!result.success) {
+    return res.status(422).json(result);
+  }
+
+  res.json(result);
 }

@@ -12,7 +12,7 @@ import { useWorkspaceMemory } from './EnterpriseDecisionSuite';
 import {
   api, getEvidenceContext, getContentBrief, generateContentItem,
   generateContentPlan, getContentAssets, getAssetVersionHistory,
-  regenerateContentAsset, getIntegrationHealth
+  regenerateContentAsset, getIntegrationHealth, fromAssetToEmailCampaign
 } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
 
@@ -41,6 +41,7 @@ const S = {
   tag: (color: string) => ({ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, background: `${color}15`, color }),
   row: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: C.bg, borderRadius: '8px', border: `1px solid #1d2738`, minWidth: 0 },
   scrollY: { maxHeight: '400px', overflowY: 'auto' as const, overflowX: 'hidden' as const },
+  smallButton: { padding: '4px 10px', borderRadius: '6px', border: '1px solid', cursor: 'pointer', fontSize: '10px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 },
   previewBox: { padding: '12px', background: C.bg, borderRadius: '8px', fontSize: '13px', color: C.muted, lineHeight: 1.6, maxHeight: '500px', overflowY: 'auto' as const, overflowX: 'hidden' as const, minWidth: 0, wordBreak: 'break-word' as const, whiteSpace: 'pre-wrap' as const },
 };
 
@@ -554,7 +555,7 @@ function YouTubeRenderer({ content, onCopy }: { content: any; onCopy: (text: str
   );
 }
 
-function EmailRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
+function EmailRenderer({ content, onCopy, selectedChatId, onAddToCampaign }: { content: any; onCopy: (text: string) => void; selectedChatId?: string; onAddToCampaign?: (assetId: string) => void }) {
   const rendered = [
     `Subject: ${content.subject}`,
     content.previewText ? `Preview text: ${content.previewText}` : '',
@@ -586,7 +587,14 @@ function EmailRenderer({ content, onCopy }: { content: any; onCopy: (text: strin
         {content.previewText && <div style={{ fontSize: '11px', color: C.dim, marginBottom: '12px' }}>{content.previewText}</div>}
         <div style={{ whiteSpace: 'pre-wrap', color: C.muted, lineHeight: 1.7 }}>{rendered}</div>
       </div>
-      <CopyButton text={rendered} onCopy={onCopy} />
+      <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
+        <CopyButton text={rendered} onCopy={onCopy} />
+        {content._assetId && selectedChatId && onAddToCampaign && (
+          <button onClick={() => onAddToCampaign(content._assetId)} style={{ ...S.smallButton, background: `${C.purple}15`, color: C.purple, border: `1px solid ${C.purple}30` }}>
+            <Mail size={12} /> Add to Email Campaign
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -662,7 +670,7 @@ function CopyButton({ text, onCopy }: { text: string; onCopy: (text: string) => 
   );
 }
 
-function ContentPreview({ content }: { content: any }) {
+function ContentPreview({ content, selectedChatId, onAddToCampaign }: { content: any; selectedChatId?: string; onAddToCampaign?: (assetId: string) => void }) {
   if (!content) return null;
 
   const [copyFeedback, setCopyFeedback] = useState('');
@@ -693,7 +701,7 @@ function ContentPreview({ content }: { content: any }) {
   } else if (contentType === 'youtube_description' || (content.openingHook && content.description)) {
     renderer = <YouTubeRenderer content={content} onCopy={handleCopy} />;
   } else if (contentType === 'email_copy' || (content.emailType && content.subject)) {
-    renderer = <EmailRenderer content={content} onCopy={handleCopy} />;
+    renderer = <EmailRenderer content={content} onCopy={handleCopy} selectedChatId={selectedChatId} onAddToCampaign={onAddToCampaign} />;
   } else if (contentType === 'creative_brief' || (content.objective && content.visualDirection)) {
     renderer = <CreativeBriefRenderer content={content} onCopy={handleCopy} />;
   } else if (contentType === 'video_script' || (content.duration && content.scenes)) {
@@ -731,11 +739,11 @@ function ContentPreview({ content }: { content: any }) {
   );
 }
 
-function ReviewPanel({ content, qualityScore }: { content: any; qualityScore: any }) {
+function ReviewPanel({ content, qualityScore, selectedChatId, onAddToCampaign }: { content: any; qualityScore: any; selectedChatId?: string; onAddToCampaign?: (assetId: string) => void }) {
   if (!content) return null;
   return (
     <div style={{ display: 'grid', gap: '16px' }}>
-      <ContentPreview content={content} />
+      <ContentPreview content={content} selectedChatId={selectedChatId} onAddToCampaign={onAddToCampaign} />
       <EvidenceUsedPanel content={content} />
       <QualityPanel qualityScore={qualityScore} />
       <ClaimPanel content={content} />
@@ -1045,7 +1053,26 @@ export default function AIContentStudio() {
   const [error, setError] = useState<string | null>(null);
   const [readiness, setReadiness] = useState<any>(null);
   const [readinessLoading, setReadinessLoading] = useState(false);
+  const [addingToCampaign, setAddingToCampaign] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  const handleAddToEmailCampaign = useCallback(async (assetId: string) => {
+    if (!selectedChatId || addingToCampaign) return;
+    setAddingToCampaign(true);
+    try {
+      const result = await fromAssetToEmailCampaign(selectedChatId, assetId, { purpose: 'promotional' });
+      if (result.success !== false && result.data) {
+        setError(null);
+        alert('Email campaign created!');
+      } else {
+        setError(result.error || 'Failed to create email campaign');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to create email campaign');
+    } finally {
+      setAddingToCampaign(false);
+    }
+  }, [selectedChatId, addingToCampaign]);
 
   useEffect(() => {
     setBrief(null);
@@ -1222,7 +1249,7 @@ export default function AIContentStudio() {
           )
         )}
         {generatedContent && (
-          <ReviewPanel content={generatedContent} qualityScore={qualityScore} />
+          <ReviewPanel content={generatedContent} qualityScore={qualityScore} selectedChatId={selectedChatId} onAddToCampaign={handleAddToEmailCampaign} />
         )}
       </div>
     );
