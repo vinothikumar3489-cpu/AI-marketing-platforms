@@ -54,32 +54,6 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
     return { rejected: true, reason: 'Context belongs to another chat', code: 'CHAT_OWNER_MISMATCH', checks: emptyChecks({ chatExists: true, chatOwnedByUser: false }) };
   }
 
-  const hasProductName = !!(chat.productName || chat.title);
-
-  console.info("[Evidence Context] Chat details", {
-    chatId,
-    userId,
-    productName: chat.productName,
-    title: chat.title,
-    hasProductName
-  });
-
-  if (!hasProductName) {
-    console.warn("[Evidence Context] Product identity missing", {
-      chatId,
-      userId,
-      productName: chat.productName,
-      title: chat.title,
-      hasProductName
-    });
-    return {
-      rejected: true,
-      reason: 'Product identity is missing. Set a product name first.',
-      code: 'PRODUCT_IDENTITY_MISSING',
-      checks: emptyChecks({ chatExists: true, chatOwnedByUser: true, productIntelligenceExists: false }),
-    };
-  }
-
   // --- Gather evidence (snapshot is optional, fall back to intelligence records) ---
   const evidenceSnapshot = await getLatestEvidenceSnapshot({ prisma, userId, chatId });
   const raw = evidenceSnapshot?.evidence || {};
@@ -161,7 +135,8 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
   const channelData = campaignIntel?.channelRecommendation || {};
   const seoInfo = seoIntel || {};
 
-  // Use canonical product identity resolver
+  // Resolve product identity from intelligence records before any validation
+  // This uses inputJson paths, not chat.title, so it works when chat title is a generic label
   const productIdentity = resolveProductIdentity({
     chat,
     productIntelligence: productIntel,
@@ -173,8 +148,25 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
     productName: productIdentity.productName,
     brandName: productIdentity.brandName,
     source: productIdentity.source,
-    domain: productIdentity.domain
+    domain: productIdentity.domain,
+    resolved: productIdentity.resolved
   });
+
+  // Reject if product identity could not be resolved
+  if (!productIdentity.resolved || !productIdentity.productName) {
+    console.warn("[Evidence Context] Product identity unresolved", {
+      chatId, userId,
+      productName: productIdentity.productName,
+      source: productIdentity.source
+    });
+    return {
+      rejected: true,
+      reason: 'The product identity could not be resolved from the current analysis.',
+      code: 'PRODUCT_IDENTITY_UNRESOLVED',
+      checks: emptyChecks({ ...checks, productIdentityResolved: false }),
+      missing: ['PRODUCT_IDENTITY'],
+    };
+  }
 
   // Validate legacy SEO — if only generic SEO topics without product data, reject
   const seoKeywords = seoInfo?.keywordOpportunities || seoInfo?.keywordIntelligence?.primaryKeywords || [];

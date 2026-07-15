@@ -37,7 +37,7 @@ export async function getProductIntelligenceForChat({ prisma, userId, chatId }) 
       chatId,
       userId,
       productIntelId: productIntel.id,
-      productName: productIntel.productName,
+      productName: productIntel.productName || productIntel.inputJson?.productName || '(in inputJson)',
       hasProductAnalysis: !!productIntel.productAnalysis,
       hasAudienceIntelligence: !!productIntel.audienceIntelligence
     });

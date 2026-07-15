@@ -74,26 +74,31 @@ export function resolveProductIdentity({ chat, productIntelligence, evidenceSnap
   let source = null;
   let evidenceReference = null;
 
-  // Priority 1: ProductIntelligence explicit brand/product fields
+  // Priority 1: ProductIntelligence — check inputJson first (where productName is actually stored),
+  // then productAnalysis content, then top-level fields (which may not exist on the Prisma model)
   const pi = productIntelligence;
   const analysis = pi?.productAnalysis || {};
+  const inputJson = pi?.inputJson || {};
 
-  if (!isGeneric(pi?.productName)) {
-    productName = pi.productName; source = 'pi_productName'; evidenceReference = 'ProductIntelligence.productName';
+  const candidateName = inputJson.productName || inputJson.brandName || pi?.productName || null;
+  const candidateCompany = inputJson.companyName || inputJson.name || pi?.companyName || pi?.name || null;
+  const candidateBrand = inputJson.brandName || pi?.brandName || inputJson.name || null;
+
+  if (!isGeneric(candidateName)) {
+    productName = candidateName; source = 'inputJson_productName'; evidenceReference = 'ProductIntelligence.inputJson.productName';
   } else if (!isGeneric(analysis?.productName)) {
     productName = analysis.productName; source = 'pi_analysis_productName'; evidenceReference = 'ProductIntelligence.productAnalysis.productName';
-  } else if (!isGeneric(pi?.name)) {
-    productName = pi.name; source = 'pi_name'; evidenceReference = 'ProductIntelligence.name';
-  } else if (!isGeneric(pi?.brandName)) {
-    productName = pi.brandName; source = 'pi_brandName'; evidenceReference = 'ProductIntelligence.brandName';
-    brandName = pi.brandName;
-  } else if (!isGeneric(pi?.companyName)) {
-    productName = pi.companyName; source = 'pi_companyName'; evidenceReference = 'ProductIntelligence.companyName';
-    companyName = pi.companyName;
+  } else if (!isGeneric(analysis?.name)) {
+    productName = analysis.name; source = 'pi_analysis_name'; evidenceReference = 'ProductIntelligence.productAnalysis.name';
+  } else if (!isGeneric(candidateCompany)) {
+    productName = candidateCompany; source = 'inputJson_companyName'; evidenceReference = 'ProductIntelligence.inputJson.companyName';
+  } else if (!isGeneric(candidateBrand)) {
+    productName = candidateBrand; source = 'inputJson_brandName'; evidenceReference = 'ProductIntelligence.inputJson.brandName';
+    brandName = candidateBrand;
   }
 
-  if (!brandName && !isGeneric(pi?.brandName)) brandName = pi.brandName;
-  if (!companyName && !isGeneric(pi?.companyName)) companyName = pi.companyName;
+  if (!brandName && !isGeneric(candidateBrand)) brandName = candidateBrand;
+  if (!companyName && !isGeneric(candidateCompany)) companyName = candidateCompany;
 
   // Priority 2: EvidenceSnapshot product data
   if (!productName || isGeneric(productName)) {
