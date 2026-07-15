@@ -1,6 +1,6 @@
 import { callAI } from '../../ai/services/aiRouter.service.js';
 import { validateContentClaims, validateBriefContent } from './claim-validator.service.js';
-import { validateContentOutput, SCHEMA_REGISTRY } from './content-schemas.js';
+import { validateContentOutput, repairAIOutput, SCHEMA_REGISTRY } from './content-schemas.js';
 
 const CONTENT_TYPES = {
   blog_article: { label: 'Blog Article' },
@@ -1211,16 +1211,30 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
     };
   }
 
-  const schemaValidation = validateContentOutput(result, assetType);
+  let repairedResult = repairAIOutput(result, assetType);
+  let schemaValidation = validateContentOutput(repairedResult, assetType);
+
+  if (!schemaValidation.valid) {
+    const retryBrief = {
+      ...brief,
+      _retryInstructions: `Schema validation failed. Errors:\n${schemaValidation.errors.join('\n')}\nReturn valid JSON matching the original schema.`,
+    };
+    const retryResult = await generator(retryBrief);
+    if (retryResult) {
+      repairedResult = repairAIOutput(retryResult, assetType);
+      schemaValidation = validateContentOutput(repairedResult, assetType);
+    }
+  }
+
   if (!schemaValidation.valid) {
     return {
-      content: { ...result, _type: assetType },
+      content: { ...repairedResult, _type: assetType },
       metadata: {
         type: assetType,
         label: typeConfig.label,
         status: 'schema_rejected',
         generatedAt: new Date().toISOString(),
-        provider: result._provider || 'content_studio_ai',
+        provider: repairedResult._provider || 'content_studio_ai',
         schemaErrors: schemaValidation.errors,
       },
     };

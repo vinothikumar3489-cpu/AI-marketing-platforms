@@ -3,6 +3,7 @@ import { buildEvidenceContext } from "../services/execution/evidence-context-bui
 import { generateCampaignIntelligence } from "../services/automation/campaign-intelligence.service.js";
 import { getSeoIntelligenceForChat } from "../services/loaders/seo-intelligence.loader.js";
 import { getProductIntelligenceForChat } from "../services/loaders/product-intelligence.loader.js";
+import { mapCampaignPlanToPersistence } from "../services/execution/campaign-persistence.mapper.js";
 
 const inProgressCampaign = new Set();
 
@@ -156,50 +157,12 @@ export const generateCampaignPlan = async (req, res) => {
       });
     }
 
+    const { create, update } = mapCampaignPlanToPersistence(campaignData, { userId, chatId, existingPlan });
+
     const plan = await prisma.campaignPlan.upsert({
       where: { chatId },
-      update: {
-        executiveSummary: campaignData.executiveSummary,
-        businessGoal: campaignData.businessGoal,
-        campaignObjective: campaignData.campaignObjective,
-        audienceSelection: campaignData.audienceSelection,
-        channelRecommendations: campaignData.channelRecommendations,
-        timeline: campaignData.timeline,
-        marketingFunnel: campaignData.marketingFunnel,
-        kpiFramework: campaignData.kpiFramework,
-        riskAssessment: campaignData.riskAssessment,
-        opportunityAssessment: campaignData.opportunityAssessment,
-        nextActions: campaignData.nextActions || campaignData.executiveSummary?.nextActions,
-        status: "draft",
-        provider: campaignData._metadata?.provider || "ai",
-        fallbackUsed: campaignData._metadata?.fallbackUsed || false,
-        versionNumber: campaignData._metadata?.versionNumber || 1,
-        generatedAt: campaignData._metadata?.generatedAt,
-        evidenceHash: campaignData._metadata?.evidenceHash,
-        contradictionsDetected: campaignData._metadata?.contradictionsDetected || 0,
-      },
-      create: {
-        userId,
-        chatId,
-        executiveSummary: campaignData.executiveSummary,
-        businessGoal: campaignData.businessGoal,
-        campaignObjective: campaignData.campaignObjective,
-        audienceSelection: campaignData.audienceSelection,
-        channelRecommendations: campaignData.channelRecommendations,
-        timeline: campaignData.timeline,
-        marketingFunnel: campaignData.marketingFunnel,
-        kpiFramework: campaignData.kpiFramework,
-        riskAssessment: campaignData.riskAssessment,
-        opportunityAssessment: campaignData.opportunityAssessment,
-        nextActions: campaignData.nextActions || campaignData.executiveSummary?.nextActions,
-        status: "draft",
-        provider: campaignData._metadata?.provider || "ai",
-        fallbackUsed: campaignData._metadata?.fallbackUsed || false,
-        versionNumber: campaignData._metadata?.versionNumber || 1,
-        generatedAt: campaignData._metadata?.generatedAt,
-        evidenceHash: campaignData._metadata?.evidenceHash,
-        contradictionsDetected: campaignData._metadata?.contradictionsDetected || 0,
-      },
+      update,
+      create,
     });
 
     await prisma.automationLog.create({

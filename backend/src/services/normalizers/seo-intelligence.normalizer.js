@@ -180,6 +180,7 @@ export function normalizeSeoForExecution(seoInfo) {
   // Extract content gaps from all known shapes
   const contentGapsRaw = seoInfo.contentGaps ?? 
     seoInfo.gapAnalysis ?? 
+    seoInfo.contentGapRecord?.contentGaps ?? 
     seoInfo.contentGaps?.gaps ?? 
     seoInfo.contentGaps?.items ?? 
     seoInfo.contentGaps?.missingPages ?? 
@@ -275,4 +276,35 @@ export function normalizeSeoForExecution(seoInfo) {
   };
 }
 
-export default { normalizeSeoForExecution };
+/**
+ * Normalize SEO intelligence for frontend display.
+ * Returns cleaner output suitable for rendering in UI components.
+ */
+export function normalizeSeoForFrontend(seoInfo) {
+  const exec = normalizeSeoForExecution(seoInfo);
+
+  return {
+    status: seoInfo?.status || 'completed',
+    technicalAudit: exec.technicalAudit || null,
+    primaryKeywords: exec.primaryKeywords,
+    secondaryKeywords: exec.secondaryKeywords,
+    longTailKeywords: exec.longTailKeywords,
+    questionKeywords: exec.questionKeywords,
+    allKeywords: exec.allKeywords,
+    contentOpportunities: exec.contentOpportunities,
+    contentGaps: exec.contentGaps,
+    blogIdeas: exec.blogIdeas,
+    competitors: null,
+    aiSearchReadiness: null,
+    actionPlan: exec.actionPlan || null,
+    dataCompleteness: {
+      hasKeywords: exec.allKeywords.length > 0,
+      hasContentGaps: exec.contentGaps.length > 0 || exec.contentOpportunities.length > 0,
+      hasTechnicalAudit: !!exec.technicalAudit,
+      hasCompetitors: false,
+    },
+    warnings: exec.warnings,
+  };
+}
+
+export default { normalizeSeoForExecution, normalizeSeoForFrontend };

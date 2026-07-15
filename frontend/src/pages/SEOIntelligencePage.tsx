@@ -36,7 +36,7 @@ const isPlainObject = (value: unknown): value is Record<string, any> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
 // Coerce any value to a display string without dumping raw JSON.
-const renderText = (value: unknown, fallback = 'Not measured'): string => {
+const renderText = (value: unknown, fallback = ''): string => {
   if (value === null || value === undefined || value === '') return fallback;
   if (typeof value === 'string' || typeof value === 'number') return String(value);
   if (Array.isArray(value)) return value.map(v => renderText(v, '')).filter(Boolean).join(', ') || fallback;
@@ -589,7 +589,10 @@ function ExecutiveDashboard({ data }: { data: any }) {
       } : null,
       executiveRecommendation: {
         text: toDisplayText(execOverview.priorityActions?.[0], 'Improve technical SEO and content authority to boost overall visibility.'),
-        reasoning: `Based on current scores: Technical ${technicalHealth ?? 'Not measured'}, Content ${contentAuthority ?? 'Not measured'}, AI Visibility ${aiVisibility ?? 'Not measured'}`,
+        reasoning: ['Technical', 'Content', 'AI Visibility'].map(label => {
+          const val = label === 'Technical' ? technicalHealth : label === 'Content' ? contentAuthority : aiVisibility;
+          return val != null ? `${label}: ${val}` : null;
+        }).filter(Boolean).join(', ') || 'Analysis completed.',
         confidence: null
       }
     };
@@ -693,27 +696,24 @@ function ExecutiveDashboard({ data }: { data: any }) {
         <div>{kpiItems.length > 0 && <KPIDashboard items={kpiItems} columns={2} />}</div>
       </div>
 
-      {/* Null-safe notice: scores unavailable but analysis still succeeded */}
-      {kpiItems.length === 0 && (
+      {/* Null-safe notice: only show actual scores, hide if all null */}
+      {kpiItems.length === 0 && ([overallSeoScore, technicalHealth, contentAuthority, aiVisibility].some(v => v != null)) && (
         <Card style={{ background: 'rgba(83,167,255,0.06)', borderColor: '#293245' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
             {[
               { label: 'Overall SEO Score', value: overallSeoScore },
               { label: 'Technical Score', value: technicalHealth },
               { label: 'Content Authority', value: contentAuthority },
-              { label: 'AI Visibility (GEO)', value: aiVisibility },
-            ].map((item, i) => (
-              <div key={i} style={{ padding: '12px', border: '1px solid #293245', borderRadius: '8px', background: '#0f1729' }}>
+              { label: 'AI Visibility', value: aiVisibility },
+            ].filter(item => item.value != null).map((item, i) => (
+              <div key={i} style={{ padding: '10px 16px', border: '1px solid #293245', borderRadius: '8px', background: '#0f1729', flex: '1 0 auto', minWidth: '160px' }}>
                 <div style={{ fontSize: '11px', color: '#9aa7bd', marginBottom: '4px' }}>{item.label}</div>
-                <strong style={{ fontSize: '18px', color: item.value != null ? '#e5edff' : '#9aa7bd' }}>
-                  {item.value != null ? `${Math.round(asNumber(item.value, 0))}/100` : `${item.label.split(' ')[0]} score not measured`}
+                <strong style={{ fontSize: '18px', color: '#e5edff' }}>
+                  {`${Math.round(asNumber(item.value, 0))}/100`}
                 </strong>
               </div>
             ))}
           </div>
-          <p style={{ margin: '12px 0 0 0', fontSize: '12px', color: '#9aa7bd' }}>
-            Some scores could not be measured for this website (e.g. PageSpeed metrics unavailable). The analysis still completed — review the technical evidence, keyword ideas, and content sections below.
-          </p>
         </Card>
       )}
 
@@ -1496,18 +1496,18 @@ function KeywordIntelligence({ data }: { data: any }) {
             <tbody>
               {table.data.map((k: any, i: number) => {
                 const kd = asNumber(k.keywordDifficulty || k.difficulty || k.kd, null);
-                const kdDisplay = kd !== null ? kd : 'Not measured';
+                const kdDisplay = kd !== null ? kd : '—';
                 const kdColor = kd > 70 ? '#ff4757' : kd > 40 ? '#ffa502' : kd !== null ? '#10e18b' : '#9aa7bd';
                 const volume = k.volume !== null ? k.volume : k.searchVolume !== null ? k.searchVolume : null;
-                const volumeDisplay = volume !== null ? formatNumber(volume) : 'Not measured';
+                const volumeDisplay = volume !== null ? formatNumber(volume) : '—';
                 const cpc = k.cpc !== null ? k.cpc : null;
-                const cpcDisplay = cpc !== null ? formatMoney(cpc) : 'Not measured';
+                const cpcDisplay = cpc !== null ? formatMoney(cpc) : '—';
                 const competition = k.competition !== null ? k.competition : null;
-                const competitionDisplay = competition !== null ? (competition * 100).toFixed(0) + '%' : 'Not measured';
+                const competitionDisplay = competition !== null ? (competition * 100).toFixed(0) + '%' : '—';
                 const competitionIndex = k.competitionIndex !== null ? k.competitionIndex : null;
-                const competitionIndexDisplay = competitionIndex !== null ? competitionIndex : 'Not measured';
-                const intent = k.intent || k.searchIntent || 'Not measured';
-                const source = k.source || k.dataSource || 'Not specified';
+                const competitionIndexDisplay = competitionIndex !== null ? competitionIndex : '—';
+                const intent = k.intent || k.searchIntent || null;
+                const source = k.source || k.dataSource || null;
                 const hasDataForSEO = k.source === 'DataForSEO';
                 
                 return (
@@ -1838,34 +1838,40 @@ function GeoIntelligence({ data }: { data: any }) {
             </div>
           )}
         </Card>
-        <Card>
-          <h3><Globe size={18} /> Entity & Knowledge Graph</h3>
-          <div className="result-grid" style={{ gridTemplateColumns: '1fr' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0b1220', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #10e18b' }}>
-              <div>
-                <b style={{ display: 'block', fontSize: '14px' }}>Entity Coverage</b>
-                <span style={{ fontSize: '12px', color: '#9aa7bd' }}>Brand presence in LLM training data</span>
-              </div>
-              <strong style={{ fontSize: '20px', color: entityCoverageScore != null ? '#10e18b' : '#9aa7bd' }}>{entityCoverageScore != null ? `${Math.round(entityCoverageScore)}/100` : 'Not measured'}</strong>
+        {([entityCoverageScore, citationReadinessScore, answerabilityScore].some(v => v != null)) && (
+          <Card>
+            <h3><Globe size={18} /> Entity & Knowledge Graph</h3>
+            <div className="result-grid" style={{ gridTemplateColumns: '1fr' }}>
+              {entityCoverageScore != null && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0b1220', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #10e18b' }}>
+                  <div>
+                    <b style={{ display: 'block', fontSize: '14px' }}>Entity Coverage</b>
+                    <span style={{ fontSize: '12px', color: '#9aa7bd' }}>Brand presence in LLM training data</span>
+                  </div>
+                  <strong style={{ fontSize: '20px', color: '#10e18b' }}>{`${Math.round(entityCoverageScore)}/100`}</strong>
+                </div>
+              )}
+              {citationReadinessScore != null && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0b1220', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #ff4757' }}>
+                  <div>
+                    <b style={{ display: 'block', fontSize: '14px' }}>Citation Readiness</b>
+                    <span style={{ fontSize: '12px', color: '#9aa7bd' }}>Probability of being cited as source</span>
+                  </div>
+                  <strong style={{ fontSize: '20px', color: '#ff4757' }}>{`${Math.round(citationReadinessScore)}/100`}</strong>
+                </div>
+              )}
+              {answerabilityScore != null && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0b1220', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #53a7ff' }}>
+                  <div>
+                    <b style={{ display: 'block', fontSize: '14px' }}>Answerability</b>
+                    <span style={{ fontSize: '12px', color: '#9aa7bd' }}>How well content resolves user queries</span>
+                  </div>
+                  <strong style={{ fontSize: '20px', color: '#53a7ff' }}>{`${Math.round(answerabilityScore)}/100`}</strong>
+                </div>
+              )}
             </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0b1220', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #ff4757' }}>
-              <div>
-                <b style={{ display: 'block', fontSize: '14px' }}>Citation Readiness</b>
-                <span style={{ fontSize: '12px', color: '#9aa7bd' }}>Probability of being cited as source</span>
-              </div>
-              <strong style={{ fontSize: '20px', color: citationReadinessScore != null ? '#ff4757' : '#9aa7bd' }}>{citationReadinessScore != null ? `${Math.round(citationReadinessScore)}/100` : 'Not measured'}</strong>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0b1220', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #53a7ff' }}>
-              <div>
-                <b style={{ display: 'block', fontSize: '14px' }}>Answerability</b>
-                <span style={{ fontSize: '12px', color: '#9aa7bd' }}>How well content resolves user queries</span>
-              </div>
-              <strong style={{ fontSize: '20px', color: answerabilityScore != null ? '#53a7ff' : '#9aa7bd' }}>{answerabilityScore != null ? `${Math.round(answerabilityScore)}/100` : 'Not measured'}</strong>
-            </div>
-          </div>
-        </Card>
+          </Card>
+        )}
       </div>
       
       <Card>
