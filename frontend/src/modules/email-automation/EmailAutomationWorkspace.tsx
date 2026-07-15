@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Mail, Send, CheckCircle2, AlertTriangle, Loader2, Clock, FileText, Eye, Edit3, RotateCcw, History, ThumbsUp, XCircle, Undo, Sparkles, Zap, Target, TrendingUp, Users, Building, Activity } from 'lucide-react';
 import { Card, Badge, Loading, EmptyState } from '../../components/UI';
 import { useProject } from '../../context/ProjectContext';
-import { generateEmailCampaign, getEmailCampaign, listEmailCampaigns, updateEmailItem, regenerateEmailItem, submitCampaignForReview, approveEmailCampaign, requestCampaignChanges, createEmailCampaignVersion, restoreEmailCampaignVersion, getCampaignPlan } from '../../lib/api';
+import { generateEmailCampaign, getEmailCampaign, listEmailCampaigns, updateEmailItem, regenerateEmailItem, submitCampaignForReview, approveEmailCampaign, requestCampaignChanges, createEmailCampaignVersion, restoreEmailCampaignVersion, getCampaignPlan, sendTestCampaignEmail, sendCampaignEmails } from '../../lib/api';
 
 const LOADING_STAGES = [
   'Loading campaign plan and evidence data...',
@@ -34,6 +34,11 @@ export function EmailAutomationWorkspace() {
   const [regeneratingItem, setRegeneratingItem] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
   const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [testRecipient, setTestRecipient] = useState('');
+  const [sendingTest, setSendingTest] = useState(false);
+  const [sendingReal, setSendingReal] = useState(false);
+  const [sendResult, setSendResult] = useState<any>(null);
+  const [testSendResult, setTestSendResult] = useState<any>(null);
 
   useEffect(() => {
     if (!selectedChatId) return;
@@ -187,6 +192,36 @@ export function EmailAutomationWorkspace() {
     }
   }
 
+  async function handleTestSend() {
+    if (!selectedChatId || !selectedCampaign || !testRecipient.trim()) return;
+    setSendingTest(true);
+    setTestSendResult(null);
+    try {
+      const result = await sendTestCampaignEmail(selectedChatId, selectedCampaign.id, testRecipient.trim());
+      setTestSendResult(result);
+      await openCampaign(selectedCampaign.id);
+    } catch (err: any) {
+      setTestSendResult({ success: false, error: err.message || 'Failed to send test' });
+    } finally {
+      setSendingTest(false);
+    }
+  }
+
+  async function handleRealSend() {
+    if (!selectedChatId || !selectedCampaign) return;
+    setSendingReal(true);
+    setSendResult(null);
+    try {
+      const result = await sendCampaignEmails(selectedChatId, selectedCampaign.id);
+      setSendResult(result);
+      await openCampaign(selectedCampaign.id);
+    } catch (err: any) {
+      setSendResult({ success: false, error: err.message || 'Failed to send campaign' });
+    } finally {
+      setSendingReal(false);
+    }
+  }
+
   function backToList() {
     setView('list');
     setSelectedCampaign(null);
@@ -299,6 +334,37 @@ export function EmailAutomationWorkspace() {
               onRequestChanges={handleRequestChanges}
             />
             <EvidencePanel campaign={campaign} />
+
+            <Card>
+              <h4 style={{ margin: '0 0 12px 0', color: '#e5e7eb', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px' }}>
+                <Send size={14} style={{ color: '#a855f7' }} /> Send
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input value={testRecipient} onChange={e => setTestRecipient(e.target.value)} placeholder="test@example.com" style={{ flex: 1, padding: '6px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '11px' }} />
+                  <button onClick={handleTestSend} disabled={sendingTest || !testRecipient.trim() || campaign.approvalStatus !== 'APPROVED'} style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #53a7ff', background: 'rgba(83,167,255,0.15)', color: '#53a7ff', cursor: 'pointer', fontSize: '11px', fontWeight: 600, opacity: sendingTest || !testRecipient.trim() || campaign.approvalStatus !== 'APPROVED' ? 0.5 : 1, whiteSpace: 'nowrap' }}>
+                    {sendingTest ? <><Loader2 className="spin" size={12} /> Sending...</> : 'Test Send'}
+                  </button>
+                </div>
+                {campaign.approvalStatus !== 'APPROVED' && (
+                  <div style={{ fontSize: '10px', color: '#ffb347' }}>Approve the campaign before sending.</div>
+                )}
+                {testSendResult && (
+                  <div style={{ padding: '6px 10px', borderRadius: '4px', fontSize: '11px', background: testSendResult.success ? 'rgba(16,225,139,0.08)' : 'rgba(255,71,87,0.08)', border: `1px solid ${testSendResult.success ? 'rgba(16,225,139,0.2)' : 'rgba(255,71,87,0.2)'}` }}>
+                    {testSendResult.success ? <>Submitted to Brevo (ID: {testSendResult.providerMessageId || testSendResult.data?.providerMessageId})</> : <>Failed: {testSendResult.error}</>}
+                  </div>
+                )}
+                <button onClick={handleRealSend} disabled={sendingReal || campaign.approvalStatus !== 'APPROVED'} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #10e18b', background: 'rgba(16,225,139,0.12)', color: '#10e18b', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center', opacity: sendingReal || campaign.approvalStatus !== 'APPROVED' ? 0.5 : 1 }}>
+                  {sendingReal ? <><Loader2 className="spin" size={14} /> Sending...</> : <><Send size={14} /> Send Approved Campaign</>}
+                </button>
+                {sendResult && (
+                  <div style={{ padding: '6px 10px', borderRadius: '4px', fontSize: '11px', background: sendResult.success ? 'rgba(16,225,139,0.08)' : 'rgba(255,71,87,0.08)', border: `1px solid ${sendResult.success ? 'rgba(16,225,139,0.2)' : 'rgba(255,71,87,0.2)'}` }}>
+                    {sendResult.success ? <>Sent {sendResult.sentCount || 0} emails to {sendResult.totalRecipients || 0} recipients.</> : <>Failed: {sendResult.error}</>}
+                  </div>
+                )}
+              </div>
+            </Card>
+
             <div style={{ fontSize: '11px', color: '#6b7a93', padding: '8px' }}>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                 <button onClick={() => setShowVersionHistory(!showVersionHistory)} style={{

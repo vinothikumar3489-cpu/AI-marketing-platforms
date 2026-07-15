@@ -12,6 +12,7 @@ import {
   handleProviderHealth,
   sendTestCampaignEmail,
   sendCampaignEmails,
+  handleBrevoWebhook,
   getDeliveryLogs,
 } from "../services/automation/email-campaign.service.js";
 
@@ -148,4 +149,9 @@ export async function handleGetDeliveryLogs(req, res) {
 
   const logs = await getDeliveryLogs(campaignId);
   res.json({ success: true, data: logs });
+}
+
+export async function handleBrevoWebhookEndpoint(req, res) {
+  const result = await handleBrevoWebhook(req.body);
+  res.status(result.success ? 200 : 400).json(result);
 }

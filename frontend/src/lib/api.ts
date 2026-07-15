@@ -381,6 +381,14 @@ export async function restoreEmailCampaignVersion(chatId: string, campaignId: st
   return api.post<any>(`/chats/${chatId}/email-campaign/${campaignId}/versions/${versionId}/restore`);
 }
 
+export async function sendTestCampaignEmail(chatId: string, campaignId: string, recipientEmail: string, itemId?: string) {
+  return api.post<any>(`/chats/${chatId}/email-campaign/${campaignId}/test-send`, { recipientEmail, itemId });
+}
+
+export async function sendCampaignEmails(chatId: string, campaignId: string) {
+  return api.post<any>(`/chats/${chatId}/email-campaign/${campaignId}/send`);
+}
+
 // ============================================
 // CRM MODULE (Phase 17)
 // ============================================

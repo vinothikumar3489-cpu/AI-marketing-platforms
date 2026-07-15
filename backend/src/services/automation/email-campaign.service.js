@@ -524,6 +524,11 @@ export async function updateEmailItem(campaignId, itemId, updates, userId) {
   });
   if (!existingItem) throw new Error(`EmailSequenceItem not found: ${itemId}`);
 
+  const campaign = await prisma.emailCampaign.findUnique({
+    where: { id: campaignId },
+  });
+  if (!campaign) throw new Error(`EmailCampaign not found: ${campaignId}`);
+
   const changedFields = [];
   for (const [key, value] of Object.entries(updates)) {
     if (JSON.stringify(existingItem[key]) !== JSON.stringify(value)) {
@@ -535,6 +540,27 @@ export async function updateEmailItem(campaignId, itemId, updates, userId) {
     where: { id: itemId },
     data: updates,
   });
+
+  if (campaign.approvalStatus === "APPROVED") {
+    await prisma.emailCampaign.update({
+      where: { id: campaignId },
+      data: {
+        approvalStatus: "NOT_SUBMITTED",
+        status: "DRAFT",
+        approvedAt: null,
+      },
+    });
+    await prisma.emailCampaignLog.create({
+      data: {
+        emailCampaignId: campaignId,
+        emailSequenceItemId: itemId,
+        action: "approval_invalidated",
+        status: "completed",
+        message: "Edit after approval — approval status reset to NOT_SUBMITTED",
+        metadata: { changedFields, userId, previousApprovalStatus: "APPROVED" },
+      },
+    });
+  }
 
   await prisma.emailCampaignLog.create({
     data: {
@@ -879,6 +905,8 @@ export async function sendTestCampaignEmail(campaignId, recipientEmail, itemId) 
     signature: campaign.senderName ? `${campaign.senderName}` : "",
   });
 
+  const idempotencyKey = `test_${campaignId}_${item.id}_${Date.now()}`;
+
   const result = await sendEmail({
     to: recipientEmail,
     subject: item.subjectLine || "No subject",
@@ -886,6 +914,7 @@ export async function sendTestCampaignEmail(campaignId, recipientEmail, itemId) 
     text,
     senderName: campaign.senderName || undefined,
     tags: [`campaign:${campaignId}`, `item:${item.id}`, "test-send"],
+    idempotencyKey,
   });
 
   if (result.success) {
@@ -894,9 +923,9 @@ export async function sendTestCampaignEmail(campaignId, recipientEmail, itemId) 
         emailCampaignId: campaignId,
         emailSequenceItemId: item.id,
         action: "test_sent",
-        status: "delivered",
-        message: `Test email sent to ${result.maskedRecipient || recipientEmail}`,
-        metadata: { recipient: recipientEmail, provider: result.provider, providerMessageId: result.providerMessageId },
+        status: "submitted",
+        message: `Test email submitted to provider (${result.provider}) — awaiting delivery webhook`,
+        metadata: { recipient: recipientEmail, provider: result.provider, providerMessageId: result.providerMessageId, idempotencyKey },
       },
     });
   }
@@ -907,7 +936,10 @@ export async function sendTestCampaignEmail(campaignId, recipientEmail, itemId) 
 export async function sendCampaignEmails(campaignId) {
   const campaign = await prisma.emailCampaign.findUnique({
     where: { id: campaignId },
-    include: { sequenceItems: { orderBy: { sequenceOrder: "asc" } } },
+    include: {
+      sequenceItems: { orderBy: { sequenceOrder: "asc" } },
+      crmDeals: { include: { contact: true } },
+    },
   });
   if (!campaign) throw new Error(`EmailCampaign not found: ${campaignId}`);
 
@@ -920,9 +952,44 @@ export async function sendCampaignEmails(campaignId) {
     return { success: false, error: "No email provider configured.", code: "NO_PROVIDER", providers: health.providers };
   }
 
+  const recipients = campaign.crmDeals
+    ?.map(d => d.contact)
+    ?.filter(c => c && c.email)
+    ?.filter(c => {
+      if (c.status === "ARCHIVED" || c.archivedAt) return false;
+      if (c.consentStatus === "NOT_MEASURED" || c.consentStatus === "REVOKED") return false;
+      return true;
+    }) || [];
+
+  const skippedContacts = campaign.crmDeals
+    ?.map(d => d.contact)
+    ?.filter(c => c && c.email)
+    ?.filter(c => !(c.status === "ACTIVE" && (c.consentStatus === "GRANTED" || c.consentStatus === "NOT_MEASURED"))) || [];
+
+  if (recipients.length === 0) {
+    return {
+      success: false,
+      error: "No eligible recipients found. All associated contacts are archived, unsubscribed, or have revoked consent.",
+      code: "NO_ELIGIBLE_RECIPIENTS",
+      skippedContacts: skippedContacts.map(c => ({ id: c.id, email: c.email, reason: c.status !== "ACTIVE" ? "archived" : c.consentStatus === "REVOKED" ? "consent_revoked" : "consent_not_granted" })),
+    };
+  }
+
   const results = [];
   for (const item of campaign.sequenceItems) {
-    if (item.status !== "draft") continue;
+    if (item.status !== "draft") {
+      results.push({ sequenceOrder: item.sequenceOrder, skipped: true, reason: `Item status is "${item.status}", not "draft"` });
+      continue;
+    }
+
+    const existingLog = await prisma.emailCampaignLog.findFirst({
+      where: { emailCampaignId: campaignId, emailSequenceItemId: item.id, action: { in: ["sent", "send_failed"] } },
+      orderBy: { createdAt: "desc" },
+    });
+    if (existingLog) {
+      results.push({ sequenceOrder: item.sequenceOrder, skipped: true, reason: "Already sent/failed — idempotency block" });
+      continue;
+    }
 
     const html = renderEmailHtml({
       subject: item.subjectLine || "",
@@ -945,34 +1012,109 @@ export async function sendCampaignEmails(campaignId) {
       signature: campaign.senderName ? `${campaign.senderName}` : "",
     });
 
-    const result = await sendEmail({
-      to: "", // placeholder — real recipient list not in this scope
-      subject: item.subjectLine || "No subject",
-      html,
-      text,
-      senderName: campaign.senderName || undefined,
-      tags: [`campaign:${campaignId}`, `item:${item.id}`],
-    });
+    const itemResults = [];
+    for (const contact of recipients) {
+      const personalizedHtml = html.replace(/\{\{firstName\}\}/g, contact.firstName || 'there').replace(/\{\{companyName\}\}/g, contact.company?.name || '');
+      const personalizedText = text.replace(/\{\{firstName\}\}/g, contact.firstName || 'there').replace(/\{\{companyName\}\}/g, contact.company?.name || '');
 
-    results.push({ sequenceOrder: item.sequenceOrder, result });
+      const idempotencyKey = `send_${campaignId}_${item.id}_${contact.id}_${Date.now()}`;
+
+      const result = await sendEmail({
+        to: contact.email,
+        subject: item.subjectLine?.replace(/\{\{firstName\}\}/g, contact.firstName || 'there').replace(/\{\{companyName\}\}/g, contact.company?.name || '') || "No subject",
+        html: personalizedHtml,
+        text: personalizedText,
+        senderName: campaign.senderName || undefined,
+        tags: [`campaign:${campaignId}`, `item:${item.id}`, `contact:${contact.id}`],
+        idempotencyKey,
+      });
+
+      itemResults.push({ contactId: contact.id, email: contact.email, result });
+      await prisma.emailCampaignLog.create({
+        data: {
+          emailCampaignId: campaignId,
+          emailSequenceItemId: item.id,
+          action: result.success ? "sent" : "send_failed",
+          status: result.success ? "submitted" : "failed",
+          message: result.success ? `Email submitted to provider for ${contact.email}` : `Send failed for ${contact.email}: ${result.error?.message || "Unknown"}`,
+          metadata: { contactId: contact.id, recipient: contact.email, provider: result.provider, providerMessageId: result.providerMessageId, error: result.error, idempotencyKey },
+        },
+      });
+    }
+
+    const allSucceeded = itemResults.every(r => r.result.success);
+    results.push({ sequenceOrder: item.sequenceOrder, itemResults });
     await prisma.emailSequenceItem.update({
       where: { id: item.id },
-      data: { status: result.success ? "sent" : "failed" },
+      data: { status: allSucceeded ? "sent" : "partial" },
     });
+  }
 
+  const sentCount = results.reduce((sum, r) => sum + (r.itemResults?.filter(ir => ir.result.success).length || 0), 0);
+  const totalCount = results.reduce((sum, r) => sum + (r.itemResults?.length || 0), 0);
+
+  return { success: true, results, totalItems: results.length, totalRecipients: totalCount, sentCount, skippedContacts: skippedContacts.map(c => ({ id: c.id, email: c.email })) };
+}
+
+export async function handleBrevoWebhook(payload) {
+  const { event, messageId, email, date, tag, ts } = payload || {};
+
+  if (!messageId) {
+    return { success: false, error: "Missing messageId in webhook payload" };
+  }
+
+  const eventAction = event || "unknown";
+  const eventStatusMap = {
+    delivered: "delivered",
+    bounce: "bounced",
+    blocked: "bounced",
+    spam: "marked_spam",
+    invalid: "invalid",
+    deferred: "deferred",
+    click: "clicked",
+    open: "opened",
+    unsubscribed: "unsubscribed",
+    error: "failed",
+  };
+  const mappedStatus = eventStatusMap[eventAction] || eventAction;
+
+  const allLogs = await prisma.emailCampaignLog.findMany({
+    where: {
+      action: { in: ["sent", "test_sent", "send_failed"] },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 500,
+  });
+
+  const logs = allLogs.filter(log => {
+    const meta = log.metadata;
+    return meta && typeof meta === "object" && meta.providerMessageId === messageId;
+  });
+
+  if (logs.length === 0) {
+    return { success: false, error: `No EmailCampaignLog found for providerMessageId: ${messageId}`, messageId };
+  }
+
+  for (const log of logs) {
     await prisma.emailCampaignLog.create({
       data: {
-        emailCampaignId: campaignId,
-        emailSequenceItemId: item.id,
-        action: result.success ? "sent" : "send_failed",
-        status: result.success ? "delivered" : "failed",
-        message: result.success ? "Email sent successfully" : `Send failed: ${result.error?.message || "Unknown"}`,
-        metadata: { provider: result.provider, providerMessageId: result.providerMessageId, error: result.error },
+        emailCampaignId: log.emailCampaignId,
+        emailSequenceItemId: log.emailSequenceItemId,
+        action: `provider_${mappedStatus}`,
+        status: mappedStatus,
+        message: `Brevo webhook: ${eventAction} for ${email || "unknown"} at ${date || new Date().toISOString()}`,
+        metadata: {
+          providerEvent: eventAction,
+          providerMessageId: messageId,
+          recipient: email,
+          timestamp: date || ts || new Date().toISOString(),
+          previousLogId: log.id,
+        },
       },
     });
   }
 
-  return { success: true, results, total: results.length, delivered: results.filter(r => r.result.success).length };
+  return { success: true, event: eventAction, messageId, status: mappedStatus, logsUpdated: logs.length };
 }
 
 export async function getDeliveryLogs(campaignId) {

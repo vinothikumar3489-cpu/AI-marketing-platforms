@@ -30,7 +30,7 @@ import { automationRouter } from "./routes/automation.routes.js";
 import { reportRouter } from "./services/reporting/report.routes.js";
 import { evidenceRouter } from "./modules/evidence/evidence.routes.js";
 import { campaignRouter } from "./routes/campaign.routes.js";
-import { emailCampaignRouter } from "./routes/email-campaign.routes.js";
+import { emailCampaignRouter, brevoWebhookRouter } from "./routes/email-campaign.routes.js";
 import { crmRouter } from "./routes/crm.routes.js";
 import { salesCopilotRouter } from "./routes/sales-copilot.routes.js";
 
@@ -326,6 +326,9 @@ app.use("/api/campaign", automationLimiter, campaignRouter);
 app.use("/api/chats", automationLimiter, emailCampaignRouter);
 app.use("/api/chats", automationLimiter, crmRouter);
 app.use("/api/chats", automationLimiter, salesCopilotRouter);
+
+// Brevo webhook (no auth required)
+app.use("/api/webhooks/email", brevoWebhookRouter);
 
 // Serve local fallback assets for Cloudinary-free operation
 const localAssetsDir = path.join(process.cwd(), 'local-assets');

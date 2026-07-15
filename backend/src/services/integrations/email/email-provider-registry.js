@@ -7,6 +7,13 @@ const PROVIDERS = {
 const SEND_PROVIDER_PREFERENCE = ['brevo'];
 
 function detectProvider() {
+  const envProvider = (process.env.EMAIL_PROVIDER || '').toLowerCase().trim();
+  if (envProvider && PROVIDERS[envProvider]) {
+    const health = PROVIDERS[envProvider].health();
+    if (health?.configured && health?.senderConfigured) {
+      return envProvider;
+    }
+  }
   const configured = SEND_PROVIDER_PREFERENCE.find(p => {
     const health = PROVIDERS[p]?.health();
     return health?.configured && health?.senderConfigured;

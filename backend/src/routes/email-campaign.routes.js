@@ -14,10 +14,12 @@ import {
   handleProviderHealthCheck,
   handleSendTestCampaignEmail,
   handleSendCampaign,
+  handleBrevoWebhookEndpoint,
   handleGetDeliveryLogs,
 } from "../controllers/email-campaign.controller.js";
 
 export const emailCampaignRouter = Router();
+export const brevoWebhookRouter = Router();
 
 emailCampaignRouter.use(requireAuth);
 
@@ -35,3 +37,7 @@ emailCampaignRouter.post("/:chatId/email-campaign/:campaignId/send", handleSendC
 emailCampaignRouter.post("/:chatId/email-campaign/:campaignId/test-send", handleSendTestCampaignEmail);
 emailCampaignRouter.post("/:chatId/email-campaign/:campaignId/versions", handleCreateVersion);
 emailCampaignRouter.post("/:chatId/email-campaign/:campaignId/versions/:versionId/restore", handleRestoreVersion);
+
+// Brevo webhook (no auth — Brevo signs requests via IP allowlist)
+// This is mounted directly in server.js without requireAuth
+brevoWebhookRouter.post("/brevo", handleBrevoWebhookEndpoint);
