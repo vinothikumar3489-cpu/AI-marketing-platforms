@@ -297,20 +297,36 @@ function buildMarketIntelligence(productIntelligence) {
 
 function buildScoreSummary(productIntelligence, competitorIntelligence, campaignIntelligence) {
   const productAnalysis = productIntelligence?.productAnalysis || {};
+  const marketDiscovery = productIntelligence?.marketDiscovery || {};
+  const audienceIntelligence = productIntelligence?.audienceIntelligence || {};
+  const competitorAnalysis = competitorIntelligence?.competitorAnalysis || {};
   const positioningEngine = competitorIntelligence?.positioningEngine || {};
   const intentPrediction = competitorIntelligence?.intentPrediction || {};
+  const campaignGenerator = campaignIntelligence?.campaignGenerator || {};
 
   // Only include scores that actually exist - never default to 0
   const scores = {};
 
   const productConfidence = normalizeScore(productAnalysis.confidenceScore);
-  if (productConfidence !== null) scores.productConfidence = productConfidence;
+  if (productConfidence !== null) scores.productFitScore = productConfidence;
+
+  const marketConfidence = normalizeScore(marketDiscovery.confidenceScore);
+  if (marketConfidence !== null) scores.marketSizeScore = marketConfidence;
+
+  const audienceConfidence = normalizeScore(audienceIntelligence.confidenceScore);
+  if (audienceConfidence !== null) scores.audienceClarityScore = audienceConfidence;
+
+  const competitorConfidence = normalizeScore(competitorAnalysis.confidenceScore);
+  if (competitorConfidence !== null) scores.competitiveDefensibilityScore = competitorConfidence;
 
   const positioningConfidence = normalizeScore(positioningEngine.confidenceScore);
-  if (positioningConfidence !== null) scores.positioningConfidence = positioningConfidence;
+  if (positioningConfidence !== null) scores.positioningScore = positioningConfidence;
 
   const intentConfidence = normalizeScore(intentPrediction.confidenceScore);
-  if (intentConfidence !== null) scores.intentConfidence = intentConfidence;
+  if (intentConfidence !== null) scores.intentScore = intentConfidence;
+
+  const campaignConfidence = normalizeScore(campaignGenerator.confidenceScore);
+  if (campaignConfidence !== null) scores.campaignReadinessScore = campaignConfidence;
 
   // Calculate overall growth score only if we have component scores
   if (Object.keys(scores).length > 0) {
@@ -318,6 +334,21 @@ function buildScoreSummary(productIntelligence, competitorIntelligence, campaign
     if (scoreValues.length > 0) {
       scores.overallGrowthScore = Math.round(scoreValues.reduce((sum, s) => sum + s, 0) / scoreValues.length);
     }
+  }
+
+  // Calculate derived scores only if we have the required components
+  if (scores.marketSizeScore !== null && scores.audienceClarityScore !== null) {
+    scores.marketOpportunityScore = Math.round((scores.marketSizeScore + scores.audienceClarityScore) / 2);
+  }
+
+  if (scores.campaignReadinessScore !== null && scores.positioningScore !== null) {
+    scores.campaignViabilityScore = Math.round((scores.campaignReadinessScore + scores.positioningScore) / 2);
+  }
+
+  // Data confidence score based on data completeness
+  const completeness = buildDataCompleteness(productIntelligence, competitorIntelligence, campaignIntelligence);
+  if (completeness.percentageComplete > 0) {
+    scores.dataConfidenceScore = completeness.percentageComplete;
   }
 
   return Object.keys(scores).length > 0 ? scores : null;

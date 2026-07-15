@@ -27,6 +27,7 @@ import {
 import { collectBusinessIntelligence, synthesizeWithAI } from '../../services/intelligence/business-intelligence.service.js';
 import { generateExecutiveStory } from '../../services/intelligence/executive-story.service.js';
 import { generateActionPlan } from '../../services/intelligence/action-plan.service.js';
+import { isGenericLabel, preferDefinedValue } from '../../utils/merge-utilities.util.js';
 import {
   logCompanyCollected, logTechnologyCollected, logPricingCollected,
   logCompetitorsCollected, logMarketCollected, logAudienceCollected,
@@ -298,21 +299,35 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     // Step 1: Product Analysis (evidence-backed)
     console.log('✨ [Growth Workspace] Running Product Analysis...');
     steps[0].status = 'running';
+    steps[0].startTime = new Date().toISOString();
     try {
       const rawResult = await runProductAnalysis(input, websiteData, evidenceGrowthData);
       results.product = validateProductAnalysis(rawResult, input);
       steps[0].status = 'completed';
       steps[0].provider = results.product.provider || 'groq';
       steps[0].confidenceScore = results.product.confidenceScore ?? null;
+      steps[0].endTime = new Date().toISOString();
+      steps[0].duration = steps[0].endTime ? new Date(steps[0].endTime).getTime() - new Date(steps[0].startTime).getTime() : null;
       console.log('✅ [Growth Workspace] Product Analysis complete & validated:', {
         hasUSP: !!results.product.usp,
         featuresCount: results.product.features?.length || 0,
-        provider: results.product.provider
+        provider: results.product.provider,
+        duration: steps[0].duration
       });
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Product Analysis failed:', error.message);
-      warnings.push(`Product Analysis fallback: ${error.message}`);
-      results.product = validateProductAnalysis(null, input);
+      steps[0].endTime = new Date().toISOString();
+      steps[0].duration = steps[0].endTime ? new Date(steps[0].endTime).getTime() - new Date(steps[0].startTime).getTime() : null;
+      steps[0].error = error.message;
+      steps[0].errorType = error.name || 'Error';
+      warnings.push({
+        code: 'PRODUCT_ANALYSIS_FAILED',
+        message: error.message,
+        provider: 'groq',
+        fallbackUsed: true,
+        timestamp: new Date().toISOString()
+      });
+      results.product = validateProductAnalysis(generateProductFallback(input, websiteData, synthesizedIntel), input);
       steps[0].status = 'completed';
       steps[0].provider = 'fallback';
       steps[0].confidenceScore = results.product.confidenceScore ?? null;
@@ -322,21 +337,35 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Market Discovery...');
     steps[1].status = 'running';
+    steps[1].startTime = new Date().toISOString();
     try {
       const rawResult = await runMarketDiscovery(input, results.product);
       results.market = validateMarketDiscovery(rawResult, input);
       steps[1].status = 'completed';
       steps[1].provider = results.market.provider || 'groq';
       steps[1].confidenceScore = results.market.confidenceScore ?? null;
+      steps[1].endTime = new Date().toISOString();
+      steps[1].duration = steps[1].endTime ? new Date(steps[1].endTime).getTime() - new Date(steps[1].startTime).getTime() : null;
       console.log('✅ [Growth Workspace] Market Discovery complete & validated:', {
         trendsCount: results.market.marketTrends?.length || 0,
         opportunitiesCount: results.market.opportunities?.length || 0,
-        provider: results.market.provider
+        provider: results.market.provider,
+        duration: steps[1].duration
       });
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Market Discovery failed:', error.message);
-      warnings.push(`Market Discovery fallback: ${error.message}`);
-      results.market = validateMarketDiscovery(null, input);
+      steps[1].endTime = new Date().toISOString();
+      steps[1].duration = steps[1].endTime ? new Date(steps[1].endTime).getTime() - new Date(steps[1].startTime).getTime() : null;
+      steps[1].error = error.message;
+      steps[1].errorType = error.name || 'Error';
+      warnings.push({
+        code: 'MARKET_DISCOVERY_FAILED',
+        message: error.message,
+        provider: 'groq',
+        fallbackUsed: true,
+        timestamp: new Date().toISOString()
+      });
+      results.market = validateMarketDiscovery(generateMarketFallback(input, results.product, synthesizedIntel), input);
       steps[1].status = 'completed';
       steps[1].provider = 'fallback';
       steps[1].confidenceScore = results.market.confidenceScore ?? null;
@@ -346,21 +375,35 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Audience Intelligence...');
     steps[2].status = 'running';
+    steps[2].startTime = new Date().toISOString();
     try {
       const rawResult = await runAudienceIntelligence(input, results.product);
       results.audience = validateAudienceIntelligence(rawResult, input);
       steps[2].status = 'completed';
       steps[2].provider = results.audience.provider || 'groq';
       steps[2].confidenceScore = results.audience.confidenceScore ?? null;
+      steps[2].endTime = new Date().toISOString();
+      steps[2].duration = steps[2].endTime ? new Date(steps[2].endTime).getTime() - new Date(steps[2].startTime).getTime() : null;
       console.log('✅ [Growth Workspace] Audience Intelligence complete & validated:', {
         personasCount: results.audience.buyerPersonas?.length || 0,
         channelsCount: results.audience.bestChannels?.length || 0,
-        provider: results.audience.provider
+        provider: results.audience.provider,
+        duration: steps[2].duration
       });
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Audience Intelligence failed:', error.message);
-      warnings.push(`Audience Intelligence fallback: ${error.message}`);
-      results.audience = validateAudienceIntelligence(null, input);
+      steps[2].endTime = new Date().toISOString();
+      steps[2].duration = steps[2].endTime ? new Date(steps[2].endTime).getTime() - new Date(steps[2].startTime).getTime() : null;
+      steps[2].error = error.message;
+      steps[2].errorType = error.name || 'Error';
+      warnings.push({
+        code: 'AUDIENCE_INTELLIGENCE_FAILED',
+        message: error.message,
+        provider: 'groq',
+        fallbackUsed: true,
+        timestamp: new Date().toISOString()
+      });
+      results.audience = validateAudienceIntelligence(generateAudienceFallback(input, results.product, synthesizedIntel), input);
       steps[2].status = 'completed';
       steps[2].provider = 'fallback';
       steps[2].confidenceScore = results.audience.confidenceScore ?? null;
@@ -370,22 +413,36 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Competitor Analysis...');
     steps[3].status = 'running';
+    steps[3].startTime = new Date().toISOString();
     try {
       const rawResult = await runCompetitorAnalysis(input, results.product, researchData?.competitors || []);
       results.competitor = validateCompetitorAnalysis(rawResult, input);
       steps[3].status = 'completed';
       steps[3].provider = results.competitor.provider || 'groq';
       steps[3].confidenceScore = results.competitor.confidenceScore ?? null;
+      steps[3].endTime = new Date().toISOString();
+      steps[3].duration = steps[3].endTime ? new Date(steps[3].endTime).getTime() - new Date(steps[3].startTime).getTime() : null;
       console.log('✅ [Growth Workspace] Competitor Analysis complete & validated:', {
         competitorsCount: results.competitor.directCompetitors?.length || 0,
         gapsCount: results.competitor.marketGaps?.length || 0,
         provider: results.competitor.provider,
-        orchestratorCompetitorsUsed: researchData?.competitors?.length || 0
+        orchestratorCompetitorsUsed: researchData?.competitors?.length || 0,
+        duration: steps[3].duration
       });
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Competitor Analysis failed:', error.message);
-      warnings.push(`Competitor Analysis fallback: ${error.message}`);
-      results.competitor = validateCompetitorAnalysis(null, input);
+      steps[3].endTime = new Date().toISOString();
+      steps[3].duration = steps[3].endTime ? new Date(steps[3].endTime).getTime() - new Date(steps[3].startTime).getTime() : null;
+      steps[3].error = error.message;
+      steps[3].errorType = error.name || 'Error';
+      warnings.push({
+        code: 'COMPETITOR_ANALYSIS_FAILED',
+        message: error.message,
+        provider: 'groq',
+        fallbackUsed: true,
+        timestamp: new Date().toISOString()
+      });
+      results.competitor = validateCompetitorAnalysis(generateCompetitorFallback(input, results.product, researchData?.competitors || [], synthesizedIntel), input);
       steps[3].status = 'completed';
       steps[3].provider = 'fallback';
       steps[3].confidenceScore = results.competitor.confidenceScore ?? null;
@@ -395,21 +452,35 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Intent Prediction...');
     steps[4].status = 'running';
+    steps[4].startTime = new Date().toISOString();
     try {
       const rawResult = await runIntentPrediction(input, results.audience);
       results.intent = validateIntentPrediction(rawResult, input);
       steps[4].status = 'completed';
       steps[4].provider = results.intent.provider || 'groq';
       steps[4].confidenceScore = results.intent.confidenceScore ?? null;
+      steps[4].endTime = new Date().toISOString();
+      steps[4].duration = steps[4].endTime ? new Date(steps[4].endTime).getTime() - new Date(steps[4].startTime).getTime() : null;
       console.log('✅ [Growth Workspace] Intent Prediction complete & validated:', {
         hotSegmentsCount: results.intent.hotSegments?.length || 0,
         signalsCount: results.intent.buyingSignals?.length || 0,
-        provider: results.intent.provider
+        provider: results.intent.provider,
+        duration: steps[4].duration
       });
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Intent Prediction failed:', error.message);
-      warnings.push(`Intent Prediction fallback: ${error.message}`);
-      results.intent = validateIntentPrediction(null, input);
+      steps[4].endTime = new Date().toISOString();
+      steps[4].duration = steps[4].endTime ? new Date(steps[4].endTime).getTime() - new Date(steps[4].startTime).getTime() : null;
+      steps[4].error = error.message;
+      steps[4].errorType = error.name || 'Error';
+      warnings.push({
+        code: 'INTENT_PREDICTION_FAILED',
+        message: error.message,
+        provider: 'groq',
+        fallbackUsed: true,
+        timestamp: new Date().toISOString()
+      });
+      results.intent = validateIntentPrediction(generateIntentFallback(input, results.audience, synthesizedIntel), input);
       steps[4].status = 'completed';
       steps[4].provider = 'fallback';
       steps[4].confidenceScore = results.intent.confidenceScore ?? null;
@@ -419,21 +490,35 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Positioning Engine...');
     steps[5].status = 'running';
+    steps[5].startTime = new Date().toISOString();
     try {
       const rawResult = await runPositioningEngine(input, results.product, results.competitor);
       results.positioning = validatePositioningEngine(rawResult, input);
       steps[5].status = 'completed';
       steps[5].provider = results.positioning.provider || 'groq';
       steps[5].confidenceScore = results.positioning.confidenceScore ?? null;
+      steps[5].endTime = new Date().toISOString();
+      steps[5].duration = steps[5].endTime ? new Date(steps[5].endTime).getTime() - new Date(steps[5].startTime).getTime() : null;
       console.log('✅ [Growth Workspace] Positioning Engine complete & validated:', {
         hasStatement: !!results.positioning.positioningStatement,
         pillarsCount: results.positioning.messagingPillars?.length || 0,
-        provider: results.positioning.provider
+        provider: results.positioning.provider,
+        duration: steps[5].duration
       });
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Positioning Engine failed:', error.message);
-      warnings.push(`Positioning Engine fallback: ${error.message}`);
-      results.positioning = validatePositioningEngine(null, input);
+      steps[5].endTime = new Date().toISOString();
+      steps[5].duration = steps[5].endTime ? new Date(steps[5].endTime).getTime() - new Date(steps[5].startTime).getTime() : null;
+      steps[5].error = error.message;
+      steps[5].errorType = error.name || 'Error';
+      warnings.push({
+        code: 'POSITIONING_ENGINE_FAILED',
+        message: error.message,
+        provider: 'groq',
+        fallbackUsed: true,
+        timestamp: new Date().toISOString()
+      });
+      results.positioning = validatePositioningEngine(generatePositioningFallback(input, results.product, results.competitor, synthesizedIntel), input);
       steps[5].status = 'completed';
       steps[5].provider = 'fallback';
       steps[5].confidenceScore = results.positioning.confidenceScore ?? null;
@@ -443,22 +528,36 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Campaign Generator...');
     steps[6].status = 'running';
+    steps[6].startTime = new Date().toISOString();
     try {
       const rawResult = await runCampaignGenerator(input, results);
       results.campaign = validateCampaignGenerator(rawResult, input);
       steps[6].status = 'completed';
       steps[6].provider = results.campaign.provider || 'groq';
       steps[6].confidenceScore = results.campaign.confidenceScore ?? null;
+      steps[6].endTime = new Date().toISOString();
+      steps[6].duration = steps[6].endTime ? new Date(steps[6].endTime).getTime() - new Date(steps[6].startTime).getTime() : null;
       console.log('✅ [Growth Workspace] Campaign Generator complete & validated:', {
         anglesCount: results.campaign.creativeAngles?.length || 0,
         hooksCount: results.campaign.copyHooks?.length || 0,
         hasActionPlan: !!(results.campaign.actionPlan?.sevenDay?.length || results.campaign.actionPlan?.thirtyDay?.length),
-        provider: results.campaign.provider
+        provider: results.campaign.provider,
+        duration: steps[6].duration
       });
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Campaign Generator failed:', error.message);
-      warnings.push(`Campaign Generator fallback: ${error.message}`);
-      results.campaign = validateCampaignGenerator(null, input);
+      steps[6].endTime = new Date().toISOString();
+      steps[6].duration = steps[6].endTime ? new Date(steps[6].endTime).getTime() - new Date(steps[6].startTime).getTime() : null;
+      steps[6].error = error.message;
+      steps[6].errorType = error.name || 'Error';
+      warnings.push({
+        code: 'CAMPAIGN_GENERATOR_FAILED',
+        message: error.message,
+        provider: 'groq',
+        fallbackUsed: true,
+        timestamp: new Date().toISOString()
+      });
+      results.campaign = validateCampaignGenerator(generateCampaignFallback(input, websiteData, results, synthesizedIntel), input);
       steps[6].status = 'completed';
       steps[6].provider = 'fallback';
       steps[6].confidenceScore = results.campaign.confidenceScore ?? null;
@@ -468,21 +567,35 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Channel Recommendation...');
     steps[7].status = 'running';
+    steps[7].startTime = new Date().toISOString();
     try {
       const rawResult = await runChannelRecommendation(input, results.audience, results.campaign);
       results.channel = validateChannelRecommendation(rawResult, input);
       steps[7].status = 'completed';
       steps[7].provider = results.channel.provider || 'groq';
       steps[7].confidenceScore = results.channel.confidenceScore ?? null;
+      steps[7].endTime = new Date().toISOString();
+      steps[7].duration = steps[7].endTime ? new Date(steps[7].endTime).getTime() - new Date(steps[7].startTime).getTime() : null;
       console.log('✅ [Growth Workspace] Channel Recommendation complete & validated:', {
         channelsCount: results.channel.recommendedChannels?.length || 0,
         primaryChannel: results.channel.primaryChannel,
-        provider: results.channel.provider
+        provider: results.channel.provider,
+        duration: steps[7].duration
       });
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Channel Recommendation failed:', error.message);
-      warnings.push(`Channel Recommendation fallback: ${error.message}`);
-      results.channel = validateChannelRecommendation(null, input);
+      steps[7].endTime = new Date().toISOString();
+      steps[7].duration = steps[7].endTime ? new Date(steps[7].endTime).getTime() - new Date(steps[7].startTime).getTime() : null;
+      steps[7].error = error.message;
+      steps[7].errorType = error.name || 'Error';
+      warnings.push({
+        code: 'CHANNEL_RECOMMENDATION_FAILED',
+        message: error.message,
+        provider: 'groq',
+        fallbackUsed: true,
+        timestamp: new Date().toISOString()
+      });
+      results.channel = validateChannelRecommendation(generateChannelFallback(input, results.audience, results.campaign, synthesizedIntel), input);
       steps[7].status = 'completed';
       steps[7].provider = 'fallback';
       steps[7].confidenceScore = results.channel.confidenceScore ?? null;
@@ -577,46 +690,73 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     // Generate product-specific top recommendation from evidence
     function generateTopRecommendation(results, input) {
-      const productName = input.companyName || input.productName || 'the product';
+      const productName = preferDefinedValue(input.companyName, input.productName, synthesizedIntel?.companyIntelligence?.name);
+      
+      // Reject generic product names
+      if (isGenericLabel(productName)) {
+        return 'Insufficient verified product identity to generate specific recommendation.';
+      }
+      
       const signals = evidenceGrowthData?.growthSignals || [];
       const features = (evidenceGrowthData?.productIntelligence?.features || []).map(f => f.value);
       
-      if (signals.length > 0) {
-        return `Based on evidence: ${signals[0]?.signal || ''}. Leverage this opportunity for ${productName}.`;
+      if (signals.length > 0 && signals[0]?.signal) {
+        return `Based on evidence: ${signals[0].signal}. Leverage this opportunity for ${productName}.`;
       }
       if (features.length > 0) {
         return `Prioritize marketing the key features found: ${features.slice(0, 3).join(', ')} for ${productName}.`;
       }
       
-      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel || 'digital channels';
-      const topPersona = results.audience?.buyerPersonas?.[0]?.name || 'target audience';
-      return `Focus on ${primaryChannel} to reach ${topPersona} for ${productName}.`;
+      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel;
+      const topPersona = results.audience?.buyerPersonas?.[0]?.name;
+      
+      if (primaryChannel && topPersona && !isGenericLabel(primaryChannel) && !isGenericLabel(topPersona)) {
+        return `Focus on ${primaryChannel} to reach ${topPersona} for ${productName}.`;
+      }
+      
+      return 'Insufficient verified evidence to generate specific recommendation.';
     }
 
     function generatePrimaryRisk(results, input) {
+      const productName = preferDefinedValue(input.companyName, input.productName, synthesizedIntel?.companyIntelligence?.name);
       const topCompetitor = results.competitor?.directCompetitors?.[0]?.name;
-      const productName = input.companyName || input.productName || 'the product';
       
-      if (topCompetitor) {
+      // Reject generic product names
+      if (isGenericLabel(productName)) {
+        return 'Insufficient verified product identity to identify specific risks.';
+      }
+      
+      if (topCompetitor && !isGenericLabel(topCompetitor)) {
         return `Competitive pressure from ${topCompetitor} in the market.`;
       }
       return `Data insufficient to identify primary risk for ${productName}.`;
     }
 
     function generateImmediateAction(results, input) {
+      const productName = preferDefinedValue(input.companyName, input.productName, synthesizedIntel?.companyIntelligence?.name);
+      
+      // Reject generic product names
+      if (isGenericLabel(productName)) {
+        return 'Insufficient verified product identity to generate specific action.';
+      }
+      
       const features = (evidenceGrowthData?.productIntelligence?.features || []).map(f => f.value);
       const ctas = evidenceGrowthData?.productIntelligence?.ctaTexts || [];
-      const productName = input.companyName || input.productName || 'the product';
       
-      if (ctas.length > 0) {
+      if (ctas.length > 0 && ctas[0]) {
         return `Test and optimize existing CTAs from website: "${ctas[0]}" to improve conversion for ${productName}.`;
       }
       if (features.length > 0) {
         return `Build landing pages highlighting top features: ${features.slice(0, 2).join(', ')} for ${productName}.`;
       }
       
-      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel || 'marketing';
-      return `Launch ${primaryChannel} campaign to validate ${productName} positioning.`;
+      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel;
+      
+      if (primaryChannel && !isGenericLabel(primaryChannel)) {
+        return `Launch ${primaryChannel} campaign to validate ${productName} positioning.`;
+      }
+      
+      return 'Insufficient verified evidence to generate specific action.';
     }
 
     const marketOpportunityScore = calculateMarketOpportunityScore(normalizedResults.market);

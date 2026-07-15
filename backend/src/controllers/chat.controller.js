@@ -596,6 +596,8 @@ export const getFullResults = async (req, res) => {
 
   // Growth requires at minimum ProductIntelligence
   const growthStatus = hasProduct ? 'COMPLETED' : 'NOT_RUN';
+  
+  // SEO status is independent of Growth - requires SEO intelligence
   const seoStatus = hasSeo ? 'COMPLETED' : 'NOT_RUN';
 
   // Build canonical Growth Workspace payload

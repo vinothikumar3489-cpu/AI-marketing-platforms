@@ -213,6 +213,76 @@ export default function SEOIntelligencePage() {
     return false;
   }
 
+  // Helper: check if specific tab has meaningful data
+  function hasTabData(tabName: string, seoData: any): boolean {
+    if (!seoData || typeof seoData !== 'object') return false;
+    
+    switch (tabName) {
+      case 'Executive Dashboard':
+        return !!(seoData.executiveDashboard && typeof seoData.executiveDashboard === 'object' && Object.keys(seoData.executiveDashboard).length > 0);
+      case 'Executive Story':
+        return !!(seoData.executiveStory && typeof seoData.executiveStory === 'object' && Object.keys(seoData.executiveStory).length > 0);
+      case 'Technical Audit':
+        const techAudit = seoData.technicalAudit || {};
+        return !!(techAudit && typeof techAudit === 'object' && (
+          techAudit.performanceScore != null || 
+          techAudit.seoScore != null || 
+          techAudit.accessibilityScore != null || 
+          techAudit.bestPracticesScore != null ||
+          (techAudit.criticalIssues && techAudit.criticalIssues.length > 0) ||
+          (techAudit.highIssues && techAudit.highIssues.length > 0) ||
+          (techAudit.recommendations && techAudit.recommendations.length > 0)
+        ));
+      case 'Keyword Intelligence':
+        const kwIntel = seoData.keywordIntelligence || {};
+        return !!(kwIntel && typeof kwIntel === 'object' && (
+          (kwIntel.primaryKeywords && kwIntel.primaryKeywords.length > 0) ||
+          (kwIntel.secondaryKeywords && kwIntel.secondaryKeywords.length > 0) ||
+          (kwIntel.longTailKeywords && kwIntel.longTailKeywords.length > 0) ||
+          (kwIntel.questionKeywords && kwIntel.questionKeywords.length > 0) ||
+          (kwIntel.clusters && kwIntel.clusters.length > 0)
+        ));
+      case 'Competitor SEO':
+        const compIntel = seoData.competitorIntelligence || {};
+        return !!(compIntel && typeof compIntel === 'object' && (
+          (compIntel.competitors && compIntel.competitors.length > 0) ||
+          (compIntel.competitorProfiles && compIntel.competitorProfiles.length > 0) ||
+          (compIntel.keywordGaps && typeof compIntel.keywordGaps === 'object' && Object.keys(compIntel.keywordGaps).length > 0)
+        ));
+      case 'Content Gaps':
+        const contentGaps = seoData.contentGapAnalysis || {};
+        return !!(contentGaps && typeof contentGaps === 'object' && (
+          (contentGaps.contentGaps && contentGaps.contentGaps.length > 0) ||
+          (contentGaps.missingPages && contentGaps.missingPages.length > 0) ||
+          (contentGaps.opportunities && contentGaps.opportunities.length > 0)
+        ));
+      case 'GEO / AI Visibility':
+        const geoIntel = seoData.geoIntelligence || {};
+        return !!(geoIntel && typeof geoIntel === 'object' && (
+          geoIntel.aiVisibilityScore != null ||
+          (geoIntel.entities && geoIntel.entities.length > 0) ||
+          (geoIntel.geoKeywords && geoIntel.geoKeywords.length > 0)
+        ));
+      case 'Blog Intelligence':
+        const blogIntel = seoData.blogIntelligence || {};
+        return !!(blogIntel && typeof blogIntel === 'object' && (
+          (blogIntel.blogIdeas && blogIntel.blogIdeas.length > 0) ||
+          (blogIntel.topics && blogIntel.topics.length > 0)
+        ));
+      case 'Action Plan':
+        const actionPlan = seoData.actionPlan || seoData.executiveDashboard?.executiveActionPlan || {};
+        return !!(actionPlan && typeof actionPlan === 'object' && (
+          (actionPlan.immediate && actionPlan.immediate.length > 0) ||
+          (actionPlan.day7 && actionPlan.day7.length > 0) ||
+          (actionPlan.day30 && actionPlan.day30.length > 0) ||
+          (actionPlan.day60 && actionPlan.day60.length > 0) ||
+          (actionPlan.day90 && actionPlan.day90.length > 0)
+        ));
+      default:
+        return false;
+    }
+  }
+
   // Reset SEO state when switching chats
   useEffect(() => {
     setUrl('');
@@ -229,25 +299,20 @@ export default function SEOIntelligencePage() {
     }
   }, [selectedChatId]);
 
-  // On fullResults change: update if data exists, never clear existing results
+  // Update SEO state when fullResults changes (after analysis completion)
   useEffect(() => {
     if (isNewAnalysis) return;
-    if (!selectedChatId) return;
     const ss = fullResults.seoStatus;
     if (ss === 'COMPLETED' || ss === 'COMPLETED_WITH_WARNINGS') {
       const r = fullResults.seoIntelligence || fullResults.seo || {};
-      if (r && typeof r === 'object' && Object.keys(r).length > 0) {
-        storedChatRef.current = selectedChatId;
-        setSeo(r);
+      if (r && typeof r === 'object' && Object.keys(r).length > 0 && storedChatRef.current === selectedChatId) {
+        // Sanitize SEO objects to prevent React error #31
+        const safeSeoResult = sanitizeSeoForDisplay(r);
+        setSeo(normalizeSeo(safeSeoResult));
         setMode('results');
-        if (!url) setUrl(r.websiteUrl || '');
       }
-    } else if (ss === 'NOT_RUN') {
-      setMode('form');
-    } else if (ss === 'FAILED') {
-      setMode('error');
     }
-  }, [fullResults]);
+  }, [fullResults, selectedChatId, isNewAnalysis]);
 
   async function run() {
     if (!url) { setError('Website URL is required'); return; }
@@ -436,22 +501,22 @@ export default function SEOIntelligencePage() {
             <SearchBar onSearch={() => {}} />
           </div>
           <div className="tab-row" style={{ overflowX: 'auto', whiteSpace: 'nowrap' }}>
-            {tabs.map(t => (
+            {tabs.filter(t => hasTabData(t, seo)).map(t => (
               <button key={t} onClick={() => setActiveTab(t)} className={activeTab === t ? 'active' : ''}>{t}</button>
             ))}
           </div>
 
           <div className="tab-content" style={{ marginTop: '20px' }}>
             <TabErrorBoundary key={activeTab} tabName={activeTab}>
-              {activeTab === 'Executive Dashboard' && <ExecutiveDashboard data={seo} />}
-              {activeTab === 'Executive Story' && <ExecutiveStory data={seo} />}
-              {activeTab === 'Technical Audit' && <TechnicalAudit data={{ ...seo, ...seo.technicalAudit }} />}
-              {activeTab === 'Keyword Intelligence' && <KeywordIntelligence data={seo.keywordIntelligence} />}
-              {activeTab === 'Competitor SEO' && <CompetitorSEO data={seo.competitorIntelligence} />}
-              {activeTab === 'Content Gaps' && <ContentGaps data={seo.contentGapAnalysis} />}
-              {activeTab === 'GEO / AI Visibility' && <GeoIntelligence data={seo.geoIntelligence} />}
-              {activeTab === 'Blog Intelligence' && <BlogIntelligence data={seo.blogIntelligence} />}
-              {activeTab === 'Action Plan' && <ActionPlan data={seo} />}
+              {activeTab === 'Executive Dashboard' && hasTabData('Executive Dashboard', seo) && <ExecutiveDashboard data={seo} />}
+              {activeTab === 'Executive Story' && hasTabData('Executive Story', seo) && <ExecutiveStory data={seo} />}
+              {activeTab === 'Technical Audit' && hasTabData('Technical Audit', seo) && <TechnicalAudit data={{ ...seo, ...seo.technicalAudit }} />}
+              {activeTab === 'Keyword Intelligence' && hasTabData('Keyword Intelligence', seo) && <KeywordIntelligence data={seo.keywordIntelligence} />}
+              {activeTab === 'Competitor SEO' && hasTabData('Competitor SEO', seo) && <CompetitorSEO data={seo.competitorIntelligence} />}
+              {activeTab === 'Content Gaps' && hasTabData('Content Gaps', seo) && <ContentGaps data={seo.contentGapAnalysis} />}
+              {activeTab === 'GEO / AI Visibility' && hasTabData('GEO / AI Visibility', seo) && <GeoIntelligence data={seo.geoIntelligence} />}
+              {activeTab === 'Blog Intelligence' && hasTabData('Blog Intelligence', seo) && <BlogIntelligence data={seo.blogIntelligence} />}
+              {activeTab === 'Action Plan' && hasTabData('Action Plan', seo) && <ActionPlan data={seo} />}
             </TabErrorBoundary>
           </div>
         </Card>
@@ -1215,7 +1280,29 @@ function TechnicalAudit({ data }: { data: any }) {
   const mobileScores = pageSpeed?.mobile?.lighthouseScores || pageSpeed?.mobile?.scores;
   const desktopScores = pageSpeed?.desktop?.lighthouseScores || pageSpeed?.desktop?.scores;
 
-  if (import.meta.env.DEV) { console.log('[Technical Tab] resolved scores', { performanceScore, seoScore, accessibilityScore, bestPracticesScore, mobileScore, desktopScore }); }
+  // Check if we have any meaningful technical audit data
+  const hasTechnicalData = performanceScore !== null || seoScore !== null || accessibilityScore !== null || 
+                           bestPracticesScore !== null || mobileScore !== null || desktopScore !== null ||
+                           critical.length > 0 || high.length > 0 || recs.length > 0 ||
+                           pageSpeed !== null || coreWebVitals !== null;
+
+  if (import.meta.env.DEV) { 
+    console.log('[Technical Tab] resolved scores', { performanceScore, seoScore, accessibilityScore, bestPracticesScore, mobileScore, desktopScore }); 
+    console.log('[Technical Tab] hasTechnicalData', hasTechnicalData);
+  }
+  
+  // Show empty state if no technical data available
+  if (!hasTechnicalData) {
+    return (
+      <Card>
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9aa7bd' }}>
+          <Code size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+          <h3 style={{ margin: '0 0 8px 0', color: '#e2e8f0' }}>No Technical Audit Data</h3>
+          <p style={{ margin: 0, fontSize: '14px' }}>No verified technical SEO data available. Run a technical audit to see performance, accessibility, and best practices scores.</p>
+        </div>
+      </Card>
+    );
+  }
   
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
@@ -1428,11 +1515,34 @@ function KeywordIntelligence({ data }: { data: any }) {
   
   // Filter out irrelevant brand/competitor keyword pollution
   const pollutedTerms = ['canva', 'semrush', 'wix', 'wordpress', 'shopify', 'squarespace', 'godaddy', 'weebly', 'joomla', 'magento', 'clickfunnels', 'unbounce', 'leadpages', 'instapage', 'landingi'];
+  const genericSingleWords = ['seo', 'tool', 'software', 'app', 'website', 'online', 'digital', 'marketing', 'best', 'top', 'free', 'cheap', 'good', 'great'];
+  
   const isRelevantKeyword = (k: any) => {
     const kwText = typeof k === 'string' ? k : (k?.keyword || k?.term || k?.title || k?.name || '');
     const kw = String(kwText || '').toLowerCase().trim();
-    if (!kw) return true;
-    return !pollutedTerms.some(t => kw === t || kw.startsWith(t + ' ') || kw.endsWith(' ' + t) || kw.includes(t + ' vs') || kw.includes(' vs ' + t));
+    if (!kw) return false;
+    
+    // Filter out polluted brand/competitor terms
+    if (pollutedTerms.some(t => kw === t || kw.startsWith(t + ' ') || kw.endsWith(' ' + t) || kw.includes(t + ' vs') || kw.includes(' vs ' + t))) {
+      return false;
+    }
+    
+    // Filter out generic single-word keywords (unless they're part of a multi-word phrase)
+    if (genericSingleWords.includes(kw) && kw.split(' ').length === 1) {
+      return false;
+    }
+    
+    // Filter out keywords with no meaningful data (if volume/difficulty available, require at least one)
+    const volume = k.volume !== null ? k.volume : k.searchVolume !== null ? k.searchVolume : null;
+    const difficulty = k.keywordDifficulty !== null ? k.keywordDifficulty : k.difficulty !== null ? k.difficulty : k.kd !== null ? k.kd : null;
+    
+    // If both volume and difficulty are null/undefined, the keyword may be low quality
+    // But we still allow it if it's a multi-word phrase (likely long-tail)
+    if (volume === null && difficulty === null && kw.split(' ').length < 2) {
+      return false;
+    }
+    
+    return true;
   };
   
   const tables = [
@@ -1441,6 +1551,21 @@ function KeywordIntelligence({ data }: { data: any }) {
     { title: 'Long-Tail Keywords', data: asArray(data.longTailKeywords || data.keywordOpportunities?.longTailKeywords).filter(isRelevantKeyword) },
     { title: 'Question / FAQ Keywords', data: asArray(data.questionKeywords || data.keywordOpportunities?.questionKeywords).filter(isRelevantKeyword) },
   ];
+  
+  // Check if we have any meaningful keyword data after filtering
+  const totalKeywords = tables.reduce((sum, table) => sum + table.data.length, 0);
+  
+  if (totalKeywords === 0) {
+    return (
+      <Card>
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9aa7bd' }}>
+          <Search size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+          <h3 style={{ margin: '0 0 8px 0', color: '#e2e8f0' }}>No Quality Keywords Found</h3>
+          <p style={{ margin: 0, fontSize: '14px' }}>No verified keyword data available after quality filtering. Run keyword analysis to discover high-value opportunities.</p>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
@@ -1575,9 +1700,27 @@ function CompetitorSEO({ data }: { data: any }) {
     console.log('competitors count:', (data?.competitors || []).length);
     console.log('keywordGaps keys:', Object.keys(data?.keywordGaps || {}));
     console.log('contentGaps count:', (data?.contentGaps || []).length);
+    console.log('hasCompetitors:', data?.metadata?.hasCompetitors);
+    console.log('emptyStateMessage:', data?.metadata?.emptyStateMessage);
     console.log('===== END TAB: CompetitorSEO =====');
   }
-  if (!data || Object.keys(data).length === 0) return <EnterpriseEmptyState title="No Competitor SEO" message="No verified competitor data available." icon={Target} />;
+  
+  // Check if competitors are available
+  const hasCompetitors = data?.metadata?.hasCompetitors ?? false;
+  const emptyStateMessage = data?.metadata?.emptyStateMessage || 'No verified competitors were identified from the current evidence.';
+  
+  // If no competitors, show compact empty state
+  if (!hasCompetitors) {
+    return (
+      <Card>
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9aa7bd' }}>
+          <Target size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+          <h3 style={{ margin: '0 0 8px 0', color: '#e2e8f0' }}>No Competitors Found</h3>
+          <p style={{ margin: 0, fontSize: '14px' }}>{emptyStateMessage}</p>
+        </div>
+      </Card>
+    );
+  }
 
   // Read competitorProfiles from CompetitorSeoRecord (canonical shape from backend controller)
   const competitorProfiles = asArray(data.competitorProfiles || data.competitors || []);
@@ -1607,7 +1750,7 @@ function CompetitorSEO({ data }: { data: any }) {
                   <Badge className="blue" style={{ fontSize: '10px', marginBottom: '10px' }}>DataForSEO SERP</Badge>
                 )}
                 {c.isFallback || c.source === 'CategoryFallback' ? (
-                  <Badge className="yellow" style={{ fontSize: '10px', marginBottom: '10px' }}>Estimated</Badge>
+                  <Badge className="yellow" style={{ fontSize: '0px', marginBottom: '10px' }}>Estimated</Badge>
                 ) : null}
                 {c.domainDataSource && c.domainDataSource !== 'Unavailable' && (
                   <Badge className="green" style={{ fontSize: '10px', marginBottom: '10px' }}>{c.domainDataSource}</Badge>
@@ -1649,7 +1792,13 @@ function CompetitorSEO({ data }: { data: any }) {
       )}
 
       {competitorProfiles.length === 0 && (
-        <EnterpriseEmptyState title="No competitors found" message="No verified direct competitors found from available SERP data." icon={Target} />
+        <Card>
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9aa7bd' }}>
+            <Target size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+            <h3 style={{ margin: '0 0 8px 0', color: '#e2e8f0' }}>No Competitors Found</h3>
+            <p style={{ margin: 0, fontSize: '14px' }}>{emptyStateMessage}</p>
+          </div>
+        </Card>
       )}
 
       {keywordGaps.length > 0 && (
@@ -2112,7 +2261,15 @@ function ActionPlan({ data }: { data: any }) {
   const hasPlan = totalActionPlanItems > 0;
 
   if (!hasPlan) {
-    return <EnterpriseEmptyState title="Action Plan Not Available" message="No action plan data generated. Run the full SEO analysis first." icon={Map} />;
+    return (
+      <Card>
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9aa7bd' }}>
+          <Map size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+          <h3 style={{ margin: '0 0 8px 0', color: '#e2e8f0' }}>No Action Plan Available</h3>
+          <p style={{ margin: 0, fontSize: '14px' }}>No verified action plan data available. Run the full SEO analysis to generate prioritized action items.</p>
+        </div>
+      </Card>
+    );
   }
   
   // Normalize to phases using canonical structure

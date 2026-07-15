@@ -10,6 +10,7 @@ import {
 } from './chart-generator.service.js';
 import { prisma } from '../../config/prisma.js';
 import { buildGrowthFrontendPayload } from '../growth/growth-frontend-payload.service.js';
+import { validateReport, sanitizeReport } from '../../utils/report-validator.js';
 
 export async function buildReportData(chatId, userId) {
   console.log('[Report] Building report data for chat:', chatId);
@@ -149,34 +150,41 @@ export async function generateExecutiveReport(chatId, userId, format = 'pdf') {
   console.log(`[Report] type=executive format=${format} chatId=${chatId}`);
   console.log('[Report] data loaded');
   const data = await buildReportData(chatId, userId);
+  
+  // Validate report data for consistency
+  const validation = validateReport(data, 'ExecutiveReport');
+  console.log('[Report] validation:', validation.isValid ? 'PASS' : 'WARN', validation.warnings.length, 'issues');
+  
+  // Sanitize report data to remove placeholders/fake data
+  const sanitizedData = sanitizeReport(data, 'ExecutiveReport');
 
   console.log(`[Report] generator started format=${format}`);
   try {
     let result;
     switch (format) {
       case 'pdf': {
-        const html = buildExecutiveReportHtml(data);
+        const html = buildExecutiveReportHtml(sanitizedData);
         result = await generatePdf(html, { format: 'A4', landscape: false });
         break;
       }
       case 'docx': {
-        result = await generateDocx(data);
+        result = await generateDocx(sanitizedData);
         break;
       }
       case 'pptx': {
-        result = await generatePptx(data);
+        result = await generatePptx(sanitizedData);
         break;
       }
       case 'json': {
-        result = Buffer.from(JSON.stringify(data, null, 2));
+        result = Buffer.from(JSON.stringify(sanitizedData, null, 2));
         break;
       }
       case 'csv': {
-        result = Buffer.from(generateCsv(data));
+        result = Buffer.from(generateCsv(sanitizedData));
         break;
       }
       case 'markdown': {
-        result = Buffer.from(generateMarkdown(data, 'executive'));
+        result = Buffer.from(generateMarkdown(sanitizedData, 'executive'));
         break;
       }
       default:
@@ -194,30 +202,37 @@ export async function generateGrowthReport(chatId, userId, format = 'pdf') {
   console.log(`[Report] type=growth format=${format} chatId=${chatId}`);
   console.log('[Report] data loaded');
   const data = await buildReportData(chatId, userId);
+  
+  // Validate report data for consistency
+  const validation = validateReport(data, 'GrowthReport');
+  console.log('[Report] validation:', validation.isValid ? 'PASS' : 'WARN', validation.warnings.length, 'issues');
+  
+  // Sanitize report data to remove placeholders/fake data
+  const sanitizedData = sanitizeReport(data, 'GrowthReport');
 
   console.log(`[Report] generator started format=${format}`);
   try {
     let result;
     switch (format) {
       case 'pdf': {
-        const html = buildGrowthReportHtml(data);
+        const html = buildGrowthReportHtml(sanitizedData);
         result = await generatePdf(html, { format: 'A4', landscape: false });
         break;
       }
       case 'docx':
-        result = await generateDocx(data);
+        result = await generateDocx(sanitizedData);
         break;
       case 'pptx':
-        result = await generatePptx(data);
+        result = await generatePptx(sanitizedData);
         break;
       case 'json':
-        result = Buffer.from(JSON.stringify(data, null, 2));
+        result = Buffer.from(JSON.stringify(sanitizedData, null, 2));
         break;
       case 'csv':
-        result = Buffer.from(generateCsv(data));
+        result = Buffer.from(generateCsv(sanitizedData));
         break;
       case 'markdown':
-        result = Buffer.from(generateMarkdown(data, 'growth'));
+        result = Buffer.from(generateMarkdown(sanitizedData, 'growth'));
         break;
       default:
         throw new Error(`Unsupported format: ${format}`);
@@ -234,30 +249,37 @@ export async function generateSeoReport(chatId, userId, format = 'pdf') {
   console.log(`[Report] type=seo format=${format} chatId=${chatId}`);
   console.log('[Report] data loaded');
   const data = await buildReportData(chatId, userId);
+  
+  // Validate report data for consistency
+  const validation = validateReport(data, 'SeoReport');
+  console.log('[Report] validation:', validation.isValid ? 'PASS' : 'WARN', validation.warnings.length, 'issues');
+  
+  // Sanitize report data to remove placeholders/fake data
+  const sanitizedData = sanitizeReport(data, 'SeoReport');
 
   console.log(`[Report] generator started format=${format}`);
   try {
     let result;
     switch (format) {
       case 'pdf': {
-        const html = buildSeoReportHtml(data);
+        const html = buildSeoReportHtml(sanitizedData);
         result = await generatePdf(html, { format: 'A4', landscape: false });
         break;
       }
       case 'docx':
-        result = await generateDocx(data);
+        result = await generateDocx(sanitizedData);
         break;
       case 'pptx':
-        result = await generatePptx(data);
+        result = await generatePptx(sanitizedData);
         break;
       case 'json':
-        result = Buffer.from(JSON.stringify(data, null, 2));
+        result = Buffer.from(JSON.stringify(sanitizedData, null, 2));
         break;
       case 'csv':
-        result = Buffer.from(generateCsv(data));
+        result = Buffer.from(generateCsv(sanitizedData));
         break;
       case 'markdown':
-        result = Buffer.from(generateMarkdown(data, 'seo'));
+        result = Buffer.from(generateMarkdown(sanitizedData, 'seo'));
         break;
       default:
         throw new Error(`Unsupported format: ${format}`);
