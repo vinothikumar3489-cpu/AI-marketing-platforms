@@ -362,29 +362,28 @@ app.use((err, req, res, _next) => {
   });
 });
 
-// Graceful shutdown handlers
-process.on('SIGTERM', () => {
-  console.log('\n⚠️ SIGTERM received, shutting down gracefully...');
-  server.close(() => {
+// Graceful shutdown handlers (module-level ref filled after server starts)
+let runningServer;
+function shutdownGracefully(signal) {
+  console.log(`\n⚠️ ${signal} received, shutting down gracefully...`);
+  if (runningServer) {
+    runningServer.close(() => {
+      prisma.$disconnect();
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 10000);
+  } else {
     prisma.$disconnect();
     process.exit(0);
-  });
-  setTimeout(() => process.exit(1), 10000);
-});
-
-process.on('SIGINT', () => {
-  console.log('\n⚠️ SIGINT received, shutting down gracefully...');
-  server.close(() => {
-    prisma.$disconnect();
-    process.exit(0);
-  });
-  setTimeout(() => process.exit(1), 10000);
-});
+  }
+}
+process.on('SIGTERM', () => shutdownGracefully('SIGTERM'));
+process.on('SIGINT', () => shutdownGracefully('SIGINT'));
 
 // Start server - always on port 5000
 (async () => {
   try {
-    await startServer(app);
+    runningServer = await startServer(app);
   } catch (error) {
     console.error('❌ Failed to start backend server:', error.message);
     process.exit(1);
