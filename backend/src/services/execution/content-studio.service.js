@@ -1,6 +1,12 @@
 import { callAI } from '../../ai/services/aiRouter.service.js';
 import { validateContentClaims, validateBriefContent } from './claim-validator.service.js';
 import { validateContentOutput, repairAIOutput, SCHEMA_REGISTRY } from './content-schemas.js';
+import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
+
+const INVALID_PRODUCT_LABELS = new Set([
+  'unknown product', 'new analysis', 'new & featured', 'untitled',
+  'new project', 'growth analysis', 'featured', 'home',
+]);
 
 const CONTENT_TYPES = {
   blog_article: { label: 'Blog Article' },
@@ -1196,6 +1202,18 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
       _label: typeConfig.label,
       _status: 'blocked',
       _reason: briefValidation.issues.join('; '),
+      _generatedAt: new Date().toISOString(),
+    };
+  }
+
+  const identity = resolveProductIdentity(brief?._productIdentity || {});
+  const productName = (identity?.productName || '').toLowerCase().trim();
+  if (INVALID_PRODUCT_LABELS.has(productName) || !productName || productName.length < 2) {
+    return {
+      _type: assetType,
+      _label: typeConfig.label,
+      _status: 'blocked',
+      _reason: `Invalid product identity: "${identity?.productName || 'none'}" — content generation requires a verified product`,
       _generatedAt: new Date().toISOString(),
     };
   }

@@ -141,13 +141,13 @@ export function SeoIntelligencePage() {
               <div className="flex items-center gap-3 mb-2">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Overall SEO Score</div>
               </div>
-              <div className="text-3xl font-bold text-brand-blue">{data.seoScore || 0}/100</div>
+              <div className="text-3xl font-bold text-brand-blue">{data.seoScore != null ? `${data.seoScore}/100` : '—'}</div>
             </div>
             <div className="glass rounded-3xl p-5 border border-white/10">
               <div className="flex items-center gap-3 mb-2">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">PageSpeed Score</div>
               </div>
-              <div className="text-3xl font-bold text-brand-purple">{data.pageSpeedScore || 0}/100</div>
+              <div className="text-3xl font-bold text-brand-purple">{data.pageSpeedScore != null ? `${data.pageSpeedScore}/100` : '—'}</div>
             </div>
           </div>
 

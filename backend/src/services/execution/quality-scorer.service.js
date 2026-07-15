@@ -7,6 +7,11 @@
 
 import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
 
+const INVALID_PRODUCT_IDENTITIES = new Set([
+  'unknown product', 'new analysis', 'new & featured', 'untitled',
+  'new project', 'growth analysis', 'featured', 'home',
+]);
+
 const QUALITY_CHECKS = {
   productSpecificity: {
     label: 'Product specificity',
@@ -436,6 +441,17 @@ const QUALITY_CHECKS = {
         return { status: 'passed', detail: `Minor originality concerns: ${evidence.join(', ')}` };
       }
       return { status: 'passed', detail: 'No generic filler or repetition issues detected' };
+    },
+  },
+  productIdentity: {
+    label: 'Product identity',
+    check: (content, brief) => {
+      const identity = brief?._productIdentity;
+      const name = identity?.productName?.toLowerCase?.() || '';
+      if (INVALID_PRODUCT_IDENTITIES.has(name) || !name || name.length < 2) {
+        return { status: 'blocked', detail: `Invalid product identity: "${identity?.productName || 'none'}" — content generation blocked` };
+      }
+      return { status: 'passed', detail: `Product identity verified: ${identity?.productName}` };
     },
   },
 };

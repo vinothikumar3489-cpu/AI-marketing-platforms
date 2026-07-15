@@ -761,9 +761,9 @@ function ExecutiveSnapshot({ results }: { results: any }) {
 
       {/* Phase 6C: Compare Results (placeholder) */}
       <CompareResults metrics={[
-        sum?.overallGrowthScore != null ? { label: 'Growth Score', current: asNumber(sum?.overallGrowthScore), previous: asNumber(sum?.previousGrowthScore || 0) } : null,
-        sum?.marketOpportunityScore != null ? { label: 'Market Opportunity', current: asNumber(sum?.marketOpportunityScore), previous: asNumber(sum?.previousMarketScore || 0) } : null,
-        sum?.audienceClarityScore != null ? { label: 'Audience Clarity', current: asNumber(sum?.audienceClarityScore), previous: asNumber(sum?.previousAudienceScore || 0) } : null,
+        sum?.overallGrowthScore != null ? { label: 'Growth Score', current: asNumber(sum?.overallGrowthScore), previous: sum?.previousGrowthScore != null ? asNumber(sum?.previousGrowthScore) : null } : null,
+        sum?.marketOpportunityScore != null ? { label: 'Market Opportunity', current: asNumber(sum?.marketOpportunityScore), previous: sum?.previousMarketScore != null ? asNumber(sum?.previousMarketScore) : null } : null,
+        sum?.audienceClarityScore != null ? { label: 'Audience Clarity', current: asNumber(sum?.audienceClarityScore), previous: sum?.previousAudienceScore != null ? asNumber(sum?.previousAudienceScore) : null } : null,
       ].filter(Boolean)} />
 
       {/* Phase 6C: Confidence Visualization */}

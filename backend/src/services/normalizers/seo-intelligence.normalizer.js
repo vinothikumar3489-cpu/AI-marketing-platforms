@@ -5,6 +5,7 @@
  */
 
 import { asArray, takeArray } from './array-helpers.js';
+import { isLowQualityKeyword } from '../../services/execution/keyword-quality.filter.js';
 
 /**
  * Extract keyword text from various object shapes
@@ -21,6 +22,7 @@ function extractKeywordText(k) {
  */
 function normalizeKeywordItem(k) {
   const keyword = extractKeywordText(k);
+  if (isLowQualityKeyword(keyword)) return null;
   const difficulty = k.keywordDifficulty ?? k.difficulty ?? k.kd ?? null;
   const competition = k.competition ?? k.paidCompetition ?? k.competitionIndex ?? null;
   
@@ -192,13 +194,13 @@ export function normalizeSeoForExecution(seoInfo) {
     seoInfo.topicIdeas ?? 
     seoInfo.blogTopics ?? [];
 
-  // Normalize all keyword arrays
-  const normalizedNested = asArray(nestedKeywords).map(normalizeKeywordItem);
-  const normalizedPrimary = asArray(primaryKeywordsRaw).map(normalizeKeywordItem);
-  const normalizedSecondary = asArray(secondaryKeywordsRaw).map(normalizeKeywordItem);
-  const normalizedLongTail = asArray(longTailKeywordsRaw).map(normalizeKeywordItem);
-  const normalizedQuestion = asArray(questionKeywordsRaw).map(normalizeKeywordItem);
-  const normalizedCompetitor = asArray(competitorKeywordsRaw).map(normalizeKeywordItem);
+  // Normalize all keyword arrays, filtering out low-quality entries
+  const normalizedNested = asArray(nestedKeywords).map(normalizeKeywordItem).filter(Boolean);
+  const normalizedPrimary = asArray(primaryKeywordsRaw).map(normalizeKeywordItem).filter(Boolean);
+  const normalizedSecondary = asArray(secondaryKeywordsRaw).map(normalizeKeywordItem).filter(Boolean);
+  const normalizedLongTail = asArray(longTailKeywordsRaw).map(normalizeKeywordItem).filter(Boolean);
+  const normalizedQuestion = asArray(questionKeywordsRaw).map(normalizeKeywordItem).filter(Boolean);
+  const normalizedCompetitor = asArray(competitorKeywordsRaw).map(normalizeKeywordItem).filter(Boolean);
 
   // Combine all keywords and deduplicate
   const allKeywordsRaw = [
@@ -222,7 +224,7 @@ export function normalizeSeoForExecution(seoInfo) {
   // Normalize clusters
   const normalizedClusters = asArray(clustersRaw).map(cluster => ({
     name: cluster.name || cluster.topic || 'Cluster',
-    keywords: asArray(cluster.keywords).map(normalizeKeywordItem),
+    keywords: asArray(cluster.keywords).map(normalizeKeywordItem).filter(Boolean),
     volume: cluster.volume ?? null,
     difficulty: cluster.difficulty ?? null
   }));

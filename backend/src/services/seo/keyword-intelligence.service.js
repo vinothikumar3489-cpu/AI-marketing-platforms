@@ -215,7 +215,9 @@ function filterJunkKeywords(keywords, source = 'unknown') {
       'canva\'s', 'templates', 'designing', 'design',
       'undefined', 'account', 'semrush', 'general',
       'homepage', 'url', 'self link', 'page title', 'meta title',
-      'month', 'year', 'day', 'week'
+      'month', 'year', 'day', 'week',
+      'ratings', 'original', 'cookies', 'lecturesall', 'levelscurrent',
+      'rating', 'lecture', 'current', 'level', 'levels'
     ];
 
     if (/^\[/.test(lowerKeyword)) return false;
@@ -227,7 +229,10 @@ function filterJunkKeywords(keywords, source = 'unknown') {
     if (lowerKeyword.includes("'s") || lowerKeyword.includes("'")) return false;
     if (lowerKeyword.includes('http') || lowerKeyword.includes('www.') || lowerKeyword.includes('.com') ||
         lowerKeyword.includes('.me/') || lowerKeyword.includes('.app') || lowerKeyword.includes('.io')) return false;
-    if (/^[a-z]{15,}$/.test(lowerKeyword) || /^[a-z]+[A-Z][a-z]/.test(lowerKeyword)) return false;
+    // Reject concatenated HTML artifact tokens: all lowercase >12 chars or camelCase-boundary
+    if (/^[a-z]{12,}$/.test(lowerKeyword) || /^[a-z]+[A-Z][a-z]/.test(lowerKeyword)) return false;
+    // Reject tokens with digits mixed without spaces (e.g., "course2", "level3")
+    if (/^[a-z]+\d+[a-z]*$/.test(lowerKeyword)) return false;
     if (/^[\d,+.$\-‰%]+$/.test(keyword.trim())) return false;
 
     const wordCount = keyword.split(' ').length;

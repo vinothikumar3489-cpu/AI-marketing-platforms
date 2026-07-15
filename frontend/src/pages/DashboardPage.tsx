@@ -114,15 +114,15 @@ export default function DashboardPage() {
               <>
                 <li style={{ borderLeft: '3px solid #ff4757', paddingLeft: '15px' }}>
                   <b style={{ color: '#ff4757' }}>Critical Risk:</b>
-                  <p style={{ margin: '5px 0 0', fontSize: '13px', color: '#9aa7bd' }}>Your AI Visibility across {projects.length} projects is averaging {kpis.ai || 45}/100. Competitors are outranking you in ChatGPT.</p>
+                  <p style={{ margin: '5px 0 0', fontSize: '13px', color: '#9aa7bd' }}>AI Visibility: {kpis.ai != null ? `${kpis.ai}/100` : 'Not measured yet. Run an analysis to generate insights.'}</p>
                 </li>
                 <li style={{ borderLeft: '3px solid #10e18b', paddingLeft: '15px' }}>
                   <b style={{ color: '#10e18b' }}>Top Opportunity:</b>
-                  <p style={{ margin: '5px 0 0', fontSize: '13px', color: '#9aa7bd' }}>SEO Authority is strong at {kpis.seo || 65}/100. Expanding Long-Tail and FAQ content can yield immediate traffic boosts.</p>
+                  <p style={{ margin: '5px 0 0', fontSize: '13px', color: '#9aa7bd' }}>SEO Authority: {kpis.seo != null ? `${kpis.seo}/100` : 'Not measured yet. Run an analysis to generate insights.'}</p>
                 </li>
                 <li style={{ borderLeft: '3px solid #a855f7', paddingLeft: '15px' }}>
                   <b style={{ color: '#a855f7' }}>Growth Directive:</b>
-                  <p style={{ margin: '5px 0 0', fontSize: '13px', color: '#9aa7bd' }}>Focus budget on LinkedIn and Content Marketing. Customer demand scores average {kpis.demand || 80}/100 indicating high readiness.</p>
+                  <p style={{ margin: '5px 0 0', fontSize: '13px', color: '#9aa7bd' }}>Customer Demand: {kpis.demand != null ? `${kpis.demand}/100` : 'Not measured yet. Run an analysis to generate insights.'}</p>
                 </li>
               </>
             )}

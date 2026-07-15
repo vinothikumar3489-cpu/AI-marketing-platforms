@@ -60,8 +60,9 @@ export const ContentSectionTags = ({ sections }: { sections: string[] | string }
   );
 };
 
-export const OpportunityProgress = ({ score }: { score: number }) => {
-  const safeScore = Math.min(100, Math.max(0, Number(score) || 0));
+export const OpportunityProgress = ({ score }: { score: number | null | undefined }) => {
+  if (score == null) return <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#9aa7bd', fontSize: '13px' }}>Not measured</div>;
+  const safeScore = Math.min(100, Math.max(0, Number(score)));
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
       <div style={{ flex: 1, background: '#1d2738', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>

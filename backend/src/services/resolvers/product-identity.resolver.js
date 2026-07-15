@@ -1,199 +1,164 @@
-/**
- * Canonical Product Identity Resolver
- * Resolves the actual product name, brand, and company from multiple sources
- * Prioritizes analyzed product data over project/chat titles
- */
+const GENERIC_LABELS = new Set([
+  'new analysis', 'untitled project', 'growth analysis', 'new project',
+  'untitled', 'new & featured', 'featured', 'home', 'courses',
+  'project', 'analysis', 'my', 'the', 'test', 'demo', 'sample',
+  'unknown product', 'product', 'website', 'landing', 'page',
+]);
 
-import { asArray } from '../normalizers/array-helpers.js';
-
-// Generic titles that should not be used as product names
-const GENERIC_TITLES = [
-  'New Analysis',
-  'Untitled Project',
-  'Growth Analysis',
-  'New Project',
-  'Project',
-  'Analysis',
-  'Untitled',
-  'My',
-  'The',
-  'Test',
-  'Demo',
-  'Sample',
-];
-
-/**
- * Check if a name is a generic title that should not be used as product name
- */
-function isGenericTitle(name) {
-  if (!name || typeof name !== 'string') return true;
-  const normalized = name.trim();
-  return GENERIC_TITLES.some(generic => 
-    normalized.toLowerCase() === generic.toLowerCase()
-  );
+function isGeneric(label) {
+  if (!label || typeof label !== 'string') return true;
+  const t = label.trim();
+  if (t.length < 2) return true;
+  return GENERIC_LABELS.has(t.toLowerCase());
 }
 
-/**
- * Resolve product identity from multiple sources
- * Priority order as specified:
- * 1. ProductIntelligence.productName
- * 2. ProductIntelligence.name
- * 3. ProductIntelligence.brandName
- * 4. ProductIntelligence.companyName
- * 5. detected brand from product summary
- * 6. website title or H1
- * 7. analyzed domain
- * 8. explicit user-provided product name
- * 9. chat title only as projectTitle
- */
+function extractDomain(url) {
+  if (!url || typeof url !== 'string') return null;
+  try {
+    const u = new URL(url.startsWith('http') ? url : `https://${url}`);
+    return u.hostname.replace(/^www\./, '').toLowerCase();
+  } catch { return null; }
+}
+
+function domainToBrand(domain) {
+  if (!domain) return null;
+  const parts = domain.split('.');
+  if (parts.length < 2) return null;
+  const name = parts[0];
+  if (!name || name.length < 2 || GENERIC_LABELS.has(name)) return null;
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+}
+
+function extractBrandFromTitle(title) {
+  if (!title || typeof title !== 'string') return null;
+  // Try "Brand: Subtitle" or "Brand - Subtitle" or "Subtitle | Brand"
+  const pipe = title.split('|').map(s => s.trim()).filter(Boolean);
+  if (pipe.length >= 2) {
+    const candidate = pipe[pipe.length - 1];
+    if (!isGeneric(candidate)) return candidate;
+  }
+  const colon = title.split(':').map(s => s.trim()).filter(Boolean);
+  if (colon.length >= 2) {
+    const candidate = colon[0];
+    if (!isGeneric(candidate)) return candidate;
+  }
+  const dash = title.split('—').map(s => s.trim()).filter(Boolean);
+  if (dash.length >= 2) {
+    const candidate = dash[dash.length - 1];
+    if (!isGeneric(candidate)) return candidate;
+  }
+  const hyphen = title.split(' - ').map(s => s.trim()).filter(Boolean);
+  if (hyphen.length >= 2) {
+    const candidate = hyphen[hyphen.length - 1];
+    if (!isGeneric(candidate)) return candidate;
+  }
+  return null;
+}
+
+function extractBrandFromStructuredData(data) {
+  if (!data || typeof data !== 'object') return null;
+  return data.organizationName || data.brandName || data.name || data.productName || null;
+}
+
 export function resolveProductIdentity({ chat, productIntelligence, evidenceSnapshot, website }) {
   const projectTitle = chat?.title || 'New Analysis';
   const websiteUrl = chat?.websiteUrl || website?.url || null;
-  
-  // Extract domain from website URL
-  let domain = null;
-  if (websiteUrl) {
-    try {
-      const url = new URL(websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`);
-      domain = url.hostname.replace('www.', '');
-    } catch (e) {
-      domain = websiteUrl;
-    }
-  }
+  const domain = extractDomain(websiteUrl);
 
-  // Track evidence reference for debugging
+  let productName = null;
+  let brandName = null;
+  let companyName = null;
+  let source = null;
   let evidenceReference = null;
-  let source = 'unknown';
 
-  // Priority 1: ProductIntelligence.productName
-  let productName = productIntelligence?.productName || null;
-  let brandName = productIntelligence?.brandName || null;
-  let companyName = productIntelligence?.companyName || null;
-  
-  if (productName && !isGenericTitle(productName)) {
-    source = 'productIntelligence_productName';
-    evidenceReference = 'ProductIntelligence.productName';
+  // Priority 1: ProductIntelligence explicit brand/product fields
+  const pi = productIntelligence;
+  const analysis = pi?.productAnalysis || {};
+
+  if (!isGeneric(pi?.productName)) {
+    productName = pi.productName; source = 'pi_productName'; evidenceReference = 'ProductIntelligence.productName';
+  } else if (!isGeneric(analysis?.productName)) {
+    productName = analysis.productName; source = 'pi_analysis_productName'; evidenceReference = 'ProductIntelligence.productAnalysis.productName';
+  } else if (!isGeneric(pi?.name)) {
+    productName = pi.name; source = 'pi_name'; evidenceReference = 'ProductIntelligence.name';
+  } else if (!isGeneric(pi?.brandName)) {
+    productName = pi.brandName; source = 'pi_brandName'; evidenceReference = 'ProductIntelligence.brandName';
+    brandName = pi.brandName;
+  } else if (!isGeneric(pi?.companyName)) {
+    productName = pi.companyName; source = 'pi_companyName'; evidenceReference = 'ProductIntelligence.companyName';
+    companyName = pi.companyName;
   }
 
-  // Priority 2: ProductIntelligence.productAnalysis.productName (nested)
-  if (!productName || isGenericTitle(productName)) {
-    const paName = productIntelligence?.productAnalysis?.productName || productIntelligence?.productAnalysis?.name || null;
-    if (paName && !isGenericTitle(paName)) {
-      productName = paName;
-      source = 'productIntelligence_productAnalysis_productName';
-      evidenceReference = 'ProductIntelligence.productAnalysis.productName';
-    }
+  if (!brandName && !isGeneric(pi?.brandName)) brandName = pi.brandName;
+  if (!companyName && !isGeneric(pi?.companyName)) companyName = pi.companyName;
+
+  // Priority 2: EvidenceSnapshot product data
+  if (!productName || isGeneric(productName)) {
+    const sd = evidenceSnapshot?.evidence?.product || evidenceSnapshot?.evidence?.company || {};
+    if (!isGeneric(sd?.name)) { productName = sd.name; source = 'evidence_product_name'; evidenceReference = 'EvidenceSnapshot.product.name'; }
+    else if (!isGeneric(sd?.brandName)) { productName = sd.brandName; source = 'evidence_brand_name'; evidenceReference = 'EvidenceSnapshot.product.brandName'; }
+    if (!brandName && !isGeneric(sd?.brandName)) brandName = sd.brandName;
   }
 
-  // Priority 3: ProductIntelligence.name
-  if (!productName || isGenericTitle(productName)) {
-    const piName = productIntelligence?.name || null;
-    if (piName && !isGenericTitle(piName)) {
-      productName = piName;
-      source = 'productIntelligence_name';
-      evidenceReference = 'ProductIntelligence.name';
-    }
+  // Priority 3: Structured data org/product name
+  if (!productName || isGeneric(productName)) {
+    const sdName = extractBrandFromStructuredData(evidenceSnapshot?.evidence?.structuredData);
+    if (sdName && !isGeneric(sdName)) { productName = sdName; source = 'structured_data'; evidenceReference = 'structuredData.organizationName'; }
   }
 
-  // Priority 4: ProductIntelligence.brandName
-  if (!brandName) {
-    brandName = productIntelligence?.brandName || productIntelligence?.productAnalysis?.brandName || null;
-    if (brandName && !productName) {
-      productName = brandName;
-      source = 'productIntelligence_brandName';
-      evidenceReference = 'ProductIntelligence.brandName';
-    }
+  // Priority 4: Website title/H1 → extract brand
+  if (!productName || isGeneric(productName)) {
+    const title = website?.title || evidenceSnapshot?.evidence?.website?.title || null;
+    const extracted = extractBrandFromTitle(title);
+    if (extracted && !isGeneric(extracted)) { productName = extracted; source = 'website_title_brand'; evidenceReference = 'Website.title'; }
   }
 
-  // Priority 5: ProductIntelligence.companyName
-  if (!companyName) {
-    companyName = productIntelligence?.companyName || productIntelligence?.productAnalysis?.companyName || null;
+  // Priority 5: Website H1
+  if (!productName || isGeneric(productName)) {
+    const h1 = website?.heroText || evidenceSnapshot?.evidence?.website?.heroText || null;
+    if (h1 && !isGeneric(h1) && h1.length < 100) { productName = h1; source = 'website_h1'; evidenceReference = 'Website.heroText'; }
   }
 
-  // Priority 5: detected brand from product summary
-  if (!productName || isGenericTitle(productName)) {
-    const productAnalysis = productIntelligence?.productAnalysis || {};
-    const summary = productAnalysis.summary || productAnalysis.productSummary || '';
-    // Try to extract brand from summary (simple heuristic)
-    const brandMatch = summary.match(/^([A-Z][a-zA-Z]+)\s+is/i);
-    if (brandMatch && !isGenericTitle(brandMatch[1])) {
-      productName = brandMatch[1];
-      brandName = brandName || productName;
-      source = 'productSummary_brand';
-      evidenceReference = 'ProductIntelligence.productAnalysis.summary';
-    }
+  // Priority 6: Domain → brand
+  if (!productName || isGeneric(productName)) {
+    const db = domainToBrand(domain);
+    if (db && !isGeneric(db)) { productName = db; brandName = brandName || db; source = 'domain'; evidenceReference = 'Domain'; }
   }
 
-  // Priority 6: website title or H1
-  if (!productName || isGenericTitle(productName)) {
-    const websiteTitle = website?.title || website?.heroText || evidenceSnapshot?.evidence?.website?.title || null;
-    if (websiteTitle && !isGenericTitle(websiteTitle)) {
-      productName = websiteTitle;
-      source = 'website_title';
-      evidenceReference = 'Website.title';
-    }
+  // Priority 7: Product summary brand detection
+  if (!productName || isGeneric(productName)) {
+    const summary = analysis.summary || analysis.productSummary || '';
+    const brandMatch = summary.match(/^([A-Z][a-zA-Z0-9]+)\s+is/i);
+    if (brandMatch && !isGeneric(brandMatch[1])) { productName = brandMatch[1]; brandName = brandName || productName; source = 'summary_brand'; evidenceReference = 'ProductIntelligence.productAnalysis.summary'; }
   }
 
-  // Priority 7: analyzed domain
-  if (!productName || isGenericTitle(productName)) {
-    if (domain) {
-      // Convert domain to product name (e.g., virlo.ai -> Virlo, my-site.com -> My Site)
-      const domainPart = domain.split('.')[0];
-      const domainName = domainPart
-        .replace(/[-_]/g, ' ')
-        .split(' ')
-        .filter(w => w.length > 0 && !/^\d+$/.test(w))
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-        .join(' ');
-      if (domainName && !isGenericTitle(domainName)) {
-        productName = domainName;
-        brandName = brandName || domainName;
-        source = 'domain';
-        evidenceReference = 'Domain extraction';
-      }
-    }
+  // Priority 8: chat.productName
+  if (!productName || isGeneric(productName)) {
+    if (chat?.productName && !isGeneric(chat.productName)) { productName = chat.productName; source = 'chat_productName'; evidenceReference = 'Chat.productName'; }
   }
 
-  // Priority 8: explicit user-provided product name (chat.productName)
-  if (!productName || isGenericTitle(productName)) {
-    if (chat?.productName && !isGenericTitle(chat.productName)) {
-      productName = chat.productName;
-      source = 'chat_productName';
-      evidenceReference = 'Chat.productName';
-    }
+  const resolved = Boolean(productName && !isGeneric(productName));
+
+  if (!resolved) {
+    return {
+      projectTitle,
+      productName: null,
+      brandName: null,
+      companyName: null,
+      websiteUrl,
+      domain,
+      category: null,
+      source: 'unresolved',
+      evidenceReference: 'No valid product identity found',
+      resolved: false,
+    };
   }
 
-  // Priority 9: chat.title ONLY as projectTitle fallback, never as productName
-  // If we reach here, productName is still generic or null - use domain or mark as unknown
-  if (!productName || isGenericTitle(productName)) {
-    if (domain) {
-      const domainPart = domain.split('.')[0];
-      const domainName = domainPart
-        .replace(/[-_]/g, ' ')
-        .split(' ')
-        .filter(w => w.length > 0 && !/^\d+$/.test(w))
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-        .join(' ');
-      productName = domainName || 'Unknown Product';
-      brandName = brandName || productName;
-      source = 'domain_fallback';
-      evidenceReference = 'Domain fallback';
-    } else {
-      productName = 'Unknown Product';
-      source = 'unknown';
-      evidenceReference = 'No product identity found';
-    }
-  }
+  if (!brandName) brandName = productName;
+  if (!companyName) brandName = productName;
+  if (!brandName) brandName = productName;
 
-  // If brandName still not set, use productName
-  if (!brandName) {
-    brandName = productName;
-  }
-
-  // If companyName still not set, use brandName
-  if (!companyName) {
-    companyName = brandName;
-  }
+  const category = analysis?.category || analysis?.industry || null;
 
   return {
     projectTitle,
@@ -202,8 +167,10 @@ export function resolveProductIdentity({ chat, productIntelligence, evidenceSnap
     companyName,
     websiteUrl,
     domain,
+    category,
     source,
-    evidenceReference
+    evidenceReference,
+    resolved: true,
   };
 }
 
