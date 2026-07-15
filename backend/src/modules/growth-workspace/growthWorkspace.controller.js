@@ -45,18 +45,16 @@ export const runFullAnalysisHandler = async (req, res) => {
       });
     }
 
-    const persistence = result.persisted || {};
-    console.info('[Growth Stage]', { stage: 'PIPELINE_COMPLETE', status: result.overallStatus, chatId, persistence });
+    console.info('[Growth Stage]', { stage: 'PIPELINE_COMPLETE', status: 'completed', chatId });
     console.log('✅ [Growth Workspace Controller] Analysis complete');
     
     return res.json({
       success: true,
-      chatId: result.chatId,
+      chatId: result.chatId, // Return the actual or newly created chatId
       results: result.results,
       steps: result.steps,
       summary: result.summary,
       overallStatus: result.overallStatus,
-      persisted: persistence,
       warnings: result.warnings || []
     });
 

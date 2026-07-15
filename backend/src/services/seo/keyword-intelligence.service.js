@@ -2,8 +2,6 @@ import { getKeywordMetrics, isDataForSEOConfigured } from '../dataforseo.service
 import { isValidKeyword } from '../../utils/text.util.js';
 import { asArray } from '../../utils/text.util.js';
 import { logEvidenceError } from '../../utils/evidence-logger.js';
-import { callAI } from '../../ai/services/aiRouter.service.js';
-import { classifyKeyword } from './seo-frontend-payload.service.js';
 
 // ============================================
 // KEYWORD INTELLIGENCE ENGINE
@@ -77,10 +75,10 @@ export async function generateKeywordIntelligence({
       : [];
 
     const result = {
-      primaryKeywords: markAsTopicIdeas(extractedKeywords.primary || [], safeProductName),
-      secondaryKeywords: markAsTopicIdeas(extractedKeywords.secondary || [], safeProductName),
-      longTailKeywords: markAsTopicIdeas(extractedKeywords.longTail || [], safeProductName),
-      questionKeywords: markAsTopicIdeas(extractedKeywords.questions || [], safeProductName),
+      primaryKeywords: markAsTopicIdeas(extractedKeywords.primary || []),
+      secondaryKeywords: markAsTopicIdeas(extractedKeywords.secondary || []),
+      longTailKeywords: markAsTopicIdeas(extractedKeywords.longTail || []),
+      questionKeywords: markAsTopicIdeas(extractedKeywords.questions || []),
       clusters: clusters || [],
       competitorKeywords: [],
       contentOpportunities: [],
@@ -138,10 +136,9 @@ export async function generateKeywordIntelligence({
   }
 }
 
-function markAsTopicIdeas(keywords, productName) {
+function markAsTopicIdeas(keywords) {
   return keywords.map(k => ({
     keyword: k.keyword || k,
-    type: classifyKeyword(k.keyword || k, productName, ''),
     searchVolume: null,
     keywordDifficulty: null,
     cpc: null,
@@ -175,7 +172,6 @@ async function enrichWithDataForSEO(result, extractedKeywords) {
         const metrics = metricsMap.get(kw.keyword?.toLowerCase());
         return {
           ...kw,
-          type: classifyKeyword(kw.keyword, safeProductName, safeCompanyName),
           searchVolume: metrics?.volume ?? null,
           keywordDifficulty: metrics?.keywordDifficulty ?? null,
           cpc: metrics?.cpc ?? null,
@@ -215,9 +211,7 @@ function filterJunkKeywords(keywords, source = 'unknown') {
       'canva\'s', 'templates', 'designing', 'design',
       'undefined', 'account', 'semrush', 'general',
       'homepage', 'url', 'self link', 'page title', 'meta title',
-      'month', 'year', 'day', 'week',
-      'ratings', 'original', 'cookies', 'lecturesall', 'levelscurrent',
-      'rating', 'lecture', 'current', 'level', 'levels'
+      'month', 'year', 'day', 'week'
     ];
 
     if (/^\[/.test(lowerKeyword)) return false;
@@ -229,10 +223,7 @@ function filterJunkKeywords(keywords, source = 'unknown') {
     if (lowerKeyword.includes("'s") || lowerKeyword.includes("'")) return false;
     if (lowerKeyword.includes('http') || lowerKeyword.includes('www.') || lowerKeyword.includes('.com') ||
         lowerKeyword.includes('.me/') || lowerKeyword.includes('.app') || lowerKeyword.includes('.io')) return false;
-    // Reject concatenated HTML artifact tokens: all lowercase >12 chars or camelCase-boundary
-    if (/^[a-z]{12,}$/.test(lowerKeyword) || /^[a-z]+[A-Z][a-z]/.test(lowerKeyword)) return false;
-    // Reject tokens with digits mixed without spaces (e.g., "course2", "level3")
-    if (/^[a-z]+\d+[a-z]*$/.test(lowerKeyword)) return false;
+    if (/^[a-z]{15,}$/.test(lowerKeyword) || /^[a-z]+[A-Z][a-z]/.test(lowerKeyword)) return false;
     if (/^[\d,+.$\-‰%]+$/.test(keyword.trim())) return false;
 
     const wordCount = keyword.split(' ').length;
@@ -397,9 +388,12 @@ async function extractKeywordsFromWebsite({
     return result;
   }
 
-  // Try AI extraction via shared router (Groq -> Gemini -> fallback)
+  // Try AI extraction with GROQ
   const allText = `${title}\n${description}\n${h1Texts.join('\n')}\n${text.substring(0, 3000)}`;
-  const aiPrompt = `Extract topic ideas and keyword phrases from this website content for "${productName}" in "${industry}" industry.
+  const GROQ_API_KEY = process.env.GROQ_API_KEY;
+  if (GROQ_API_KEY) {
+    try {
+      const prompt = `Extract topic ideas and keyword phrases from this website content for "${productName}" in "${industry}" industry.
 
 Website Content:
 ${allText}
@@ -417,52 +411,68 @@ Rules:
 - DO NOT return generic terms like "software", "business", "platform", "solution"
 - DO NOT return the product name alone without context
 - Return topic ideas only — all metrics will be null
-- Prioritize product-specific phrases that describe what the product DOES
-- Include use-case phrases and audience pain-point phrases
+- Prioritize product-specific phrases that describe what the product DOES (e.g., "TikTok social listening", "short-form video analytics", "creator analytics", "trend tracking")
+- Include use-case phrases (e.g., "competitor monitoring for TikTok", "viral content research", "ad research for Reels")
+- Include audience pain-point phrases (e.g., "track TikTok trends", "find viral creators", "monitor short-form video performance")
 - Max 8 per category`;
 
-  try {
-    const aiResult = await callAI(aiPrompt);
-    if (aiResult.success && aiResult.data) {
-      const parsed = aiResult.data;
-      if (parsed.primary || parsed.secondary) {
-        const allAi = [
-          ...(parsed.primary || []).map(k => ({ phrase: k, score: 80 })),
-          ...(parsed.secondary || []).map(k => ({ phrase: k, score: 65 })),
-          ...(parsed.longTail || []).map(k => ({ phrase: k, score: 50 })),
-        ];
-        const cleanPhrases = allAi
-          .filter(p => {
-            const lower = p.phrase.toLowerCase();
-            const isBoilerplate = BOILERPLATE_PHRASES.some(bp => lower.includes(bp));
-            return !isBoilerplate && lower.split(' ').every(w => !STOPWORDS.has(w) || w.length <= 1);
-          })
-          .filter(p => p.phrase.length >= 5);
-        const deduped = deduplicateSimilar(cleanPhrases.map(p => p.phrase));
-        const scored = deduped.map(phrase => {
-          const found = cleanPhrases.find(p => p.phrase === phrase);
-          return { phrase, score: found ? found.score : 50 };
-        }).filter(p => p.score >= 50);
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            { role: 'system', content: 'You are an SEO specialist. Return valid JSON only. Never generate fake metrics.' },
+            { role: 'user', content: prompt }
+          ],
+          response_format: { type: 'json_object' }
+        })
+      });
 
-        if (scored.length > 0) {
-          const primaryKeywords = scored.slice(0, 8).map(p => ({
-            keyword: p.phrase, source: aiResult.provider || 'ai_extracted', confidence: null, metricType: 'topic_idea_only', label: 'topic idea only', intent: null, relevanceScore: p.score
-          }));
-          const secondaryKeywords = scored.slice(8, 20).map(p => ({
-            keyword: p.phrase, source: aiResult.provider || 'ai_extracted', confidence: null, metricType: 'topic_idea_only', label: 'topic idea only', intent: null, relevanceScore: p.score
-          }));
-          const longTailKeywords = scored.slice(20, 30).map(p => ({
-            keyword: p.phrase, source: aiResult.provider || 'ai_extracted', confidence: null, metricType: 'topic_idea_only', label: 'topic idea only', intent: null, relevanceScore: p.score
-          }));
-          console.log(`[Keyword Extraction] AI extracted ${scored.length} keyword candidates`);
-          return {
-            primary: primaryKeywords, secondary: secondaryKeywords, longTail: longTailKeywords, questions: parsed.questions || [],
-          };
+      if (response.ok) {
+        const data = await response.json();
+        const parsed = JSON.parse(data.choices[0].message.content);
+        if (parsed.primary || parsed.secondary) {
+          // Filter through heuristic pipeline too
+          const allAi = [
+            ...(parsed.primary || []).map(k => ({ phrase: k, score: 80 })),
+            ...(parsed.secondary || []).map(k => ({ phrase: k, score: 65 })),
+            ...(parsed.longTail || []).map(k => ({ phrase: k, score: 50 })),
+          ];
+          const cleanPhrases = allAi
+            .filter(p => {
+              const lower = p.phrase.toLowerCase();
+              const isBoilerplate = BOILERPLATE_PHRASES.some(bp => lower.includes(bp));
+              return !isBoilerplate && lower.split(' ').every(w => !STOPWORDS.has(w) || w.length <= 1);
+            })
+            .filter(p => p.phrase.length >= 5);
+          const deduped = deduplicateSimilar(cleanPhrases.map(p => p.phrase));
+          const scored = deduped.map(phrase => {
+            const found = cleanPhrases.find(p => p.phrase === phrase);
+            return { phrase, score: found ? found.score : 50 };
+          }).filter(p => p.score >= 50);
+
+          if (scored.length > 0) {
+            const primaryKeywords = scored.slice(0, 8).map(p => ({
+              keyword: p.phrase, source: 'ai_extracted', confidence: null, metricType: 'topic_idea_only', label: 'topic idea only', intent: null, relevanceScore: p.score
+            }));
+            const secondaryKeywords = scored.slice(8, 20).map(p => ({
+              keyword: p.phrase, source: 'ai_extracted', confidence: null, metricType: 'topic_idea_only', label: 'topic idea only', intent: null, relevanceScore: p.score
+            }));
+            const longTailKeywords = scored.slice(20, 30).map(p => ({
+              keyword: p.phrase, source: 'ai_extracted', confidence: null, metricType: 'topic_idea_only', label: 'topic idea only', intent: null, relevanceScore: p.score
+            }));
+            console.log(`[Keyword Extraction] AI extracted ${scored.length} keyword candidates`);
+            return {
+              primary: primaryKeywords, secondary: secondaryKeywords, longTail: longTailKeywords, questions: parsed.questions || [],
+            };
+          }
         }
       }
-    }
-  } catch (e) {
-    if (process.env.NODE_ENV !== 'production') {
+    } catch (e) {
       console.log('⚠️ [Keyword Extraction] AI extraction failed:', e.message);
     }
   }
@@ -554,21 +564,38 @@ async function generateTopicClusters(extracted, productName) {
 
   if (allKeywords.length < 2) return [];
 
-  try {
-    const clusterPrompt = `Group these topics for "${productName}" into 1-3 clusters:
+  const GROQ_API_KEY = process.env.GROQ_API_KEY;
+  if (GROQ_API_KEY) {
+    try {
+      const prompt = `Group these topics for "${productName}" into 1-3 clusters:
 ${allKeywords.join(', ')}
 
 Return ONLY valid JSON:
 [{"name": "cluster name", "keywords": ["kw1", "kw2"], "priority": 1}]`;
 
-    const aiResult = await callAI(clusterPrompt);
-    if (aiResult.success && aiResult.data) {
-      const result = aiResult.data;
-      const clusters = Array.isArray(result) ? result : (result.clusters || []);
-      return clusters.slice(0, 3);
-    }
-  } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            { role: 'system', content: 'Return valid JSON only.' },
+            { role: 'user', content: prompt }
+          ],
+          response_format: { type: 'json_object' }
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const result = JSON.parse(data.choices[0].message.content);
+        const clusters = Array.isArray(result) ? result : (result.clusters || []);
+        return clusters.slice(0, 3);
+      }
+    } catch (error) {
       console.log('⚠️ [Clustering] AI clustering failed:', error.message);
     }
   }

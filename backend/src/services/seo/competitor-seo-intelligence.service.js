@@ -2,8 +2,6 @@ import fetch from 'node-fetch';
 import { getSerpCompetitors, normalizeSerpCompetitors, separateCompetitorsByType, isDataForSEOConfigured, getDomainData } from '../dataforseo.service.js';
 import { researchCompetitors } from '../tavily.service.js';
 import { asArray } from '../../utils/text.util.js';
-import { getValidatedCompetitorsForChat } from '../competitors/shared-competitor.service.js';
-import { prisma } from '../../config/prisma.js';
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
@@ -15,7 +13,7 @@ const EXA_API_KEY = process.env.EXA_API_KEY;
 
 /**
  * Generate comprehensive competitor SEO intelligence
- * @param {Object} params - { keywordIntelligence, geoIntelligence, websiteData, identity, orchestratorCompetitors, chatId, userId }
+ * @param {Object} params - { keywordIntelligence, geoIntelligence, websiteData, identity, orchestratorCompetitors }
  * @returns {Object} - Complete competitor intelligence
  */
 export async function generateCompetitorSeoIntelligence({
@@ -23,11 +21,9 @@ export async function generateCompetitorSeoIntelligence({
   geoIntelligence = {},
   websiteData = {},
   identity,
-  orchestratorCompetitors = [],
-  chatId = null,
-  userId = null
+  orchestratorCompetitors = []
 }) {
-  console.log('🎯 [Competitor SEO] Starting competitor analysis...', { orchestratorCompetitorsCount: orchestratorCompetitors.length, chatId });
+  console.log('🎯 [Competitor SEO] Starting competitor analysis...', { orchestratorCompetitorsCount: orchestratorCompetitors.length });
 
   // Safely define identity fields before any use
   const safeIdentity = identity || {};
@@ -39,59 +35,17 @@ export async function generateCompetitorSeoIntelligence({
   const industry = safeIdentity.industry || category;
 
   try {
-    // Step 1: Discover competitors (prioritize Growth competitors via shared engine)
+    // Step 1: Discover competitors (use orchestrator data if available)
     console.log('🔍 [Competitor SEO] Step 1: Discovering competitors...');
-    
-    let rawCompetitors = [];
-    
-    // First try to get validated competitors from Growth (shared engine)
-    if (chatId && userId) {
-      console.log('🔍 [Competitor SEO] Checking for Growth competitors via shared engine...');
-      try {
-        const sharedCompetitorResult = await getValidatedCompetitorsForChat({
-          userId,
-          chatId,
-          productIdentity: safeIdentity,
-          category,
-          useCases: safeIdentity.useCases || []
+    const rawCompetitors = orchestratorCompetitors.length > 0 
+      ? orchestratorCompetitors
+      : await discoverCompetitors({
+          productName: identity.productName,
+          industry: identity.industry,
+          websiteUrl: identity.websiteUrl,
+          keywordIntelligence,
+          identity
         });
-        
-        if (sharedCompetitorResult.competitors && sharedCompetitorResult.competitors.length > 0) {
-          console.log(`✅ [Competitor SEO] Found ${sharedCompetitorResult.competitors.length} validated competitors from Growth`);
-          rawCompetitors = sharedCompetitorResult.competitors.map(c => ({
-            name: c.name,
-            domain: c.domain,
-            website: c.sourceUrl || `https://${c.domain}`,
-            competitorType: c.competitorType,
-            positioning: 'Validated from Growth',
-            source: c.source,
-            evidence: c.evidence
-          }));
-        } else {
-          console.log('⚠️ [Competitor SEO] No Growth competitors found, will use orchestrator or discovery');
-        }
-      } catch (sharedError) {
-        console.log('⚠️ [Competitor SEO] Shared competitor engine failed:', sharedError.message);
-      }
-    }
-    
-    // Fallback to orchestrator competitors if no Growth competitors
-    if (rawCompetitors.length === 0 && orchestratorCompetitors.length > 0) {
-      console.log('🔍 [Competitor SEO] Using orchestrator competitors');
-      rawCompetitors = orchestratorCompetitors;
-    }
-    
-    // Final fallback to discovery if no competitors yet
-    if (rawCompetitors.length === 0) {
-      console.log('🔍 [Competitor SEO] Running competitor discovery...');
-      rawCompetitors = await discoverCompetitors({
-        productName: identity.productName,
-        industry: identity.industry,
-        websiteUrl: identity.websiteUrl,
-        keywordIntelligence,
-        identity
-      });
-    }
     
     // Filter self-links and bad competitors even for orchestrator-sourced data
     let competitors = filterAllCompetitors(rawCompetitors, identity);
@@ -165,9 +119,7 @@ export async function generateCompetitorSeoIntelligence({
       metadata: {
         totalCompetitors: competitors?.length || 0,
         directCompetitors: competitors?.filter(c => c.competitorType === 'direct').length || 0,
-        analyzedAt: new Date().toISOString(),
-        hasCompetitors: competitors?.length > 0,
-        emptyStateMessage: competitors?.length === 0 ? 'No verified competitors were identified from the current evidence.' : null
+        analyzedAt: new Date().toISOString()
       }
     };
 
@@ -197,9 +149,7 @@ export async function generateCompetitorSeoIntelligence({
         analyzedAt: new Date().toISOString(),
         source: 'Unavailable',
         error: error.message,
-        message: 'Competitor intelligence unavailable due to processing error',
-        hasCompetitors: false,
-        emptyStateMessage: 'No verified competitors were identified from the current evidence.'
+        message: 'Competitor intelligence unavailable due to processing error'
       }
     };
   }

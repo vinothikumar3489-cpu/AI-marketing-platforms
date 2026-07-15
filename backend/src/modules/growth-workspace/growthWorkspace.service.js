@@ -27,7 +27,6 @@ import {
 import { collectBusinessIntelligence, synthesizeWithAI } from '../../services/intelligence/business-intelligence.service.js';
 import { generateExecutiveStory } from '../../services/intelligence/executive-story.service.js';
 import { generateActionPlan } from '../../services/intelligence/action-plan.service.js';
-import { isGenericLabel, preferDefinedValue } from '../../utils/merge-utilities.util.js';
 import {
   logCompanyCollected, logTechnologyCollected, logPricingCollected,
   logCompetitorsCollected, logMarketCollected, logAudienceCollected,
@@ -299,35 +298,21 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     // Step 1: Product Analysis (evidence-backed)
     console.log('✨ [Growth Workspace] Running Product Analysis...');
     steps[0].status = 'running';
-    steps[0].startTime = new Date().toISOString();
     try {
-      const rawResult = await runProductAnalysis(input, websiteData, evidenceGrowthData, synthesizedIntel);
+      const rawResult = await runProductAnalysis(input, websiteData, evidenceGrowthData);
       results.product = validateProductAnalysis(rawResult, input);
       steps[0].status = 'completed';
       steps[0].provider = results.product.provider || 'groq';
       steps[0].confidenceScore = results.product.confidenceScore ?? null;
-      steps[0].endTime = new Date().toISOString();
-      steps[0].duration = steps[0].endTime ? new Date(steps[0].endTime).getTime() - new Date(steps[0].startTime).getTime() : null;
       console.log('✅ [Growth Workspace] Product Analysis complete & validated:', {
         hasUSP: !!results.product.usp,
         featuresCount: results.product.features?.length || 0,
-        provider: results.product.provider,
-        duration: steps[0].duration
+        provider: results.product.provider
       });
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Product Analysis failed:', error.message);
-      steps[0].endTime = new Date().toISOString();
-      steps[0].duration = steps[0].endTime ? new Date(steps[0].endTime).getTime() - new Date(steps[0].startTime).getTime() : null;
-      steps[0].error = error.message;
-      steps[0].errorType = error.name || 'Error';
-      warnings.push({
-        code: 'PRODUCT_ANALYSIS_FAILED',
-        message: error.message,
-        provider: 'groq',
-        fallbackUsed: true,
-        timestamp: new Date().toISOString()
-      });
-      results.product = validateProductAnalysis(generateProductFallback(input, websiteData, synthesizedIntel), input);
+      warnings.push(`Product Analysis fallback: ${error.message}`);
+      results.product = validateProductAnalysis(null, input);
       steps[0].status = 'completed';
       steps[0].provider = 'fallback';
       steps[0].confidenceScore = results.product.confidenceScore ?? null;
@@ -337,35 +322,21 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Market Discovery...');
     steps[1].status = 'running';
-    steps[1].startTime = new Date().toISOString();
     try {
-      const rawResult = await runMarketDiscovery(input, results.product, synthesizedIntel);
+      const rawResult = await runMarketDiscovery(input, results.product);
       results.market = validateMarketDiscovery(rawResult, input);
       steps[1].status = 'completed';
       steps[1].provider = results.market.provider || 'groq';
       steps[1].confidenceScore = results.market.confidenceScore ?? null;
-      steps[1].endTime = new Date().toISOString();
-      steps[1].duration = steps[1].endTime ? new Date(steps[1].endTime).getTime() - new Date(steps[1].startTime).getTime() : null;
       console.log('✅ [Growth Workspace] Market Discovery complete & validated:', {
         trendsCount: results.market.marketTrends?.length || 0,
         opportunitiesCount: results.market.opportunities?.length || 0,
-        provider: results.market.provider,
-        duration: steps[1].duration
+        provider: results.market.provider
       });
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Market Discovery failed:', error.message);
-      steps[1].endTime = new Date().toISOString();
-      steps[1].duration = steps[1].endTime ? new Date(steps[1].endTime).getTime() - new Date(steps[1].startTime).getTime() : null;
-      steps[1].error = error.message;
-      steps[1].errorType = error.name || 'Error';
-      warnings.push({
-        code: 'MARKET_DISCOVERY_FAILED',
-        message: error.message,
-        provider: 'groq',
-        fallbackUsed: true,
-        timestamp: new Date().toISOString()
-      });
-      results.market = validateMarketDiscovery(generateMarketFallback(input, results.product, synthesizedIntel), input);
+      warnings.push(`Market Discovery fallback: ${error.message}`);
+      results.market = validateMarketDiscovery(null, input);
       steps[1].status = 'completed';
       steps[1].provider = 'fallback';
       steps[1].confidenceScore = results.market.confidenceScore ?? null;
@@ -375,35 +346,21 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Audience Intelligence...');
     steps[2].status = 'running';
-    steps[2].startTime = new Date().toISOString();
     try {
-      const rawResult = await runAudienceIntelligence(input, results.product, synthesizedIntel);
+      const rawResult = await runAudienceIntelligence(input, results.product);
       results.audience = validateAudienceIntelligence(rawResult, input);
       steps[2].status = 'completed';
       steps[2].provider = results.audience.provider || 'groq';
       steps[2].confidenceScore = results.audience.confidenceScore ?? null;
-      steps[2].endTime = new Date().toISOString();
-      steps[2].duration = steps[2].endTime ? new Date(steps[2].endTime).getTime() - new Date(steps[2].startTime).getTime() : null;
       console.log('✅ [Growth Workspace] Audience Intelligence complete & validated:', {
         personasCount: results.audience.buyerPersonas?.length || 0,
         channelsCount: results.audience.bestChannels?.length || 0,
-        provider: results.audience.provider,
-        duration: steps[2].duration
+        provider: results.audience.provider
       });
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Audience Intelligence failed:', error.message);
-      steps[2].endTime = new Date().toISOString();
-      steps[2].duration = steps[2].endTime ? new Date(steps[2].endTime).getTime() - new Date(steps[2].startTime).getTime() : null;
-      steps[2].error = error.message;
-      steps[2].errorType = error.name || 'Error';
-      warnings.push({
-        code: 'AUDIENCE_INTELLIGENCE_FAILED',
-        message: error.message,
-        provider: 'groq',
-        fallbackUsed: true,
-        timestamp: new Date().toISOString()
-      });
-      results.audience = validateAudienceIntelligence(generateAudienceFallback(input, results.product, synthesizedIntel), input);
+      warnings.push(`Audience Intelligence fallback: ${error.message}`);
+      results.audience = validateAudienceIntelligence(null, input);
       steps[2].status = 'completed';
       steps[2].provider = 'fallback';
       steps[2].confidenceScore = results.audience.confidenceScore ?? null;
@@ -413,36 +370,22 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Competitor Analysis...');
     steps[3].status = 'running';
-    steps[3].startTime = new Date().toISOString();
     try {
-      const rawResult = await runCompetitorAnalysis(input, results.product, researchData?.competitors || [], synthesizedIntel);
+      const rawResult = await runCompetitorAnalysis(input, results.product, researchData?.competitors || []);
       results.competitor = validateCompetitorAnalysis(rawResult, input);
       steps[3].status = 'completed';
       steps[3].provider = results.competitor.provider || 'groq';
       steps[3].confidenceScore = results.competitor.confidenceScore ?? null;
-      steps[3].endTime = new Date().toISOString();
-      steps[3].duration = steps[3].endTime ? new Date(steps[3].endTime).getTime() - new Date(steps[3].startTime).getTime() : null;
       console.log('✅ [Growth Workspace] Competitor Analysis complete & validated:', {
         competitorsCount: results.competitor.directCompetitors?.length || 0,
         gapsCount: results.competitor.marketGaps?.length || 0,
         provider: results.competitor.provider,
-        orchestratorCompetitorsUsed: researchData?.competitors?.length || 0,
-        duration: steps[3].duration
+        orchestratorCompetitorsUsed: researchData?.competitors?.length || 0
       });
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Competitor Analysis failed:', error.message);
-      steps[3].endTime = new Date().toISOString();
-      steps[3].duration = steps[3].endTime ? new Date(steps[3].endTime).getTime() - new Date(steps[3].startTime).getTime() : null;
-      steps[3].error = error.message;
-      steps[3].errorType = error.name || 'Error';
-      warnings.push({
-        code: 'COMPETITOR_ANALYSIS_FAILED',
-        message: error.message,
-        provider: 'groq',
-        fallbackUsed: true,
-        timestamp: new Date().toISOString()
-      });
-      results.competitor = validateCompetitorAnalysis(generateCompetitorFallback(input, results.product, researchData?.competitors || [], synthesizedIntel), input);
+      warnings.push(`Competitor Analysis fallback: ${error.message}`);
+      results.competitor = validateCompetitorAnalysis(null, input);
       steps[3].status = 'completed';
       steps[3].provider = 'fallback';
       steps[3].confidenceScore = results.competitor.confidenceScore ?? null;
@@ -452,35 +395,21 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Intent Prediction...');
     steps[4].status = 'running';
-    steps[4].startTime = new Date().toISOString();
     try {
-      const rawResult = await runIntentPrediction(input, results.audience, synthesizedIntel);
+      const rawResult = await runIntentPrediction(input, results.audience);
       results.intent = validateIntentPrediction(rawResult, input);
       steps[4].status = 'completed';
       steps[4].provider = results.intent.provider || 'groq';
       steps[4].confidenceScore = results.intent.confidenceScore ?? null;
-      steps[4].endTime = new Date().toISOString();
-      steps[4].duration = steps[4].endTime ? new Date(steps[4].endTime).getTime() - new Date(steps[4].startTime).getTime() : null;
       console.log('✅ [Growth Workspace] Intent Prediction complete & validated:', {
         hotSegmentsCount: results.intent.hotSegments?.length || 0,
         signalsCount: results.intent.buyingSignals?.length || 0,
-        provider: results.intent.provider,
-        duration: steps[4].duration
+        provider: results.intent.provider
       });
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Intent Prediction failed:', error.message);
-      steps[4].endTime = new Date().toISOString();
-      steps[4].duration = steps[4].endTime ? new Date(steps[4].endTime).getTime() - new Date(steps[4].startTime).getTime() : null;
-      steps[4].error = error.message;
-      steps[4].errorType = error.name || 'Error';
-      warnings.push({
-        code: 'INTENT_PREDICTION_FAILED',
-        message: error.message,
-        provider: 'groq',
-        fallbackUsed: true,
-        timestamp: new Date().toISOString()
-      });
-      results.intent = validateIntentPrediction(generateIntentFallback(input, results.audience, synthesizedIntel), input);
+      warnings.push(`Intent Prediction fallback: ${error.message}`);
+      results.intent = validateIntentPrediction(null, input);
       steps[4].status = 'completed';
       steps[4].provider = 'fallback';
       steps[4].confidenceScore = results.intent.confidenceScore ?? null;
@@ -490,35 +419,21 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Positioning Engine...');
     steps[5].status = 'running';
-    steps[5].startTime = new Date().toISOString();
     try {
-      const rawResult = await runPositioningEngine(input, results.product, results.competitor, synthesizedIntel);
+      const rawResult = await runPositioningEngine(input, results.product, results.competitor);
       results.positioning = validatePositioningEngine(rawResult, input);
       steps[5].status = 'completed';
       steps[5].provider = results.positioning.provider || 'groq';
       steps[5].confidenceScore = results.positioning.confidenceScore ?? null;
-      steps[5].endTime = new Date().toISOString();
-      steps[5].duration = steps[5].endTime ? new Date(steps[5].endTime).getTime() - new Date(steps[5].startTime).getTime() : null;
       console.log('✅ [Growth Workspace] Positioning Engine complete & validated:', {
         hasStatement: !!results.positioning.positioningStatement,
         pillarsCount: results.positioning.messagingPillars?.length || 0,
-        provider: results.positioning.provider,
-        duration: steps[5].duration
+        provider: results.positioning.provider
       });
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Positioning Engine failed:', error.message);
-      steps[5].endTime = new Date().toISOString();
-      steps[5].duration = steps[5].endTime ? new Date(steps[5].endTime).getTime() - new Date(steps[5].startTime).getTime() : null;
-      steps[5].error = error.message;
-      steps[5].errorType = error.name || 'Error';
-      warnings.push({
-        code: 'POSITIONING_ENGINE_FAILED',
-        message: error.message,
-        provider: 'groq',
-        fallbackUsed: true,
-        timestamp: new Date().toISOString()
-      });
-      results.positioning = validatePositioningEngine(generatePositioningFallback(input, results.product, results.competitor, synthesizedIntel), input);
+      warnings.push(`Positioning Engine fallback: ${error.message}`);
+      results.positioning = validatePositioningEngine(null, input);
       steps[5].status = 'completed';
       steps[5].provider = 'fallback';
       steps[5].confidenceScore = results.positioning.confidenceScore ?? null;
@@ -528,36 +443,22 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Campaign Generator...');
     steps[6].status = 'running';
-    steps[6].startTime = new Date().toISOString();
     try {
-      const rawResult = await runCampaignGenerator(input, results, synthesizedIntel);
+      const rawResult = await runCampaignGenerator(input, results);
       results.campaign = validateCampaignGenerator(rawResult, input);
       steps[6].status = 'completed';
       steps[6].provider = results.campaign.provider || 'groq';
       steps[6].confidenceScore = results.campaign.confidenceScore ?? null;
-      steps[6].endTime = new Date().toISOString();
-      steps[6].duration = steps[6].endTime ? new Date(steps[6].endTime).getTime() - new Date(steps[6].startTime).getTime() : null;
       console.log('✅ [Growth Workspace] Campaign Generator complete & validated:', {
         anglesCount: results.campaign.creativeAngles?.length || 0,
         hooksCount: results.campaign.copyHooks?.length || 0,
         hasActionPlan: !!(results.campaign.actionPlan?.sevenDay?.length || results.campaign.actionPlan?.thirtyDay?.length),
-        provider: results.campaign.provider,
-        duration: steps[6].duration
+        provider: results.campaign.provider
       });
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Campaign Generator failed:', error.message);
-      steps[6].endTime = new Date().toISOString();
-      steps[6].duration = steps[6].endTime ? new Date(steps[6].endTime).getTime() - new Date(steps[6].startTime).getTime() : null;
-      steps[6].error = error.message;
-      steps[6].errorType = error.name || 'Error';
-      warnings.push({
-        code: 'CAMPAIGN_GENERATOR_FAILED',
-        message: error.message,
-        provider: 'groq',
-        fallbackUsed: true,
-        timestamp: new Date().toISOString()
-      });
-      results.campaign = validateCampaignGenerator(generateCampaignFallback(input, websiteData, results, synthesizedIntel), input);
+      warnings.push(`Campaign Generator fallback: ${error.message}`);
+      results.campaign = validateCampaignGenerator(null, input);
       steps[6].status = 'completed';
       steps[6].provider = 'fallback';
       steps[6].confidenceScore = results.campaign.confidenceScore ?? null;
@@ -567,35 +468,21 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Channel Recommendation...');
     steps[7].status = 'running';
-    steps[7].startTime = new Date().toISOString();
     try {
-      const rawResult = await runChannelRecommendation(input, results.audience, results.campaign, synthesizedIntel);
+      const rawResult = await runChannelRecommendation(input, results.audience, results.campaign);
       results.channel = validateChannelRecommendation(rawResult, input);
       steps[7].status = 'completed';
       steps[7].provider = results.channel.provider || 'groq';
       steps[7].confidenceScore = results.channel.confidenceScore ?? null;
-      steps[7].endTime = new Date().toISOString();
-      steps[7].duration = steps[7].endTime ? new Date(steps[7].endTime).getTime() - new Date(steps[7].startTime).getTime() : null;
       console.log('✅ [Growth Workspace] Channel Recommendation complete & validated:', {
         channelsCount: results.channel.recommendedChannels?.length || 0,
         primaryChannel: results.channel.primaryChannel,
-        provider: results.channel.provider,
-        duration: steps[7].duration
+        provider: results.channel.provider
       });
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Channel Recommendation failed:', error.message);
-      steps[7].endTime = new Date().toISOString();
-      steps[7].duration = steps[7].endTime ? new Date(steps[7].endTime).getTime() - new Date(steps[7].startTime).getTime() : null;
-      steps[7].error = error.message;
-      steps[7].errorType = error.name || 'Error';
-      warnings.push({
-        code: 'CHANNEL_RECOMMENDATION_FAILED',
-        message: error.message,
-        provider: 'groq',
-        fallbackUsed: true,
-        timestamp: new Date().toISOString()
-      });
-      results.channel = validateChannelRecommendation(generateChannelFallback(input, results.audience, results.campaign, synthesizedIntel), input);
+      warnings.push(`Channel Recommendation fallback: ${error.message}`);
+      results.channel = validateChannelRecommendation(null, input);
       steps[7].status = 'completed';
       steps[7].provider = 'fallback';
       steps[7].confidenceScore = results.channel.confidenceScore ?? null;
@@ -690,73 +577,46 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     // Generate product-specific top recommendation from evidence
     function generateTopRecommendation(results, input) {
-      const productName = preferDefinedValue(input.companyName, input.productName, synthesizedIntel?.companyIntelligence?.name);
-      
-      // Reject generic product names
-      if (isGenericLabel(productName)) {
-        return 'Insufficient verified product identity to generate specific recommendation.';
-      }
-      
+      const productName = input.companyName || input.productName || 'the product';
       const signals = evidenceGrowthData?.growthSignals || [];
       const features = (evidenceGrowthData?.productIntelligence?.features || []).map(f => f.value);
       
-      if (signals.length > 0 && signals[0]?.signal) {
-        return `Based on evidence: ${signals[0].signal}. Leverage this opportunity for ${productName}.`;
+      if (signals.length > 0) {
+        return `Based on evidence: ${signals[0]?.signal || ''}. Leverage this opportunity for ${productName}.`;
       }
       if (features.length > 0) {
         return `Prioritize marketing the key features found: ${features.slice(0, 3).join(', ')} for ${productName}.`;
       }
       
-      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel;
-      const topPersona = results.audience?.buyerPersonas?.[0]?.name;
-      
-      if (primaryChannel && topPersona && !isGenericLabel(primaryChannel) && !isGenericLabel(topPersona)) {
-        return `Focus on ${primaryChannel} to reach ${topPersona} for ${productName}.`;
-      }
-      
-      return 'Insufficient verified evidence to generate specific recommendation.';
+      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel || 'digital channels';
+      const topPersona = results.audience?.buyerPersonas?.[0]?.name || 'target audience';
+      return `Focus on ${primaryChannel} to reach ${topPersona} for ${productName}.`;
     }
 
     function generatePrimaryRisk(results, input) {
-      const productName = preferDefinedValue(input.companyName, input.productName, synthesizedIntel?.companyIntelligence?.name);
       const topCompetitor = results.competitor?.directCompetitors?.[0]?.name;
+      const productName = input.companyName || input.productName || 'the product';
       
-      // Reject generic product names
-      if (isGenericLabel(productName)) {
-        return 'Insufficient verified product identity to identify specific risks.';
-      }
-      
-      if (topCompetitor && !isGenericLabel(topCompetitor)) {
+      if (topCompetitor) {
         return `Competitive pressure from ${topCompetitor} in the market.`;
       }
       return `Data insufficient to identify primary risk for ${productName}.`;
     }
 
     function generateImmediateAction(results, input) {
-      const productName = preferDefinedValue(input.companyName, input.productName, synthesizedIntel?.companyIntelligence?.name);
-      
-      // Reject generic product names
-      if (isGenericLabel(productName)) {
-        return 'Insufficient verified product identity to generate specific action.';
-      }
-      
       const features = (evidenceGrowthData?.productIntelligence?.features || []).map(f => f.value);
       const ctas = evidenceGrowthData?.productIntelligence?.ctaTexts || [];
+      const productName = input.companyName || input.productName || 'the product';
       
-      if (ctas.length > 0 && ctas[0]) {
+      if (ctas.length > 0) {
         return `Test and optimize existing CTAs from website: "${ctas[0]}" to improve conversion for ${productName}.`;
       }
       if (features.length > 0) {
         return `Build landing pages highlighting top features: ${features.slice(0, 2).join(', ')} for ${productName}.`;
       }
       
-      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel;
-      
-      if (primaryChannel && !isGenericLabel(primaryChannel)) {
-        return `Launch ${primaryChannel} campaign to validate ${productName} positioning.`;
-      }
-      
-      return 'Insufficient verified evidence to generate specific action.';
+      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel || 'marketing';
+      return `Launch ${primaryChannel} campaign to validate ${productName} positioning.`;
     }
 
     const marketOpportunityScore = calculateMarketOpportunityScore(normalizedResults.market);
@@ -1059,30 +919,23 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     console.log('💾 [Growth Workspace] Core intelligence saved to database');
     console.log(`✅ [Growth Workspace] hasActionPlan: ${!!normalizedResults.campaign.actionPlan}`);
 
-    // Verify database records — this is the source of truth for the response
-    let persisted = {
-      productIntelligence: false,
-      audienceIntelligence: false,
-      competitorIntelligence: false,
-      campaignIntelligence: false,
-    };
+    // Verify database records
     try {
-      const [product, comp, campaign] = await Promise.all([
+      const [product, audience, competitor, campaign] = await Promise.all([
         prisma.productIntelligence.findFirst({ where: { userId, chatId: validChatId }, select: { id: true } }),
         prisma.competitorIntelligence.findFirst({ where: { userId, chatId: validChatId }, select: { id: true } }),
         prisma.campaignIntelligence.findFirst({ where: { userId, chatId: validChatId }, select: { id: true } }),
       ]);
-      persisted = {
-        productIntelligence: !!product,
-        audienceIntelligence: !!product,
-        competitorIntelligence: !!comp,
-        campaignIntelligence: !!campaign,
-      };
       console.info('[Growth Stage]', {
         stage: 'PERSISTENCE_VERIFIED',
         status: 'completed',
         chatId: validChatId,
-        persistence: persisted,
+        persistence: {
+          hasProductIntelligence: !!product,
+          hasAudienceIntelligence: !!audience,
+          hasCompetitorIntelligence: !!competitor,
+          hasCampaignIntelligence: !!campaign,
+        }
       });
     } catch (verifyError) {
       console.error('[Growth Stage]', {
@@ -1093,13 +946,6 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
         errorMessage: verifyError.message,
       });
     }
-
-    // Derive overall status from persistence, not from step completion
-    const required = persisted.productIntelligence && persisted.audienceIntelligence;
-    const optionalFailures = [];
-    if (!persisted.competitorIntelligence) optionalFailures.push('competitorIntelligence');
-    if (!persisted.campaignIntelligence) optionalFailures.push('campaignIntelligence');
-    overallStatus = required ? (optionalFailures.length > 0 ? 'completed_with_warnings' : 'completed') : 'partial';
 
     // Add message to chat
     await prisma.message.create({
@@ -1122,7 +968,6 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results: normalizedResults,
       steps,
       overallStatus,
-      persisted,
       warnings,
       businessIntelligence: synthesizedIntel ? {
         company: synthesizedIntel.companyIntelligence,
@@ -1171,7 +1016,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 // MODULE SERVICES
 // ============================================
 
-async function runProductAnalysis(input, websiteData, evidenceGrowthData, businessIntelligence = null) {
+async function runProductAnalysis(input, websiteData, evidenceGrowthData) {
   let websiteContext = '';
   if (websiteData) {
     websiteContext = `\n\nScraped Website Data:
@@ -1231,29 +1076,9 @@ Provide a JSON response with:
 
 CRITICAL INSTRUCTION: Extract REAL information from the evidence and website content. NEVER use generic placeholders. Return only valid JSON.`;
 
-  const fallbackData = generateProductFallback(input, websiteData, businessIntelligence);
+  const fallbackData = generateProductFallback(input, websiteData);
   const aiResult = await callBestAI(prompt, 1200, 'Product Analysis', fallbackData);
-
-  console.log('[Stage Log] Product Analysis:', {
-    deterministicInput: {
-      hasEvidenceGrowthData: !!evidenceGrowthData,
-      hasBusinessIntelligence: !!businessIntelligence,
-      featuresFromBI: businessIntelligence?.technologyIntelligence?.technologies?.length || 0,
-      featuresFromEvidence: evidenceGrowthData?.productIntelligence?.features?.length || 0
-    },
-    aiProvider: aiResult.provider,
-    aiSucceeded: aiResult.provider !== 'fallback',
-    aiOutput: {
-      hasFeatures: Array.isArray(aiResult.features) && aiResult.features.length > 0,
-      hasBenefits: Array.isArray(aiResult.benefits) && aiResult.benefits.length > 0,
-      featureCount: Array.isArray(aiResult.features) ? aiResult.features.length : 0,
-      benefitCount: Array.isArray(aiResult.benefits) ? aiResult.benefits.length : 0,
-      hasSummary: !!aiResult.summary,
-      hasUSP: !!aiResult.usp
-    },
-    fallbackUsed: aiResult.provider === 'fallback'
-  });
-
+  
   return {
     ...aiResult,
     provider: aiResult.provider || 'fallback',
@@ -1261,7 +1086,7 @@ CRITICAL INSTRUCTION: Extract REAL information from the evidence and website con
   };
 }
 
-async function runMarketDiscovery(input, productData, businessIntelligence = null) {
+async function runMarketDiscovery(input, productData) {
   const prompt = `Analyze the market for this product:
 
 Product: ${input.productName}
@@ -1286,7 +1111,7 @@ Provide JSON response:
 
 CRITICAL INSTRUCTION: Do NOT fabricate market sizing numbers. Use growthSignals instead of TAM/SAM/SOM. Return only valid JSON.`;
 
-  const fallbackData = generateMarketFallback(input, productData, businessIntelligence);
+  const fallbackData = generateMarketFallback(input, productData);
   const aiResult = await callBestAI(prompt, 1200, 'Market Discovery', fallbackData);
   
   return {
@@ -1296,7 +1121,7 @@ CRITICAL INSTRUCTION: Do NOT fabricate market sizing numbers. Use growthSignals 
   };
 }
 
-async function runAudienceIntelligence(input, productData, businessIntelligence = null) {
+async function runAudienceIntelligence(input, productData) {
   const prompt = `Analyze the target audience for this product:
 
 Product: ${input.productName}
@@ -1324,7 +1149,7 @@ Provide JSON response:
 
 CRITICAL INSTRUCTION: NEVER use generic text. Personas must deeply reflect the real problems ${input.productName} solves. Return only valid JSON.`;
 
-  const fallbackData = generateAudienceFallback(input, productData, businessIntelligence);
+  const fallbackData = generateAudienceFallback(input, productData);
   const aiResult = await callBestAI(prompt, 1200, 'Audience Intelligence', fallbackData);
   
   return {
@@ -1334,7 +1159,7 @@ CRITICAL INSTRUCTION: NEVER use generic text. Personas must deeply reflect the r
   };
 }
 
-async function runCompetitorAnalysis(input, productData, orchestratorCompetitors = [], businessIntelligence = null) {
+async function runCompetitorAnalysis(input, productData, orchestratorCompetitors = []) {
   const competitors = input.competitors || '';
   
   // If orchestrator provided verified competitors, use them
@@ -1368,7 +1193,7 @@ Provide JSON response:
 
 CRITICAL INSTRUCTION: NEVER use generic placeholders like "Competitor 1". Use real competitor names if known, or infer real players in the ${input.industry} space. Return only valid JSON.`;
 
-  const fallbackData = generateCompetitorFallback(input, productData, orchestratorCompetitors, businessIntelligence);
+  const fallbackData = generateCompetitorFallback(input, productData, orchestratorCompetitors);
   const aiResult = await callBestAI(prompt, 1200, 'Competitor Analysis', fallbackData);
   
   return {
@@ -1379,7 +1204,7 @@ CRITICAL INSTRUCTION: NEVER use generic placeholders like "Competitor 1". Use re
   };
 }
 
-async function runIntentPrediction(input, audienceData, businessIntelligence = null) {
+async function runIntentPrediction(input, audienceData) {
   const prompt = `Predict buyer intent and readiness for this product:
 
 Product: ${input.productName}
@@ -1401,7 +1226,7 @@ Provide JSON response:
 
 CRITICAL INSTRUCTION: Return ONLY valid JSON in the exact schema specified. Use the value/confidence/impact schema.`;
 
-  const fallbackData = generateIntentFallback(input, audienceData, businessIntelligence);
+  const fallbackData = generateIntentFallback(input, audienceData);
   const aiResult = await callBestAI(prompt, 1000, 'Intent Prediction', fallbackData);
   
   return {
@@ -1411,7 +1236,7 @@ CRITICAL INSTRUCTION: Return ONLY valid JSON in the exact schema specified. Use 
   };
 }
 
-async function runPositioningEngine(input, productData, competitorData, businessIntelligence = null) {
+async function runPositioningEngine(input, productData, competitorData) {
   const prompt = `Create positioning strategy for this product:
 
 Product: ${input.productName}
@@ -1430,7 +1255,7 @@ Provide JSON response:
 
 CRITICAL INSTRUCTION: Return ONLY valid JSON using the exact schema above.`;
 
-  const fallbackData = generatePositioningFallback(input, productData, competitorData, businessIntelligence);
+  const fallbackData = generatePositioningFallback(input, productData, competitorData);
   const aiResult = await callBestAI(prompt, 1000, 'Positioning Engine', fallbackData);
   
   return {
@@ -1440,7 +1265,7 @@ CRITICAL INSTRUCTION: Return ONLY valid JSON using the exact schema above.`;
   };
 }
 
-async function runCampaignGenerator(input, allResults, businessIntelligence = null) {
+async function runCampaignGenerator(input, allResults) {
   const duration = input.duration || '7 days';
   
   const prompt = `Generate a ${duration} marketing campaign:
@@ -1473,7 +1298,7 @@ Provide JSON response:
 
 CRITICAL INSTRUCTION: Do NOT invent ROI, CTR, CPA, or conversion numbers. Action plan MUST use 'sevenDay', 'thirtyDay', 'sixtyDay', 'ninetyDay' timelines. Every task MUST explain WHY it exists using the problem, evidence, and researchSource fields. Do not use generic placeholders.`;
 
-  const fallbackData = generateCampaignFallback(input, allResults.product, allResults, businessIntelligence);
+  const fallbackData = generateCampaignFallback(input, allResults.product, allResults);
   const aiResult = await callBestAI(prompt, 1200, 'Campaign Generator', fallbackData);
   
   return {
@@ -1483,7 +1308,7 @@ CRITICAL INSTRUCTION: Do NOT invent ROI, CTR, CPA, or conversion numbers. Action
   };
 }
 
-async function runChannelRecommendation(input, audienceData, campaignData, businessIntelligence = null) {
+async function runChannelRecommendation(input, audienceData, campaignData) {
   const prompt = `Recommend marketing channels:
 
 Product: ${input.productName}
@@ -1509,7 +1334,7 @@ Provide JSON response:
 
 CRITICAL INSTRUCTION: Do NOT invent budget allocations or ROI percentages. Return only valid JSON.`;
 
-  const fallbackData = generateChannelFallback(input, audienceData, campaignData, businessIntelligence);
+  const fallbackData = generateChannelFallback(input, audienceData, campaignData);
   const aiResult = await callBestAI(prompt, 1000, 'Channel Recommendation', fallbackData);
   
   return {

@@ -9,14 +9,11 @@ import {
   generateGrowthMatrixChart, generateScoreRadarChart
 } from './chart-generator.service.js';
 import { prisma } from '../../config/prisma.js';
-import { buildGrowthFrontendPayload } from '../growth/growth-frontend-payload.service.js';
-import { validateReport, sanitizeReport } from '../../utils/report-validator.js';
 
 export async function buildReportData(chatId, userId) {
   console.log('[Report] Building report data for chat:', chatId);
 
-  const [chat, productIntel, competitorIntel, campaignIntel, seoIntel] = await Promise.all([
-    prisma.chat.findUnique({ where: { id: chatId } }),
+  const [productIntel, competitorIntel, campaignIntel, seoIntel] = await Promise.all([
     prisma.productIntelligence.findUnique({ where: { chatId } }),
     prisma.competitorIntelligence.findUnique({ where: { chatId } }),
     prisma.campaignIntelligence.findUnique({ where: { chatId } }),
@@ -34,58 +31,46 @@ export async function buildReportData(chatId, userId) {
     })
   ]);
 
-  if (!chat) {
-    throw new Error('Chat not found: ' + chatId);
-  }
+  const input = productIntel?.inputJson || campaignIntel?.inputJson || {};
 
-  // Use canonical Growth payload for consistency with frontend
-  const growthWorkspace = buildGrowthFrontendPayload({
-    chat,
-    productIntelligence: productIntel,
-    competitorIntelligence: competitorIntel,
-    campaignIntelligence: campaignIntel,
-    website: { url: chat?.websiteUrl }
-  });
+  const product = productIntel?.productAnalysis || {};
+  const market = productIntel?.marketDiscovery || {};
+  const audience = productIntel?.audienceIntelligence || {};
+
+  const competitor = competitorIntel?.competitorAnalysis || {};
+  const intent = competitorIntel?.intentPrediction || {};
+  const positioning = competitorIntel?.positioningEngine || {};
+
+  const campaign = campaignIntel?.campaignGenerator || {};
+  const channel = campaignIntel?.channelRecommendation || {};
+  const executiveStory = campaignIntel?.executiveStory || {};
+  const actionPlan = campaignIntel?.actionPlan || {};
 
   const seo = seoIntel ? normalizeSeoIntelligence(seoIntel) : null;
 
-  // Extract data from canonical payload
-  const product = growthWorkspace.productDNA || {};
-  const market = growthWorkspace.marketIntelligence || {};
-  const audience = growthWorkspace.audienceIntelligence || {};
-  const competitor = growthWorkspace.competitorIntelligence || {};
-  const positioning = growthWorkspace.positioning || {};
-  const campaign = growthWorkspace.campaignStrategy || {};
-  const channel = growthWorkspace.channelStrategy || {};
-  const executiveStory = campaign?.executiveStory || {};
-  const actionPlan = growthWorkspace.actionPlan || {};
-  const productIdentity = growthWorkspace.productIdentity || {};
-  const companyOverview = growthWorkspace.companyOverview || {};
-  const scoreSummary = growthWorkspace.scoreSummary || {};
-
   const scores = {
-    overallGrowthScore: scoreSummary.overallGrowthScore ?? null,
-    dataCompletenessScore: growthWorkspace.dataCompleteness?.percentageComplete ?? null,
-    evidenceBased: true,
-    evidenceSourcesCount: 0,
-    marketOpportunityScore: null,
-    audienceClarityScore: scoreSummary.audienceClarityScore ?? null,
-    competitiveDefensibilityScore: scoreSummary.competitiveDefensibilityScore ?? null,
-    campaignReadinessScore: scoreSummary.campaignReadinessScore ?? null
+    overallGrowthScore: campaign?.growthSummary?.overallGrowthScore ?? campaign?.growthSummary?.dataCompletenessScore ?? null,
+    dataCompletenessScore: campaign?.growthSummary?.dataCompletenessScore ?? null,
+    evidenceBased: campaign?.growthSummary?.evidenceBased ?? false,
+    evidenceSourcesCount: campaign?.growthSummary?.evidenceSourcesCount ?? 0,
+    marketOpportunityScore: campaign?.growthSummary?.evidenceBased ? campaign?.growthSummary?.overallGrowthScore : null,
+    audienceClarityScore: null,
+    competitiveDefensibilityScore: null,
+    campaignReadinessScore: null
   };
 
-  const company = companyOverview || {
-    name: productIdentity.companyName || productIdentity.productName || 'Unknown',
-    website: productIdentity.websiteUrl || '',
-    industry: market.industry || 'Unknown',
+  const company = executiveStory?.companyOverview || {
+    name: input?.companyName || input?.productName || 'Unknown',
+    website: input?.websiteUrl || '',
+    industry: input?.industry || 'Unknown',
     businessModel: 'Unknown',
     b2bOrB2C: 'Unknown',
     targetMarket: 'Unknown',
     headquarters: 'Unknown',
     employeeEstimate: 'Unknown',
     fundingStage: 'Unknown',
-    domain: productIdentity.domain || '',
-    category: product.category || 'Unknown'
+    domain: '',
+    category: 'Unknown'
   };
 
   const technologyData = {
@@ -103,15 +88,15 @@ export async function buildReportData(chatId, userId) {
   };
 
   const competitorData = {
-    direct: extractArray(competitor?.competitors || []),
-    indirect: extractArray(competitor?.indirectCompetitors || []),
-    all: extractArray(competitor?.competitors || [])
+    direct: extractArray(competitor?.directCompetitors || competitor?.competitors),
+    indirect: extractArray(competitor?.indirectCompetitors),
+    all: [...extractArray(competitor?.directCompetitors || competitor?.competitors), ...extractArray(competitor?.indirectCompetitors)]
   };
 
   const audienceData = {
-    personas: extractArray(audience?.personas || []),
-    segments: extractArray(audience?.segments || []),
-    channels: extractArray(audience?.channels || [])
+    personas: extractArray(audience?.buyerPersonas || audience?.personas),
+    segments: extractArray(audience?.audienceSegments),
+    channels: extractArray(audience?.bestChannels)
   };
 
   const marketData = {
@@ -143,10 +128,10 @@ export async function buildReportData(chatId, userId) {
 
   return {
     company, market: marketData, audience: audienceData, competitor: competitorData,
-    intent: null, positioning: positioningData, pricing,
+    intent, positioning: positioningData, pricing,
     technology: technologyData, scores, actionPlan: actionPlanData,
     channelData, product, campaign, seo, executiveStory,
-    chat: { id: chatId, input: chat?.inputJson || null }
+    chat: { id: chatId, input }
   };
 }
 
@@ -154,41 +139,34 @@ export async function generateExecutiveReport(chatId, userId, format = 'pdf') {
   console.log(`[Report] type=executive format=${format} chatId=${chatId}`);
   console.log('[Report] data loaded');
   const data = await buildReportData(chatId, userId);
-  
-  // Validate report data for consistency
-  const validation = validateReport(data, 'ExecutiveReport');
-  console.log('[Report] validation:', validation.isValid ? 'PASS' : 'WARN', validation.warnings.length, 'issues');
-  
-  // Sanitize report data to remove placeholders/fake data
-  const sanitizedData = sanitizeReport(data, 'ExecutiveReport');
 
   console.log(`[Report] generator started format=${format}`);
   try {
     let result;
     switch (format) {
       case 'pdf': {
-        const html = buildExecutiveReportHtml(sanitizedData);
+        const html = buildExecutiveReportHtml(data);
         result = await generatePdf(html, { format: 'A4', landscape: false });
         break;
       }
       case 'docx': {
-        result = await generateDocx(sanitizedData);
+        result = await generateDocx(data);
         break;
       }
       case 'pptx': {
-        result = await generatePptx(sanitizedData);
+        result = await generatePptx(data);
         break;
       }
       case 'json': {
-        result = Buffer.from(JSON.stringify(sanitizedData, null, 2));
+        result = Buffer.from(JSON.stringify(data, null, 2));
         break;
       }
       case 'csv': {
-        result = Buffer.from(generateCsv(sanitizedData));
+        result = Buffer.from(generateCsv(data));
         break;
       }
       case 'markdown': {
-        result = Buffer.from(generateMarkdown(sanitizedData, 'executive'));
+        result = Buffer.from(generateMarkdown(data, 'executive'));
         break;
       }
       default:
@@ -206,37 +184,30 @@ export async function generateGrowthReport(chatId, userId, format = 'pdf') {
   console.log(`[Report] type=growth format=${format} chatId=${chatId}`);
   console.log('[Report] data loaded');
   const data = await buildReportData(chatId, userId);
-  
-  // Validate report data for consistency
-  const validation = validateReport(data, 'GrowthReport');
-  console.log('[Report] validation:', validation.isValid ? 'PASS' : 'WARN', validation.warnings.length, 'issues');
-  
-  // Sanitize report data to remove placeholders/fake data
-  const sanitizedData = sanitizeReport(data, 'GrowthReport');
 
   console.log(`[Report] generator started format=${format}`);
   try {
     let result;
     switch (format) {
       case 'pdf': {
-        const html = buildGrowthReportHtml(sanitizedData);
+        const html = buildGrowthReportHtml(data);
         result = await generatePdf(html, { format: 'A4', landscape: false });
         break;
       }
       case 'docx':
-        result = await generateDocx(sanitizedData);
+        result = await generateDocx(data);
         break;
       case 'pptx':
-        result = await generatePptx(sanitizedData);
+        result = await generatePptx(data);
         break;
       case 'json':
-        result = Buffer.from(JSON.stringify(sanitizedData, null, 2));
+        result = Buffer.from(JSON.stringify(data, null, 2));
         break;
       case 'csv':
-        result = Buffer.from(generateCsv(sanitizedData));
+        result = Buffer.from(generateCsv(data));
         break;
       case 'markdown':
-        result = Buffer.from(generateMarkdown(sanitizedData, 'growth'));
+        result = Buffer.from(generateMarkdown(data, 'growth'));
         break;
       default:
         throw new Error(`Unsupported format: ${format}`);
@@ -253,37 +224,30 @@ export async function generateSeoReport(chatId, userId, format = 'pdf') {
   console.log(`[Report] type=seo format=${format} chatId=${chatId}`);
   console.log('[Report] data loaded');
   const data = await buildReportData(chatId, userId);
-  
-  // Validate report data for consistency
-  const validation = validateReport(data, 'SeoReport');
-  console.log('[Report] validation:', validation.isValid ? 'PASS' : 'WARN', validation.warnings.length, 'issues');
-  
-  // Sanitize report data to remove placeholders/fake data
-  const sanitizedData = sanitizeReport(data, 'SeoReport');
 
   console.log(`[Report] generator started format=${format}`);
   try {
     let result;
     switch (format) {
       case 'pdf': {
-        const html = buildSeoReportHtml(sanitizedData);
+        const html = buildSeoReportHtml(data);
         result = await generatePdf(html, { format: 'A4', landscape: false });
         break;
       }
       case 'docx':
-        result = await generateDocx(sanitizedData);
+        result = await generateDocx(data);
         break;
       case 'pptx':
-        result = await generatePptx(sanitizedData);
+        result = await generatePptx(data);
         break;
       case 'json':
-        result = Buffer.from(JSON.stringify(sanitizedData, null, 2));
+        result = Buffer.from(JSON.stringify(data, null, 2));
         break;
       case 'csv':
-        result = Buffer.from(generateCsv(sanitizedData));
+        result = Buffer.from(generateCsv(data));
         break;
       case 'markdown':
-        result = Buffer.from(generateMarkdown(sanitizedData, 'seo'));
+        result = Buffer.from(generateMarkdown(data, 'seo'));
         break;
       default:
         throw new Error(`Unsupported format: ${format}`);

@@ -39,8 +39,8 @@ export default function GrowthWorkspacePage() {
   const [error, setError] = useState('');
   const [results, setResults] = useState<any>({});
   const [creatingChat, setCreatingChat] = useState(false);
-  type Status = 'NOT_RUN' | 'RUNNING' | 'COMPLETED' | 'COMPLETED_WITH_WARNINGS' | 'FAILED';
-  const [status, setStatus] = useState<Status>('NOT_RUN');
+  type Status = 'idle' | 'input_required' | 'running' | 'completed' | 'failed';
+  const [status, setStatus] = useState<Status>('idle');
   const analysisRunningRef = useRef(false);
 
   useEffect(() => {
@@ -51,46 +51,36 @@ export default function GrowthWorkspacePage() {
     });
   }, []);
 
-  useEffect(() => {
-    setResults({});
-    setError('');
-    setStep(1);
-    setStatus(fullResults.growthStatus === 'COMPLETED' || fullResults.growthStatus === 'COMPLETED_WITH_WARNINGS' ? fullResults.growthStatus : selectedChatId ? 'NOT_RUN' : 'NOT_RUN');
-  }, [selectedChatId]);
+  function hasRealContent(obj: any): boolean {
+    return obj && typeof obj === 'object' && Object.keys(obj).length > 0;
+  }
 
   useEffect(() => {
     if (analysisRunningRef.current) return;
-    const gs = fullResults.growthStatus;
-    if (gs === 'COMPLETED' || gs === 'COMPLETED_WITH_WARNINGS') {
-      // PRIORITY: Use canonical growthWorkspace if available
-      const workspace = fullResults.growthWorkspace;
-      const r = workspace ? {
-        product: workspace.productDNA,
-        market: workspace.marketIntelligence,
-        audience: workspace.audienceIntelligence,
-        competitor: workspace.competitorIntelligence,
-        intent: workspace.competitorIntelligence?.intentPrediction,
-        positioning: workspace.positioning,
-        campaign: workspace.campaignStrategy,
-        channel: workspace.channelStrategy,
-        executiveStory: workspace.campaignStrategy?.executiveStory,
-        actionPlan: workspace.actionPlan,
-        summary: workspace.scoreSummary,
-        productIdentity: workspace.productIdentity,
-        companyOverview: workspace.companyOverview,
-        executiveSummary: workspace.executiveSummary,
-        opportunities: workspace.opportunities,
-        risks: workspace.risks,
-        dataCompleteness: workspace.dataCompleteness
-      } : fullResults.growth || {};
-      setResults(r);
-      setStatus(gs);
-    } else if (gs === 'NOT_RUN' || gs === 'FAILED') {
-      setResults({});
-      setStatus(gs);
-      setStep(1);
+    let cancelled = false;
+    const r = fullResults.growth || {};
+    const hasGrowthData = fullResults.hasGrowthWorkspace === true ||
+      hasRealContent(r.product) || hasRealContent(r.market) || hasRealContent(r.audience) ||
+      hasRealContent(r.competitor) || hasRealContent(r.intent) || hasRealContent(r.positioning) ||
+  hasRealContent(r.campaign) || hasRealContent(r.channel) || hasRealContent(r.executiveStory) ||
+  hasRealContent(r.actionPlan) || hasRealContent(r.evidence);
+
+    if (!cancelled) {
+      if (hasGrowthData) {
+        setResults(r);
+        setStatus('completed');
+      } else {
+        setResults({});
+        if (selectedChatId) {
+          setStatus('input_required');
+        } else {
+          setStatus('idle');
+        }
+        setStep(1);
+      }
     }
-  }, [fullResults]);
+    return () => { cancelled = true; };
+  }, [fullResults, selectedChatId]);
 
   async function run() {
     if (!form.websiteUrl) {
@@ -99,7 +89,7 @@ export default function GrowthWorkspacePage() {
     }
     setError(''); 
     setLoading(true);
-    setStatus('RUNNING');
+    setStatus('running');
     analysisRunningRef.current = true;
     try {
       let chatId = selectedChatId;
@@ -121,7 +111,7 @@ export default function GrowthWorkspacePage() {
       
       await loadFullResults(chatId);
       
-      setStatus('COMPLETED');
+      setStatus('completed');
     } catch (e: any) {
       const status = e?.status || e?.response?.status || 0;
       const msg = e.message || 'Analysis failed';
@@ -136,7 +126,7 @@ export default function GrowthWorkspacePage() {
       } else {
         setError(msg);
       }
-      setStatus('FAILED');
+      setStatus('failed');
     } finally {
       setLoading(false);
       analysisRunningRef.current = false;
@@ -149,7 +139,7 @@ export default function GrowthWorkspacePage() {
     setForm(defaults);
     setResults({});
     setError('');
-    setStatus('NOT_RUN');
+    setStatus('input_required');
     setStep(1);
     try {
       await createChat('New Growth Analysis');
@@ -208,7 +198,7 @@ export default function GrowthWorkspacePage() {
       </Card>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '20px' }}>
         <PageHeader eyebrow="All-in-one Analysis Command Center" title="Growth Workspace" subtitle="Generate a multi-stage, validated business intelligence report." />
-        {(status === 'COMPLETED' || status === 'COMPLETED_WITH_WARNINGS' || status === 'FAILED') && (
+        {(status === 'completed' || status === 'failed') && (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <div className="dropdown" style={{ position: 'relative' }}>
               <button className="secondary-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -243,7 +233,7 @@ export default function GrowthWorkspacePage() {
         </Card>
       )}
       
-      {(status === 'NOT_RUN' || status === 'FAILED') && !loading && !creatingChat && (
+      {(status === 'input_required' || status === 'idle') && !loading && !creatingChat && (
         <Card style={{ padding: '30px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #293245', paddingBottom: '15px' }}>
             <h2 style={{ margin: 0, color: '#fff', fontSize: '20px' }}>Project Configuration (Step {step} of 7)</h2>
@@ -352,7 +342,7 @@ export default function GrowthWorkspacePage() {
         </Card>
       )}
       
-      {status === 'RUNNING' && (
+      {status === 'running' && (
         <div style={{ display: 'grid', gap: '20px' }}>
           <LoadingSkeleton type="table" count={3} />
           <LoadingSkeleton type="card" count={3} />
@@ -360,7 +350,7 @@ export default function GrowthWorkspacePage() {
         </div>
       )}
       
-      {(status === 'COMPLETED' || status === 'COMPLETED_WITH_WARNINGS') && hasData && (
+      {status === 'completed' && hasData && (
         <Card>
           <SmartNavigation items={tabs.map(t => ({ id: t, label: t }))} activeId={activeTab} onNavigate={setActiveTab} />
           <div style={{ marginBottom: '16px' }}>
@@ -405,7 +395,7 @@ export default function GrowthWorkspacePage() {
         </Card>
       )}
 
-      {(status === 'COMPLETED' || status === 'COMPLETED_WITH_WARNINGS') && !hasData && (
+      {status === 'completed' && !hasData && (
         <Card>
           <EmptyState 
             title="No Verified Growth Data Available" 
@@ -449,11 +439,11 @@ function ExecutiveSnapshot({ results }: { results: any }) {
   );
   
   const radarData = hasScores ? [
-    { subject: 'Product Fit', A: sum.productFitScore != null ? asNumber(sum.productFitScore) : (results.product?.confidenceScore != null ? asNumber(results.product.confidenceScore) : null), fullMark: 100 },
-    { subject: 'Market Size', A: sum.marketSizeScore != null ? asNumber(sum.marketSizeScore) : (results.market?.confidenceScore != null ? asNumber(results.market.confidenceScore) : null), fullMark: 100 },
-    { subject: 'Audience Clarity', A: sum.audienceClarityScore != null ? asNumber(sum.audienceClarityScore) : (results.audience?.confidenceScore != null ? asNumber(results.audience.confidenceScore) : null), fullMark: 100 },
-    { subject: 'Competitive Defense', A: sum.competitiveDefensibilityScore != null ? asNumber(sum.competitiveDefensibilityScore) : (results.competitor?.confidenceScore != null ? asNumber(results.competitor.confidenceScore) : null), fullMark: 100 },
-    { subject: 'Campaign Readiness', A: sum.campaignReadinessScore != null ? asNumber(sum.campaignReadinessScore) : (results.campaign?.confidenceScore != null ? asNumber(results.campaign.confidenceScore) : null), fullMark: 100 },
+    { subject: 'Product Fit', A: asNumber(sum.productFitScore || results.product?.confidenceScore), fullMark: 100 },
+    { subject: 'Market Size', A: asNumber(sum.marketSizeScore || results.market?.confidenceScore), fullMark: 100 },
+    { subject: 'Audience Clarity', A: asNumber(sum.audienceClarityScore || results.audience?.confidenceScore), fullMark: 100 },
+    { subject: 'Competitive Defense', A: asNumber(sum.competitiveDefensibilityScore || results.competitor?.confidenceScore), fullMark: 100 },
+    { subject: 'Campaign Readiness', A: asNumber(sum.campaignReadinessScore || results.campaign?.confidenceScore), fullMark: 100 },
   ].filter(d => d.A !== null) : [];
 
   // Phase 6C: Build executive summary data from existing results
@@ -584,10 +574,10 @@ function ExecutiveSnapshot({ results }: { results: any }) {
 
   // Phase 6C: Confidence data
   const confidenceData = useMemo(() => [
-    sum?.overallGrowthScore != null ? { section: 'Growth Analysis', confidence: asNumber(sum?.overallGrowthScore), evidenceStrength: null, sourceCount: results.evidence?.sources?.length ?? 0, dataFreshness: 'Today' } : null,
-    sum?.marketOpportunityScore != null ? { section: 'Market Intelligence', confidence: asNumber(sum?.marketOpportunityScore), evidenceStrength: null, sourceCount: results.market?.sources?.length ?? 0, dataFreshness: 'Today' } : null,
-    sum?.audienceClarityScore != null ? { section: 'Audience Intelligence', confidence: asNumber(sum?.audienceClarityScore), evidenceStrength: null, sourceCount: results.audience?.sources?.length ?? 0, dataFreshness: 'Today' } : null,
-    sum?.competitiveDefensibilityScore != null ? { section: 'Competitor Intelligence', confidence: asNumber(sum?.competitiveDefensibilityScore), evidenceStrength: null, sourceCount: results.competitor?.sources?.length ?? 0, dataFreshness: 'Today' } : null,
+    sum?.overallGrowthScore != null ? { section: 'Growth Analysis', confidence: asNumber(sum?.overallGrowthScore), evidenceStrength: null, sourceCount: results.evidence?.sources?.length || 0, dataFreshness: 'Today' } : null,
+    sum?.marketOpportunityScore != null ? { section: 'Market Intelligence', confidence: asNumber(sum?.marketOpportunityScore), evidenceStrength: null, sourceCount: results.market?.sources?.length || 0, dataFreshness: 'Today' } : null,
+    sum?.audienceClarityScore != null ? { section: 'Audience Intelligence', confidence: asNumber(sum?.audienceClarityScore), evidenceStrength: null, sourceCount: results.audience?.sources?.length || 0, dataFreshness: 'Today' } : null,
+    sum?.competitiveDefensibilityScore != null ? { section: 'Competitor Intelligence', confidence: asNumber(sum?.competitiveDefensibilityScore), evidenceStrength: null, sourceCount: results.competitor?.sources?.length || 0, dataFreshness: 'Today' } : null,
   ].filter(Boolean), [sum, results]);
 
   const filterOptions = [
@@ -771,9 +761,9 @@ function ExecutiveSnapshot({ results }: { results: any }) {
 
       {/* Phase 6C: Compare Results (placeholder) */}
       <CompareResults metrics={[
-        sum?.overallGrowthScore != null ? { label: 'Growth Score', current: asNumber(sum?.overallGrowthScore), previous: sum?.previousGrowthScore != null ? asNumber(sum?.previousGrowthScore) : null } : null,
-        sum?.marketOpportunityScore != null ? { label: 'Market Opportunity', current: asNumber(sum?.marketOpportunityScore), previous: sum?.previousMarketScore != null ? asNumber(sum?.previousMarketScore) : null } : null,
-        sum?.audienceClarityScore != null ? { label: 'Audience Clarity', current: asNumber(sum?.audienceClarityScore), previous: sum?.previousAudienceScore != null ? asNumber(sum?.previousAudienceScore) : null } : null,
+        sum?.overallGrowthScore != null ? { label: 'Growth Score', current: asNumber(sum?.overallGrowthScore), previous: asNumber(sum?.previousGrowthScore || 0) } : null,
+        sum?.marketOpportunityScore != null ? { label: 'Market Opportunity', current: asNumber(sum?.marketOpportunityScore), previous: asNumber(sum?.previousMarketScore || 0) } : null,
+        sum?.audienceClarityScore != null ? { label: 'Audience Clarity', current: asNumber(sum?.audienceClarityScore), previous: asNumber(sum?.previousAudienceScore || 0) } : null,
       ].filter(Boolean)} />
 
       {/* Phase 6C: Confidence Visualization */}
@@ -1643,35 +1633,15 @@ function ActionCard({ item }: { item: any }) {
 function ReportView({ data, chatId }: { data: any, chatId?: string }) {
   const sections = ['Executive Snapshot', 'Executive Story', 'Product DNA', 'Market Intelligence', 'Audience Intelligence', 'Competitor Intelligence', 'Intent Prediction', 'Positioning Strategy', 'Campaign Strategy', 'Channel Strategy', 'Action Plan'];
   const hasSection = (key: string) => {
-    if (key === 'Executive Snapshot') return !!(data.summary || data.growthSummary || data.scoreSummary);
+    if (key === 'Executive Snapshot') return !!(data.summary || data.growthSummary);
     if (key === 'Executive Story') return !!(data.executiveStory && Object.keys(data.executiveStory).length > 0);
     if (key === 'Product DNA') return !!(data.product && Object.keys(data.product).length > 0);
-    if (key === 'Market Intelligence') {
-      const market = data.market || {};
-      return !!(market.tam || market.sam || market.som || market.industry || 
-                (market.marketTrends && market.marketTrends.length > 0) ||
-                (market.growthOpportunities && market.growthOpportunities.length > 0));
-    }
-    if (key === 'Audience Intelligence') {
-      const audience = data.audience || {};
-      return !!((audience.personas && audience.personas.length > 0) ||
-                (audience.painPoints && audience.painPoints.length > 0) ||
-                (audience.targetUsers && audience.targetUsers.length > 0) ||
-                (audience.decisionMakers && audience.decisionMakers.length > 0));
-    }
-    if (key === 'Competitor Intelligence') {
-      const competitor = data.competitor || {};
-      return !!((competitor.competitors && competitor.competitors.length > 0) ||
-                (competitor.marketGaps && competitor.marketGaps.length > 0));
-    }
+    if (key === 'Market Intelligence') return !!(data.market && Object.keys(data.market).length > 0);
+    if (key === 'Audience Intelligence') return !!(data.audience && Object.keys(data.audience).length > 0);
+    if (key === 'Competitor Intelligence') return !!(data.competitor && Object.keys(data.competitor).length > 0);
     if (key === 'Intent Prediction') return !!(data.intent && Object.keys(data.intent).length > 0);
     if (key === 'Positioning Strategy') return !!(data.positioning && Object.keys(data.positioning).length > 0);
-    if (key === 'Campaign Strategy') {
-      const campaign = data.campaign || {};
-      return !!((campaign.objectives && campaign.objectives.length > 0) ||
-                (campaign.channels && campaign.channels.length > 0) ||
-                (campaign.marketingAngles && campaign.marketingAngles.length > 0));
-    }
+    if (key === 'Campaign Strategy') return !!(data.campaign && Object.keys(data.campaign).length > 0);
     if (key === 'Channel Strategy') return !!(data.channel && Object.keys(data.channel).length > 0);
     if (key === 'Action Plan') return !!(data.actionPlan && Object.keys(data.actionPlan).length > 0);
     return false;
@@ -1681,9 +1651,9 @@ function ReportView({ data, chatId }: { data: any, chatId?: string }) {
   const totalPages = Math.max(1, Math.round(includedSections.length * 2.5));
 
   const reportSections = [
-    { name: 'Executive Snapshot', content: `Data Completeness: ${data.evidence?.sourceSummary?.completenessScore ?? 'N/A'}%\nGrowth Signals: ${data.evidence?.growthSignals?.length ?? 0}\nEvidence Sources: ${data.evidence?.sourceSummary?.sourcesCollected ?? 0}/${data.evidence?.sourceSummary?.totalSources ?? '?'}` },
+    { name: 'Executive Snapshot', content: `Data Completeness: ${data.evidence?.sourceSummary?.completenessScore || 'N/A'}%\nGrowth Signals: ${data.evidence?.growthSignals?.length || 0}\nEvidence Sources: ${data.evidence?.sourceSummary?.sourcesCollected || 0}/${data.evidence?.sourceSummary?.totalSources || '?'}` },
     { name: 'Executive Story', content: data.executiveStory?.executiveSummary?.title || 'Enterprise Business Intelligence Report' },
-    { name: 'Market Intelligence', content: `Market size data (TAM/SAM/SOM) not available without paid API sources. Growth Signals: ${data.evidence?.growthSignals?.length ?? data.market?.growthSignals?.length ?? 0}` },
+    { name: 'Market Intelligence', content: `Market size data (TAM/SAM/SOM) not available without paid API sources. Growth Signals: ${data.evidence?.growthSignals?.length || data.market?.growthSignals?.length || 0}` },
   ];
 
   return (

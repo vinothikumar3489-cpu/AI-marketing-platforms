@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
-import { buildGrowthFrontendPayload } from "../services/growth/growth-frontend-payload.service.js";
 
 export async function getChatIntelligenceReadiness({ userId, chatId }) {
   const [productIntel, competitorIntel, campaignIntel, seoIntel, automationPlan] = await Promise.all([
@@ -588,52 +587,55 @@ export const getFullResults = async (req, res) => {
     hasAutomationPlan: !!automationPlan,
   });
 
-  // Derive status flags from DB records
-  const hasProduct = !!productIntelligence;
-  const hasCompetitor = !!competitorIntelligence;
-  const hasCampaign = !!campaignIntelligence;
-  const hasSeo = !!normalizedSeoIntelligence;
-
-  // Growth requires at minimum ProductIntelligence
-  const growthStatus = hasProduct ? 'COMPLETED' : 'NOT_RUN';
-  
-  // SEO status is independent of Growth - requires SEO intelligence
-  const seoStatus = hasSeo ? 'COMPLETED' : 'NOT_RUN';
-
-  // Build canonical Growth Workspace payload
-  const growthWorkspace = buildGrowthFrontendPayload({
-    chat,
-    productIntelligence,
-    competitorIntelligence,
-    campaignIntelligence,
-    website: { url: chat?.websiteUrl }
-  });
+  // Build canonical fullResults shape
+  const hasGrowthWorkspace = !!(productIntelligence || competitorIntelligence || campaignIntelligence);
+  const hasSeoIntelligence = !!normalizedSeoIntelligence;
 
   const canonicalResult = {
     success: true,
     chat,
-    chatId: chat.id,
-    growthStatus,
-    seoStatus,
-    productIdentity: growthWorkspace.productIdentity,
-    growthWorkspace: growthWorkspace.status === 'COMPLETED' ? growthWorkspace : null,
-    seoIntelligence: hasSeo ? {
-      technicalAudit: normalizedSeoIntelligence.technicalAudit || null,
-      keywordIntelligence: normalizedSeoIntelligence.keywordIntelligence || null,
-      competitorIntelligence: normalizedSeoIntelligence.competitorIntelligence || null,
-      contentGapAnalysis: normalizedSeoIntelligence.contentGapAnalysis || null,
-      blogIntelligence: normalizedSeoIntelligence.blogIntelligence || null,
-      geoIntelligence: normalizedSeoIntelligence.geoIntelligence || null,
-      executiveDashboard: normalizedSeoIntelligence.executiveDashboard || null,
+    growth: hasGrowthWorkspace ? {
+      identity: {
+        websiteUrl: chat?.websiteUrl || productIntelligence?.inputJson?.websiteUrl || '',
+        productName: chat?.productName || productIntelligence?.inputJson?.productName || '',
+        companyName: chat?.title || productIntelligence?.inputJson?.companyName || '',
+        industry: productIntelligence?.inputJson?.industry || '',
+      },
+      product: productIntelligence?.productAnalysis ?? null,
+      market: productIntelligence?.marketDiscovery ?? null,
+      audience: productIntelligence?.audienceIntelligence ?? null,
+      competitor: competitorIntelligence?.competitorAnalysis ?? null,
+      intent: competitorIntelligence?.intentPrediction ?? null,
+      positioning: competitorIntelligence?.positioningEngine ?? null,
+      campaign: campaignIntelligence?.campaignGenerator ?? null,
+      channel: campaignIntelligence?.channelRecommendation ?? null,
+      executiveStory: campaignIntelligence?.executiveStory || campaignIntelligence?.campaignGenerator?.executiveStory || campaignIntelligence?.campaignGenerator?.metadata?.executiveStory || null,
+      actionPlan: campaignIntelligence?.actionPlan || campaignIntelligence?.campaignGenerator?.actionPlan || campaignIntelligence?.campaignGenerator?.metadata?.actionPlan || null,
+      summary: campaignIntelligence?.campaignGenerator?.growthSummary || campaignIntelligence?.campaignGenerator?.metadata?.growthSummary || null
+    } : null,
+    seoIntelligence: hasSeoIntelligence ? {
+      identity: {
+        websiteUrl: seoIntelligence?.websiteUrl || '',
+        domain: seoIntelligence?.domain || '',
+        companyName: seoIntelligence?.companyName || '',
+        productName: seoIntelligence?.productName || '',
+      },
+      technicalAudit: normalizedSeoIntelligence.technicalAudit || {},
+      keywordIntelligence: normalizedSeoIntelligence.keywordIntelligence || {},
+      competitorIntelligence: normalizedSeoIntelligence.competitorIntelligence || {},
+      contentGapAnalysis: normalizedSeoIntelligence.contentGapAnalysis || {},
+      blogIntelligence: normalizedSeoIntelligence.blogIntelligence || {},
+      geoIntelligence: normalizedSeoIntelligence.geoIntelligence || {},
+      executiveDashboard: normalizedSeoIntelligence.executiveDashboard || {},
       executiveStory: normalizedSeoIntelligence.executiveStory || null,
       actionPlan: normalizedSeoIntelligence.actionPlan || null,
-      scoreBreakdown: normalizedSeoIntelligence.scoreBreakdown || null,
-    } : null,
-    hasProductIntelligence: hasProduct,
-    hasAudienceIntelligence: hasProduct,
-    hasCompetitorIntelligence: hasCompetitor,
-    hasCampaignIntelligence: hasCampaign,
-    hasSeoIntelligence: hasSeo,
+      scoreBreakdown: normalizedSeoIntelligence.scoreBreakdown || {},
+    } : {},
+    hasGrowthWorkspace,
+    hasProductIntelligence: !!productIntelligence,
+    hasCompetitorIntelligence: !!competitorIntelligence,
+    hasCampaignIntelligence: !!campaignIntelligence,
+    hasSeoIntelligence,
     // Backward compatibility fields
     productIntelligence,
     competitorIntelligence,
