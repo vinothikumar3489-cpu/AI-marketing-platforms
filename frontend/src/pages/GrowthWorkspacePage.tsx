@@ -39,8 +39,8 @@ export default function GrowthWorkspacePage() {
   const [error, setError] = useState('');
   const [results, setResults] = useState<any>({});
   const [creatingChat, setCreatingChat] = useState(false);
-  type Status = 'idle' | 'input_required' | 'running' | 'completed' | 'failed';
-  const [status, setStatus] = useState<Status>('idle');
+  type Status = 'NOT_RUN' | 'RUNNING' | 'COMPLETED' | 'COMPLETED_WITH_WARNINGS' | 'FAILED';
+  const [status, setStatus] = useState<Status>('NOT_RUN');
   const analysisRunningRef = useRef(false);
 
   useEffect(() => {
@@ -51,36 +51,26 @@ export default function GrowthWorkspacePage() {
     });
   }, []);
 
-  function hasRealContent(obj: any): boolean {
-    return obj && typeof obj === 'object' && Object.keys(obj).length > 0;
-  }
+  useEffect(() => {
+    setResults({});
+    setError('');
+    setStep(1);
+    setStatus(fullResults.growthStatus === 'COMPLETED' || fullResults.growthStatus === 'COMPLETED_WITH_WARNINGS' ? fullResults.growthStatus : selectedChatId ? 'NOT_RUN' : 'NOT_RUN');
+  }, [selectedChatId]);
 
   useEffect(() => {
     if (analysisRunningRef.current) return;
-    let cancelled = false;
-    const r = fullResults.growth || {};
-    const hasGrowthData = fullResults.hasGrowthWorkspace === true ||
-      hasRealContent(r.product) || hasRealContent(r.market) || hasRealContent(r.audience) ||
-      hasRealContent(r.competitor) || hasRealContent(r.intent) || hasRealContent(r.positioning) ||
-  hasRealContent(r.campaign) || hasRealContent(r.channel) || hasRealContent(r.executiveStory) ||
-  hasRealContent(r.actionPlan) || hasRealContent(r.evidence);
-
-    if (!cancelled) {
-      if (hasGrowthData) {
-        setResults(r);
-        setStatus('completed');
-      } else {
-        setResults({});
-        if (selectedChatId) {
-          setStatus('input_required');
-        } else {
-          setStatus('idle');
-        }
-        setStep(1);
-      }
+    const gs = fullResults.growthStatus;
+    if (gs === 'COMPLETED' || gs === 'COMPLETED_WITH_WARNINGS') {
+      const r = fullResults.growth || {};
+      setResults(r);
+      setStatus(gs);
+    } else if (gs === 'NOT_RUN' || gs === 'FAILED') {
+      setResults({});
+      setStatus(gs);
+      setStep(1);
     }
-    return () => { cancelled = true; };
-  }, [fullResults, selectedChatId]);
+  }, [fullResults]);
 
   async function run() {
     if (!form.websiteUrl) {
@@ -89,7 +79,7 @@ export default function GrowthWorkspacePage() {
     }
     setError(''); 
     setLoading(true);
-    setStatus('running');
+    setStatus('RUNNING');
     analysisRunningRef.current = true;
     try {
       let chatId = selectedChatId;
@@ -111,7 +101,7 @@ export default function GrowthWorkspacePage() {
       
       await loadFullResults(chatId);
       
-      setStatus('completed');
+      setStatus('COMPLETED');
     } catch (e: any) {
       const status = e?.status || e?.response?.status || 0;
       const msg = e.message || 'Analysis failed';
@@ -126,7 +116,7 @@ export default function GrowthWorkspacePage() {
       } else {
         setError(msg);
       }
-      setStatus('failed');
+      setStatus('FAILED');
     } finally {
       setLoading(false);
       analysisRunningRef.current = false;
@@ -139,7 +129,7 @@ export default function GrowthWorkspacePage() {
     setForm(defaults);
     setResults({});
     setError('');
-    setStatus('input_required');
+    setStatus('NOT_RUN');
     setStep(1);
     try {
       await createChat('New Growth Analysis');
@@ -198,7 +188,7 @@ export default function GrowthWorkspacePage() {
       </Card>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '20px' }}>
         <PageHeader eyebrow="All-in-one Analysis Command Center" title="Growth Workspace" subtitle="Generate a multi-stage, validated business intelligence report." />
-        {(status === 'completed' || status === 'failed') && (
+        {(status === 'COMPLETED' || status === 'COMPLETED_WITH_WARNINGS' || status === 'FAILED') && (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <div className="dropdown" style={{ position: 'relative' }}>
               <button className="secondary-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -233,7 +223,7 @@ export default function GrowthWorkspacePage() {
         </Card>
       )}
       
-      {(status === 'input_required' || status === 'idle') && !loading && !creatingChat && (
+      {(status === 'NOT_RUN' || status === 'FAILED') && !loading && !creatingChat && (
         <Card style={{ padding: '30px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #293245', paddingBottom: '15px' }}>
             <h2 style={{ margin: 0, color: '#fff', fontSize: '20px' }}>Project Configuration (Step {step} of 7)</h2>
@@ -342,7 +332,7 @@ export default function GrowthWorkspacePage() {
         </Card>
       )}
       
-      {status === 'running' && (
+      {status === 'RUNNING' && (
         <div style={{ display: 'grid', gap: '20px' }}>
           <LoadingSkeleton type="table" count={3} />
           <LoadingSkeleton type="card" count={3} />
@@ -350,7 +340,7 @@ export default function GrowthWorkspacePage() {
         </div>
       )}
       
-      {status === 'completed' && hasData && (
+      {(status === 'COMPLETED' || status === 'COMPLETED_WITH_WARNINGS') && hasData && (
         <Card>
           <SmartNavigation items={tabs.map(t => ({ id: t, label: t }))} activeId={activeTab} onNavigate={setActiveTab} />
           <div style={{ marginBottom: '16px' }}>
@@ -395,7 +385,7 @@ export default function GrowthWorkspacePage() {
         </Card>
       )}
 
-      {status === 'completed' && !hasData && (
+      {(status === 'COMPLETED' || status === 'COMPLETED_WITH_WARNINGS') && !hasData && (
         <Card>
           <EmptyState 
             title="No Verified Growth Data Available" 

@@ -1485,7 +1485,7 @@ function filterVisibleTabs(allTabs: typeof tabs, data: any, execData: any, campa
 }
 
 export default function AutomationCenterPage() {
-  const { selectedChatId, fullResults } = useProject();
+  const { selectedChatId, fullResults, loadFullResults } = useProject();
   const [active, setActive] = useWorkspaceMemory('auto-activeTab', 'Plan');
   const [data, setData] = useState<any>(null);
   const [genError, setGenError] = useState<string | null>(null);
@@ -1556,6 +1556,7 @@ export default function AutomationCenterPage() {
         setGenError(getApiErrorMessage(res.error));
       } else {
         setData(res.automationPlan || res.data || res);
+        await loadFullResults(selectedChatId);
       }
     } catch (e: any) {
       setGenError(getApiErrorMessage(e));
@@ -1594,6 +1595,7 @@ export default function AutomationCenterPage() {
       } else {
         await loadCampaignPlan();
       }
+      await loadFullResults(selectedChatId);
       setCampaignLoading(false);
     } catch (e: any) {
       setCampaignError(getApiErrorMessage(e));
@@ -1721,10 +1723,10 @@ export default function AutomationCenterPage() {
             )}
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button className="primary-btn" onClick={generate} disabled={genLoading || !selectedChatId || !hasProductIntel} title={!hasProductIntel ? 'Complete Growth Analysis before generating Automation Plan' : ''}>
+            <button className="primary-btn" onClick={generate} disabled={genLoading || !selectedChatId || !hasCampaignIntel} title={!hasCampaignIntel ? 'Complete Campaign Intelligence before generating Automation Plan' : ''}>
               {genLoading ? 'Generating...' : 'Generate Automation Plan'}
             </button>
-            <button className="secondary-btn" onClick={executeAll} disabled={execLoading || !selectedChatId || !hasProductIntel} title={!hasProductIntel ? 'Complete Growth Analysis before executing modules' : ''} style={{ borderColor: '#a855f7', color: '#a855f7' }}>
+            <button className="secondary-btn" onClick={executeAll} disabled={execLoading || !selectedChatId || !hasCampaignIntel} title={!hasCampaignIntel ? 'Complete Campaign Intelligence before executing modules' : ''} style={{ borderColor: '#a855f7', color: '#a855f7' }}>
               {execLoading ? 'Generating...' : 'Execute All Modules'}
             </button>
             <button className="secondary-btn" onClick={generateCampaign} disabled={campaignLoading || !selectedChatId || !hasProductIntel} title={!hasProductIntel ? 'Complete Growth Analysis before generating Campaign Intelligence' : ''} style={{ borderColor: '#10e18b', color: '#10e18b' }}>
@@ -1733,7 +1735,12 @@ export default function AutomationCenterPage() {
           </div>
           {!hasProductIntel && selectedChatId && (
             <div style={{ marginTop: '8px', fontSize: '12px', color: '#ffb347' }}>
-              Complete Growth Analysis before generating Campaign or Automation modules.
+              Complete Growth Analysis before generating Campaign Intelligence. Campaign Intelligence is required for Automation Plan.
+            </div>
+          )}
+          {hasProductIntel && !hasCampaignIntel && selectedChatId && (
+            <div style={{ marginTop: '8px', fontSize: '12px', color: '#ffb347' }}>
+              Generate Campaign Intelligence before creating an Automation Plan or executing modules.
             </div>
           )}
         </div>

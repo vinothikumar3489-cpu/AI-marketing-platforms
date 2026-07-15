@@ -213,34 +213,39 @@ export default function SEOIntelligencePage() {
     return false;
   }
 
-  // On mount, hydrate from fullResults if data exists for this chat
+  // Reset SEO state when switching chats
   useEffect(() => {
-    if (isNewAnalysis) return;
-    if (!selectedChatId) return;
-    const r = fullResults.seoIntelligence || fullResults.seo || {};
-    
-    // Crash detector: find risky objects that cause React error #31
-    if (import.meta.env.DEV) {
-      findRiskyObjects(fullResults, "fullResults");
+    setUrl('');
+    setSeo({});
+    setError('');
+    const ss = fullResults.seoStatus;
+    if (ss === 'COMPLETED' || ss === 'COMPLETED_WITH_WARNINGS') {
+      const r = fullResults.seoIntelligence || fullResults.seo || {};
+      if (r && typeof r === 'object' && Object.keys(r).length > 0) {
+        storedChatRef.current = selectedChatId;
+        setSeo(r);
+        setMode('results');
+      }
     }
-    if (hasRealSeoData(r)) {
-      storedChatRef.current = selectedChatId;
-      setSeo(r);
-      setMode('results');
-      if (!url) setUrl(r.websiteUrl || '');
-    }
-  }, []);
+  }, [selectedChatId]);
 
   // On fullResults change: update if data exists, never clear existing results
   useEffect(() => {
     if (isNewAnalysis) return;
     if (!selectedChatId) return;
-    const r = fullResults.seoIntelligence || fullResults.seo || {};
-    if (hasRealSeoData(r)) {
-      storedChatRef.current = selectedChatId;
-      setSeo(r);
-      setMode('results');
-      if (!url) setUrl(r.websiteUrl || '');
+    const ss = fullResults.seoStatus;
+    if (ss === 'COMPLETED' || ss === 'COMPLETED_WITH_WARNINGS') {
+      const r = fullResults.seoIntelligence || fullResults.seo || {};
+      if (r && typeof r === 'object' && Object.keys(r).length > 0) {
+        storedChatRef.current = selectedChatId;
+        setSeo(r);
+        setMode('results');
+        if (!url) setUrl(r.websiteUrl || '');
+      }
+    } else if (ss === 'NOT_RUN') {
+      setMode('form');
+    } else if (ss === 'FAILED') {
+      setMode('error');
     }
   }, [fullResults]);
 

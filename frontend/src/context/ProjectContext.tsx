@@ -66,8 +66,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     setSelectedChatId(id);
     localStorage.setItem('selectedChatId', id);
     
-    // Load results for the selected chat
-    await loadFullResults(id);
+    // loadFullResults will be triggered by the useEffect on user/selectedChatId change
     console.log('[ProjectContext selectChat complete] chatId:', id);
   }
 
