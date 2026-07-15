@@ -1001,8 +1001,32 @@ export const generateContentItem = async (req, res) => {
       });
     }
 
+    // Check for schema rejection
+    if (meta?.status === 'schema_rejected') {
+      const typeLabel = CONTENT_TYPES[contentType]?.label || contentType;
+      const errorDetails = (meta.schemaErrors || []).join('; ');
+      const userMessage = `${typeLabel} did not match the required format. Please try again.`;
+      console.error("[Content Studio] Schema rejected", {
+        chatId, userId, contentType,
+        errors: meta.schemaErrors,
+      });
+      return res.status(422).json({
+        success: false,
+        error: userMessage,
+        code: "SCHEMA_REJECTED",
+        retryable: true,
+        stage: "VALIDATION",
+        details: errorDetails,
+      });
+    }
+
     // Stage 5: Quality scoring
     const qualityScore = scoreContentQuality(contentBody, brief, contentType);
+
+    // Ensure _type is set on content for frontend detection
+    if (contentBody && typeof contentBody === 'object' && !contentBody._type) {
+      contentBody._type = contentType;
+    }
 
     // Stage 6: Persist asset
     const asset = await saveContentAsset(prisma, {

@@ -48,9 +48,8 @@ function safeExtractJSON(data) {
 
 const POSSIBLE_CHANNELS = [
   "Google Search", "LinkedIn", "Meta", "Instagram", "Facebook",
-  "YouTube", "Reddit", "Email", "Referral", "Content Marketing",
-  "Product Hunt", "Communities", "Partnerships", "Organic SEO",
-  "Webinars", "Events"
+  "YouTube", "Reddit", "Email", "Content Marketing",
+  "Product Hunt", "Communities", "Partnerships", "Organic SEO"
 ];
 
 const POSSIBLE_GOALS = [
@@ -316,7 +315,31 @@ function validateCampaignOutput(data, evidenceReconciliation) {
 
   // PART 12: Post-generation consistency validator to remove contradictions
   const contradictions = detectCampaignContradictions(data, evidenceReconciliation);
-  
+
+  // Remove contradictory risks and next actions
+  contradictions.forEach(contradiction => {
+    if (contradiction.message === 'Risk states SEO intelligence missing but SEO data exists') {
+      data.riskAssessment = data.riskAssessment?.filter(r =>
+        !(r.risk?.toLowerCase().includes('seo') && r.cause?.toLowerCase().includes('missing'))
+      );
+    }
+    if (contradiction.message === 'Risk states competitor intelligence missing but competitor data exists') {
+      data.riskAssessment = data.riskAssessment?.filter(r =>
+        !(r.risk?.toLowerCase().includes('competitor') && r.cause?.toLowerCase().includes('missing'))
+      );
+    }
+    if (contradiction.message === 'Next action says run SEO but SEO intelligence already exists') {
+      data.nextActions = data.nextActions?.filter(a =>
+        !(a.action?.toLowerCase().includes('seo') && a.action?.toLowerCase().includes('run'))
+      );
+    }
+    if (contradiction.message === 'Next action says run competitor analysis but competitor data exists') {
+      data.nextActions = data.nextActions?.filter(a =>
+        !(a.action?.toLowerCase().includes('competitor') && a.action?.toLowerCase().includes('analysis'))
+      );
+    }
+  });
+
   // PART 10: Add versioning metadata
   const validated = {
     executiveSummary: data.executiveSummary || null,
@@ -711,7 +734,7 @@ function applyCampaignSafety(campaignResult, evidenceStatus) {
         stageData.channels = stageData.channels.filter(channel => {
           // Keep if channel is available or is a general channel type
           return availableChannels.includes(channel) || 
-                 ['Email', 'Direct', 'In-App', 'Referral'].includes(channel);
+                 ['Email', 'Direct'].includes(channel);
         });
       }
     });
@@ -755,10 +778,10 @@ function generateEvidenceBasedCampaign(context) {
       campaignName: `${productName} Evidence-Based Campaign`,
       campaignTheme: `Growth through ${goal.goal || "strategic marketing"}`,
       campaignGoal: goal.goal || "Brand Awareness",
-      recommendedDuration: "90 days",
+      recommendedDuration: "Proposed planning horizon — to be confirmed by user",
       primaryAudience: {
-        value: audience?.primary?.value || "TBD from audience intelligence",
-        reason: hasAudienceData ? "Derived from audience intelligence analysis" : "Audience intelligence not yet available",
+        value: audience?.primary?.value || "Not yet determined from available evidence",
+        reason: hasAudienceData ? "Derived from audience intelligence analysis" : "Audience intelligence not yet available — run audience analysis first",
         evidence: hasAudienceData ? "audience_intelligence" : "insufficient_evidence",
         _evidenceStatus: hasAudienceData ? "EVIDENCE_BACKED" : "NOT_MEASURED"
       },
@@ -802,7 +825,7 @@ function generateEvidenceBasedCampaign(context) {
     marketingFunnel: buildFunnel(context, channelRecs),
     kpiFramework: buildKPIs(context).map(k => ({
       ...k,
-      _evidenceStatus: k.status === "Measured" ? "EVIDENCE_BACKED" : k.status === "Estimated" ? "AI_INFERRED" : "NOT_MEASURED"
+      _evidenceStatus: k.status === "MEASURED" ? "EVIDENCE_BACKED" : k.status === "CONNECTED" ? "EVIDENCE_BACKED" : "NOT_MEASURED"
     })),
     riskAssessment: buildRisks(context).map(r => ({
       ...r,
@@ -949,7 +972,7 @@ function buildCampaignObjective(context, goal) {
       evidence: "kpi_framework_definition"
     },
     targetAudience: {
-      value: audience?.primary?.value || "TBD from audience intelligence",
+      value: audience?.primary?.value || null,
       reason: audience?.primary?.value ? "Derived from audience intelligence" : "Awaiting audience intelligence analysis",
       evidence: audience?.primary?.value ? "audience_intelligence" : "insufficient_evidence"
     },
@@ -959,9 +982,9 @@ function buildCampaignObjective(context, goal) {
       evidence: "insufficient_evidence"
     },
     timeline: {
-      value: "12 weeks (90 days)",
-      reason: "Standard campaign duration for measurable results",
-      evidence: "campaign_planning_standards"
+      value: (goal?.goal?.toLowerCase().includes('launch') || goal?.goal?.toLowerCase().includes('product')) ? "60 days" : "90 days (proposed planning horizon)",
+      reason: "Proposed planning horizon based on campaign objectives",
+      evidence: "ai_inferred: planning_horizon"
     },
     priority: "high",
     dependencies: [
@@ -1064,7 +1087,7 @@ function determineChannels(context) {
       priority: "high",
       reason: "Product features and USPs identified — content marketing can showcase them effectively",
       evidence: "product_intelligence",
-      recommendedContent: "Product-focused content, case studies, comparison guides",
+      recommendedContent: "Product-focused content, comparison guides, feature highlights",
       recommendedCTA: "Get Started / Learn More",
       organicOrPaid: "organic"
     });
@@ -1111,7 +1134,7 @@ function determineChannels(context) {
     priority: "low",
     reason: "Community engagement for brand building and feedback",
     evidence: "channel_best_practices",
-    recommendedContent: "Discussion participation, AMAs, community support",
+      recommendedContent: "Discussion participation, community support, industry topics",
     recommendedCTA: "Join Community",
     organicOrPaid: "organic"
   });
@@ -1149,7 +1172,7 @@ function buildTimeline(context, channels) {
       { title: "Build email nurture sequence", description: "Create initial email workflow for lead nurturing", dependency: "Measurement infrastructure ready", ownerRole: "Email Marketer", evidence: "channel_recommendation" },
     ],
     week3: [
-      { title: "Publish content marketing assets", description: "Release product-focused content and case studies", dependency: "Content production complete", ownerRole: "Content Manager", evidence: "product_intelligence" },
+      { title: "Publish content marketing assets", description: "Release product-focused content and feature highlights", dependency: "Content production complete", ownerRole: "Content Manager", evidence: "product_intelligence" },
       { title: "Begin community engagement", description: "Start participating in relevant industry communities", dependency: "Brand guidelines finalized", ownerRole: "Community Manager", evidence: "channel_recommendation" },
       { title: "Review week 1-2 analytics", description: "Analyze initial data and adjust strategy", dependency: "Measurement infrastructure live", ownerRole: "Marketing Operations", evidence: "analytics_data_review" },
     ],
@@ -1160,8 +1183,8 @@ function buildTimeline(context, channels) {
     ],
     month2: [
       { title: "Expand content distribution", description: "Extend content reach through partnerships and syndication", dependency: "Content library established", ownerRole: "Content Manager", evidence: "content_strategy" },
-      { title: "Launch retargeting campaign", description: "Set up retargeting for engaged but unconverted audience", dependency: "Sufficient traffic data", ownerRole: "Paid Media Specialist", evidence: "audience_engagement_data" },
-      { title: "Deepen community presence", description: "Host AMA or community event", dependency: "Community presence established", ownerRole: "Community Manager", evidence: "community_growth_strategy" },
+      { title: "Optimize landing pages", description: "Refine landing pages for engaged audience segments", dependency: "Sufficient traffic data", ownerRole: "SEO Specialist", evidence: "audience_engagement_data" },
+      { title: "Deepen community presence", description: "Increase engagement in industry communities", dependency: "Community presence established", ownerRole: "Community Manager", evidence: "community_growth_strategy" },
     ],
     month3: [
       { title: "Full campaign performance review", description: "Comprehensive analysis of all channels and KPIs", dependency: "3 months of data", ownerRole: "Marketing Strategist", evidence: "quarterly_performance_data" },
@@ -1186,36 +1209,36 @@ function buildFunnel(context, channels) {
     interest: {
       objective: "Engage audience with relevant content and establish authority",
       channels: topChannels,
-      content: "In-depth guides, case studies, webinars, comparison content",
+      content: "In-depth guides, comparison content, how-to articles",
       cta: "Download Guide / Watch Webinar",
       measurement: "Time on page, content downloads, email signups, social engagement"
     },
     consideration: {
       objective: "Nurture prospects toward solution awareness and evaluation",
       channels: ["Email", "Content Marketing", "LinkedIn"],
-      content: "Product comparisons, feature highlights, ROI calculators, demo content",
+      content: "Product comparisons, feature highlights, demo content",
       cta: "Schedule Demo / Request Quote",
       measurement: "Demo requests, content engagement score, email CTR"
     },
     conversion: {
       objective: "Convert qualified prospects into customers",
       channels: ["Email", "Google Search", "Direct"],
-      content: "Case studies, testimonials, free trial offers, limited-time incentives",
+      content: "Testimonials, free trial offers, limited-time incentives",
       cta: "Start Free Trial / Get Started",
       measurement: "Conversion rate, signup rate, revenue (when measurable)"
     },
     retention: {
       objective: "Retain customers and drive product adoption",
-      channels: ["Email", "In-App", "Communities"],
+      channels: ["Email", "Communities"],
       content: "Onboarding sequences, product tips, feature updates, success stories",
       cta: "Explore Feature / Join Community",
       measurement: "Activation rate, retention rate, feature adoption, NPS"
     },
     advocacy: {
       objective: "Convert customers into brand advocates and referral sources",
-      channels: ["Email", "Referral", "Communities"],
-      content: "Referral program, case study features, customer spotlight, review requests",
-      cta: "Refer a Friend / Leave a Review",
+      channels: ["Email", "Communities"],
+      content: "Customer spotlight, review requests, success stories",
+      cta: "Leave a Review / Share Feedback",
       measurement: "Referral count, reviews, testimonials, organic mentions"
     }
   };
@@ -1231,9 +1254,9 @@ function buildKPIs(context) {
   const hasProductData = !!(product.usp?.value || product.features?.value?.length);
 
   if (hasSeoData) {
-    kpis.push({ kpi: "Organic Traffic", howToMeasure: "Google Search Console + Google Analytics", tool: "Google Search Console", frequency: "weekly", status: "Estimated" });
-    kpis.push({ kpi: "Organic CTR", howToMeasure: "Google Search Console average CTR", tool: "Google Search Console", frequency: "weekly", status: "Estimated" });
-    kpis.push({ kpi: "Organic Keyword Rankings", howToMeasure: "Track target keyword positions in SERP", tool: "Google Search Console / DataForSEO", frequency: "weekly", status: "Estimated" });
+    kpis.push({ kpi: "Organic Traffic", howToMeasure: "Google Search Console + Google Analytics", tool: "Google Search Console", frequency: "weekly", status: "NOT_CONFIGURED" });
+    kpis.push({ kpi: "Organic CTR", howToMeasure: "Google Search Console average CTR", tool: "Google Search Console", frequency: "weekly", status: "NOT_CONFIGURED" });
+    kpis.push({ kpi: "Organic Keyword Rankings", howToMeasure: "Track target keyword positions in SERP", tool: "Google Search Console / DataForSEO", frequency: "weekly", status: "NOT_CONFIGURED" });
   }
 
   if (hasAudienceData) {
@@ -1248,7 +1271,7 @@ function buildKPIs(context) {
     kpis.push({ kpi: "Activation Rate", howToMeasure: "Users who completed key activation milestone", tool: "Product Analytics", frequency: "monthly", status: "Not Yet Measured" });
   }
 
-  kpis.push({ kpi: "Website Traffic", howToMeasure: "Google Analytics sessions and users", tool: "Google Analytics", frequency: "weekly", status: "Estimated" });
+  kpis.push({ kpi: "Website Traffic", howToMeasure: "Google Analytics sessions and users", tool: "Google Analytics", frequency: "weekly", status: "Not Yet Measured" });
 
   if (kpis.length === 0) {
     kpis.push({ kpi: "Website Traffic", howToMeasure: "Google Analytics sessions", tool: "Google Analytics", frequency: "weekly", status: "Not Yet Measured" });

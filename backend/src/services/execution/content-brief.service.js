@@ -93,6 +93,60 @@ export async function buildContentBrief(prisma, userId, chatId) {
     warnings: normalizedProduct.warnings
   });
 
+  // PART 2b: Derive conservative capabilities from summary/USP when no features exist
+  const derivedFeatures = [];
+  const hasExplicitFeatures = normalizedProduct.features.length > 0
+    || (productAnalysis.features && productAnalysis.features.length > 0)
+    || (productAnalysis.capabilities && productAnalysis.capabilities.length > 0)
+    || (website.featuresText && website.featuresText.length > 0);
+  if (!hasExplicitFeatures) {
+    const summary = productAnalysis.summary || productAnalysis.productSummary || '';
+    const usp = productAnalysis.usp || '';
+    const textToParse = (summary + ' ' + usp).toLowerCase();
+    const capabilityPatterns = [
+      { name: 'Video trend tracking', keywords: ['trend', 'viral', 'video', 'short-form'] },
+      { name: 'Creator monitoring', keywords: ['creator', 'influencer', 'content creator'] },
+      { name: 'Competitor monitoring', keywords: ['competitor', 'competitive', 'compete'] },
+      { name: 'Platform analytics', keywords: ['analytics', 'insight', 'data', 'measure'] },
+      { name: 'Content discovery', keywords: ['discover', 'find', 'content research', 'content planning'] },
+      { name: 'Social listening', keywords: ['listen', 'social listening', 'monitor'] },
+    ];
+    capabilityPatterns.forEach(({ name, keywords }) => {
+      const matched = keywords.some(k => textToParse.includes(k));
+      if (matched) {
+        derivedFeatures.push({
+          name,
+          description: null,
+          benefit: null,
+          evidence: null,
+          inferenceStatus: 'AI_INFERRED_FROM_EVIDENCE',
+        });
+      }
+    });
+    if (derivedFeatures.length > 0) {
+      console.info('[Content Brief] Derived capabilities from summary/USP:', derivedFeatures.map(f => f.name));
+    }
+  }
+
+  // PART 5: Filter low-quality SEO keywords
+  const LOW_QUALITY_KEYWORDS = new Set([
+    'started', 'alerts', 'outlier', 'shorts', 'text', 'tracking', 'trends',
+    'content', 'alert', 'product', 'home', 'page', 'app', 'get', 'use',
+    'how', 'what', 'why', 'when', 'where', 'login', 'signup', 'sign up',
+    'register', 'pricing', 'features', 'blog', 'docs', 'documentation',
+    'support', 'contact', 'about', 'careers', 'help', 'search', 'setting',
+    'settings', 'dashboard', 'profile', 'account', 'billing',
+  ]);
+
+  const filteredKeywords = normalizedSeo.keywords.filter(k => {
+    const keyword = (typeof k === 'string' ? k : (k.keyword || k.phrase || k.text || '')).trim().toLowerCase();
+    if (!keyword || keyword.length < 3) return false;
+    if (LOW_QUALITY_KEYWORDS.has(keyword)) return false;
+    if (/^\d+$/.test(keyword)) return false;
+    if (keyword.startsWith('http') || keyword.startsWith('www')) return false;
+    return true;
+  });
+
   const brief = {
     company: {
       name: productIdentity.companyName || chat.title || null,
@@ -106,15 +160,16 @@ export async function buildContentBrief(prisma, userId, chatId) {
       name: productIdentity.productName,
       brandName: productIdentity.brandName,
       summary: productAnalysis.summary || productAnalysis.productSummary || null,
-      features: normalizedProduct.features.length > 0
+      features: derivedFeatures.length > 0 ? derivedFeatures : (normalizedProduct.features.length > 0
         ? normalizedProduct.features
         : normalizeFeatures(takeArray(
-            website.featuresText
-            || productAnalysis.features
+            productAnalysis.features
             || productAnalysis.capabilities
             || productAnalysis.keyFeatures
             || productAnalysis.productFeatures
-            || [], 15)),
+            || productAnalysis.differentiators
+            || website.featuresText
+            || [], 15))),
       benefits: normalizedProduct.benefits.length > 0
         ? normalizedProduct.benefits
         : normalizeBenefits(takeArray(
@@ -147,7 +202,7 @@ export async function buildContentBrief(prisma, userId, chatId) {
       strengths: takeArray(c.strengths, 5),
       weaknesses: takeArray(c.weaknesses, 5),
     })),
-    verifiedKeywords: normalizedSeo.keywords.slice(0, 20),
+    verifiedKeywords: filteredKeywords.slice(0, 20),
     topicIdeas: normalizedSeo.blogIdeas.slice(0, 10),
     contentGaps: normalizedSeo.contentGaps.slice(0, 10),
     tone: 'professional',

@@ -1,233 +1,134 @@
 
 import { prisma } from "../../config/prisma.js";
 import { scrapeWebsite } from "../../services/scraper.service.js";
+import { callAI } from "./aiRouter.service.js";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-const GEMINI_API_URL = process.env.GEMINI_API_URL || "https://generativelanguage.googleapis.com/v1beta/models";
-
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-
-const PAGESPEED_API_KEY = process.env.PAGESPEED_API_KEY || "";
+const getPageSpeedKey = () => process.env.PAGESPEED_API_KEY || "";
 const PAGESPEED_API_URL = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
 
-function extractJsonFromText(text) {
-  if (!text || typeof text !== "string") return null;
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return null;
-  try {
-    return JSON.parse(jsonMatch[0]);
-  } catch (e) {
-    console.warn("Failed to parse JSON from AI response:", e.message);
-    return null;
-  }
-}
-
-function buildPrompt(inputData, scrapedData, pageSpeedScore = 0) {
-  const { productName, targetKeywords } = inputData;
-  const scrapedText = JSON.stringify(scrapedData || {}).slice(0, 2500);
-
-  return `You are a Senior SEO Analyst. Analyze the website and provide comprehensive SEO insights.
-
-PRODUCT DETAILS:
-- Product Name: ${productName}
-- Target Keywords: ${targetKeywords || ""}
-
-SCRAPED WEBSITE DATA (TRIMMED):
-${scrapedText}
-
-PAGESPEED SCORE (out of 100):
-${pageSpeedScore}
-
-Return ONLY a valid JSON object with these exact fields (no markdown, no extra text):
-{
-  "seoScore": 0,
-  "pageSpeedScore": ${pageSpeedScore},
-  "metaTitleAnalysis": "",
-  "metaDescriptionAnalysis": "",
-  "headingStructure": [],
-  "keywordSuggestions": [],
-  "technicalSeoIssues": [],
-  "contentImprovementIdeas": [],
-  "backlinkAuthorityNotes": "",
-  "priorityFixes": [],
-  "finalRecommendation": ""
-}
-
-Ensure all arrays have at least 3 items. Return ONLY valid JSON.`;
-}
-
 function getRuleBasedFallback(inputData, pageSpeedScore = 0) {
+  const productName = inputData?.productName || 'Product';
   return {
-    seoScore: 0,
+    seoScore: null,
     pageSpeedScore: pageSpeedScore,
     metaTitleAnalysis: "Check if title is 50-60 characters, includes main keyword, and is unique.",
     metaDescriptionAnalysis: "Check if description is 150-160 characters, includes main keyword, and is compelling.",
     headingStructure: ["Ensure one H1 per page", "Use H2-H3 for content hierarchy", "Include keywords in headings"],
-    keywordSuggestions: [],
-    technicalSeoIssues: ["Check mobile-friendliness", "Ensure fast page speed", "Fix broken links"],
-    contentImprovementIdeas: ["Add keyword-rich content", "Create blog posts", "Update content regularly"],
-    backlinkAuthorityNotes: "Backlink data not available - focus on content quality and outreach.",
-    priorityFixes: ["Improve page speed", "Optimize meta tags", "Fix mobile issues"],
-    finalRecommendation: "Start with technical SEO fixes, then create keyword-rich content."
+    keywordSuggestions: [`${productName} features`, `${productName} pricing`, `${productName} vs alternatives`, `${productName} for teams`],
+    technicalSeoIssues: ["Check mobile-friendliness", "Ensure fast page speed", "Verify SSL certificate"],
+    contentImprovementIdeas: ["Create product-specific landing pages", "Add use-case documentation", "Build comparison content"],
+    backlinkAuthorityNotes: "Backlink data not available — focus on content quality and internal linking.",
+    priorityFixes: ["Verify meta tags across key pages", "Improve page speed", "Fix heading hierarchy"],
+    finalRecommendation: "Build topical authority through product-specific content."
   };
 }
 
-async function getPageSpeedScore(url) {
+async function getPageSpeedData(url) {
   try {
-    if (!PAGESPEED_API_KEY) {
-      console.warn("⚠️ PAGESPEED_API_KEY not found, returning null");
-      return null;
-    }
-    const response = await fetch(
-      `${PAGESPEED_API_URL}?url=${encodeURIComponent(url)}&key=${PAGESPEED_API_KEY}&category=SEO&strategy=DESKTOP`
-    );
-    if (!response.ok) {
-      throw new Error(`PageSpeed API error: ${response.status}`);
-    }
-    const data = await response.json();
-    return Math.round(
-      (data.lighthouseResult?.categories?.seo?.score || 0) * 100
-    );
+    const key = getPageSpeedKey();
+    const mobileUrl = `${PAGESPEED_API_URL}?url=${encodeURIComponent(url)}&key=${key}&strategy=MOBILE`;
+    const desktopUrl = `${PAGESPEED_API_URL}?url=${encodeURIComponent(url)}&key=${key}&strategy=DESKTOP`;
+
+    const [mobileRes, desktopRes] = await Promise.allSettled([
+      key ? fetch(mobileUrl) : Promise.reject(new Error('No API key')),
+      key ? fetch(desktopUrl) : Promise.reject(new Error('No API key'))
+    ]);
+
+    const extract = (resp) => {
+      if (resp.status !== 'fulfilled' || !resp.value.ok) return null;
+      return resp.value.json().then(d => {
+        const lh = d.lighthouseResult;
+        return {
+          performance: Math.round((lh?.categories?.performance?.score || 0) * 100),
+          accessibility: Math.round((lh?.categories?.accessibility?.score || 0) * 100),
+          bestPractices: Math.round((lh?.categories?.['best-practices']?.score || 0) * 100),
+          seo: Math.round((lh?.categories?.seo?.score || 0) * 100)
+        };
+      }).catch(() => null);
+    };
+
+    const mobile = mobileRes.status === 'fulfilled' ? await extract(mobileRes) : null;
+    const desktop = desktopRes.status === 'fulfilled' ? await extract(desktopRes) : null;
+
+    return {
+      source: 'GOOGLE_PAGESPEED',
+      measuredAt: new Date().toISOString(),
+      mobile,
+      desktop
+    };
   } catch (e) {
-    console.warn("⚠️ PageSpeed API failed:", e.message);
     return null;
   }
 }
 
-async function callGemini(prompt) {
-  if (!GEMINI_API_KEY) {
-    console.log("⚠️ GEMINI_API_KEY not found");
-    return { success: false };
-  }
-  try {
-    console.log("🤖 Calling Gemini API for SEO Intelligence...");
-    const response = await fetch(`${GEMINI_API_URL}/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          maxOutputTokens: 2000,
-          temperature: 0.4
-        }
-      })
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      console.warn("❌ Gemini API error:", response.status, errorData);
-      return { success: false };
-    }
-    const data = await response.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!content) {
-      console.warn("❌ Gemini response missing content");
-      return { success: false };
-    }
-    const parsed = extractJsonFromText(content);
-    if (!parsed) {
-      console.warn("❌ Failed to parse JSON from Gemini response");
-      return { success: false };
-    }
-    console.log("✅ Gemini API successful for SEO Intelligence");
-    return { success: true, data: parsed, provider: "gemini" };
-  } catch (e) {
-    console.warn("❌ Gemini API failed:", e.message);
-    return { success: false };
-  }
-}
+function buildPrompt(inputData, scrapedData, pageSpeedData) {
+  const { productName, targetKeywords } = inputData || {};
+  const scrapedText = JSON.stringify(scrapedData || {}).slice(0, 2500);
+  const speedInfo = pageSpeedData ? `Mobile: ${pageSpeedData.mobile?.seo ?? 'N/A'}, Desktop: ${pageSpeedData.desktop?.seo ?? 'N/A'}` : 'Not measured';
 
-async function callGroq(prompt) {
-  if (!GROQ_API_KEY) {
-    console.log("⚠️ GROQ_API_KEY not found");
-    return { success: false };
-  }
-  try {
-    console.log("🤖 Calling Groq API for SEO Intelligence...");
-    const response = await fetch(GROQ_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 2000,
-        temperature: 0.4
-      })
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      console.warn("❌ Groq API error:", response.status, errorData);
-      return { success: false };
-    }
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) {
-      console.warn("❌ Groq response missing content");
-      return { success: false };
-    }
-    const parsed = extractJsonFromText(content);
-    if (!parsed) {
-      console.warn("❌ Failed to parse JSON from Groq response");
-      return { success: false };
-    }
-    console.log("✅ Groq API successful for SEO Intelligence");
-    return { success: true, data: parsed, provider: "groq" };
-  } catch (e) {
-    console.warn("❌ Groq API failed:", e.message);
-    return { success: false };
-  }
+  return `You are a Senior SEO Analyst analyzing ${productName || 'a product'}.
+
+WEBSITE DATA:
+${scrapedText}
+
+PAGESPEED SCORES:
+${speedInfo}
+
+PRODUCT: ${productName || 'Unknown'}
+KEYWORDS: ${targetKeywords || 'Not specified'}
+
+Return ONLY valid JSON:
+{
+  "seoScore": null,
+  "metaTitleAnalysis": "string — analysis of current title tag",
+  "metaDescriptionAnalysis": "string — analysis of current meta description",
+  "headingStructure": ["string"],
+  "keywordSuggestions": ["string"],
+  "technicalSeoIssues": ["string"],
+  "contentImprovementIdeas": ["string"],
+  "backlinkAuthorityNotes": "string",
+  "priorityFixes": ["string"],
+  "finalRecommendation": "string"
+}`;
 }
 
 export async function generateSeoIntelligence(inputData) {
-  const { websiteUrl } = inputData;
+  const { websiteUrl } = inputData || {};
   let scrapedData = null;
-  let pageSpeedScore = 0;
+  let pageSpeedData = null;
 
-  // Step 1: Scrape website
   if (websiteUrl) {
     try {
-      console.log("🔍 Scraping website for SEO...");
       scrapedData = await scrapeWebsite(websiteUrl);
-    } catch (e) {
-      console.warn("⚠️ Failed to scrape website:", e.message);
-    }
-  }
+    } catch (e) { /* continue */ }
 
-  // Step 2: Get PageSpeed score
-  if (websiteUrl) {
     try {
-      console.log("🔍 Fetching PageSpeed score...");
-      pageSpeedScore = await getPageSpeedScore(websiteUrl);
-    } catch (e) {
-      console.warn("⚠️ Failed to fetch PageSpeed score:", e.message);
-      pageSpeedScore = null;
-    }
+      pageSpeedData = await getPageSpeedData(websiteUrl);
+    } catch (e) { /* continue */ }
   }
 
-  // Step 3: Build prompt
-  const prompt = buildPrompt(inputData, scrapedData, pageSpeedScore);
-  console.log("📝 SEO Intelligence prompt size (chars):", prompt.length);
+  const prompt = buildPrompt(inputData, scrapedData, pageSpeedData);
+  const aiResult = await callAI(prompt);
 
-  // Step 4: Call AI providers in order
-  let result = await callGemini(prompt);
-  if (!result.success) {
-    console.log("🔄 Falling back to Groq for SEO Intelligence...");
-    result = await callGroq(prompt);
-  }
-  if (!result.success) {
-    console.log("⚠️ Using rule-based fallback for SEO Intelligence...");
-    result = { success: true, data: getRuleBasedFallback(inputData, pageSpeedScore), provider: "rule-based", fallbackUsed: true };
-  } else {
-    result.fallbackUsed = false;
-    // Ensure pageSpeedScore matches
-    result.data.pageSpeedScore = pageSpeedScore;
+  if (aiResult.success) {
+    return {
+      success: true,
+      data: {
+        ...aiResult.data,
+        pageSpeedData
+      },
+      provider: aiResult.provider,
+      fallbackUsed: false
+    };
   }
 
-  return result;
+  return {
+    success: true,
+    data: {
+      ...getRuleBasedFallback(inputData, pageSpeedData?.mobile?.seo ?? 0),
+      pageSpeedData
+    },
+    provider: 'rule-based',
+    fallbackUsed: true
+  };
 }
-

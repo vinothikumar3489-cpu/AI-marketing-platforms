@@ -1,5 +1,6 @@
 import { callAI } from "../../ai/services/aiRouter.service.js";
 import { sendTestEmail } from "../integrations/email.service.js";
+import { getEmailProviderHealth } from "../integrations/email/email-provider-registry.js";
 
 // Email campaign types with purpose and audience metadata
 const CAMPAIGN_TYPES = {
@@ -120,7 +121,7 @@ RULES:
 }
 
 // ============================================
-// 2. PROVIDER DELIVERY (587 → 465 → fallback chain)
+// 2. PROVIDER DELIVERY (via registry)
 // ============================================
 
 export async function deliverEmail(emailData, recipient) {
@@ -132,57 +133,33 @@ export async function deliverEmail(emailData, recipient) {
     attemptedProviders: [],
   };
 
-  const providerChain = [];
-
-  // Gmail SMTP: try 587 first, then 465
-  if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
-    providerChain.push({ name: 'gmail_587', config: { host: 'smtp.gmail.com', port: 587, secure: false } });
-    providerChain.push({ name: 'gmail_465', config: { host: 'smtp.gmail.com', port: 465, secure: true } });
-  }
-
-  // SendGrid
-  if (process.env.SENDGRID_API_KEY) {
-    providerChain.push({ name: 'sendgrid', config: { apiKey: process.env.SENDGRID_API_KEY } });
-  }
-
-  // Brevo
-  if (process.env.BREVO_API_KEY) {
-    providerChain.push({ name: 'brevo', config: { apiKey: process.env.BREVO_API_KEY } });
-  }
-
-  // Resend
-  if (process.env.RESEND_API_KEY) {
-    providerChain.push({ name: 'resend', config: { apiKey: process.env.RESEND_API_KEY } });
-  }
-
-  if (providerChain.length === 0) {
+  const health = getEmailProviderHealth();
+  if (!health.canSend) {
     result.status = 'failed';
-    result.error = 'No email provider configured. Configure Gmail SMTP, SendGrid, Brevo, or Resend.';
+    result.error = 'No email provider configured. Set BREVO_API_KEY and BREVO_FROM_EMAIL.';
     return result;
   }
 
-  for (const provider of providerChain) {
-    result.attemptedProviders.push(provider.name);
-    try {
-      const sendResult = await sendTestEmail({
-        recipientEmail: recipient,
-        subject: emailData.subject,
-        body: emailData.body,
-        approvalChecked: true,
-      });
+  result.attemptedProviders.push(health.activeProvider);
 
-      if (sendResult.success) {
-        result.status = 'sent';
-        result.provider = provider.name;
-        result.providerResponseId = sendResult.messageId || sendResult.id || null;
-        return result;
-      }
+  try {
+    const sendResult = await sendTestEmail({
+      recipientEmail: recipient,
+      subject: emailData.subject,
+      body: emailData.body,
+      approvalChecked: true,
+    });
 
-      result.error = sendResult.error || `Provider ${provider.name} returned failure`;
-    } catch (err) {
-      result.error = err.message || `Provider ${provider.name} threw error`;
-      console.warn(`[EmailCampaign] Provider ${provider.name} failed:`, err.message);
+    if (sendResult.success) {
+      result.status = 'sent';
+      result.provider = sendResult.provider || health.activeProvider;
+      result.providerResponseId = sendResult.messageId || null;
+      return result;
     }
+
+    result.error = sendResult.error || `Provider ${health.activeProvider} returned failure`;
+  } catch (err) {
+    result.error = err.message || `Provider threw error`;
   }
 
   result.status = 'failed';

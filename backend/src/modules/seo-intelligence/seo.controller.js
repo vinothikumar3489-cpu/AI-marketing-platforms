@@ -1,5 +1,9 @@
 import { generateCompleteSeoIntelligence } from './seoIntelligence.service.js';
 import { prisma } from '../../config/prisma.js';
+import { buildSeoFrontendPayload, normalizeDataForSEOKeywords } from '../../services/seo/seo-frontend-payload.service.js';
+import { generateSeoActionPlan } from '../../services/seo/seo-action-plan.service.js';
+import { runOnPageSeoChecks } from '../../services/seo/onpage-seo-checks.service.js';
+import { analyzeAiSearchReadiness } from '../../services/seo/ai-search-readiness.service.js';
 import {
   getContentGapsByChat,
   runContentGapAnalysis,
@@ -76,21 +80,53 @@ export const runSeoHandler = async (req, res) => {
       });
     }
 
-    // Attach identity to response
     const payload = result.data || {};
-    if (payload && typeof payload === 'object') {
-      payload.identity = {
+
+    const execDash = payload.executiveDashboard?.dashboardData || payload.executiveDashboard;
+    const techAuditData = payload.technicalAuditDetail?.auditData || payload.technicalAudit;
+    const kwData = payload.keywordIntelligence?.keywordData || payload.keywordIntelligence;
+    const compData = payload.competitorSeoRecord?.competitorData || payload.competitorSeoRecord;
+    const gapData = payload.contentGapRecord?.gapData || payload.contentGapRecord;
+    const blogData = payload.blogIntelligenceRecord?.blogData || payload.blogIntelligenceRecord;
+
+    const computedActionPlan = payload.actionPlan || generateSeoActionPlan({
+      technicalAudit: techAuditData,
+      keywords: kwData?.primaryKeywords || kwData?.keywords || [],
+      contentGaps: gapData?.contentGaps || [],
+      competitors: compData?.competitors || [],
+      identity: {
         websiteUrl: payload.websiteUrl,
         domain: payload.domain,
         companyName: payload.companyName,
         productName: payload.productName
-      };
-    }
+      }
+    });
+
+    const canonicalPayload = buildSeoFrontendPayload({
+      seoIntelligence: payload,
+      executiveDashboard: execDash,
+      technicalAudit: techAuditData,
+      keywordIntelligence: kwData,
+      competitorIntelligence: compData,
+      contentGapIntelligence: gapData,
+      blogIntelligence: blogData,
+      actionPlan: computedActionPlan,
+      productIdentity: {
+        websiteUrl: payload.websiteUrl,
+        domain: payload.domain,
+        companyName: payload.companyName,
+        productName: payload.productName
+      }
+    });
 
     return res.json({
       success: true,
       chatId,
-      seoIntelligence: payload
+      seoIntelligence: {
+        ...payload,
+        canonical: canonicalPayload,
+        actionPlan: computedActionPlan
+      }
     });
 
   } catch (error) {
@@ -140,17 +176,80 @@ export const getSeoHandler = async (req, res) => {
       console.log('✅ [SEO Get] Data found');
     }
 
-    // Structure the response
+    // Extract sub-records
+    const execDash = seoIntelligence.executiveDashboard?.dashboardData || seoIntelligence.executiveDashboard;
+    const techAuditData = seoIntelligence.technicalAuditDetail?.auditData || seoIntelligence.technicalAudit;
+    const kwData = seoIntelligence.keywordIntelligence?.keywordData || seoIntelligence.keywordIntelligence;
+    const compData = seoIntelligence.competitorSeoRecord?.competitorData || seoIntelligence.competitorSeoRecord;
+    const gapData = seoIntelligence.contentGapRecord?.gapData || seoIntelligence.contentGapRecord;
+    const blogData = seoIntelligence.blogIntelligenceRecord?.blogData || seoIntelligence.blogIntelligenceRecord;
+
+    // Build on-page checks and AI Search Readiness from available data
+    const allKeywords = [
+      ...(kwData?.primaryKeywords || []),
+      ...(kwData?.secondaryKeywords || []),
+      ...(kwData?.longTailKeywords || [])
+    ];
+    const onPageChecks = runOnPageSeoChecks(techAuditData?.websiteData || seoIntelligence.technicalAudit);
+    const aiSearchReadiness = analyzeAiSearchReadiness(
+      techAuditData?.websiteData || seoIntelligence.technicalAudit,
+      allKeywords,
+      {
+        websiteUrl: seoIntelligence.websiteUrl,
+        productName: seoIntelligence.productName
+      }
+    );
+
+    // Build action plan from available data
+    const storedActionPlan = seoIntelligence.actionPlan;
+    const computedActionPlan = storedActionPlan || generateSeoActionPlan({
+      technicalAudit: techAuditData,
+      keywords: allKeywords,
+      contentGaps: gapData?.contentGaps || [],
+      competitors: compData?.competitors || [],
+      aiSearchReadiness,
+      identity: {
+        websiteUrl: seoIntelligence.websiteUrl,
+        domain: seoIntelligence.domain,
+        companyName: seoIntelligence.companyName,
+        productName: seoIntelligence.productName
+      }
+    });
+
+    // Build canonical payload
+    const canonicalPayload = buildSeoFrontendPayload({
+      seoIntelligence,
+      executiveDashboard: execDash,
+      technicalAudit: techAuditData,
+      keywordIntelligence: kwData,
+      competitorIntelligence: compData,
+      contentGapIntelligence: gapData,
+      blogIntelligence: blogData,
+      actionPlan: computedActionPlan,
+      productIdentity: {
+        websiteUrl: seoIntelligence.websiteUrl,
+        domain: seoIntelligence.domain,
+        companyName: seoIntelligence.companyName,
+        productName: seoIntelligence.productName
+      }
+    });
+
+    // Backward-compatible legacy response
     const response = {
       id: seoIntelligence.id,
       websiteUrl: seoIntelligence.websiteUrl,
+      domain: seoIntelligence.domain,
+      companyName: seoIntelligence.companyName,
+      productName: seoIntelligence.productName,
       seoScore: seoIntelligence.seoScore,
-      seoOverview: {
-        seoScore: seoIntelligence.seoScore,
-        ...seoIntelligence.technicalAudit?.seoOverview
-      },
+      performanceScore: techAuditData?.mobile?.performance ?? null,
+      seoPerformanceScore: techAuditData?.mobile?.seo ?? null,
+      accessibilityScore: techAuditData?.mobile?.accessibility ?? null,
+      bestPracticesScore: techAuditData?.mobile?.bestPractices ?? null,
+      mobileScore: techAuditData?.mobile?.performance ?? null,
+      desktopScore: techAuditData?.desktop?.performance ?? null,
+      cwvScore: techAuditData?.mobile?.coreWebVitals?.largestContentfulPaint?.score ?? null,
       
-      // Legacy fields (for backwards compatibility)
       technicalAudit: seoIntelligence.technicalAudit,
       keywordOpportunities: seoIntelligence.keywordOpportunities,
       competitorIntelligence: seoIntelligence.competitorKeywords,
@@ -158,29 +257,33 @@ export const getSeoHandler = async (req, res) => {
       aiVisibility: seoIntelligence.aiVisibility,
       landingPageOptimization: seoIntelligence.landingPageSuggestions,
       blogOpportunities: seoIntelligence.blogIdeas,
-      actionPlan: seoIntelligence.actionPlan,
+      actionPlan: computedActionPlan,
       
-      // NEW: Enhanced data from new tables
       scoreBreakdown: seoIntelligence.scoreBreakdown || null,
       technicalAuditDetail: seoIntelligence.technicalAuditDetail?.auditData || null,
-      keywordIntelligence: seoIntelligence.keywordIntelligence || null,
+      keywordIntelligence: kwData,
       geoIntelligence: seoIntelligence.geoIntelligence || null,
-      competitorSeoRecord: seoIntelligence.competitorSeoRecord || null,
-      contentGapRecord: seoIntelligence.contentGapRecord || null,
-      blogIntelligenceRecord: seoIntelligence.blogIntelligenceRecord || null,
-      executiveDashboard: seoIntelligence.executiveDashboard || null,
+      competitorSeoRecord: compData,
+      contentGapRecord: gapData,
+      blogIntelligenceRecord: blogData,
+      executiveDashboard: execDash,
       scrapingProvider: seoIntelligence.providers?.scraping || 'unknown',
+      
+      onPageChecks,
+      aiSearchReadiness,
       
       metadata: {
         analyzedAt: seoIntelligence.updatedAt,
         providers: seoIntelligence.providers,
         warnings: seoIntelligence.warnings
-      }
+      },
+      
+      canonical: canonicalPayload
     };
 
     return res.json({ 
       success: true, 
-      seoIntelligence: response 
+      seoIntelligence: response
     });
 
   } catch (error) {

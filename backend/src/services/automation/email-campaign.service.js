@@ -1,6 +1,8 @@
 import { prisma } from "../../config/prisma.js";
 import { callAI } from "../../ai/services/aiRouter.service.js";
 import { validateContentClaims } from "../execution/claim-validator.service.js";
+import { sendEmail, getEmailProviderHealth } from "../integrations/email/email-provider-registry.js";
+import { renderEmailHtml, renderPlainText } from "../email/email-template-renderer.service.js";
 
 const EMAIL_SEQUENCE_TEMPLATES = [
   { purpose: "Introduction & Value Proposition", daysDelay: 0 },
@@ -824,4 +826,160 @@ export async function listCampaigns(chatId) {
     },
   });
   return campaigns;
+}
+
+export async function handleProviderHealth() {
+  return getEmailProviderHealth();
+}
+
+export async function sendTestCampaignEmail(campaignId, recipientEmail, itemId) {
+  const campaign = await prisma.emailCampaign.findUnique({
+    where: { id: campaignId },
+  });
+  if (!campaign) throw new Error(`EmailCampaign not found: ${campaignId}`);
+
+  if (campaign.approvalStatus !== "APPROVED") {
+    return { success: false, error: "Campaign must be approved before sending.", code: "APPROVAL_REQUIRED" };
+  }
+
+  let items;
+  if (itemId) {
+    items = await prisma.emailSequenceItem.findMany({
+      where: { id: itemId, emailCampaignId: campaignId },
+    });
+  } else {
+    items = await prisma.emailSequenceItem.findMany({
+      where: { emailCampaignId: campaignId },
+      orderBy: { sequenceOrder: "asc" },
+      take: 1,
+    });
+  }
+
+  if (!items || items.length === 0) throw new Error("No email sequence items found");
+
+  const item = items[0];
+  const html = renderEmailHtml({
+    subject: item.subjectLine || "",
+    previewText: item.previewText || "",
+    greeting: item.greetingStrategy ? `Hi {{firstName}},` : "",
+    opening: "",
+    bodyParagraphs: [item.emailBodyText || ""],
+    bulletPoints: item.evidenceUsed?.map(e => e.claim).filter(Boolean) || [],
+    cta: item.primaryCta ? { text: item.primaryCta } : null,
+    closing: "",
+    signature: campaign.senderName ? `${campaign.senderName}` : "",
+  });
+
+  const text = renderPlainText({
+    greeting: item.greetingStrategy ? `Hi {{firstName}},` : "",
+    bodyParagraphs: [item.emailBodyText || ""],
+    bulletPoints: item.evidenceUsed?.map(e => e.claim).filter(Boolean) || [],
+    cta: item.primaryCta ? { text: item.primaryCta } : null,
+    closing: "",
+    signature: campaign.senderName ? `${campaign.senderName}` : "",
+  });
+
+  const result = await sendEmail({
+    to: recipientEmail,
+    subject: item.subjectLine || "No subject",
+    html,
+    text,
+    senderName: campaign.senderName || undefined,
+    tags: [`campaign:${campaignId}`, `item:${item.id}`, "test-send"],
+  });
+
+  if (result.success) {
+    await prisma.emailCampaignLog.create({
+      data: {
+        emailCampaignId: campaignId,
+        emailSequenceItemId: item.id,
+        action: "test_sent",
+        status: "delivered",
+        message: `Test email sent to ${result.maskedRecipient || recipientEmail}`,
+        metadata: { recipient: recipientEmail, provider: result.provider, providerMessageId: result.providerMessageId },
+      },
+    });
+  }
+
+  return result;
+}
+
+export async function sendCampaignEmails(campaignId) {
+  const campaign = await prisma.emailCampaign.findUnique({
+    where: { id: campaignId },
+    include: { sequenceItems: { orderBy: { sequenceOrder: "asc" } } },
+  });
+  if (!campaign) throw new Error(`EmailCampaign not found: ${campaignId}`);
+
+  if (campaign.approvalStatus !== "APPROVED") {
+    return { success: false, error: "Campaign must be approved before sending.", code: "APPROVAL_REQUIRED" };
+  }
+
+  const health = getEmailProviderHealth();
+  if (!health.canSend) {
+    return { success: false, error: "No email provider configured.", code: "NO_PROVIDER", providers: health.providers };
+  }
+
+  const results = [];
+  for (const item of campaign.sequenceItems) {
+    if (item.status !== "draft") continue;
+
+    const html = renderEmailHtml({
+      subject: item.subjectLine || "",
+      previewText: item.previewText || "",
+      greeting: item.greetingStrategy ? `Hi {{firstName}},` : "",
+      opening: "",
+      bodyParagraphs: [item.emailBodyText || ""],
+      bulletPoints: item.evidenceUsed?.map(e => e.claim).filter(Boolean) || [],
+      cta: item.primaryCta ? { text: item.primaryCta } : null,
+      closing: "",
+      signature: campaign.senderName ? `${campaign.senderName}` : "",
+    });
+
+    const text = renderPlainText({
+      greeting: item.greetingStrategy ? `Hi {{firstName}},` : "",
+      bodyParagraphs: [item.emailBodyText || ""],
+      bulletPoints: item.evidenceUsed?.map(e => e.claim).filter(Boolean) || [],
+      cta: item.primaryCta ? { text: item.primaryCta } : null,
+      closing: "",
+      signature: campaign.senderName ? `${campaign.senderName}` : "",
+    });
+
+    const result = await sendEmail({
+      to: "", // placeholder — real recipient list not in this scope
+      subject: item.subjectLine || "No subject",
+      html,
+      text,
+      senderName: campaign.senderName || undefined,
+      tags: [`campaign:${campaignId}`, `item:${item.id}`],
+    });
+
+    results.push({ sequenceOrder: item.sequenceOrder, result });
+    await prisma.emailSequenceItem.update({
+      where: { id: item.id },
+      data: { status: result.success ? "sent" : "failed" },
+    });
+
+    await prisma.emailCampaignLog.create({
+      data: {
+        emailCampaignId: campaignId,
+        emailSequenceItemId: item.id,
+        action: result.success ? "sent" : "send_failed",
+        status: result.success ? "delivered" : "failed",
+        message: result.success ? "Email sent successfully" : `Send failed: ${result.error?.message || "Unknown"}`,
+        metadata: { provider: result.provider, providerMessageId: result.providerMessageId, error: result.error },
+      },
+    });
+  }
+
+  return { success: true, results, total: results.length, delivered: results.filter(r => r.result.success).length };
+}
+
+export async function getDeliveryLogs(campaignId) {
+  const logs = await prisma.emailCampaignLog.findMany({
+    where: { emailCampaignId: campaignId },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+  return logs;
 }

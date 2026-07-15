@@ -217,6 +217,7 @@ export function benefitToText(benefit) {
 
 /**
  * Main normalization function for product intelligence
+ * Searches all possible feature/benefit paths in the product intelligence record
  */
 export function normalizeProductIntelligence(productIntel) {
   if (!productIntel || typeof productIntel !== 'object') {
@@ -226,26 +227,46 @@ export function normalizeProductIntelligence(productIntel) {
       warnings: ['Product intelligence not available or invalid']
     };
   }
-  
-  const features = normalizeFeatures(productIntel.features || productIntel.productAnalysis?.features);
-  const benefits = normalizeBenefits(productIntel.benefits || productIntel.productAnalysis?.benefits);
-  
+
+  const pa = productIntel.productAnalysis || {};
+  const website = productIntel.websiteEvidence || {};
+
+  // Search all possible feature paths in order of preference
+  const rawFeatures = productIntel.features
+    || pa.features
+    || pa.keyFeatures
+    || pa.capabilities
+    || pa.productFeatures
+    || pa.differentiators
+    || website.features
+    || [];
+
+  const rawBenefits = productIntel.benefits
+    || pa.benefits
+    || pa.coreBenefits
+    || pa.valuePropositions
+    || pa.advantages
+    || website.benefits
+    || [];
+
+  const features = normalizeFeatures(rawFeatures);
+  const benefits = normalizeBenefits(rawBenefits);
+
   const warnings = [];
-  
+
   if (features.length === 0) {
     warnings.push('No features available in product intelligence');
   }
-  
+
   if (benefits.length === 0) {
     warnings.push('No benefits available in product intelligence');
   }
-  
-  // Check for features with missing names
+
   const unnamedFeatures = features.filter(f => f.name === `Feature ${features.indexOf(f) + 1}`);
   if (unnamedFeatures.length > 0) {
     warnings.push(`${unnamedFeatures.length} features have no explicit name`);
   }
-  
+
   return {
     features,
     benefits,

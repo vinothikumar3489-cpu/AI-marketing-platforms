@@ -1,21 +1,94 @@
-/**
- * Zod schemas for validating AI-generated content output.
- * One schema per content type — rejects malformed output before it reaches the database.
- */
-
 import { z } from 'zod';
 
 const evidenceUsed = z.array(z.string()).default([]);
 const claimsRequiringReview = z.array(z.string()).default([]);
-const generatedAt = z.string().optional();
-const provider = z.string().optional();
 
-const seoMeta = z.object({
-  metaTitle: z.string().max(200).optional(),
-  metaDescription: z.string().max(300).optional(),
-}).optional();
+const linkedInPostSchema = z.object({
+  _type: z.string().optional(),
+  hook: z.string().min(1),
+  body: z.string().min(1),
+  cta: z.string().nullable(),
+  hashtags: z.array(z.string()).max(8).default([]),
+  audience: z.string().nullable(),
+  angle: z.string(),
+  evidenceUsed,
+  claimsRequiringReview,
+});
 
-export const blogArticleSchema = z.object({
+const instagramPostSchema = z.object({
+  _type: z.string().optional(),
+  hook: z.string(),
+  caption: z.string(),
+  cta: z.string().nullable(),
+  hashtags: z.array(z.string()).max(15).default([]),
+  visualConcept: z.string().nullable(),
+  audience: z.string().nullable(),
+  angle: z.string(),
+  evidenceUsed,
+  claimsRequiringReview,
+});
+
+const twitterPostSchema = z.object({
+  _type: z.string().optional(),
+  post: z.string().min(1).max(280),
+  cta: z.string().nullable(),
+  hashtags: z.array(z.string()).max(3).default([]),
+  angle: z.string(),
+  evidenceUsed,
+  claimsRequiringReview,
+});
+
+const facebookPostSchema = z.object({
+  _type: z.string().optional(),
+  headline: z.string().nullable(),
+  body: z.string().min(1),
+  cta: z.string().nullable(),
+  audience: z.string().nullable(),
+  angle: z.string(),
+  evidenceUsed,
+  claimsRequiringReview,
+});
+
+const youtubeDescriptionSchema = z.object({
+  _type: z.string().optional(),
+  title: z.string(),
+  openingHook: z.string(),
+  description: z.string().min(1),
+  chapters: z.array(z.object({
+    timestamp: z.string(),
+    title: z.string(),
+  })).default([]),
+  links: z.array(z.object({
+    label: z.string(),
+    url: z.string(),
+  })).default([]),
+  cta: z.string().nullable(),
+  hashtags: z.array(z.string()).max(15).default([]),
+  keywords: z.array(z.string()).default([]),
+  evidenceUsed,
+  claimsRequiringReview,
+});
+
+const emailCopySchema = z.object({
+  _type: z.string().optional(),
+  emailType: z.enum(['outreach', 'nurture', 'product_announcement', 'newsletter', 'follow_up', 'trial_conversion']),
+  subject: z.string(),
+  previewText: z.string().nullable(),
+  greeting: z.string(),
+  opening: z.string(),
+  bodyParagraphs: z.array(z.string()).min(1),
+  bulletPoints: z.array(z.string()).default([]),
+  ctaText: z.string(),
+  ctaUrl: z.string().nullable(),
+  closing: z.string(),
+  signature: z.string(),
+  personalizationFields: z.array(z.string()).default([]),
+  complianceNote: z.string().nullable(),
+  evidenceUsed,
+  claimsRequiringReview,
+});
+
+const blogArticleSchema = z.object({
   title: z.string().min(1).max(200),
   purpose: z.string().optional(),
   audience: z.string().optional(),
@@ -31,7 +104,7 @@ export const blogArticleSchema = z.object({
   claimsRequiringReview,
 });
 
-export const faqPageSchema = z.object({
+const faqPageSchema = z.object({
   title: z.string().min(1).max(200),
   purpose: z.string().optional(),
   audience: z.string().optional(),
@@ -43,7 +116,7 @@ export const faqPageSchema = z.object({
   claimsRequiringReview,
 });
 
-export const landingPageSchema = z.object({
+const landingPageSchema = z.object({
   headline: z.string().min(1).max(200),
   subHeadline: z.string().max(300).optional(),
   problem: z.string().optional(),
@@ -58,11 +131,14 @@ export const landingPageSchema = z.object({
     response: z.string(),
   })).default([]),
   cta: z.string().optional(),
-  seoMetadata: seoMeta,
+  seoMetadata: z.object({
+    metaTitle: z.string().max(200).optional(),
+    metaDescription: z.string().max(300).optional(),
+  }).optional(),
   evidenceUsed,
 });
 
-export const productPageSchema = z.object({
+const productPageSchema = z.object({
   title: z.string().min(1).max(200),
   purpose: z.string().optional(),
   productSummary: z.string().optional(),
@@ -72,11 +148,14 @@ export const productPageSchema = z.object({
     evidence: z.string().optional(),
   })).default([]),
   cta: z.string().optional(),
-  seoMetadata: seoMeta,
+  seoMetadata: z.object({
+    metaTitle: z.string().max(200).optional(),
+    metaDescription: z.string().max(300).optional(),
+  }).optional(),
   evidenceUsed,
 });
 
-export const comparisonPageSchema = z.object({
+const comparisonPageSchema = z.object({
   title: z.string().min(1).max(200),
   purpose: z.string().optional(),
   primaryProduct: z.string().optional(),
@@ -95,7 +174,7 @@ export const comparisonPageSchema = z.object({
   claimsRequiringReview,
 });
 
-export const featureAnnouncementSchema = z.object({
+const featureAnnouncementSchema = z.object({
   title: z.string().min(1).max(200),
   purpose: z.string().optional(),
   featureName: z.string().optional(),
@@ -106,7 +185,7 @@ export const featureAnnouncementSchema = z.object({
   evidenceUsed,
 });
 
-export const whitepaperSchema = z.object({
+const whitepaperSchema = z.object({
   title: z.string().min(1).max(200),
   purpose: z.string().optional(),
   audience: z.string().optional(),
@@ -120,60 +199,7 @@ export const whitepaperSchema = z.object({
   limitations: z.array(z.string()).default([]),
 });
 
-export const linkedinPostSchema = z.object({
-  text: z.string().min(1).max(4000),
-  hook: z.string().max(300).optional(),
-  cta: z.string().optional(),
-  evidenceUsed,
-});
-
-export const instagramPostSchema = z.object({
-  caption: z.string().min(1).max(3000),
-  hook: z.string().max(200).optional(),
-  hashtags: z.array(z.string()).max(10).default([]),
-  cta: z.string().optional(),
-  evidenceUsed,
-});
-
-export const twitterPostSchema = z.object({
-  text: z.string().min(1).max(400),
-  cta: z.string().optional(),
-  evidenceUsed,
-});
-
-export const facebookPostSchema = z.object({
-  text: z.string().min(1).max(3000),
-  hook: z.string().optional(),
-  cta: z.string().optional(),
-  evidenceUsed,
-});
-
-export const youtubeDescriptionSchema = z.object({
-  title: z.string().max(200).optional(),
-  description: z.string().min(1).max(6000),
-  timestamps: z.array(z.object({
-    time: z.string(),
-    topic: z.string(),
-  })).default([]),
-  links: z.array(z.object({
-    text: z.string(),
-    url: z.string(),
-  })).default([]),
-  cta: z.string().optional(),
-  evidenceUsed,
-  claimsRequiringReview,
-});
-
-export const emailCopySchema = z.object({
-  subjectLine: z.string().min(1).max(200),
-  previewText: z.string().max(200).optional(),
-  body: z.string().min(1),
-  cta: z.string().optional(),
-  personalizationFields: z.array(z.string()).default([]),
-  evidenceUsed,
-});
-
-export const creativeBriefSchema = z.object({
+const creativeBriefSchema = z.object({
   objective: z.string().optional(),
   audience: z.string().optional(),
   message: z.string().optional(),
@@ -187,7 +213,7 @@ export const creativeBriefSchema = z.object({
   claimsRequiringReview,
 });
 
-export const videoScriptSchema = z.object({
+const videoScriptSchema = z.object({
   duration: z.string().optional(),
   scenes: z.array(z.object({
     scene: z.number().or(z.string()).optional(),
@@ -209,7 +235,7 @@ export const SCHEMAS = {
   comparison_page: comparisonPageSchema,
   feature_announcement: featureAnnouncementSchema,
   whitepaper: whitepaperSchema,
-  linkedin_post: linkedinPostSchema,
+  linkedin_post: linkedInPostSchema,
   instagram_post: instagramPostSchema,
   twitter_post: twitterPostSchema,
   facebook_post: facebookPostSchema,
@@ -219,17 +245,51 @@ export const SCHEMAS = {
   video_script: videoScriptSchema,
 };
 
+export const SCHEMA_REGISTRY = {
+  linkedin_post: { schema: linkedInPostSchema, renderer: 'linkedin' },
+  instagram_post: { schema: instagramPostSchema, renderer: 'instagram' },
+  twitter_post: { schema: twitterPostSchema, renderer: 'twitter' },
+  facebook_post: { schema: facebookPostSchema, renderer: 'facebook' },
+  youtube_description: { schema: youtubeDescriptionSchema, renderer: 'youtube' },
+  email_copy: { schema: emailCopySchema, renderer: 'email' },
+  creative_brief: { schema: creativeBriefSchema, renderer: 'creativeBrief' },
+  video_script: { schema: videoScriptSchema, renderer: 'videoScript' },
+  blog_article: { schema: blogArticleSchema, renderer: 'blog' },
+  faq_page: { schema: faqPageSchema, renderer: 'faq' },
+  landing_page: { schema: landingPageSchema, renderer: 'landing' },
+  product_page: { schema: productPageSchema, renderer: 'product' },
+  comparison_page: { schema: comparisonPageSchema, renderer: 'comparison' },
+  feature_announcement: { schema: featureAnnouncementSchema, renderer: 'featureAnnouncement' },
+  whitepaper: { schema: whitepaperSchema, renderer: 'whitepaper' },
+};
+
 export function validateContentOutput(raw, assetType) {
-  const schema = SCHEMAS[assetType];
-  if (!schema) {
+  const entry = SCHEMA_REGISTRY[assetType];
+  if (!entry) {
+    console.warn(`[Schema] No schema registered for: ${assetType}`);
     return { valid: false, errors: [`No schema for content type: ${assetType}`] };
   }
 
-  const result = schema.safeParse(raw);
+  console.info('[Content Schema Debug]', {
+    contentType: assetType,
+    resultType: typeof raw,
+    resultKeys: raw && typeof raw === 'object' ? Object.keys(raw) : [],
+    hasTextField: Boolean(raw && typeof raw === 'object' && typeof raw.text === 'string'),
+    hasBodyField: Boolean(raw && typeof raw === 'object' && typeof raw.body === 'string'),
+    hasPostField: Boolean(raw && typeof raw === 'object' && typeof raw.post === 'string'),
+    hasCaptionField: Boolean(raw && typeof raw === 'object' && typeof raw.caption === 'string'),
+    hasHookField: Boolean(raw && typeof raw === 'object' && typeof raw.hook === 'string'),
+    hasHeadlineField: Boolean(raw && typeof raw === 'object' && typeof raw.headline === 'string'),
+    hasSubjectField: Boolean(raw && typeof raw === 'object' && typeof raw.subject === 'string'),
+  });
+
+  const result = entry.schema.safeParse(raw);
   if (result.success) {
     return { valid: true, data: result.data };
   }
 
   const errors = result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`);
+  console.warn(`[Schema] Validation failed for ${assetType}:`, JSON.stringify(errors));
+  console.warn(`[Schema] Raw received:`, JSON.stringify(raw).substring(0, 500));
   return { valid: false, errors };
 }

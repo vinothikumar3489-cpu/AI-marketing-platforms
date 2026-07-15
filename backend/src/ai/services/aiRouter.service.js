@@ -1,42 +1,57 @@
 
 import { prisma } from "../../config/prisma.js";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-const GEMINI_API_URL = process.env.GEMINI_API_URL || "https://generativelanguage.googleapis.com/v1beta/models";
+const getGeminiKey = () => process.env.GEMINI_API_KEY;
+const getGeminiModel = () => process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const getGeminiUrl = () => process.env.GEMINI_API_URL || "https://generativelanguage.googleapis.com/v1beta/models";
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const getGroqKey = () => process.env.GROQ_API_KEY;
+const getGroqModel = () => process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+const getGroqUrl = () => "https://api.groq.com/openai/v1/chat/completions";
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+const getOpenAIKey = () => process.env.OPENAI_API_KEY;
+const getOpenAIModel = () => process.env.OPENAI_MODEL || "gpt-4o-mini";
+const getOpenAIUrl = () => "https://api.openai.com/v1/chat/completions";
 
-// In-memory Gemini quota cooldown
-const GEMINI_QUOTA_COOLDOWN_MS = 300000; // 5 minutes
+const GEMINI_QUOTA_COOLDOWN_MS = 300000;
 let geminiQuotaExhaustedUntil = 0;
+
+const PROVIDER_STATUS = {};
+
+function getStatus(provider) {
+  if (PROVIDER_STATUS[provider] !== undefined) return PROVIDER_STATUS[provider];
+  let status;
+  switch (provider) {
+    case 'groq':
+      status = getGroqKey() ? 'AVAILABLE' : 'NOT_CONFIGURED';
+      break;
+    case 'gemini':
+      status = getGeminiKey() ? 'AVAILABLE' : 'NOT_CONFIGURED';
+      break;
+    case 'openai':
+      status = getOpenAIKey() ? 'AVAILABLE' : 'NOT_CONFIGURED';
+      break;
+    default:
+      status = 'NOT_CONFIGURED';
+  }
+  PROVIDER_STATUS[provider] = status;
+  return status;
+}
 
 function extractJsonFromText(text) {
   if (!text || typeof text !== "string") return null;
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) return null;
   let raw = jsonMatch[0];
-  // Repair common JSON issues
   try {
     return JSON.parse(raw);
   } catch (e) {
-    // Try repairing
     try {
-      // Remove trailing commas before closing braces/brackets
       raw = raw.replace(/,\s*([}\]])/g, '$1');
-      // Remove unescaped newlines inside strings
       raw = raw.replace(/(?<!\\)\n/g, ' ');
-      // Remove trailing comma at end of object
       raw = raw.replace(/,\s*$/, '');
       return JSON.parse(raw);
     } catch (e2) {
-      console.warn("Failed to parse JSON from AI response:", e2.message);
       return null;
     }
   }
@@ -95,18 +110,13 @@ function getRuleBasedFallback(productData) {
 }
 
 async function callGemini(prompt) {
-  if (!GEMINI_API_KEY) {
-    console.log("⚠️ GEMINI_API_KEY not found");
-    return { success: false };
-  }
-  // Check quota cooldown
-  if (Date.now() < geminiQuotaExhaustedUntil) {
-    console.log("⏳ Gemini quota exhausted, skipping (cooldown active)");
-    return { success: false };
-  }
+  const key = getGeminiKey();
+  if (!key) return { success: false, status: 'NOT_CONFIGURED' };
+  if (Date.now() < geminiQuotaExhaustedUntil) return { success: false, status: 'QUOTA_EXHAUSTED' };
   try {
-    console.log("🤖 Calling Gemini API...");
-    const response = await fetch(`${GEMINI_API_URL}/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+    const model = getGeminiModel();
+    const apiUrl = getGeminiUrl();
+    const response = await fetch(`${apiUrl}/${model}:generateContent?key=${key}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -120,162 +130,163 @@ async function callGemini(prompt) {
     });
 
     if (response.status === 429) {
-      console.warn("❌ Gemini quota exhausted (429). Activating cooldown.");
       geminiQuotaExhaustedUntil = Date.now() + GEMINI_QUOTA_COOLDOWN_MS;
-      return { success: false };
+      return { success: false, status: 'QUOTA_EXHAUSTED' };
+    }
+
+    if (response.status === 403 || response.status === 401) {
+      PROVIDER_STATUS.gemini = 'NOT_CONFIGURED';
+      return { success: false, status: 'NOT_CONFIGURED' };
     }
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      console.warn("❌ Gemini API error:", response.status, errorData);
-      return { success: false };
+      return { success: false, status: 'TEMPORARILY_UNAVAILABLE' };
     }
     const data = await response.json();
     const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!content) {
-      console.warn("❌ Gemini response missing content");
-      return { success: false };
-    }
+    if (!content) return { success: false, status: 'TEMPORARILY_UNAVAILABLE' };
     const parsed = extractJsonFromText(content);
-    if (!parsed) {
-      console.warn("❌ Failed to parse JSON from Gemini response");
-      return { success: false };
-    }
-    console.log("✅ Gemini API successful");
+    if (!parsed) return { success: false, status: 'TEMPORARILY_UNAVAILABLE' };
     return { success: true, data: parsed, provider: "gemini" };
   } catch (e) {
-    console.warn("❌ Gemini API failed:", e.message);
-    return { success: false };
+    return { success: false, status: 'TEMPORARILY_UNAVAILABLE' };
   }
 }
 
 async function callGroq(prompt) {
-  if (!GROQ_API_KEY) {
-    console.log("⚠️ GROQ_API_KEY not found");
-    return { success: false };
-  }
+  const key = getGroqKey();
+  if (!key) return { success: false, status: 'NOT_CONFIGURED' };
   try {
-    console.log("🤖 Calling Groq API...");
-    const response = await fetch(GROQ_API_URL, {
+    const apiUrl = getGroqUrl();
+    const model = getGroqModel();
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
+        Authorization: `Bearer ${key}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: GROQ_MODEL,
+        model: model,
         messages: [{ role: "user", content: prompt }],
         max_tokens: 4000,
         temperature: 0.4
       }),
       signal: AbortSignal.timeout(45000)
     });
+
+    if (response.status === 403 || response.status === 401) {
+      PROVIDER_STATUS.groq = 'NOT_CONFIGURED';
+      return { success: false, status: 'NOT_CONFIGURED' };
+    }
+
+    if (response.status === 429) {
+      return { success: false, status: 'RATE_LIMITED' };
+    }
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      console.warn("❌ Groq API error:", response.status, errorData);
-      return { success: false };
+      return { success: false, status: 'TEMPORARILY_UNAVAILABLE' };
     }
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
-    if (!content) {
-      console.warn("❌ Groq response missing content");
-      return { success: false };
-    }
+    if (!content) return { success: false, status: 'TEMPORARILY_UNAVAILABLE' };
     const parsed = extractJsonFromText(content);
-    if (!parsed) {
-      console.warn("❌ Failed to parse JSON from Groq response");
-      return { success: false };
-    }
-    console.log("✅ Groq API successful");
+    if (!parsed) return { success: false, status: 'TEMPORARILY_UNAVAILABLE' };
     return { success: true, data: parsed, provider: "groq" };
   } catch (e) {
-    console.warn("❌ Groq API failed:", e.message);
-    return { success: false };
+    return { success: false, status: 'TEMPORARILY_UNAVAILABLE' };
   }
 }
 
 async function callOpenAI(prompt) {
-  if (!OPENAI_API_KEY) {
-    console.log("⚠️ OPENAI_API_KEY not found");
-    return { success: false };
-  }
+  const key = getOpenAIKey();
+  if (!key) return { success: false, status: 'NOT_CONFIGURED' };
   try {
-    console.log("🤖 Calling OpenAI API...");
-    const response = await fetch(OPENAI_API_URL, {
+    const apiUrl = getOpenAIUrl();
+    const model = getOpenAIModel();
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${key}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: OPENAI_MODEL,
+        model: model,
         messages: [{ role: "user", content: prompt }],
         max_tokens: 4000,
-        temperature: 0.4,
-        response_format: { type: "json_object" }
+        temperature: 0.4
       }),
       signal: AbortSignal.timeout(45000)
     });
+
+    if (response.status === 403 || response.status === 401) {
+      PROVIDER_STATUS.openai = 'NOT_CONFIGURED';
+      return { success: false, status: 'NOT_CONFIGURED' };
+    }
+
+    if (response.status === 429) {
+      return { success: false, status: 'RATE_LIMITED' };
+    }
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      console.warn("❌ OpenAI API error:", response.status, errorData);
-      return { success: false };
+      return { success: false, status: 'TEMPORARILY_UNAVAILABLE' };
     }
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
-    if (!content) {
-      console.warn("❌ OpenAI response missing content");
-      return { success: false };
-    }
+    if (!content) return { success: false, status: 'TEMPORARILY_UNAVAILABLE' };
     const parsed = extractJsonFromText(content);
-    if (!parsed) {
-      console.warn("❌ Failed to parse JSON from OpenAI response");
-      return { success: false };
-    }
-    console.log("✅ OpenAI API successful");
+    if (!parsed) return { success: false, status: 'TEMPORARILY_UNAVAILABLE' };
     return { success: true, data: parsed, provider: "openai" };
   } catch (e) {
-    console.warn("❌ OpenAI API failed:", e.message);
-    return { success: false };
+    return { success: false, status: 'TEMPORARILY_UNAVAILABLE' };
   }
 }
 
-async function tryWithRetry(providerFn, providerName, prompt) {
+async function tryWithRetry(providerFn, prompt) {
   const result = await providerFn(prompt);
   if (result.success) return result;
-  // Retry once with strict JSON-only instruction
   const retryPrompt = prompt + "\n\nReturn only a valid compact JSON object matching the requested schema. No markdown, no explanation.";
   const retryResult = await providerFn(retryPrompt);
   if (retryResult.success) return retryResult;
   return result;
 }
 
-/**
- * Generic AI caller: tries Groq → Gemini → OpenAI → returns { success, data?, provider? }
- * Gemini is skipped during quota cooldown (429 resets 5-min timer).
- */
 export async function callAI(prompt) {
-  let result = await tryWithRetry(callGroq, "groq", prompt);
-  if (result.success) return result;
-  result = await tryWithRetry(callGemini, "gemini", prompt);
-  if (result.success) return result;
-  result = await tryWithRetry(callOpenAI, "openai", prompt);
-  if (result.success) return result;
+  const groqStatus = getStatus('groq');
+  if (groqStatus === 'AVAILABLE' || groqStatus === 'RATE_LIMITED') {
+    const result = await tryWithRetry(callGroq, prompt);
+    if (result.success) return result;
+    if (result.status === 'RATE_LIMITED') PROVIDER_STATUS.groq = 'RATE_LIMITED';
+  }
+
+  if (Date.now() < geminiQuotaExhaustedUntil) {
+    PROVIDER_STATUS.gemini = 'QUOTA_EXHAUSTED';
+  }
+  const geminiStatus = getStatus('gemini');
+  if ((geminiStatus === 'AVAILABLE' || geminiStatus === 'RATE_LIMITED') && Date.now() >= geminiQuotaExhaustedUntil) {
+    const result = await tryWithRetry(callGemini, prompt);
+    if (result.success) return result;
+    if (result.status === 'QUOTA_EXHAUSTED' || result.status === 'RATE_LIMITED') {
+      PROVIDER_STATUS.gemini = 'QUOTA_EXHAUSTED';
+    }
+  }
+
+  const openaiStatus = getStatus('openai');
+  if (openaiStatus === 'AVAILABLE') {
+    const result = await tryWithRetry(callOpenAI, prompt);
+    if (result.success) return result;
+  }
+
   return { success: false };
 }
 
 export async function generateProductAnalysis(productData, scrapedData) {
   const prompt = buildPrompt(productData, scrapedData);
-  console.log("📝 Prompt size (chars):", prompt.length);
-  console.log("📊 Scraped content length (chars):", (scrapedData?.cleanedText || "").length);
 
   let result = await callAI(prompt);
   if (result.success) {
     return { ...result, fallbackUsed: false };
   }
 
-  // Use rule-based fallback
-  console.log("⚠️ Using rule-based fallback analysis...");
   const fallbackData = getRuleBasedFallback(productData);
   return {
     success: true,

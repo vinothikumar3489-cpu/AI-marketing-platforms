@@ -232,7 +232,12 @@ function ContentGeneratorPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeGroup, setActiveGroup] = useState<string>('long-form');
+  const [contentGoal, setContentGoal] = useState<string>('');
+  const [contentTone, setContentTone] = useState<string>('');
   const generatingRef = useRef(false);
+
+  const GOALS = ['Awareness', 'Education', 'Engagement', 'Lead generation', 'Trial conversion', 'Product announcement'];
+  const TONES = ['Professional', 'Educational', 'Conversational', 'Bold', 'Technical', 'Founder-led'];
 
   const handleGenerate = useCallback(async () => {
     // PART 9: In-flight protection to prevent duplicate POSTs
@@ -308,6 +313,16 @@ function ContentGeneratorPanel({
             </button>
           );
         })}
+      </div>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', alignItems: 'center' }}>
+        <select value={contentGoal} onChange={e => setContentGoal(e.target.value)} style={{ ...S.input, width: 'auto', minWidth: '120px', fontSize: '10px', padding: '4px 8px' }}>
+          <option value="">Any goal</option>
+          {GOALS.map(g => <option key={g} value={g}>{g}</option>)}
+        </select>
+        <select value={contentTone} onChange={e => setContentTone(e.target.value)} style={{ ...S.input, width: 'auto', minWidth: '120px', fontSize: '10px', padding: '4px 8px' }}>
+          <option value="">Any tone</option>
+          {TONES.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
       </div>
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
         <button
@@ -422,62 +437,287 @@ function EvidenceUsedPanel({ content }: { content: any }) {
   );
 }
 
+// ============================================
+// DEDICATED CONTENT TYPE RENDERERS (Part 23)
+// ============================================
+
+function LinkedInRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
+  const fullText = [content.hook, content.body, content.cta].filter(Boolean).join('\n\n');
+  return (
+    <div style={S.card}>
+      <div style={{ ...S.cardHeader, marginBottom: '4px' }}><Linkedin size={18} style={{ color: C.brand }} /><span style={S.cardTitle}>LinkedIn Post</span></div>
+      <div style={{ fontSize: '11px', color: C.dim, marginBottom: '8px' }}>Angle: {content.angle} {content.audience ? `| Audience: ${content.audience}` : ''}</div>
+      <div style={S.previewBox}>
+        <div style={{ fontWeight: 600, color: C.text, marginBottom: '8px' }}>{content.hook}</div>
+        <div style={{ color: C.muted, marginBottom: '8px' }}>{content.body}</div>
+        {content.cta && <div style={{ color: C.brand, fontWeight: 600, marginTop: '8px' }}>{content.cta}</div>}
+      </div>
+      {content.hashtags?.length > 0 && (
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '8px' }}>
+          {content.hashtags.map((h: string, i: number) => <span key={i} style={S.tag(C.brand)}>{h}</span>)}
+        </div>
+      )}
+      <CopyButton text={fullText} onCopy={onCopy} />
+    </div>
+  );
+}
+
+function InstagramRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
+  const captionWithHashtags = content.hashtags?.length
+    ? content.caption + '\n\n' + content.hashtags.join(' ')
+    : content.caption;
+  return (
+    <div style={S.card}>
+      <div style={{ ...S.cardHeader, marginBottom: '4px' }}><Instagram size={18} style={{ color: C.pink }} /><span style={S.cardTitle}>Instagram Post</span></div>
+      <div style={{ fontSize: '11px', color: C.dim, marginBottom: '8px' }}>
+        {content.angle ? `Angle: ${content.angle} | ` : ''}
+        {content.audience ? `Audience: ${content.audience}` : ''}
+      </div>
+      {content.visualConcept && (
+        <div style={{ padding: '8px 10px', background: 'rgba(168,85,247,0.08)', borderRadius: '6px', border: '1px solid rgba(168,85,247,0.2)', fontSize: '11px', color: C.purple, marginBottom: '10px' }}>
+          <Camera size={12} style={{ marginRight: '4px' }} /> Visual concept: {content.visualConcept}
+        </div>
+      )}
+      <div style={S.previewBox}>
+        <div style={{ fontWeight: 600, color: C.text, marginBottom: '8px' }}>{content.hook}</div>
+        <div style={{ whiteSpace: 'pre-wrap', color: C.muted }}>{captionWithHashtags}</div>
+      </div>
+      {content.cta && <div style={{ color: C.pink, fontWeight: 600, marginTop: '8px', fontSize: '13px' }}>{content.cta}</div>}
+      <CopyButton text={captionWithHashtags} onCopy={onCopy} />
+    </div>
+  );
+}
+
+function TwitterRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
+  const fullPost = content.hashtags?.length
+    ? content.post + ' ' + content.hashtags.join(' ')
+    : content.post;
+  return (
+    <div style={S.card}>
+      <div style={{ ...S.cardHeader, marginBottom: '4px' }}><Twitter size={18} style={{ color: C.cyan }} /><span style={S.cardTitle}>X (Twitter) Post</span></div>
+      <div style={{ fontSize: '11px', color: C.dim, marginBottom: '4px' }}>Angle: {content.angle}</div>
+      <div style={S.previewBox}>{fullPost}</div>
+      <div style={{ fontSize: '10px', color: C.dim, marginTop: '4px' }}>{fullPost.length}/280 chars</div>
+      {content.cta && <div style={{ color: C.cyan, fontWeight: 600, marginTop: '6px', fontSize: '13px' }}>{content.cta}</div>}
+      <CopyButton text={fullPost} onCopy={onCopy} />
+    </div>
+  );
+}
+
+function FacebookRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
+  const fullText = [content.headline, content.body, content.cta].filter(Boolean).join('\n\n');
+  return (
+    <div style={S.card}>
+      <div style={{ ...S.cardHeader, marginBottom: '4px' }}><Facebook size={18} style={{ color: C.brand }} /><span style={S.cardTitle}>Facebook Post</span></div>
+      <div style={{ fontSize: '11px', color: C.dim, marginBottom: '8px' }}>Angle: {content.angle} {content.audience ? `| Audience: ${content.audience}` : ''}</div>
+      <div style={S.previewBox}>
+        {content.headline && <div style={{ fontWeight: 600, color: C.text, marginBottom: '8px' }}>{content.headline}</div>}
+        <div style={{ color: C.muted, marginBottom: '8px' }}>{content.body}</div>
+        {content.cta && <div style={{ color: C.brand, fontWeight: 600, marginTop: '8px' }}>{content.cta}</div>}
+      </div>
+      <CopyButton text={fullText} onCopy={onCopy} />
+    </div>
+  );
+}
+
+function YouTubeRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
+  const descParts = [
+    content.openingHook,
+    '',
+    content.description,
+    '',
+    content.chapters?.length ? 'Chapters:' : '',
+    ...(content.chapters || []).map((ch: any) => `${ch.timestamp} — ${ch.title}`),
+    '',
+    content.links?.length ? 'Links:' : '',
+    ...(content.links || []).map((l: any) => `${l.label}: ${l.url}`),
+    '',
+    content.hashtags?.length ? content.hashtags.join(' ') : '',
+    '',
+    content.cta,
+  ].filter(Boolean).join('\n');
+
+  return (
+    <div style={S.card}>
+      <div style={{ ...S.cardHeader, marginBottom: '4px' }}><Youtube size={18} style={{ color: C.critical }} /><span style={S.cardTitle}>YouTube Description</span></div>
+      <div style={{ fontSize: '13px', fontWeight: 700, color: C.text, marginBottom: '4px' }}>{content.title}</div>
+      <div style={S.previewBox}>
+        <div style={{ color: C.muted, whiteSpace: 'pre-wrap' }}>{descParts}</div>
+      </div>
+      {content.keywords?.length > 0 && (
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '8px' }}>
+          {content.keywords.map((k: string, i: number) => <span key={i} style={S.tag(C.needsImprovement)}>{k}</span>)}
+        </div>
+      )}
+      <CopyButton text={descParts} onCopy={onCopy} />
+    </div>
+  );
+}
+
+function EmailRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
+  const rendered = [
+    `Subject: ${content.subject}`,
+    content.previewText ? `Preview text: ${content.previewText}` : '',
+    '',
+    content.greeting,
+    '',
+    content.opening,
+    '',
+    ...content.bodyParagraphs.map((p: string) => p + '\n'),
+    content.bulletPoints?.length ? content.bulletPoints.map((b: string) => `• ${b}`).join('\n') : '',
+    '',
+    content.ctaText,
+    '',
+    content.closing,
+    '',
+    content.signature,
+    content.complianceNote ? `\n${content.complianceNote}` : '',
+  ].filter(Boolean).join('\n');
+
+  return (
+    <div style={S.card}>
+      <div style={{ ...S.cardHeader, marginBottom: '4px' }}><Mail size={18} style={{ color: C.purple }} /><span style={S.cardTitle}>Email Copy</span></div>
+      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '8px' }}>
+        <span style={S.tag(C.purple)}>{content.emailType?.replace(/_/g, ' ')}</span>
+        {content.personalizationFields?.map((f: string, i: number) => <span key={i} style={S.tag(C.needsImprovement)}>{f}</span>)}
+      </div>
+      <div style={S.previewBox}>
+        <div style={{ fontSize: '14px', fontWeight: 700, color: C.text, marginBottom: '4px' }}>{content.subject}</div>
+        {content.previewText && <div style={{ fontSize: '11px', color: C.dim, marginBottom: '12px' }}>{content.previewText}</div>}
+        <div style={{ whiteSpace: 'pre-wrap', color: C.muted, lineHeight: 1.7 }}>{rendered}</div>
+      </div>
+      <CopyButton text={rendered} onCopy={onCopy} />
+    </div>
+  );
+}
+
+function CreativeBriefRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
+  const fullText = [
+    `Objective: ${content.objective}`,
+    `Audience: ${content.audience}`,
+    `Message: ${content.message}`,
+    `Visual: ${content.visualDirection}`,
+    `Brand signals: ${content.brandSignals?.join(', ')}`,
+    `Required text: ${content.requiredText}`,
+    `CTA: ${content.cta}`,
+    `Format: ${content.format}`,
+    content.evidenceLimitations?.length ? `Limitations: ${content.evidenceLimitations.join('; ')}` : '',
+  ].filter(Boolean).join('\n');
+
+  return (
+    <div style={S.card}>
+      <div style={{ ...S.cardHeader, marginBottom: '4px' }}><PenTool size={18} style={{ color: C.needsImprovement }} /><span style={S.cardTitle}>Creative Brief</span></div>
+      <div style={S.previewBox}>
+        <div style={{ display: 'grid', gap: '10px' }}>
+          {content.objective && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>OBJECTIVE</span><span style={{ color: C.text }}>{content.objective}</span></div>}
+          {content.audience && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>AUDIENCE</span><span style={{ color: C.text }}>{content.audience}</span></div>}
+          {content.message && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>MESSAGE</span><span style={{ color: C.text }}>{content.message}</span></div>}
+          {content.visualDirection && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>VISUAL DIRECTION</span><span style={{ color: C.text }}>{content.visualDirection}</span></div>}
+          {content.brandSignals?.length > 0 && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>BRAND SIGNALS</span><span style={{ color: C.text }}>{content.brandSignals.join(', ')}</span></div>}
+          {content.requiredText && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>REQUIRED TEXT</span><span style={{ color: C.accent, fontWeight: 600 }}>{content.requiredText}</span></div>}
+          {content.format && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>FORMAT</span><span style={S.tag(C.needsImprovement)}>{content.format}</span></div>}
+          {content.evidenceLimitations?.length > 0 && <div><span style={{ color: C.critical, fontSize: '10px', display: 'block' }}>LIMITATIONS</span>{content.evidenceLimitations.map((l: string, i: number) => <div key={i} style={{ color: C.muted, fontSize: '11px' }}>⚠ {l}</div>)}</div>}
+        </div>
+      </div>
+      <CopyButton text={fullText} onCopy={onCopy} />
+    </div>
+  );
+}
+
+function VideoScriptRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
+  const fullText = (content.scenes || []).map((s: any) =>
+    `Scene ${s.scene}: ${s.narration}
+  On-screen: ${s.onScreenText || ''}
+  Visual: ${s.visual || ''}
+  Evidence: ${s.evidencePoint || ''}
+  CTA: ${s.cta || '—'}`
+  ).join('\n\n');
+
+  return (
+    <div style={S.card}>
+      <div style={{ ...S.cardHeader, marginBottom: '4px' }}><Camera size={18} style={{ color: C.critical }} /><span style={S.cardTitle}>Video Script</span></div>
+      <div style={{ fontSize: '11px', color: C.dim, marginBottom: '8px' }}>Duration: {content.duration || '30s'} | {content.scenes?.length || 0} scenes</div>
+      <div style={S.previewBox}>
+        {(content.scenes || []).map((s: any, i: number) => (
+          <div key={i} style={{ marginBottom: '14px', padding: '10px', background: C.bg, borderRadius: '8px', border: '1px solid rgba(255,71,87,0.15)' }}>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: C.critical, marginBottom: '4px' }}>SCENE {s.scene || i + 1}</div>
+            <div style={{ fontSize: '12px', color: C.text, marginBottom: '4px' }}>🎙 {s.narration}</div>
+            {s.onScreenText && <div style={{ fontSize: '11px', color: C.accent, marginBottom: '2px' }}>📺 {s.onScreenText}</div>}
+            {s.visual && <div style={{ fontSize: '11px', color: C.muted, marginBottom: '2px' }}>🎬 {s.visual}</div>}
+            {s.evidencePoint && <div style={{ fontSize: '10px', color: C.dim }}>📋 {s.evidencePoint}</div>}
+            {s.cta && <div style={{ fontSize: '11px', color: C.brand, fontWeight: 600, marginTop: '2px' }}>👉 {s.cta}</div>}
+          </div>
+        ))}
+      </div>
+      <CopyButton text={fullText} onCopy={onCopy} />
+    </div>
+  );
+}
+
+function CopyButton({ text, onCopy }: { text: string; onCopy: (text: string) => void }) {
+  return (
+    <div style={{ marginTop: '8px', display: 'flex', gap: '4px' }}>
+      <button onClick={() => onCopy(text)} style={S.btn(C.accent)}><Copy size={12} /> Copy</button>
+    </div>
+  );
+}
+
 function ContentPreview({ content }: { content: any }) {
   if (!content) return null;
-  
-  // Canonical preview extractor - prevents duplicate content in title and body
+
+  const [copyFeedback, setCopyFeedback] = useState('');
+
+  const handleCopy = useCallback((text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopyFeedback('Copied!');
+      setTimeout(() => setCopyFeedback(''), 2000);
+    }).catch(() => {
+      setCopyFeedback('Failed to copy');
+      setTimeout(() => setCopyFeedback(''), 2000);
+    });
+  }, []);
+
+  // Detect content type from _type field or field presence
+  const contentType = content._type || '';
+
+  let renderer: JSX.Element | null = null;
+
+  if (contentType === 'linkedin_post' || (content.hook && content.body && content.hasOwnProperty('hashtags') && !content.caption)) {
+    renderer = <LinkedInRenderer content={content} onCopy={handleCopy} />;
+  } else if (contentType === 'instagram_post' || (content.hook && content.caption)) {
+    renderer = <InstagramRenderer content={content} onCopy={handleCopy} />;
+  } else if (contentType === 'twitter_post' || content.post) {
+    renderer = <TwitterRenderer content={content} onCopy={handleCopy} />;
+  } else if (contentType === 'facebook_post' || (content.headline !== undefined && content.body && !content.hook)) {
+    renderer = <FacebookRenderer content={content} onCopy={handleCopy} />;
+  } else if (contentType === 'youtube_description' || (content.openingHook && content.description)) {
+    renderer = <YouTubeRenderer content={content} onCopy={handleCopy} />;
+  } else if (contentType === 'email_copy' || (content.emailType && content.subject)) {
+    renderer = <EmailRenderer content={content} onCopy={handleCopy} />;
+  } else if (contentType === 'creative_brief' || (content.objective && content.visualDirection)) {
+    renderer = <CreativeBriefRenderer content={content} onCopy={handleCopy} />;
+  } else if (contentType === 'video_script' || (content.duration && content.scenes)) {
+    renderer = <VideoScriptRenderer content={content} onCopy={handleCopy} />;
+  }
+
+  if (renderer) {
+    return (
+      <div>
+        {renderer}
+        {copyFeedback && <div style={{ fontSize: '10px', color: C.excellent, marginTop: '4px' }}>{copyFeedback}</div>}
+      </div>
+    );
+  }
+
+  // Fallback: generic renderer for blog, FAQ, landing page, etc.
   const extractPreview = (c: any) => {
-    const contentType = c._type || c.assetType || 'unknown';
-    
-    // Extract title/headline
-    let title = toText(c.title || c.headline || c.subjectLine || c.caption);
-    
-    // Extract body/content
-    let body = toText(c.article || c.body || c.description || c.executiveSummary || c.content || c.message || c.script);
-    
-    // For social posts, use post/text as primary content
-    if (contentType.includes('linkedin') || contentType.includes('instagram') || contentType.includes('twitter') || contentType.includes('facebook')) {
-      body = toText(c.post || c.text || c.content || body);
-      if (!title) title = toText(c.headline || c.caption);
-    }
-    
-    // For email, use subject as title, body as body
-    if (contentType.includes('email')) {
-      title = toText(c.subject || c.subjectLine || title);
-      body = toText(c.body || c.content || c.message || body);
-    }
-    
-    // For creative brief, use campaignObjective as title
-    if (contentType.includes('creative_brief')) {
-      title = toText(c.campaignObjective || c.objective || title);
-      body = toText(c.coreMessage || c.keyBenefits || c.deliverables || body);
-    }
-    
-    // For YouTube description, use title as title, description as body
-    if (contentType.includes('youtube')) {
-      title = toText(c.title || c.videoTitle || title);
-      body = toText(c.description || c.body || body);
-    }
-    
-    // For video script, use title as title, script as body
-    if (contentType.includes('video')) {
-      title = toText(c.title || c.videoTitle || title);
-      body = toText(c.script || c.body || body);
-    }
-    
-    // Prevent duplicate: if title and body are the same, only show body
-    if (title === body) {
-      title = null;
-    }
-    
-    // Fallback: if no structured content, use text field only once
-    if (!title && !body && c.text) {
-      body = toText(c.text);
-    }
-    
+    let title = toText(c.title || c.headline || c.subjectLine);
+    let body = toText(c.article || c.body || c.description || c.caption || c.executiveSummary);
+    if (title === body) title = null;
+    if (!title && !body) body = JSON.stringify(c, null, 2);
     return { title, body };
   };
-  
+
   const { title, body } = extractPreview(content);
 
   return (
@@ -485,12 +725,7 @@ function ContentPreview({ content }: { content: any }) {
       <div style={S.cardHeader}><Eye size={18} style={{ color: C.accent }} /><span style={S.cardTitle}>Preview</span></div>
       {title && <div style={{ fontSize: '18px', fontWeight: 700, color: C.text, marginBottom: '12px', overflowWrap: 'anywhere', lineHeight: 1.3 }}>{title}</div>}
       <div style={S.previewBox}>
-        {body || JSON.stringify(content, null, 2)}
-      </div>
-      <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-        {content._type && <span style={S.tag(C.brand)}>{content._label || content._type}</span>}
-        {content._claimStatus && <QualityBadge status={content._claimStatus} />}
-        {content._generatedAt && <span style={{ fontSize: '10px', color: C.dim, display: 'flex', alignItems: 'center', gap: '3px' }}><Clock size={10} /> {new Date(content._generatedAt).toLocaleString()}</span>}
+        {body}
       </div>
     </div>
   );
@@ -893,11 +1128,9 @@ export default function AIContentStudio() {
       setError(result._reason || 'Generation blocked: insufficient data');
       return;
     }
-    if (result.metadata?.status === 'schema_rejected') {
-      setError('Schema validation: ' + (result.metadata.schemaErrors || []).join('; '));
-      return;
-    }
-    setGeneratedContent(result.content || result);
+    const contentData = result.content || result;
+    const resultMeta = result.metadata || {};
+    setGeneratedContent(contentData);
     setQualityScore(result.qualityScore || result?._qualityScore || null);
     if (result.asset || result._assetId) {
       setSelectedAsset(result.asset || null);

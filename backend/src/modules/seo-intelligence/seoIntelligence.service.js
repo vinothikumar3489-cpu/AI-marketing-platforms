@@ -14,8 +14,9 @@ import { collectResearchData } from '../../services/intelligence/research-orches
 import { asArray } from '../../utils/text.util.js';
 import { getLatestEvidenceSnapshot } from '../evidence/evidence.service.js';
 import { buildSEOEvidenceData } from '../evidence/evidence.normalizer.js';
-
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
+import { callAI } from '../../ai/services/aiRouter.service.js';
+import { buildSeoFrontendPayload } from '../../services/seo/seo-frontend-payload.service.js';
+import { generateSeoActionPlan } from '../../services/seo/seo-action-plan.service.js';
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
 
@@ -1133,15 +1134,12 @@ async function generateSeoAnalysis(websiteData, technicalAudit, researchData, pr
 
   let aiResponse;
   
-  // Try Groq first
-  if (GROQ_API_KEY) {
-    try {
-      aiResponse = await callGroqForSeo(prompt);
-      if (aiResponse) return parseAndEnrichAnalysis(aiResponse, websiteData, researchData);
-    } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('⚠️ [AI] Groq failed:', error.message);
-      }
+  try {
+    aiResponse = await callAIForSeo(prompt);
+    if (aiResponse) return parseAndEnrichAnalysis(aiResponse, websiteData, researchData);
+  } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('⚠️ [AI] All providers failed:', error.message);
     }
   }
 
@@ -1237,39 +1235,10 @@ Generate a complete SEO intelligence report in valid JSON format:
 Provide ONLY valid JSON. No markdown, no explanations.`;
 }
 
-async function callGroqForSeo(prompt) {
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${GROQ_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      max_tokens: 4000
-    })
-  });
-
-  if (!response.ok) throw new Error('Groq API error');
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-  
-  if (!content) throw new Error('No content in Groq response');
-
-  // Try to parse JSON
-  try {
-    return JSON.parse(content);
-  } catch {
-    // Extract JSON from markdown if present
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-    throw new Error('Could not parse JSON from response');
-  }
+async function callAIForSeo(prompt) {
+  const result = await callAI(prompt);
+  if (result.success && result.data) return result.data;
+  throw new Error('All AI providers failed for SEO analysis');
 }
 
 function deepParseJson(obj) {

@@ -1,195 +1,27 @@
 import { callAI } from '../../ai/services/aiRouter.service.js';
 import { validateContentClaims, validateBriefContent } from './claim-validator.service.js';
-import { validateContentOutput } from './content-schemas.js';
-
-// ================================================
-// SCHEMAS — output contracts per content type
-// ================================================
+import { validateContentOutput, SCHEMA_REGISTRY } from './content-schemas.js';
 
 const CONTENT_TYPES = {
-  blog_article: {
-    label: 'Blog Article',
-    schema: {
-      title: 'string — max 70 chars, product/industry specific',
-      purpose: 'string — why this article exists',
-      audience: 'string — who it is for from brief personas',
-      targetTopic: 'string — from brief verifiedKeywords or topicIdeas',
-      searchIntent: 'string — informational / commercial / navigational / transactional',
-      outline: 'array of strings — section headings',
-      article: 'string — full article body, product/evidence specific',
-      metaTitle: 'string — max 60 chars',
-      metaDescription: 'string — max 160 chars',
-      internalLinkSuggestions: 'array of { text, url } or empty',
-      cta: 'string — from brief CTA or product-specific',
-      evidenceUsed: 'array of strings — which evidence fields were used',
-      claimsRequiringReview: 'array of strings — claims that could not be verified',
-    },
-  },
-  faq_page: {
-    label: 'FAQ Page',
-    schema: {
-      title: 'string',
-      purpose: 'string',
-      audience: 'string',
-      faqItems: 'array of { question, answer } — answers limited to verified product capabilities',
-      evidenceUsed: 'array of strings',
-      claimsRequiringReview: 'array of strings',
-    },
-  },
-  landing_page: {
-    label: 'Landing Page',
-    schema: {
-      headline: 'string — max 60 chars',
-      subHeadline: 'string — max 120 chars',
-      problem: 'string — audience problem from brief painPoints',
-      solution: 'string — product solution from brief features/usp',
-      featureBenefitBlocks: 'array of { feature, benefit, evidence }',
-      objectionHandling: 'array of { objection, response } or empty',
-      cta: 'string',
-      seoMetadata: { metaTitle: 'string', metaDescription: 'string' },
-      evidenceUsed: 'array of strings',
-    },
-  },
-  product_page: {
-    label: 'Product Page',
-    schema: {
-      title: 'string',
-      purpose: 'string',
-      productSummary: 'string — from brief product.summary',
-      features: 'array of { feature, benefit, evidence }',
-      cta: 'string',
-      seoMetadata: { metaTitle: 'string', metaDescription: 'string' },
-      evidenceUsed: 'array of strings',
-    },
-  },
-  comparison_page: {
-    label: 'Comparison Page',
-    schema: {
-      title: 'string',
-      purpose: 'string',
-      primaryProduct: 'string — from brief product.name',
-      comparedCompetitors: 'array of { name, domain } — only from brief.validatedCompetitors',
-      comparisonFields: 'array of { field, ourValue, competitorValue, source } — source must be evidence, unknown when unavailable',
-      cta: 'string',
-      evidenceUsed: 'array of strings',
-      claimsRequiringReview: 'array of strings',
-    },
-  },
-  feature_announcement: {
-    label: 'Feature Announcement',
-    schema: {
-      title: 'string',
-      purpose: 'string',
-      featureName: 'string',
-      featureDescription: 'string — from brief product.features',
-      benefit: 'string',
-      availability: 'string — null if unknown, never fabricate dates',
-      cta: 'string',
-      evidenceUsed: 'array of strings',
-    },
-  },
-  whitepaper: {
-    label: 'Whitepaper',
-    schema: {
-      title: 'string',
-      purpose: 'string',
-      audience: 'string',
-      executiveSummary: 'string',
-      sections: 'array of { heading, content }',
-      conclusion: 'string',
-      evidenceUsed: 'array of strings',
-      limitations: 'array of strings — topics without evidence',
-    },
-  },
-  linkedin_post: {
-    label: 'LinkedIn Post',
-    schema: {
-      text: 'string — max 3000 chars, product/industry specific',
-      hook: 'string — first line, max 150 chars',
-      cta: 'string',
-      evidenceUsed: 'array of strings',
-    },
-  },
-  instagram_post: {
-    label: 'Instagram Post',
-    schema: {
-      caption: 'string — max 2200 chars',
-      hook: 'string — first line, max 125 chars',
-      hashtags: 'array of strings — max 5, relevant to product/industry',
-      cta: 'string',
-      evidenceUsed: 'array of strings',
-    },
-  },
-  twitter_post: {
-    label: 'X (Twitter) Post',
-    schema: {
-      text: 'string — max 280 chars',
-      cta: 'string — optional',
-      evidenceUsed: 'array of strings',
-    },
-  },
-  facebook_post: {
-    label: 'Facebook Post',
-    schema: {
-      text: 'string — max 2000 chars',
-      hook: 'string',
-      cta: 'string',
-      evidenceUsed: 'array of strings',
-    },
-  },
-  youtube_description: {
-    label: 'YouTube Description',
-    schema: {
-      title: 'string — max 70 chars',
-      description: 'string — max 5000 chars, product/evidence specific',
-      timestamps: 'array of { time, topic } or empty',
-      links: 'array of { text, url } or empty',
-      cta: 'string',
-      evidenceUsed: 'array of strings',
-    },
-  },
-  email_copy: {
-    label: 'Email Copy',
-    schema: {
-      subjectLine: 'string — max 60 chars',
-      previewText: 'string — max 100 chars',
-      body: 'string — evidence-backed pain point and product value',
-      cta: 'string — single CTA',
-      personalizationFields: 'array of strings — variables like {{firstName}}',
-      evidenceUsed: 'array of strings',
-    },
-  },
-  creative_brief: {
-    label: 'Creative Brief',
-    schema: {
-      objective: 'string — what the creative should achieve',
-      audience: 'string — from brief targetPersonas',
-      message: 'string — core message from brief USP',
-      visualDirection: 'string — reference to product/industry',
-      brandSignals: 'array of strings — from brief website.technologyHints or product.features',
-      requiredText: 'string — text that must appear (overlaid, not burned in)',
-      cta: 'string',
-      format: 'string — poster/banner/social/display',
-      evidenceLimitations: 'array of strings — what cannot be claimed',
-    },
-  },
-  video_script: {
-    label: 'Video Script',
-    schema: {
-      duration: 'string — 15s / 30s / 60s / 90s',
-      scenes: 'array of { scene, narration, onScreenText, visual, evidencePoint, cta }',
-      evidenceUsed: 'array of strings',
-      limitations: 'array of strings',
-    },
-  },
+  blog_article: { label: 'Blog Article' },
+  faq_page: { label: 'FAQ Page' },
+  landing_page: { label: 'Landing Page' },
+  product_page: { label: 'Product Page' },
+  comparison_page: { label: 'Comparison Page' },
+  feature_announcement: { label: 'Feature Announcement' },
+  whitepaper: { label: 'Whitepaper' },
+  linkedin_post: { label: 'LinkedIn Post' },
+  instagram_post: { label: 'Instagram Post' },
+  twitter_post: { label: 'X (Twitter) Post' },
+  facebook_post: { label: 'Facebook Post' },
+  youtube_description: { label: 'YouTube Description' },
+  email_copy: { label: 'Email Copy' },
+  creative_brief: { label: 'Creative Brief' },
+  video_script: { label: 'Video Script' },
 };
 
 export const CONTENT_TYPES_LIST = Object.keys(CONTENT_TYPES);
 export { CONTENT_TYPES };
-
-// ================================================
-// GENERIC PROMPT BUILDER
-// ================================================
 
 function buildEvidenceSection(brief) {
   const lines = [];
@@ -246,577 +78,1096 @@ function buildEvidenceSection(brief) {
     return `  - ${parts.join(' | ')}`;
   }).join('\n')}`);
   if (brief.topicIdeas?.length) lines.push(`Topic Ideas:\n${brief.topicIdeas.slice(0, 5).map(t => `  - ${t.topic || t}`).join('\n')}`);
-  if (brief.contentGaps?.length) lines.push(`Content Gaps:\n${brief.contentGaps.slice(0, 5).map(g => `  - ${g.topic || g}`).join('\n')}`);
-  if (brief.CTA?.length) lines.push(`Available CTAs: ${brief.CTA.join('; ')}`);
-  if (brief.limitations?.length) lines.push(`Limitations: ${brief.limitations.join('; ')}`);
-  return lines.join('\n');
+  if (brief.contentGaps?.length) lines.push(`Content Gaps:\n${brief.contentGaps.slice(0, 4).map(g => `  - ${g.gap || g}`).join('\n')}`);
+  if (brief.tone) lines.push(`Tone: ${brief.tone}`);
+  if (brief.CTA?.length) lines.push(`CTA:\n${brief.CTA.slice(0, 3).map(c => `  - ${c.text || c}`).join('\n')}`);
+  if (brief.limitations?.length) lines.push(`Limitations:\n${brief.limitations.slice(0, 3).map(l => `  - ${l}`).join('\n')}`);
+  return `\n${lines.join('\n')}\n`;
 }
 
-// ================================================
-// INDIVIDUAL GENERATORS
-// ================================================
+function getFirstFeature(brief) { return brief.product?.features?.[0] ? (typeof brief.product.features[0] === 'object' ? brief.product.features[0].name || brief.product.features[0].feature || brief.product.features[0].title || 'key feature' : brief.product.features[0]) : 'key feature'; }
 
-async function generateBlogArticle(brief) {
+function getFirstBenefit(brief) { return brief.product?.benefits?.[0] ? (typeof brief.product.benefits[0] === 'object' ? brief.product.benefits[0].text || brief.product.benefits[0].benefit || 'value' : brief.product.benefits[0]) : 'valuable outcomes'; }
+
+function getFirstPainPoint(brief) { return brief.painPoints?.[0] || brief.targetPersonas?.[0]?.painPoints?.[0] || 'common challenges'; }
+
+function getProductName(brief) { return brief.product?.name || brief.product?.brandName || brief.company?.name || 'this solution'; }
+
+function getPersonaName(brief) { return brief.targetPersonas?.[0]?.name || brief.targetPersonas?.[0]?.role || 'users'; }
+
+function getKeyword(brief, idx) { return brief.verifiedKeywords?.[idx]?.keyword || brief.verifiedKeywords?.[idx] || ''; }
+
+function buildProductEvidenceContext(brief) {
+  const product = brief.product || {};
+  const company = brief.company || {};
+  const personas = brief.targetPersonas || [];
+  const persona = personas[0] || {};
+  const keywords = (brief.verifiedKeywords || []).slice(0, 10);
+  return `PRODUCT CONTEXT:
+Identity: ${product.name || company.name || 'Unknown'}
+Summary: ${product.summary || 'N/A'}
+USP: ${product.usp || 'N/A'}
+Features: ${(product.features || []).slice(0, 6).map(f => typeof f === 'string' ? f : f.name || f.feature || f).filter(Boolean).join(', ') || 'N/A'}
+Benefits: ${(product.benefits || []).slice(0, 6).map(b => typeof b === 'string' ? b : b.text || b.benefit || b.description || b).filter(Boolean).join(', ') || 'N/A'}
+Industry: ${company.industry || 'N/A'}
+Target Persona: ${persona.name || persona.role || 'N/A'}
+Pain Points: ${(persona.painPoints || brief.painPoints || []).slice(0, 5).join('; ') || 'N/A'}
+SEO Keywords: ${keywords.map(k => k.keyword).filter(Boolean).join(', ') || 'N/A'}
+Competitors: ${(brief.validatedCompetitors || []).slice(0, 5).map(c => c.name).filter(Boolean).join(', ') || 'N/A'}
+Tone: ${brief.tone || 'professional'}
+Missing evidence: ${(brief.limitations || []).join('; ') || 'None identified'}`;
+}
+
+const RULE_BASED_FALLBACKS = {
+  linkedin_post(brief) {
+    const name = getProductName(brief);
+    const persona = getPersonaName(brief);
+    const pain = getFirstPainPoint(brief);
+    const feature = getFirstFeature(brief);
+    return {
+      hook: `Stop struggling with ${pain}.`,
+      body: `Many ${persona} face this challenge daily — but ${name} makes it simpler.\n\nWith ${feature}, you can move faster and achieve better results.\n\nBuilt for ${persona} who want to stop wasting time and start seeing real outcomes.`,
+      cta: `Try ${name} today`,
+      hashtags: ['#Productivity', '#Innovation', '#Marketing'],
+      audience: persona,
+      angle: 'content research',
+      evidenceUsed: ['product_features', 'audience_pain_points'],
+      claimsRequiringReview: []
+    };
+  },
+  instagram_post(brief) {
+    const name = getProductName(brief);
+    const persona = getPersonaName(brief);
+    const pain = getFirstPainPoint(brief);
+    const benefit = getFirstBenefit(brief);
+    return {
+      _type: 'instagram_post',
+      hook: `Your ${persona} deserve better than ${pain}.`,
+      caption: `${name} helps ${persona} unlock ${benefit}.\n\nStop settling for outdated approaches. Start with a tool built for real results.\n\nTap the link to learn more.`,
+      cta: 'Link in bio',
+      hashtags: ['#WorkSmarter', '#MarketingTips', '#Growth'],
+      visualConcept: `${persona} using ${name} on a laptop showing ${benefit}`,
+      audience: persona,
+      angle: 'visual storytelling',
+      evidenceUsed: ['audience_pain_points', 'product_benefits'],
+      claimsRequiringReview: []
+    };
+  },
+  twitter_post(brief) {
+    const name = getProductName(brief);
+    const pain = getFirstPainPoint(brief);
+    const persona = getPersonaName(brief);
+    const keyword = getKeyword(brief, 0) || pain.toLowerCase().replace(/\s+/g, '');
+    const post = `${pain} slowing you down?\n\n${name} helps you ${getFirstBenefit(brief)} — so you can focus on what matters.\n\n${keyword}`;
+    return {
+      _type: 'twitter_post',
+      post: post.length > 280 ? post.substring(0, 277) + '...' : post,
+      cta: null,
+      hashtags: ['#Productivity', '#Marketing'],
+      angle: 'quick insight',
+      audience: persona,
+      evidenceUsed: ['audience_pain_points'],
+      claimsRequiringReview: []
+    };
+  },
+  facebook_post(brief) {
+    const name = getProductName(brief);
+    const persona = getPersonaName(brief);
+    const pain = getFirstPainPoint(brief);
+    const feature = getFirstFeature(brief);
+    return {
+      _type: 'facebook_post',
+      headline: `Say goodbye to ${pain}`,
+      body: `${name} gives ${persona} the ${feature} they need to achieve ${getFirstBenefit(brief)}.\n\nBuilt by professionals, for professionals.`,
+      cta: 'Learn More',
+      audience: persona,
+      angle: 'solution highlighting',
+      evidenceUsed: ['product_features', 'audience_pain_points'],
+      claimsRequiringReview: []
+    };
+  },
+  youtube_description(brief) {
+    const name = getProductName(brief);
+    const persona = getPersonaName(brief);
+    const keyword1 = getKeyword(brief, 0) || 'marketing';
+    const keyword2 = getKeyword(brief, 1) || 'productivity';
+    return {
+      _type: 'youtube_description',
+      title: `How ${name} Helps ${persona} ${getFirstBenefit(brief)}`,
+      description: `In this video, we explore how ${name} solves ${getFirstPainPoint(brief)} for ${persona}.\n\nKey topics covered:\n- Understanding the ${keyword1} landscape\n- How ${name} fits into your ${keyword2} strategy\n- Practical tips to get started today`,
+      openingHook: `${getFirstPainPoint(brief)} slowing down your team? Here's how ${name} can help.`,
+      chapters: [
+        { timestamp: '0:00', title: 'Introduction' },
+        { timestamp: '1:30', title: 'The Problem' },
+        { timestamp: '3:00', title: 'How It Works' },
+        { timestamp: '5:00', title: 'Getting Started' }
+      ],
+      links: [],
+      cta: 'Visit our website to learn more',
+      hashtags: ['#' + keyword1.replace(/\s+/g, ''), '#' + keyword2.replace(/\s+/g, ''), '#' + name.replace(/\s+/g, '')],
+      keywords: [keyword1, keyword2, name],
+      evidenceUsed: ['product_features', 'audience_pain_points'],
+      claimsRequiringReview: []
+    };
+  },
+  email_copy(brief) {
+    const name = getProductName(brief);
+    const persona = getPersonaName(brief);
+    const pain = getFirstPainPoint(brief);
+    const benefit = getFirstBenefit(brief);
+    return {
+      _type: 'email_copy',
+      emailType: 'outreach',
+      subject: `How ${name} helps ${persona} overcome ${pain}`,
+      previewText: `Discover what ${name} can do for you.`,
+      greeting: `Hi there,`,
+      opening: `We know ${pain} is a real challenge for ${persona}. That's why we built ${name}.`,
+      bodyParagraphs: [
+        `${name} delivers ${benefit} through a simple, intuitive approach.`,
+        `Our users consistently report saving time and achieving better outcomes.`,
+        `See for yourself how ${name} can transform your workflow.`
+      ],
+      bulletPoints: [
+        `${getFirstFeature(brief)} to drive results`,
+        `Designed specifically for ${persona}`,
+        `Proven approach backed by real evidence`
+      ],
+      ctaText: `Try ${name}`,
+      ctaUrl: null,
+      closing: `Ready to get started?`,
+      signature: `The ${name} Team`,
+      personalizationFields: [],
+      complianceNote: null,
+      evidenceUsed: ['product_features', 'audience_pain_points', 'product_benefits'],
+      claimsRequiringReview: []
+    };
+  },
+  creative_brief(brief) {
+    const name = getProductName(brief);
+    const persona = getPersonaName(brief);
+    const pain = getFirstPainPoint(brief);
+    const feature = getFirstFeature(brief);
+    return {
+      _type: 'creative_brief',
+      objective: `Show how ${name} solves ${pain} for ${persona}`,
+      audience: persona,
+      message: `${name} helps ${persona} achieve ${getFirstBenefit(brief)}`,
+      visualDirection: `Professional product-focused imagery showing ${feature}`,
+      brandSignals: [name, brief.product?.brandName || name, brief.company?.industry || 'technology'].filter(Boolean),
+      requiredText: `${name}: ${getFirstBenefit(brief)} for ${persona}`,
+      cta: `Try ${name} today`,
+      format: 'Multi-channel campaign',
+      evidenceLimitations: [],
+      evidenceUsed: ['product_features', 'audience_pain_points', 'product_benefits'],
+      claimsRequiringReview: []
+    };
+  },
+  video_script(brief) {
+    const name = getProductName(brief);
+    const persona = getPersonaName(brief);
+    const pain = getFirstPainPoint(brief);
+    const feature = getFirstFeature(brief);
+    return {
+      _type: 'video_script',
+      title: `Introducing ${name} for ${persona}`,
+      format: 'Explainer',
+      duration: '60-90 seconds',
+      scenes: [
+        {
+          scene: 1,
+          narration: `Many ${persona} struggle with ${pain}. It's time-consuming, frustrating, and holds you back.`,
+          onScreenText: `The ${pain} problem`,
+          visual: `${persona} looking frustrated at a cluttered screen`,
+          evidencePoint: brief.painPoints?.[0] || 'audience pain points',
+          cta: null
+        },
+        {
+          scene: 2,
+          narration: `That's where ${name} comes in. We built ${feature} to help you ${getFirstBenefit(brief)}.`,
+          onScreenText: `${name}: ${getFirstBenefit(brief)}`,
+          visual: `Clean interface showing ${name} ${feature}`,
+          evidencePoint: brief.product?.features?.[0] ? 'product feature: ' + (typeof brief.product.features[0] === 'object' ? brief.product.features[0].name || brief.product.features[0].feature : brief.product.features[0]) : 'product evidence',
+          cta: null
+        },
+        {
+          scene: 3,
+          narration: `Ready to get started? Visit our website and see the difference ${name} can make.`,
+          onScreenText: `Start with ${name} today`,
+          visual: `${name} logo and website URL`,
+          evidencePoint: null,
+          cta: `Visit ${name} website`
+        }
+      ],
+      evidenceUsed: ['product_features', 'audience_pain_points'],
+      limitations: []
+    };
+  },
+  blog_article(brief) {
+    const name = getProductName(brief);
+    const persona = getPersonaName(brief);
+    const pain = getFirstPainPoint(brief);
+    const feature = getFirstFeature(brief);
+    const kw = getKeyword(brief, 0) || pain.toLowerCase().replace(/\s+/g, '-');
+    return {
+      _type: 'blog_article',
+      headline: `How ${name} Helps ${persona} Overcome ${pain}`,
+      metaDescription: `Learn how ${name} helps ${persona} solve ${pain} with ${feature}.`,
+      introduction: `${pain} is a common challenge for ${persona}. In this article, we explore how ${name} provides a practical solution.`,
+      sections: [
+        {
+          heading: 'Understanding the Challenge',
+          body: `Many ${persona} face ${pain} on a daily basis. This affects productivity, outcomes, and overall satisfaction.`,
+          keyTakeaways: [`${pain} is more common than you think`, `Traditional approaches fall short`, `A better solution exists`]
+        },
+        {
+          heading: `How ${name} Solves This`,
+          body: `${name} addresses ${pain} through ${feature}, enabling ${persona} to achieve ${getFirstBenefit(brief)}.`,
+          keyTakeaways: [`${feature} directly targets the root cause`, 'Proven methodology', 'Easy to implement']
+        },
+        {
+          heading: 'Getting Started',
+          body: `Ready to see ${name} in action? Start your journey today.`,
+          keyTakeaways: [`Quick setup process`, `No complex configuration needed`, `Immediate results`]
+        }
+      ],
+      conclusion: `${name} provides a powerful solution for ${persona} dealing with ${pain}. With ${feature}, you can finally achieve ${getFirstBenefit(brief)}.`,
+      cta: `Learn more about ${name}`,
+      targetKeywords: [kw, name]
+    };
+  },
+  faq_page(brief) {
+    const name = getProductName(brief);
+    const persona = getPersonaName(brief);
+    const feature = getFirstFeature(brief);
+    const benefit = getFirstBenefit(brief);
+    return {
+      headline: `Frequently Asked Questions About ${name}`,
+      metaDescription: `Find answers to common questions about ${name} and how it helps ${persona}.`,
+      introduction: `Here are answers to the most common questions about ${name}.`,
+      faqs: [
+        {
+          question: `What is ${name}?`,
+          answer: `${name} is a solution designed to help ${persona} achieve ${benefit}. It provides ${feature} in a simple, effective package.`
+        },
+        {
+          question: `Who is ${name} for?`,
+          answer: `${name} is built for ${persona} who need ${benefit}. If you're dealing with ${getFirstPainPoint(brief)}, ${name} can help.`
+        },
+        {
+          question: `How does ${name} work?`,
+          answer: `${name} uses ${feature} to deliver ${benefit}. It's designed to be intuitive and requires no special training.`
+        },
+        {
+          question: `How do I get started with ${name}?`,
+          answer: `Getting started is simple. Visit our website, sign up, and start seeing results immediately.`
+        }
+      ],
+      cta: `Try ${name} today`
+    };
+  },
+  landing_page(brief) {
+    const name = getProductName(brief);
+    const persona = getPersonaName(brief);
+    const pain = getFirstPainPoint(brief);
+    const benefit = getFirstBenefit(brief);
+    const feature = getFirstFeature(brief);
+    const kw = getKeyword(brief, 0) || name;
+    return {
+      headline: `${name}: ${benefit} for ${persona}`,
+      subheadline: `Stop struggling with ${pain}. Start seeing results.`,
+      heroCTA: `Get Started with ${name}`,
+      painPoints: [
+        `${pain} slowing you down`,
+        `Traditional tools don't deliver`,
+        `Wasted time on ${pain.toLowerCase()}`
+      ],
+      solution: `${name} provides ${feature} that helps ${persona} achieve ${benefit}.`,
+      features: [
+        { icon: '🎯', title: feature, description: `Targeted ${feature} designed for ${persona}` },
+        { icon: '⚡', title: 'Fast Results', description: `See ${benefit} from day one` },
+        { icon: '🔒', title: 'Reliable', description: `Built on proven ${getKeyword(brief, 1) || 'methodology'}` }
+      ],
+      socialProof: [],
+      finalCTA: `Start with ${name}`,
+      seoKeywords: [kw, `${name} for ${persona}`, `${kw} tool`]
+    };
+  },
+  product_page(brief) {
+    const name = getProductName(brief);
+    const persona = getPersonaName(brief);
+    const benefit = getFirstBenefit(brief);
+    const feature = getFirstFeature(brief);
+    const pain = getFirstPainPoint(brief);
+    return {
+      productName: name,
+      tagline: `${benefit} for ${persona}`,
+      overview: `${name} helps ${persona} achieve ${benefit} by addressing ${pain}.`,
+      keyFeatures: [
+        {
+          name: feature,
+          description: `Core ${feature} that drives ${benefit}`,
+          benefit: `Enables ${persona} to overcome ${pain}`
+        },
+        {
+          name: 'Easy Integration',
+          description: 'Works with your existing workflow',
+          benefit: 'No disruption to your current process'
+        },
+        {
+          name: 'Real Results',
+          description: `Proven approach to ${benefit.toLowerCase()}`,
+          benefit: `See ${benefit} quickly`
+        }
+      ],
+      useCases: [
+        {
+          scenario: `For ${persona} dealing with ${pain}`,
+          solution: `${name} provides ${feature} to directly address this challenge`,
+          outcome: `Achieve ${benefit} without the usual friction`
+        }
+      ],
+      cta: `Get ${name}`,
+      pricing: null,
+      faqs: [
+        { question: `What makes ${name} different?`, answer: `${name} focuses on ${benefit} through ${feature}.` },
+        { question: `Is ${name} right for me?`, answer: `If you're a ${persona} dealing with ${pain}, yes.` }
+      ]
+    };
+  },
+  comparison_page(brief) {
+    const name = getProductName(brief);
+    const persona = getPersonaName(brief);
+    const benefit = getFirstBenefit(brief);
+    const feature = getFirstFeature(brief);
+    const competitors = brief.validatedCompetitors?.slice(0, 2).map(c => c.name) || ['Alternative solutions'];
+    return {
+      headline: `${name} vs Alternatives`,
+      introduction: `Compare ${name} with other solutions for ${persona}.`,
+      comparisonTable: {
+        headers: ['Feature', name, ...competitors],
+        rows: [
+          { feature: benefit, [name]: '✓', [competitors[0] || 'Alternative']: 'Limited', [competitors[1] || 'Other']: '✗' },
+          { feature: feature, [name]: '✓ Native', [competitors[0] || 'Alternative']: '✓ Basic', [competitors[1] || 'Other']: '✗' },
+          { feature: 'Ease of Use', [name]: 'High', [competitors[0] || 'Alternative']: 'Medium', [competitors[1] || 'Other']: 'Low' }
+        ]
+      },
+      whyChooseUs: `${name} is purpose-built for ${persona} who need ${benefit}. Unlike alternatives, ${name} delivers ${feature} without complexity.`,
+      cta: `Try ${name}`,
+      competitorWeaknesses: competitors.map(c => ({ competitor: c, weakness: `Limited ${benefit.toLowerCase()} capabilities` }))
+    };
+  },
+  feature_announcement(brief) {
+    const name = getProductName(brief);
+    const persona = getPersonaName(brief);
+    const feature = getFirstFeature(brief);
+    const benefit = getFirstBenefit(brief);
+    return {
+      headline: `Introducing ${feature} on ${name}`,
+      subheadline: `A new way for ${persona} to achieve ${benefit}`,
+      body: `We're excited to announce a powerful new ${feature} capability in ${name}. Designed for ${persona}, this feature helps you ${benefit} faster than ever before.`,
+      benefits: [
+        `${benefit} with less effort`,
+        `Purpose-built for ${persona}`,
+        `Seamless integration with your workflow`
+      ],
+      cta: `Explore ${feature}`,
+      availability: 'Available now',
+      technicalDetails: null
+    };
+  },
+  whitepaper(brief) {
+    const name = getProductName(brief);
+    const persona = getPersonaName(brief);
+    const pain = getFirstPainPoint(brief);
+    const benefit = getFirstBenefit(brief);
+    const feature = getFirstFeature(brief);
+    return {
+      title: `${benefit}: A Guide for ${persona}`,
+      subtitle: `How ${name} Addresses ${pain} With ${feature}`,
+      executiveSummary: `This whitepaper explores how ${name} helps ${persona} overcome ${pain} and achieve ${benefit}. Based on real evidence and proven methodologies.`,
+      sections: [
+        {
+          heading: 'The Challenge',
+          body: `${persona} face ${pain} daily, impacting their ability to achieve ${benefit.toLowerCase()}. Traditional approaches are failing.`,
+          keyFindings: [`${pain} affects productivity`, 'Current tools are inadequate', 'A new approach is needed']
+        },
+        {
+          heading: `The ${name} Solution`,
+          body: `${name} addresses these challenges through ${feature}, delivering ${benefit} to ${persona}.`,
+          keyFindings: [`${feature} directly solves the core issue`, `Designed specifically for ${persona}`, 'Proven methodology']
+        },
+        {
+          heading: 'Implementation Guide',
+          body: `Getting started with ${name} is straightforward. This section covers the implementation approach.`,
+          keyFindings: ['Quick setup', 'Minimal learning curve', 'Immediate value']
+        }
+      ],
+      conclusion: `${name} provides a proven solution for ${persona} dealing with ${pain}. With ${feature}, achieving ${benefit} is now possible.`,
+      references: [],
+      cta: `Download the full ${name} whitepaper`
+    };
+  }
+};
+
+function getEvidenceForTrend(brief) {
+  const hasTrendKeywords = brief.verifiedKeywords?.some(k => k.keyword && (k.volume || k.difficulty)) || false;
+  const hasWebData = brief.evidenceSources?.websiteScrape || false;
+  if (!hasTrendKeywords && !hasWebData) {
+    return "Current trend data is not connected. This content is based on product and SEO evidence.";
+  }
+  return null;
+}
+
+async function generateLinkedInPost(brief) {
   const evidence = buildEvidenceSection(brief);
-  const productName = brief.product?.name || 'the product';
-  const industry = brief.company?.industry || 'the industry';
-  const primaryKeyword = brief.verifiedKeywords?.[0]?.keyword || '';
-  const keywords = brief.verifiedKeywords?.slice(0, 5).map(k => k.keyword).filter(Boolean).join(', ') || '';
-  const painPoint = brief.painPoints?.[0] || '';
-  const persona = brief.targetPersonas?.[0]?.name || 'professionals';
+  const productContext = buildProductEvidenceContext(brief);
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const painPoint = getFirstPainPoint(brief);
+  const usp = brief.product?.usp || '';
+  const trendNote = getEvidenceForTrend(brief);
 
-  const prompt = `You are a senior content strategist writing for ${productName} in ${industry}.
+  const prompt = `You are a LinkedIn content strategist writing a post for ${productName}.
 
-Write a comprehensive blog article that addresses a specific problem ${persona} face and positions ${productName} as the solution.
+Write a professional LinkedIn post that resonates with ${persona} who face "${painPoint}".
 
-PRODUCT EVIDENCE:
-${evidence}
+${productContext}
 
 REQUIREMENTS:
-- Title: Max 70 chars, must include the primary keyword "${primaryKeyword}" naturally
-- Target topic: Address the pain point "${painPoint}" specifically
-- Article structure: Hook → Problem → Why existing solutions fail → How ${productName} solves it → Specific features with benefits → CTA
-- Every feature/benefit claim must trace to the evidence above
-- Include 3-5 section headings that flow logically
-- Article body: 800-1200 words, written for ${persona}, conversational but authoritative
-- Do NOT use: fake statistics, customer testimonials, awards, ROI claims, or pricing
-- Do NOT start sentences with "In today's..." or "In the world of..."
-- Reference specific product features by name from the evidence
-- Meta title: max 60 chars, primary keyword "${primaryKeyword}"
-- Meta description: max 160 chars, compelling click-through reason
-- CTA: Specific to ${productName}, not generic
+- hook: A strong opening statement or question that stops the scroll. Must reference the pain point "${painPoint}" or USP "${usp}". Max 200 chars.
+- body: 2-4 short paragraphs. Professional, thought-leadership tone. Reference specific capabilities of ${productName} from evidence.
+- cta: A clear product-specific CTA or null. Not generic like "Learn more".
+- hashtags: Max 3 relevant hashtags. No hashtags in the body text. Product/industry-specific.
+- audience: Who this post targets. Must match one of the personas from evidence.
+- angle: One specific angle from: early trend detection, competitor monitoring, creator discovery, content research, ad research, short-form campaign planning, platform comparison, trend saturation avoidance.
+- Do NOT include: "In today's world", fake stats, testimonials, awards, ROI claims, pricing, competitor bashing, superlatives (best, ultimate, #1, leading).
+${trendNote ? `\nNOTE: ${trendNote}` : ''}
 
-Return valid JSON matching this schema:
+Return valid JSON:
 {
-  "title": "string",
-  "purpose": "string",
-  "audience": "string",
-  "targetTopic": "string",
-  "searchIntent": "informational",
-  "outline": ["section heading 1", "section heading 2", "..."],
-  "article": "full article body in markdown",
-  "metaTitle": "string",
-  "metaDescription": "string",
-  "internalLinkSuggestions": [{"text": "anchor text", "url": "suggested path"}],
-  "cta": "string",
+  "hook": "string — strong opening, max 200 chars",
+  "body": "string — 2-4 short paragraphs",
+  "cta": "string or null — product-specific",
+  "hashtags": ["max", "3", "hashtags"],
+  "audience": "string — persona name from evidence",
+  "angle": "string — one specific angle",
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": ["any unverifiable claims"]
 }`;
 
   try {
     const result = await callAI(prompt);
-    if (result.success && result.data) return result.data;
-  } catch (e) { console.warn(`[ContentStudio] Blog AI failed:`, e.message); }
-  return null;
+    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+  } catch (e) { /* fall through to rule-based */ }
+  return { ...RULE_BASED_FALLBACKS.linkedin_post(brief), _provider: 'rule-based' };
 }
 
-async function generateFAQ(brief) {
+async function generateInstagramPost(brief) {
   const evidence = buildEvidenceSection(brief);
-  const productName = brief.product?.name || 'the product';
-  const persona = brief.targetPersonas?.[0]?.name || 'users';
-  const painPoints = brief.painPoints?.slice(0, 4).map(p => `"${p}"`).join(', ') || '';
-  const objections = brief.objections?.slice(0, 3).map(o => `"${o}"`).join(', ') || '';
-  const features = brief.product?.features?.slice(0, 5).map(f => typeof f === 'string' ? f : f.name || f.description || '').filter(Boolean).join(', ') || '';
+  const productContext = buildProductEvidenceContext(brief);
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const painPoint = getFirstPainPoint(brief);
+  const trendNote = getEvidenceForTrend(brief);
 
-  const prompt = `You are a customer success specialist creating an FAQ page for ${productName}.
+  const prompt = `You are an Instagram content creator writing a post for ${productName}.
 
-Write FAQ entries that address real questions ${persona} would ask before purchasing or using ${productName}.
+Write an Instagram caption that engages ${persona} who deal with "${painPoint}".
 
-PRODUCT EVIDENCE:
-${evidence}
+${productContext}
 
 REQUIREMENTS:
-- Generate 8-12 FAQ entries
-- Questions must come from these categories:
-  1. Product capabilities: "What can ${productName} do?" style questions
-  2. Pain point resolution: Questions related to ${painPoints}
-  3. Objection handling: Address concerns like ${objections}
-  4. How-it-works: "How does ${productName} work?" style questions
-  5. Feature-specific: Questions about ${features}
-- Each answer must be 2-4 sentences, specific to ${productName}
-- Use "Information not available" for questions you cannot answer from evidence
-- Do NOT invent features, pricing, or capabilities not in evidence
-- Title should be product-specific: "${productName} FAQ" or "Frequently Asked Questions About ${productName}"
+- hook: A short attention-grabbing opening line. Max 100 chars.
+- caption: 3-5 lines of engaging caption text. Conversational tone. Reference product evidence naturally.
+- cta: Short call to action like "Link in bio" or "Visit our website".
+- hashtags: Max 10 relevant, product-specific hashtags.
+- visualConcept: Describe the visual that should accompany this post.
+- audience: Who this targets from evidence.
+- angle: Specific angle used.
+- Do NOT use: fake stats, testimonials, awards, ROI claims, "stay ahead of the curve", "go viral".
+${trendNote ? `\nNOTE: ${trendNote}` : ''}
 
 Return valid JSON:
 {
-  "title": "string",
-  "purpose": "string",
+  "hook": "string — max 100 chars",
+  "caption": "string — 3-5 lines",
+  "cta": "string — short CTA",
+  "hashtags": ["string"],
+  "visualConcept": "string — describe the visual",
   "audience": "string",
-  "faqItems": [{"question": "specific to ${productName}", "answer": "evidence-backed, 2-4 sentences"}],
-  "evidenceUsed": [],
+  "angle": "string",
+  "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
 }`;
 
   try {
     const result = await callAI(prompt);
-    if (result.success && result.data) return result.data;
-  } catch (e) { console.warn(`[ContentStudio] FAQ AI failed:`, e.message); }
-  return null;
+    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+  } catch (e) { /* fall through to rule-based */ }
+  return { ...RULE_BASED_FALLBACKS.instagram_post(brief), _provider: 'rule-based' };
 }
 
-async function generateLandingPage(brief) {
+async function generateTwitterPost(brief) {
   const evidence = buildEvidenceSection(brief);
-  const productName = brief.product?.name || 'the product';
-  const usp = brief.product?.usp || '';
-  const painPoint = brief.painPoints?.[0] || '';
-  const persona = brief.targetPersonas?.[0]?.name || 'professionals';
-  const feature1 = brief.product?.features?.[0];
-  const featureName = typeof feature1 === 'string' ? feature1 : feature1?.name || '';
+  const productContext = buildProductEvidenceContext(brief);
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const painPoint = getFirstPainPoint(brief);
 
-  const prompt = `You are a conversion copywriter creating a landing page for ${productName}.
+  const prompt = `You are writing an X (Twitter) post for ${productName}.
 
-The landing page must convert ${persona} who struggle with "${painPoint}" into signups/trials.
+Write a post that resonates with ${persona} who face "${painPoint}".
 
-PRODUCT EVIDENCE:
-${evidence}
+${productContext}
 
 REQUIREMENTS:
-- Headline: Max 60 chars. Must communicate the core value proposition. Reference "${featureName}" or the USP directly.
-- Sub-headline: Max 120 chars. Expand on the headline with a specific benefit.
-- Problem section: Describe the pain point "${painPoint}" in detail — make the reader feel understood
-- Solution section: Position ${productName} as the specific solution, referencing actual features
-- Feature-benefit blocks: For each of the top 3-4 features from evidence, create a block with:
-  - feature: The actual feature name from evidence
-  - benefit: What it does for the user (from evidence, not invented)
-  - evidence: Which evidence field supports this claim
-- Objection handling: Address 2-3 real objections from the evidence
-- CTA: Single, clear call-to-action. Product-specific, not "Learn More" or "Get Started" alone.
-- SEO metadata: title max 60 chars, description max 160 chars
-- Do NOT use: fake statistics, customer logos, testimonials, pricing, or comparison claims
+- post: Max 280 characters total including hashtags. Concise, impactful. One clear message.
+- hashtags: Max 2 hashtags.
+- audience: Who this targets from evidence.
+- angle: The specific angle used.
+- Do NOT use: fake stats, testimonials, superlatives.
+- Must be under 280 chars total.
 
 Return valid JSON:
 {
-  "headline": "max 60 chars",
-  "subHeadline": "max 120 chars",
-  "problem": "detailed pain point description",
-  "solution": "how ${productName} solves it specifically",
-  "featureBenefitBlocks": [{"feature": "from evidence", "benefit": "from evidence", "evidence": "field name"}],
-  "objectionHandling": [{"objection": "from evidence", "response": "from verified capabilities"}],
-  "cta": "product-specific CTA",
-  "seoMetadata": {"metaTitle": "max 60 chars", "metaDescription": "max 160 chars"},
-  "evidenceUsed": []
-}`;
-
-  try {
-    const result = await callAI(prompt);
-    if (result.success && result.data) return result.data;
-  } catch (e) { console.warn(`[ContentStudio] Landing page AI failed:`, e.message); }
-  return null;
-}
-
-async function generateProductPage(brief) {
-  const evidence = buildEvidenceSection(brief);
-  const productName = brief.product?.name || 'the product';
-  const brandName = brief.product?.brandName || '';
-  const summary = brief.product?.summary || '';
-  const usp = brief.product?.usp || '';
-
-  const prompt = `You are a product marketing manager writing the product detail page for ${productName}${brandName ? ` by ${brandName}` : ''}.
-
-This page is for users who are already considering ${productName} and need detailed feature information to make a decision.
-
-PRODUCT EVIDENCE:
-${evidence}
-
-REQUIREMENTS:
-- Title: "${productName}" — keep it clean and product-specific
-- Product summary: Rewrite the evidence summary to be compelling and specific (2-3 sentences)
-- Feature blocks: For each feature from evidence, create a block with:
-  - feature: Feature name exactly as in evidence
-  - benefit: User benefit (from evidence, not invented)
-  - evidence: Which evidence field supports this
-- CTA: Product-specific, actionable
-- SEO metadata: Title max 60 chars with product name, description max 160 chars
-- Do NOT invent pricing, awards, statistics, or capabilities not in evidence
-- Do NOT compare to competitors — this is a standalone product page
-
-Return valid JSON:
-{
-  "title": "string",
-  "purpose": "string",
-  "productSummary": "compelling 2-3 sentence summary from evidence",
-  "features": [{"feature": "from evidence", "benefit": "from evidence", "evidence": "field name"}],
-  "cta": "string",
-  "seoMetadata": {"metaTitle": "string", "metaDescription": "string"},
-  "evidenceUsed": []
-}`;
-
-  try {
-    const result = await callAI(prompt);
-    if (result.success && result.data) return result.data;
-  } catch (e) { console.warn(`[ContentStudio] Product page AI failed:`, e.message); }
-  return null;
-}
-
-async function generateComparisonPage(brief) {
-  const evidence = buildEvidenceSection(brief);
-  const competitors = brief.validatedCompetitors || [];
-  const names = competitors.map(c => c.name).filter(Boolean).join(', ');
-  const productName = brief.product?.name || 'Product';
-
-  if (!names) return {
-    title: `${productName} Comparison`,
-    purpose: 'No validated competitors available for comparison',
-    primaryProduct: productName,
-    comparedCompetitors: [],
-    comparisonFields: [],
-    cta: brief.CTA?.[0] || 'Learn more',
-    evidenceUsed: [],
-    claimsRequiringReview: ['No validated competitors — comparison not possible'],
-  };
-
-  const competitorDetails = competitors.slice(0, 4).map(c => {
-    const parts = [c.name];
-    if (c.strengths?.length) parts.push(`strengths: ${c.strengths.slice(0, 3).join('; ')}`);
-    if (c.weaknesses?.length) parts.push(`weaknesses: ${c.weaknesses.slice(0, 3).join('; ')}`);
-    return parts.join(' | ');
-  }).join('\n');
-
-  const prompt = `You are a product analyst writing an honest comparison page for ${productName}.
-
-Compare ${productName} against these specific competitors:
-${competitorDetails}
-
-PRODUCT EVIDENCE:
-${evidence}
-
-REQUIREMENTS:
-- Title: "${productName} vs [Competitor]" or "${productName} Comparison"
-- Only compare the competitors listed above — NEVER invent competitor data
-- For each comparison field:
-  - field: The feature/attribute being compared
-  - ourValue: What evidence says about ${productName} (or "Unknown" if not in evidence)
-  - competitorValue: What evidence says about the competitor (or "Unknown" if not in evidence)
-  - source: Which evidence field supports this comparison
-- Include 5-8 comparison fields covering: features, ease of use, pricing (only if in evidence), support, integrations
-- Where evidence is missing for either side, set value to "Unknown" — do NOT guess
-- CTA: Product-specific, not generic
-- Do NOT claim ${productName} is "better" or "cheaper" without direct evidence
-
-Return valid JSON:
-{
-  "title": "string",
-  "purpose": "string",
-  "primaryProduct": "${productName}",
-  "comparedCompetitors": [{"name": "from evidence", "domain": "from evidence"}],
-  "comparisonFields": [{"field": "attribute", "ourValue": "from evidence or Unknown", "competitorValue": "from evidence or Unknown", "source": "evidence field"}],
-  "cta": "string",
-  "evidenceUsed": [],
+  "post": "string — max 280 chars total",
+  "cta": "string or null",
+  "hashtags": ["max", "2"],
+  "audience": "string",
+  "angle": "string",
+  "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
 }`;
 
   try {
     const result = await callAI(prompt);
-    if (result.success && result.data) return result.data;
-  } catch (e) { console.warn(`[ContentStudio] Comparison AI failed:`, e.message); }
-  return null;
+    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+  } catch (e) { /* fall through to rule-based */ }
+  return { ...RULE_BASED_FALLBACKS.twitter_post(brief), _provider: 'rule-based' };
 }
 
-async function generateFeatureAnnouncement(brief) {
+async function generateFacebookPost(brief) {
   const evidence = buildEvidenceSection(brief);
-  const productName = brief.product?.name || 'the product';
-  const features = brief.product?.features || [];
-  const featureNames = features.map(f => typeof f === 'string' ? f : f.name || '').filter(Boolean);
-
-  const prompt = `You are a product marketing manager writing a feature announcement for ${productName}.
-
-Select the MOST IMPACTFUL feature from the evidence and write an announcement about it.
-
-PRODUCT EVIDENCE:
-${evidence}
-
-AVAILABLE FEATURES: ${featureNames.join(', ') || 'None listed'}
-
-REQUIREMENTS:
-- Feature name: Must be one of the features listed above
-- Feature description: Must come from evidence, not invented
-- Benefit: What it means for the user (from evidence)
-- availability: MUST be null — never fabricate release dates
-- Title: "${productName} Introduces [Feature Name]" style
-- CTA: Product-specific
-- Do NOT invent launch dates, beta programs, or availability windows
-
-Return valid JSON:
-{
-  "title": "string",
-  "purpose": "string",
-  "featureName": "from evidence features list",
-  "featureDescription": "from evidence",
-  "benefit": "from evidence or marked as inferred",
-  "availability": null,
-  "cta": "string",
-  "evidenceUsed": []
-}`;
-
-  try {
-    const result = await callAI(prompt);
-    if (result.success && result.data) return result.data;
-  } catch (e) { console.warn(`[ContentStudio] Feature AI failed:`, e.message); }
-  return null;
-}
-
-async function generateWhitepaper(brief) {
-  const evidence = buildEvidenceSection(brief);
-  const productName = brief.product?.name || 'the product';
-  const industry = brief.company?.industry || 'the industry';
-  const persona = brief.targetPersonas?.[0]?.name || 'decision makers';
-  const painPoint = brief.painPoints?.[0] || '';
-
-  const prompt = `You are an industry analyst writing a whitepaper for ${productName} in ${industry}.
-
-This whitepaper educates ${persona} about a problem in ${industry} and positions ${productName}'s approach as a credible solution.
-
-PRODUCT EVIDENCE:
-${evidence}
-
-REQUIREMENTS:
-- Title: Professional, research-oriented (e.g., "The State of [Topic] in ${industry}")
-- Executive summary: 150-200 words, evidence-backed overview of the problem and solution
-- 4-6 sections, each with heading and 200-300 word content block
-- Sections should cover: industry landscape, the core problem, why current approaches fail, how ${productName} addresses it, measurable outcomes (only from evidence), future outlook
-- Conclusion: Summarize findings, product positioning, and call to action
-- Limitations: List topics where evidence was insufficient
-- Do NOT fabricate statistics, research citations, or industry data
-- Do NOT make claims not supported by evidence — mark as "limited evidence available"
-- Reference specific features and benefits from the evidence
-
-Return valid JSON:
-{
-  "title": "string",
-  "purpose": "string",
-  "audience": "string",
-  "executiveSummary": "150-200 word evidence-backed summary",
-  "sections": [{"heading": "string", "content": "200-300 words, evidence-backed"}],
-  "conclusion": "string",
-  "evidenceUsed": [],
-  "limitations": ["topics where evidence was insufficient"]
-}`;
-
-  try {
-    const result = await callAI(prompt);
-    if (result.success && result.data) return result.data;
-  } catch (e) { console.warn(`[ContentStudio] Whitepaper AI failed:`, e.message); }
-  return null;
-}
-
-async function generateSocialPost(postType, brief) {
-  const evidence = buildEvidenceSection(brief);
-  const productName = brief.product?.name || 'the product';
-  const persona = brief.targetPersonas?.[0]?.name || 'professionals';
-  const painPoint = brief.painPoints?.[0] || '';
-  const feature1 = brief.product?.features?.[0];
-  const featureName = typeof feature1 === 'string' ? feature1 : feature1?.name || '';
+  const productContext = buildProductEvidenceContext(brief);
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const painPoint = getFirstPainPoint(brief);
   const usp = brief.product?.usp || '';
 
-  const platformGuidance = {
-    linkedin_post: {
-      tone: 'professional, thought-leadership, value-driven',
-      structure: 'Hook → Insight/Story → Product relevance → CTA',
-      length: 'max 3000 chars',
-      constraints: 'No hashtags in body, max 3 hashtags at end. Professional tone. Start with a bold statement or question.',
-    },
-    instagram_post: {
-      tone: 'visual, engaging, lifestyle-oriented',
-      structure: 'Hook → Story/Product highlight → Benefit → CTA',
-      length: 'max 2200 chars',
-      constraints: 'Max 5 relevant hashtags. First line must be compelling. Use line breaks for readability.',
-    },
-    twitter_post: {
-      tone: 'concise, punchy, shareable',
-      structure: 'Single compelling message in 280 chars',
-      length: 'max 280 chars',
-      constraints: 'Must be self-contained. No threads. One clear message.',
-    },
-    facebook_post: {
-      tone: 'conversational, community-focused',
-      structure: 'Question/Hook → Story → Product mention → CTA',
-      length: 'max 2000 chars',
-      constraints: 'Conversational tone. Ask questions to drive engagement. Tag product naturally.',
-    },
-    youtube_description: {
-      tone: 'informative, SEO-optimized',
-      structure: 'Summary → Timestamps → Links → CTA',
-      length: 'max 5000 chars',
-      constraints: 'Include timestamps, product links, and a compelling summary.',
-    },
-  };
+  const prompt = `You are writing a Facebook post for ${productName}.
 
-  const guidance = platformGuidance[postType] || platformGuidance.linkedin_post;
+Write an engaging post for ${persona} who face "${painPoint}".
 
-  const prompt = `You are a ${postType.replace('_', ' ')} specialist writing for ${productName}.
-
-Write a ${postType.replace('_', ' ')} that would resonate with ${persona} who struggle with "${painPoint}".
-
-PRODUCT EVIDENCE:
-${evidence}
-
-PLATFORM: ${postType.replace('_', ' ')}
-TONE: ${guidance.tone}
-STRUCTURE: ${guidance.structure}
-LENGTH: ${guidance.length}
-CONSTRAINTS: ${guidance.constraints}
+${productContext}
 
 REQUIREMENTS:
-- Reference the product feature "${featureName}" or USP "${usp}" naturally
-- Must feel native to the platform — NOT a copied-and-pasted message
-- CTA must be specific to ${productName}, not generic
-- Do NOT use fake engagement tactics ("Tag a friend who...", "Double tap if...")
-- Do NOT invent statistics or customer quotes
+- headline: A clear, benefit-driven headline. Max 150 chars.
+- body: 2-3 short paragraphs. Conversational, slightly more explanatory than Instagram.
+- cta: A clear CTA.
+- audience: Who this targets from evidence.
+- angle: The messaging angle used.
+- Do NOT use: fake stats, testimonials, superlatives, competitor bashing, fake engagement claims.
 
-Return valid JSON matching the ${postType} schema.`;
+Return valid JSON:
+{
+  "headline": "string — max 150 chars",
+  "body": "string — 2-3 short paragraphs",
+  "cta": "string",
+  "audience": "string",
+  "angle": "string",
+  "evidenceUsed": ["list evidence fields referenced"],
+  "claimsRequiringReview": []
+}`;
 
   try {
     const result = await callAI(prompt);
-    if (result.success && result.data) return { ...result.data, _platform: postType };
-  } catch (e) { console.warn(`[ContentStudio] ${postType} AI failed:`, e.message); }
-  return null;
+    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+  } catch (e) { /* fall through to rule-based */ }
+  return { ...RULE_BASED_FALLBACKS.facebook_post(brief), _provider: 'rule-based' };
+}
+
+async function generateYouTubeDescription(brief) {
+  const evidence = buildEvidenceSection(brief);
+  const productContext = buildProductEvidenceContext(brief);
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const painPoint = getFirstPainPoint(brief);
+
+  const prompt = `You are writing a YouTube video description for ${productName}.
+
+${productContext}
+
+REQUIREMENTS:
+- title: Clickable video title. Include relevant SEO keyword if available.
+- description: 4-6 line video description. Include key topics covered. Ready to paste into YouTube.
+- openingHook: A compelling hook sentence for the video intro.
+- chapters: Array of timestamped chapters [{timestamp, title}]. Max 5. Use realistic timestamps. Set to [] if no timing supplied.
+- links: Empty array — do not invent URLs.
+- cta: A clear call to action.
+- hashtags: Max 4 relevant hashtags.
+- keywords: 3-5 video keywords, product-specific.
+- Do NOT: invent URLs, fake stats, testimonials, superlatives.
+
+Return valid JSON:
+{
+  "title": "string",
+  "description": "string — 4-6 lines",
+  "openingHook": "string",
+  "chapters": [{"timestamp": "string", "title": "string"}],
+  "links": [],
+  "cta": "string",
+  "hashtags": ["string"],
+  "keywords": ["string"],
+  "evidenceUsed": ["list evidence fields referenced"],
+  "claimsRequiringReview": []
+}`;
+
+  try {
+    const result = await callAI(prompt);
+    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+  } catch (e) { /* fall through to rule-based */ }
+  return { ...RULE_BASED_FALLBACKS.youtube_description(brief), _provider: 'rule-based' };
 }
 
 async function generateEmailCopy(brief) {
   const evidence = buildEvidenceSection(brief);
-  const productName = brief.product?.name || 'the product';
-  const persona = brief.targetPersonas?.[0]?.name || 'professionals';
-  const painPoint = brief.painPoints?.[0] || '';
-  const usp = brief.product?.usp || '';
+  const productContext = buildProductEvidenceContext(brief);
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const painPoint = getFirstPainPoint(brief);
 
-  const prompt = `You are an email marketing specialist writing a promotional email for ${productName}.
+  const prompt = `You are writing a professional email for ${productName}.
 
-This email targets ${persona} who struggle with "${painPoint}" and introduces ${productName} as the solution.
+Write a send-ready email targeting ${persona} who face "${painPoint}".
 
-PRODUCT EVIDENCE:
-${evidence}
+${productContext}
 
 REQUIREMENTS:
-- Subject line: Max 60 chars, product-specific, not clickbait. Reference "${productName}" or the pain point.
-- Preview text: Max 100 chars, complements the subject line
-- Body structure:
-  1. Opening hook (pain point "${painPoint}")
-  2. Agitation (why this problem matters)
-  3. Solution introduction (${productName} and its USP)
-  4. 2-3 specific features with benefits (from evidence)
-  5. Single clear CTA
-- Personalization: Use only {{firstName}} — no other variables
-- Tone: Conversational, empathetic, professional
-- Do NOT invent statistics, testimonials, or customer names
-- Do NOT use ALL CAPS for emphasis
+- emailType: One of "outreach", "nurture", "product_announcement", "newsletter", "follow_up", "trial_conversion".
+- subject: Compelling subject line. Max 70 chars.
+- previewText: Preview/snippet text. Max 150 chars.
+- greeting: Professional greeting (e.g., "Hi {{firstName}},").
+- opening: Strong opening paragraph addressing the pain point.
+- bodyParagraphs: 2-3 short paragraphs about ${productName}.
+- bulletPoints: 3 key benefits or features as bullet points.
+- ctaText: Clear CTA text.
+- ctaUrl: null — do not invent URLs.
+- closing: Closing paragraph.
+- signature: Sender signature.
+- personalizationFields: Array of personalization field names (e.g., ["firstName", "companyName"]).
+- complianceNote: For cold outreach, include "This email is a business development inquiry. If you'd prefer not to receive further communications, please reply UNSUBSCRIBE."
+- Do NOT use: fake stats, testimonials, ROI claims, pricing, fake urgency.
 
 Return valid JSON:
 {
-  "subjectLine": "max 60 chars, product-specific",
-  "previewText": "max 100 chars",
-  "body": "structured email body in markdown",
-  "cta": "single product-specific CTA",
-  "personalizationFields": ["{{firstName}}"],
-  "evidenceUsed": []
-}`;
-
-  try {
-    const result = await callAI(prompt);
-    if (result.success && result.data) return result.data;
-  } catch (e) { console.warn(`[ContentStudio] Email AI failed:`, e.message); }
-  return null;
-}
-
-async function generateCreativeBrief(brief) {
-  const evidence = buildEvidenceSection(brief);
-  const productName = brief.product?.name || 'the product';
-  const brandName = brief.product?.brandName || productName;
-  const industry = brief.company?.industry || '';
-  const persona = brief.targetPersonas?.[0]?.name || 'professionals';
-  const features = brief.product?.features?.slice(0, 3).map(f => typeof f === 'string' ? f : f.name || '').filter(Boolean).join(', ') || '';
-  const techHints = brief.website?.technologyHints?.slice(0, 3).join(', ') || '';
-
-  const prompt = `You are a creative director writing a design brief for ${productName} by ${brandName}.
-
-The creative should resonate with ${persona} and highlight the product's key capabilities.
-
-PRODUCT EVIDENCE:
-${evidence}
-
-REQUIREMENTS:
-- Objective: What this creative should achieve (awareness, consideration, conversion)
-- Audience: Specific persona from evidence
-- Message: Core message derived from USP or top feature
-- Visual direction: Reference the ${industry} industry, product category, and brand identity. Be specific about colors, imagery style, and mood. Do NOT reference generic stock imagery.
-- Brand signals: Visual cues from ${techHints || 'product features and technology'}
-- Required text: Safe text overlay (2-5 words, product name or tagline)
-- Format: One of poster / banner / social / display / email-header
-- Evidence limitations: What cannot be claimed in the creative (fake stats, comparisons, etc.)
-- CTA: Product-specific
-
-Return valid JSON:
-{
-  "objective": "string",
-  "audience": "string",
-  "message": "core message from USP or features",
-  "visualDirection": "specific visual direction referencing product/industry",
-  "brandSignals": ["visual cues from product features or technology"],
-  "requiredText": "text overlay (2-5 words)",
-  "cta": "string",
-  "format": "poster / banner / social / display / email-header",
-  "evidenceLimitations": ["what cannot be claimed"],
-  "evidenceUsed": [],
+  "emailType": "string — one of the allowed types",
+  "subject": "string — max 70 chars",
+  "previewText": "string — max 150 chars",
+  "greeting": "string",
+  "opening": "string",
+  "bodyParagraphs": ["string"],
+  "bulletPoints": ["string"],
+  "ctaText": "string",
+  "ctaUrl": null,
+  "closing": "string",
+  "signature": "string",
+  "personalizationFields": ["string"],
+  "complianceNote": "string or null",
+  "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
 }`;
 
   try {
     const result = await callAI(prompt);
-    if (result.success && result.data) return result.data;
-  } catch (e) { console.warn(`[ContentStudio] Creative brief AI failed:`, e.message); }
-  return null;
+    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+  } catch (e) { /* fall through to rule-based */ }
+  return { ...RULE_BASED_FALLBACKS.email_copy(brief), _provider: 'rule-based' };
+}
+
+async function generateBlogArticle(brief) {
+  const evidence = buildEvidenceSection(brief);
+  const productContext = buildProductEvidenceContext(brief);
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const painPoint = getFirstPainPoint(brief);
+  const keyword = getKeyword(brief, 0) || painPoint.toLowerCase().replace(/\s+/g, '-');
+
+  const prompt = `You are writing a blog article for ${productName}.
+
+Write an informative blog post for ${persona} dealing with "${painPoint}".
+
+${productContext}
+
+REQUIREMENTS:
+- headline: SEO-friendly headline including target keyword "${keyword}" if natural. Max 70 chars.
+- metaDescription: Compelling meta description. Max 160 chars.
+- introduction: Engaging intro paragraph addressing the pain point.
+- sections: Array of {heading, body, keyTakeaways}. 2-4 sections. Each section should reference evidence.
+- conclusion: Strong conclusion with CTA.
+- cta: A clear call to action. Product-specific.
+- targetKeywords: Array of 2-3 target keywords.
+- Do NOT use: fake stats, testimonials, superlatives, invented data, "revolutionary".
+
+Return valid JSON:
+{
+  "headline": "string",
+  "metaDescription": "string — max 160 chars",
+  "introduction": "string",
+  "sections": [{"heading": "string", "body": "string", "keyTakeaways": ["string"]}],
+  "conclusion": "string",
+  "cta": "string",
+  "targetKeywords": ["string"],
+  "evidenceUsed": ["list evidence fields referenced"],
+  "claimsRequiringReview": []
+}`;
+
+  try {
+    const result = await callAI(prompt);
+    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+  } catch (e) { /* fall through to rule-based */ }
+  return { ...RULE_BASED_FALLBACKS.blog_article(brief), _provider: 'rule-based' };
+}
+
+async function generateFAQ(brief) {
+  const evidence = buildEvidenceSection(brief);
+  const productContext = buildProductEvidenceContext(brief);
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+
+  const prompt = `You are writing an FAQ page for ${productName}.
+
+${productContext}
+
+REQUIREMENTS:
+- headline: Clear FAQ page title including product name.
+- metaDescription: SEO meta description. Max 160 chars.
+- introduction: Short intro paragraph addressing common questions.
+- faqs: Array of {question, answer}. 4-6 FAQs based on evidence. Questions should reflect real customer concerns.
+- cta: A clear CTA. Product-specific.
+- Do NOT invent: fake questions, pricing, claims not supported by evidence.
+
+Return valid JSON:
+{
+  "headline": "string",
+  "metaDescription": "string — max 160 chars",
+  "introduction": "string",
+  "faqs": [{"question": "string", "answer": "string"}],
+  "cta": "string",
+  "evidenceUsed": ["list evidence fields referenced"],
+  "claimsRequiringReview": []
+}`;
+
+  try {
+    const result = await callAI(prompt);
+    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+  } catch (e) { /* fall through to rule-based */ }
+  return { ...RULE_BASED_FALLBACKS.faq_page(brief), _provider: 'rule-based' };
+}
+
+async function generateLandingPage(brief) {
+  const evidence = buildEvidenceSection(brief);
+  const productContext = buildProductEvidenceContext(brief);
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const painPoint = getFirstPainPoint(brief);
+
+  const prompt = `You are writing a landing page for ${productName}.
+
+${productContext}
+
+REQUIREMENTS:
+- headline: Benefit-driven headline. Max 80 chars. Reference USP if available.
+- subheadline: Supporting subheadline. Max 150 chars.
+- heroCTA: Primary CTA button text. Product-specific.
+- painPoints: Array of 3 pain points from the evidence this page addresses.
+- solution: One paragraph describing the solution using evidence.
+- features: Array of {icon (emoji), title, description}. 3 features. Use evidence-backed descriptions.
+- socialProof: Empty array — do not invent testimonials or stats.
+- finalCTA: Closing CTA text.
+- seoKeywords: Array of 3 SEO keywords from evidence.
+- Do NOT: invent testimonials, fake stats, ROI claims, pricing, superlatives.
+
+Return valid JSON:
+{
+  "headline": "string",
+  "subheadline": "string",
+  "heroCTA": "string",
+  "painPoints": ["string"],
+  "solution": "string",
+  "features": [{"icon": "string", "title": "string", "description": "string"}],
+  "socialProof": [],
+  "finalCTA": "string",
+  "seoKeywords": ["string"],
+  "evidenceUsed": ["list evidence fields referenced"],
+  "claimsRequiringReview": []
+}`;
+
+  try {
+    const result = await callAI(prompt);
+    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+  } catch (e) { /* fall through to rule-based */ }
+  return { ...RULE_BASED_FALLBACKS.landing_page(brief), _provider: 'rule-based' };
+}
+
+async function generateProductPage(brief) {
+  const evidence = buildEvidenceSection(brief);
+  const productContext = buildProductEvidenceContext(brief);
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const painPoint = getFirstPainPoint(brief);
+
+  const prompt = `You are writing a product page for ${productName}.
+
+${productContext}
+
+REQUIREMENTS:
+- productName: "${productName}".
+- tagline: Short compelling tagline referencing USP if available.
+- overview: One paragraph product overview addressing pain point "${painPoint}".
+- keyFeatures: Array of {name, description, benefit}. 3 features minimum from evidence.
+- useCases: Array of {scenario, solution, outcome}. At least 1 use case relevant to ${persona}.
+- cta: Clear CTA. Product-specific.
+- pricing: null — do not invent pricing.
+- faqs: Array of {question, answer}. 2 FAQs minimum from evidence.
+- Do NOT: invent pricing, testimonials, fake data, superlatives.
+
+Return valid JSON:
+{
+  "productName": "string",
+  "tagline": "string",
+  "overview": "string",
+  "keyFeatures": [{"name": "string", "description": "string", "benefit": "string"}],
+  "useCases": [{"scenario": "string", "solution": "string", "outcome": "string"}],
+  "cta": "string",
+  "pricing": null,
+  "faqs": [{"question": "string", "answer": "string"}],
+  "evidenceUsed": ["list evidence fields referenced"],
+  "claimsRequiringReview": []
+}`;
+
+  try {
+    const result = await callAI(prompt);
+    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+  } catch (e) { /* fall through to rule-based */ }
+  return { ...RULE_BASED_FALLBACKS.product_page(brief), _provider: 'rule-based' };
+}
+
+async function generateComparisonPage(brief) {
+  const evidence = buildEvidenceSection(brief);
+  const productContext = buildProductEvidenceContext(brief);
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const competitors = brief.validatedCompetitors?.slice(0, 3).map(c => c.name) || [];
+
+  const prompt = `You are writing a comparison page for ${productName}.
+
+${productContext}
+
+REQUIREMENTS:
+- headline: Comparison page title. Include product name and key category.
+- introduction: One paragraph intro stating what is being compared.
+- comparisonTable: Object with headers (array) and rows (array of objects). Be objective — ${productName} does not need to win every row. Use evidence for claims.
+- whyChooseUs: Why someone would choose ${productName} based on evidence. Reference specific features/USPs.
+- cta: Clear CTA. Product-specific.
+- competitorWeaknesses: Array of {competitor, weakness}. Only include if evidence supports it.
+${competitors.length ? `\nCompetitors from evidence: ${competitors.join(', ')}` : '\nNo competitor evidence available — use generic "Alternatives" category.'}
+- Do NOT: bash competitors without evidence, make superlative claims, use fake data.
+
+Return valid JSON:
+{
+  "headline": "string",
+  "introduction": "string",
+  "comparisonTable": {"headers": ["string"], "rows": [{"feature": "string"}]},
+  "whyChooseUs": "string",
+  "cta": "string",
+  "competitorWeaknesses": [{"competitor": "string", "weakness": "string"}],
+  "evidenceUsed": ["list evidence fields referenced"],
+  "claimsRequiringReview": []
+}`;
+
+  try {
+    const result = await callAI(prompt);
+    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+  } catch (e) { /* fall through to rule-based */ }
+  return { ...RULE_BASED_FALLBACKS.comparison_page(brief), _provider: 'rule-based' };
+}
+
+async function generateFeatureAnnouncement(brief) {
+  const evidence = buildEvidenceSection(brief);
+  const productContext = buildProductEvidenceContext(brief);
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const feature = getFirstFeature(brief);
+
+  const prompt = `You are announcing a new feature for ${productName}.
+
+${productContext}
+
+REQUIREMENTS:
+- headline: Announcement headline highlighting "${feature}". Include product name.
+- subheadline: Supporting subheadline.
+- body: 1-2 paragraphs describing the feature and its value for ${persona}. Reference evidence.
+- benefits: Array of 3 key benefits from evidence.
+- cta: Clear CTA. Product-specific.
+- availability: "Available now" or specific timeline if supported by evidence.
+- technicalDetails: null unless evidence supports it.
+- Do NOT: fake stats, testimonials, superlatives, "game-changing".
+
+Return valid JSON:
+{
+  "headline": "string",
+  "subheadline": "string",
+  "body": "string",
+  "benefits": ["string"],
+  "cta": "string",
+  "availability": "string",
+  "technicalDetails": null,
+  "evidenceUsed": ["list evidence fields referenced"],
+  "claimsRequiringReview": []
+}`;
+
+  try {
+    const result = await callAI(prompt);
+    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+  } catch (e) { /* fall through to rule-based */ }
+  return { ...RULE_BASED_FALLBACKS.feature_announcement(brief), _provider: 'rule-based' };
+}
+
+async function generateWhitepaper(brief) {
+  const evidence = buildEvidenceSection(brief);
+  const productContext = buildProductEvidenceContext(brief);
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const painPoint = getFirstPainPoint(brief);
+
+  const prompt = `You are writing a whitepaper outline for ${productName}.
+
+${productContext}
+
+REQUIREMENTS:
+- title: Whitepaper title focusing on ${painPoint} and ${productName}.
+- subtitle: Supporting subtitle.
+- executiveSummary: 2-3 sentence executive summary.
+- sections: Array of {heading, body, keyFindings}. 3 sections minimum. Each section grounded in evidence.
+- conclusion: Strong conclusion with recommendations.
+- references: Empty array — do not invent references.
+- cta: Clear CTA. Product-specific.
+- Do NOT: invent statistics, references, testimonials, superlatives.
+
+Return valid JSON:
+{
+  "title": "string",
+  "subtitle": "string",
+  "executiveSummary": "string",
+  "sections": [{"heading": "string", "body": "string", "keyFindings": ["string"]}],
+  "conclusion": "string",
+  "references": [],
+  "cta": "string",
+  "evidenceUsed": ["list evidence fields referenced"],
+  "claimsRequiringReview": []
+}`;
+
+  try {
+    const result = await callAI(prompt);
+    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+  } catch (e) { /* fall through to rule-based */ }
+  return { ...RULE_BASED_FALLBACKS.whitepaper(brief), _provider: 'rule-based' };
+}
+
+async function generateCreativeBrief(brief) {
+  const evidence = buildEvidenceSection(brief);
+  const productContext = buildProductEvidenceContext(brief);
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const painPoint = getFirstPainPoint(brief);
+
+  const prompt = `You are creating a creative brief for ${productName}.
+
+${productContext}
+
+REQUIREMENTS:
+- objective: Clear campaign objective focused on solving "${painPoint}" for ${persona}. Specific to ${productName}'s USP.
+- audience: Target audience name from evidence.
+- message: Single key message that communicates value. Rooted in product evidence.
+- visualDirection: Describe the visual creative direction with specific imagery references.
+- brandSignals: Array of brand-specific signals or themes (e.g., "minimalist design", "case study blue"). Max 5.
+- requiredText: A short required product text or tagline.
+- cta: Primary call to action. Product-specific.
+- format: Content format (e.g., "Multi-channel campaign", "Social video series", "Email nurture sequence").
+- evidenceLimitations: Empty array — do not invent limitations.
+- Do NOT: invent budget, timeline beyond evidence, fake testimonials, or generic advice.
+
+Return valid JSON:
+{
+  "objective": "string — clear campaign objective",
+  "audience": "string — target audience name",
+  "message": "string — single key message",
+  "visualDirection": "string — visual creative direction",
+  "brandSignals": ["string"],
+  "requiredText": "string — required product text",
+  "cta": "string",
+  "format": "string",
+  "evidenceLimitations": [],
+  "evidenceUsed": ["list evidence fields referenced"],
+  "claimsRequiringReview": []
+}`;
+
+  try {
+    const result = await callAI(prompt);
+    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+  } catch (e) { /* fall through to rule-based */ }
+  return { ...RULE_BASED_FALLBACKS.creative_brief(brief), _provider: 'rule-based' };
 }
 
 async function generateVideoScript(brief) {
   const evidence = buildEvidenceSection(brief);
-  const productName = brief.product?.name || 'the product';
-  const persona = brief.targetPersonas?.[0]?.name || 'professionals';
-  const painPoint = brief.painPoints?.[0] || '';
-  const usp = brief.product?.usp || '';
-  const feature1 = brief.product?.features?.[0];
-  const featureName = typeof feature1 === 'string' ? feature1 : feature1?.name || '';
+  const productContext = buildProductEvidenceContext(brief);
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const painPoint = getFirstPainPoint(brief);
 
-  const prompt = `You are a video scriptwriter creating a promotional video script for ${productName}.
+  const prompt = `You are writing a video script for ${productName}.
 
-The video targets ${persona} who struggle with "${painPoint}" and shows how ${productName} solves it.
-
-PRODUCT EVIDENCE:
-${evidence}
+${productContext}
 
 REQUIREMENTS:
-- Duration: 30 seconds (6 scenes, ~5 seconds each)
-- Scene structure: Each scene needs narration (voiceover), on-screen text, visual description, evidence point, and optional CTA
-- Scene 1: Hook — show the pain point "${painPoint}"
-- Scene 2: Agitation — why this problem matters
-- Scene 3: Solution reveal — introduce ${productName}
-- Scene 4: Feature highlight — showcase "${featureName}" specifically
-- Scene 5: Benefit proof — what the user gets
-- Scene 6: CTA — clear next step
-- Narration: Conversational, 15-20 words per scene
-- On-screen text: 3-5 words per scene, product-specific
-- Every scene must reference specific product/audience from evidence
-- Do NOT invent statistics, customer quotes, or awards
+- title: Video title. Include product name and target keyword if available.
+- format: "Explainer" or "Testimonial" or "Demo".
+- duration: Estimated duration like "60-90 seconds".
+- scenes: Array of {scene, narration, onScreenText, visual, evidencePoint, cta}. 3-5 scenes.
+- Each scene should reference specific evidence from the evidence above.
+- scene must start at 1.
+- Last scene should include cta.
+- Use "evidencePoint" (not "evidence") for the evidence reference field.
+- Use "onScreenText" (not "on_screen_text") for on-screen text.
+- narration should be speakable, natural dialogue, not formal copy.
+- Do NOT: invent testimonials, fake data, unverifiable claims, superlatives.
 
 Return valid JSON:
 {
-  "duration": "30s",
-  "scenes": [{"scene": 1, "narration": "15-20 words", "onScreenText": "3-5 words", "visual": "scene description", "evidencePoint": "which evidence this uses", "cta": "scene CTA or null"}],
-  "evidenceUsed": [],
+  "title": "string",
+  "format": "string",
+  "duration": "string",
+  "scenes": [{"scene": 1, "narration": "string", "onScreenText": "string or null", "visual": "string", "evidencePoint": "string or null", "cta": "string or null"}],
+  "evidenceUsed": ["list evidence fields referenced"],
+  "claimsRequiringReview": [],
   "limitations": []
 }`;
 
   try {
     const result = await callAI(prompt);
-    if (result.success && result.data) return result.data;
-  } catch (e) { console.warn(`[ContentStudio] Video script AI failed:`, e.message); }
-  return null;
+    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+  } catch (e) { /* fall through to rule-based */ }
+  return { ...RULE_BASED_FALLBACKS.video_script(brief), _provider: 'rule-based' };
 }
 
-// ================================================
-// GENERATOR MAP
-// ================================================
-
 const GENERATORS = {
+  linkedin_post: generateLinkedInPost,
+  instagram_post: generateInstagramPost,
+  twitter_post: generateTwitterPost,
+  facebook_post: generateFacebookPost,
+  youtube_description: generateYouTubeDescription,
+  email_copy: generateEmailCopy,
   blog_article: generateBlogArticle,
   faq_page: generateFAQ,
   landing_page: generateLandingPage,
@@ -824,23 +1175,16 @@ const GENERATORS = {
   comparison_page: generateComparisonPage,
   feature_announcement: generateFeatureAnnouncement,
   whitepaper: generateWhitepaper,
-  linkedin_post: (b) => generateSocialPost('linkedin_post', b),
-  instagram_post: (b) => generateSocialPost('instagram_post', b),
-  twitter_post: (b) => generateSocialPost('twitter_post', b),
-  facebook_post: (b) => generateSocialPost('facebook_post', b),
-  youtube_description: (b) => generateSocialPost('youtube_description', b),
-  email_copy: generateEmailCopy,
   creative_brief: generateCreativeBrief,
   video_script: generateVideoScript,
 };
 
-// ================================================
-// MAIN EXPORTS
-// ================================================
-
 export async function generateContent(assetType, brief, evidenceContext, callAiFn, userId, chatId) {
   const typeConfig = CONTENT_TYPES[assetType];
   if (!typeConfig) throw new Error(`Unknown content type: ${assetType}`);
+
+  const schemaEntry = SCHEMA_REGISTRY[assetType];
+  if (!schemaEntry) throw new Error(`No schema registered for: ${assetType}`);
 
   const generator = GENERATORS[assetType];
   if (!generator) throw new Error(`No generator for: ${assetType}`);
@@ -867,11 +1211,10 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
     };
   }
 
-  // Validate AI output against Zod schema
   const schemaValidation = validateContentOutput(result, assetType);
   if (!schemaValidation.valid) {
     return {
-      content: result,
+      content: { ...result, _type: assetType },
       metadata: {
         type: assetType,
         label: typeConfig.label,
@@ -883,11 +1226,15 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
     };
   }
 
-  // Validate claims
   const claimValidation = validateContentClaims(result, assetType);
 
+  const validatedContent = {
+    ...schemaValidation.data,
+    _type: assetType,
+  };
+
   return {
-    content: schemaValidation.data,
+    content: validatedContent,
     metadata: {
       type: assetType,
       label: typeConfig.label,
@@ -901,7 +1248,6 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
 }
 
 export async function generateContentStudioPlan(typesOrCtx, brief, evidenceContext, callAiFn, userId, chatId) {
-  // Backward compatibility: if first arg is an object (marketing-execution context), treat as legacy call
   if (typesOrCtx && typeof typesOrCtx === 'object' && !Array.isArray(typesOrCtx)) {
     const execCtx = typesOrCtx;
     const minimalBrief = {
@@ -935,3 +1281,5 @@ export async function generateContentStudioPlan(typesOrCtx, brief, evidenceConte
     },
   };
 }
+
+export { generateLinkedInPost, generateInstagramPost, generateTwitterPost, generateFacebookPost, generateYouTubeDescription, generateEmailCopy, generateCreativeBrief, generateVideoScript, generateBlogArticle, generateFAQ, generateLandingPage, generateProductPage, generateComparisonPage, generateFeatureAnnouncement, generateWhitepaper };

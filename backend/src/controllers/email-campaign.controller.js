@@ -9,6 +9,10 @@ import {
   requestChanges,
   createVersionSnapshot,
   restoreVersion,
+  handleProviderHealth,
+  sendTestCampaignEmail,
+  sendCampaignEmails,
+  getDeliveryLogs,
 } from "../services/automation/email-campaign.service.js";
 
 export async function handleGenerateEmailCampaign(req, res) {
@@ -113,4 +117,35 @@ export async function handleRestoreVersion(req, res) {
 
   const result = await restoreVersion(campaignId, versionId, userId);
   res.json({ success: true, data: result });
+}
+
+export async function handleProviderHealthCheck(req, res) {
+  const health = await handleProviderHealth();
+  res.json({ success: true, data: health });
+}
+
+export async function handleSendTestCampaignEmail(req, res) {
+  const { campaignId } = req.params;
+  const { recipientEmail, itemId } = req.body;
+
+  if (!recipientEmail) {
+    return res.status(400).json({ success: false, error: "recipientEmail is required" });
+  }
+
+  const result = await sendTestCampaignEmail(campaignId, recipientEmail, itemId);
+  res.json({ success: result.success, data: result });
+}
+
+export async function handleSendCampaign(req, res) {
+  const { campaignId } = req.params;
+
+  const result = await sendCampaignEmails(campaignId);
+  res.json({ success: result.success, data: result });
+}
+
+export async function handleGetDeliveryLogs(req, res) {
+  const { campaignId } = req.params;
+
+  const logs = await getDeliveryLogs(campaignId);
+  res.json({ success: true, data: logs });
 }
