@@ -919,23 +919,30 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     console.log('💾 [Growth Workspace] Core intelligence saved to database');
     console.log(`✅ [Growth Workspace] hasActionPlan: ${!!normalizedResults.campaign.actionPlan}`);
 
-    // Verify database records
+    // Verify database records — this is the source of truth for the response
+    let persisted = {
+      productIntelligence: false,
+      audienceIntelligence: false,
+      competitorIntelligence: false,
+      campaignIntelligence: false,
+    };
     try {
-      const [product, audience, competitor, campaign] = await Promise.all([
+      const [product, comp, campaign] = await Promise.all([
         prisma.productIntelligence.findFirst({ where: { userId, chatId: validChatId }, select: { id: true } }),
         prisma.competitorIntelligence.findFirst({ where: { userId, chatId: validChatId }, select: { id: true } }),
         prisma.campaignIntelligence.findFirst({ where: { userId, chatId: validChatId }, select: { id: true } }),
       ]);
+      persisted = {
+        productIntelligence: !!product,
+        audienceIntelligence: !!product,
+        competitorIntelligence: !!comp,
+        campaignIntelligence: !!campaign,
+      };
       console.info('[Growth Stage]', {
         stage: 'PERSISTENCE_VERIFIED',
         status: 'completed',
         chatId: validChatId,
-        persistence: {
-          hasProductIntelligence: !!product,
-          hasAudienceIntelligence: !!audience,
-          hasCompetitorIntelligence: !!competitor,
-          hasCampaignIntelligence: !!campaign,
-        }
+        persistence: persisted,
       });
     } catch (verifyError) {
       console.error('[Growth Stage]', {
@@ -946,6 +953,13 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
         errorMessage: verifyError.message,
       });
     }
+
+    // Derive overall status from persistence, not from step completion
+    const required = persisted.productIntelligence && persisted.audienceIntelligence;
+    const optionalFailures = [];
+    if (!persisted.competitorIntelligence) optionalFailures.push('competitorIntelligence');
+    if (!persisted.campaignIntelligence) optionalFailures.push('campaignIntelligence');
+    overallStatus = required ? (optionalFailures.length > 0 ? 'completed_with_warnings' : 'completed') : 'partial';
 
     // Add message to chat
     await prisma.message.create({
@@ -968,6 +982,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       results: normalizedResults,
       steps,
       overallStatus,
+      persisted,
       warnings,
       businessIntelligence: synthesizedIntel ? {
         company: synthesizedIntel.companyIntelligence,

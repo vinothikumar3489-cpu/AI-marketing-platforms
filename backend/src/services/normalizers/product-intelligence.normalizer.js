@@ -232,12 +232,17 @@ export function normalizeProductIntelligence(productIntel) {
   const website = productIntel.websiteEvidence || {};
 
   // Search all possible feature paths in order of preference
+  // Includes deeply nested paths, alternate shapes, and multi-level objects
   const rawFeatures = productIntel.features
     || pa.features
     || pa.keyFeatures
     || pa.capabilities
     || pa.productFeatures
     || pa.differentiators
+    || pa.jobsToBeDone
+    || pa.details?.features
+    || pa.summary?.features
+    || pa.productDNA?.features
     || website.features
     || [];
 
@@ -246,6 +251,9 @@ export function normalizeProductIntelligence(productIntel) {
     || pa.coreBenefits
     || pa.valuePropositions
     || pa.advantages
+    || pa.valueProposition
+    || pa.details?.benefits
+    || pa.summary?.benefits
     || website.benefits
     || [];
 

@@ -366,23 +366,22 @@ export const safeParse = (value: any, fallback: any = {}): any => {
 // GROWTH WORKSPACE NORMALIZATION
 export function normalizeFullResults(data: any) {
   const root = data?.data || data || {};
+  const growthStatus = root.growthStatus || 'NOT_RUN';
+  const seoStatus = root.seoStatus || 'NOT_RUN';
+  const hasProduct = root.hasProductIntelligence === true || !!root.productIntelligence;
+  const hasGrowth = growthStatus !== 'NOT_RUN' && growthStatus !== 'FAILED';
 
   // Handle canonical shape from backend
-  if (root.growth && Object.keys(root.growth).length > 0) {
-    // Canonical shape: growth object already has nested structure
+  if (hasGrowth && root.growth && typeof root.growth === 'object') {
     const growth = root.growth;
-
-    // Only mark completed if at least one real section has content (non-empty keys)
-    const growthModuleKeys = ['product', 'market', 'audience', 'competitor', 'intent', 'positioning', 'campaign', 'channel', 'executiveStory', 'actionPlan'];
-    const hasRealGrowthContent = growthModuleKeys.some(k => {
-      const v = growth[k];
-      return v && typeof v === 'object' && Object.keys(v).length > 0;
-    });
 
     return {
       chat: root.chat || {},
+      chatId: root.chatId || root.chat?.id || '',
+      growthStatus,
+      seoStatus,
+      productIdentity: root.productIdentity || null,
       growth: {
-        identity: growth.identity || {},
         product: safeParse(growth.product, growth.product),
         market: safeParse(growth.market, growth.market),
         audience: safeParse(growth.audience, growth.audience),
@@ -395,38 +394,35 @@ export function normalizeFullResults(data: any) {
         actionPlan: safeParse(growth.actionPlan, growth.actionPlan),
         summary: growth.summary || null,
       },
-      seoIntelligence: normalizeSeo(root.seoIntelligence || root.seo || root.seoData || root.seoAnalysis || {}),
-      seo: normalizeSeo(root.seoIntelligence || root.seo || root.seoData || root.seoAnalysis || {}), // Legacy compatibility
+      seoIntelligence: seoStatus !== 'NOT_RUN' && root.seoIntelligence ? normalizeSeo(root.seoIntelligence) : null,
+      seo: seoStatus !== 'NOT_RUN' && root.seoIntelligence ? normalizeSeo(root.seoIntelligence) : null,
       agents: asArray(root.agentRuns || []),
-      automation: root.automationPlan || {},
-      hasGrowthWorkspace: root.hasGrowthWorkspace === false ? false : hasRealGrowthContent,
-      hasSeoIntelligence: root.hasSeoIntelligence === true || !!root.seoIntelligence || !!root.seoData || !!root.seoAnalysis,
-      hasProductIntelligence: root.hasProductIntelligence === true,
+      automation: root.automationPlan || null,
+      hasGrowthWorkspace: hasProduct,
+      hasSeoIntelligence: seoStatus === 'COMPLETED' || seoStatus === 'COMPLETED_WITH_WARNINGS',
+      hasProductIntelligence: hasProduct,
       hasCompetitorIntelligence: root.hasCompetitorIntelligence === true,
       hasCampaignIntelligence: root.hasCampaignIntelligence === true,
     };
   }
 
-  // Backward compatibility: handle old flattened structure
   const productIntel = root.productIntelligence || root.growthWorkspace?.results?.product || {};
   const competitorIntel = root.competitorIntelligence || root.growthWorkspace?.results?.competitor || {};
   const campaignIntel = root.campaignIntelligence || root.growthWorkspace?.results?.campaign || {};
   const channelIntel = root.channelRecommendation || root.growthWorkspace?.results?.channel || {};
   const growth = root.growthWorkspace || root.growth || {};
+  const hasProd = root.hasProductIntelligence === true || !!productIntel?.productAnalysis;
 
-  // Fallback for executiveStory and actionPlan from multiple possible paths
   const execStory = campaignIntel.executiveStory || campaignIntel.campaignGenerator?.executiveStory || channelIntel.executiveStory || channelIntel.channelRecommendation?.executiveStory || growth.executiveStory;
   const actPlan = campaignIntel.actionPlan || campaignIntel.campaignGenerator?.actionPlan || channelIntel.actionPlan || channelIntel.channelRecommendation?.actionPlan || growth.actionPlan;
 
   return {
     chat: root.chat || {},
+    chatId: root.chatId || root.chat?.id || '',
+    growthStatus,
+    seoStatus,
+    productIdentity: root.productIdentity || null,
     growth: {
-      identity: {
-        websiteUrl: root.chat?.websiteUrl || productIntel?.inputJson?.websiteUrl || '',
-        productName: root.chat?.productName || productIntel?.inputJson?.productName || '',
-        companyName: root.chat?.title || productIntel?.inputJson?.companyName || '',
-        industry: productIntel?.inputJson?.industry || '',
-      },
       product: safeParse(productIntel.productAnalysis, productIntel.productAnalysis),
       market: safeParse(productIntel.marketDiscovery, productIntel.marketDiscovery),
       audience: safeParse(productIntel.audienceIntelligence, productIntel.audienceIntelligence),
@@ -439,13 +435,13 @@ export function normalizeFullResults(data: any) {
       actionPlan: safeParse(actPlan, actPlan),
       summary: growth.summary || safeParse(growth.summary, growth.summary) || null,
     },
-    seoIntelligence: normalizeSeo(root.seoIntelligence || root.seo || root.seoData || root.seoAnalysis || {}),
-    seo: normalizeSeo(root.seoIntelligence || root.seo || root.seoData || root.seoAnalysis || {}), // Legacy compatibility
+    seoIntelligence: seoStatus !== 'NOT_RUN' ? normalizeSeo(root.seoIntelligence || root.seo || root.seoData || root.seoAnalysis) : null,
+    seo: seoStatus !== 'NOT_RUN' ? normalizeSeo(root.seoIntelligence || root.seo || root.seoData || root.seoAnalysis) : null,
     agents: asArray(root.agentRuns || []),
     automation: root.automationPlan || root.automationPlans || root.automation || {},
-    hasGrowthWorkspace: !!(productIntel?.productAnalysis || competitorIntel?.competitorAnalysis || campaignIntel?.campaignGenerator),
-    hasSeoIntelligence: !!root.seoIntelligence || !!root.seoData || !!root.seoAnalysis,
-    hasProductIntelligence: root.hasProductIntelligence === true,
+    hasGrowthWorkspace: hasProd,
+    hasSeoIntelligence: seoStatus === 'COMPLETED' || seoStatus === 'COMPLETED_WITH_WARNINGS',
+    hasProductIntelligence: hasProd,
     hasCompetitorIntelligence: root.hasCompetitorIntelligence === true,
     hasCampaignIntelligence: root.hasCampaignIntelligence === true,
   };

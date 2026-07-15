@@ -119,9 +119,10 @@ function extractNestedKeywords(keywordOpportunities) {
  * Handles all known legacy and current data shapes
  */
 export function normalizeSeoForExecution(seoInfo) {
-  if (!seoInfo || typeof seoInfo !== 'object') {
+  if (!seoInfo || typeof seoInfo !== 'object' || seoInfo.exists === false || seoInfo.status === 'NOT_RUN') {
     return {
       available: false,
+      status: seoInfo?.status || 'NOT_RUN',
       keywords: [],
       keywordOpportunities: [],
       primaryKeywords: [],
@@ -135,7 +136,8 @@ export function normalizeSeoForExecution(seoInfo) {
       clusters: [],
       technicalAudit: null,
       seoScore: null,
-      warnings: ['SEO intelligence not available']
+      actionPlan: [],
+      warnings: seoInfo?.exists === false ? [] : ['SEO intelligence not available']
     };
   }
 
@@ -286,7 +288,8 @@ export function normalizeSeoForFrontend(seoInfo) {
   const exec = normalizeSeoForExecution(seoInfo);
 
   return {
-    status: seoInfo?.status || 'completed',
+    available: exec.available,
+    status: exec.status || (exec.available ? 'COMPLETED' : 'NOT_RUN'),
     technicalAudit: exec.technicalAudit || null,
     primaryKeywords: exec.primaryKeywords,
     secondaryKeywords: exec.secondaryKeywords,
@@ -295,7 +298,7 @@ export function normalizeSeoForFrontend(seoInfo) {
     allKeywords: exec.allKeywords,
     contentOpportunities: exec.contentOpportunities,
     contentGaps: exec.contentGaps,
-    blogIdeas: exec.blogIdeas,
+    blogIdeas: exec.blogIdeas || [],
     competitors: null,
     aiSearchReadiness: null,
     actionPlan: exec.actionPlan || null,

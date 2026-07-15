@@ -587,20 +587,33 @@ export const getFullResults = async (req, res) => {
     hasAutomationPlan: !!automationPlan,
   });
 
-  // Build canonical fullResults shape
-  const hasGrowthWorkspace = !!(productIntelligence || competitorIntelligence || campaignIntelligence);
-  const hasSeoIntelligence = !!normalizedSeoIntelligence;
+  // Derive status flags from DB records
+  const hasProduct = !!productIntelligence;
+  const hasCompetitor = !!competitorIntelligence;
+  const hasCampaign = !!campaignIntelligence;
+  const hasSeo = !!normalizedSeoIntelligence;
+
+  // Growth requires at minimum ProductIntelligence
+  const growthStatus = hasProduct ? 'COMPLETED' : 'NOT_RUN';
+  const seoStatus = hasSeo ? 'COMPLETED' : 'NOT_RUN';
+
+  // Resolve canonical identity from DB records (not chat.title)
+  const canonicalIdentity = {
+    productName: productIntelligence?.productName || productIntelligence?.inputJson?.productName || null,
+    brandName: productIntelligence?.brandName || null,
+    companyName: productIntelligence?.companyName || productIntelligence?.inputJson?.companyName || null,
+    websiteUrl: chat?.websiteUrl || productIntelligence?.inputJson?.websiteUrl || '',
+    domain: chat?.websiteUrl ? (() => { try { return new URL(chat.websiteUrl.startsWith('http') ? chat.websiteUrl : `https://${chat.websiteUrl}`).hostname.replace(/^www\./, ''); } catch { return null; } })() : null,
+  };
 
   const canonicalResult = {
     success: true,
     chat,
-    growth: hasGrowthWorkspace ? {
-      identity: {
-        websiteUrl: chat?.websiteUrl || productIntelligence?.inputJson?.websiteUrl || '',
-        productName: chat?.productName || productIntelligence?.inputJson?.productName || '',
-        companyName: chat?.title || productIntelligence?.inputJson?.companyName || '',
-        industry: productIntelligence?.inputJson?.industry || '',
-      },
+    chatId: chat.id,
+    growthStatus,
+    seoStatus,
+    productIdentity: canonicalIdentity,
+    growth: hasProduct ? {
       product: productIntelligence?.productAnalysis ?? null,
       market: productIntelligence?.marketDiscovery ?? null,
       audience: productIntelligence?.audienceIntelligence ?? null,
@@ -613,29 +626,23 @@ export const getFullResults = async (req, res) => {
       actionPlan: campaignIntelligence?.actionPlan || campaignIntelligence?.campaignGenerator?.actionPlan || campaignIntelligence?.campaignGenerator?.metadata?.actionPlan || null,
       summary: campaignIntelligence?.campaignGenerator?.growthSummary || campaignIntelligence?.campaignGenerator?.metadata?.growthSummary || null
     } : null,
-    seoIntelligence: hasSeoIntelligence ? {
-      identity: {
-        websiteUrl: seoIntelligence?.websiteUrl || '',
-        domain: seoIntelligence?.domain || '',
-        companyName: seoIntelligence?.companyName || '',
-        productName: seoIntelligence?.productName || '',
-      },
-      technicalAudit: normalizedSeoIntelligence.technicalAudit || {},
-      keywordIntelligence: normalizedSeoIntelligence.keywordIntelligence || {},
-      competitorIntelligence: normalizedSeoIntelligence.competitorIntelligence || {},
-      contentGapAnalysis: normalizedSeoIntelligence.contentGapAnalysis || {},
-      blogIntelligence: normalizedSeoIntelligence.blogIntelligence || {},
-      geoIntelligence: normalizedSeoIntelligence.geoIntelligence || {},
-      executiveDashboard: normalizedSeoIntelligence.executiveDashboard || {},
+    seoIntelligence: hasSeo ? {
+      technicalAudit: normalizedSeoIntelligence.technicalAudit || null,
+      keywordIntelligence: normalizedSeoIntelligence.keywordIntelligence || null,
+      competitorIntelligence: normalizedSeoIntelligence.competitorIntelligence || null,
+      contentGapAnalysis: normalizedSeoIntelligence.contentGapAnalysis || null,
+      blogIntelligence: normalizedSeoIntelligence.blogIntelligence || null,
+      geoIntelligence: normalizedSeoIntelligence.geoIntelligence || null,
+      executiveDashboard: normalizedSeoIntelligence.executiveDashboard || null,
       executiveStory: normalizedSeoIntelligence.executiveStory || null,
       actionPlan: normalizedSeoIntelligence.actionPlan || null,
-      scoreBreakdown: normalizedSeoIntelligence.scoreBreakdown || {},
-    } : {},
-    hasGrowthWorkspace,
-    hasProductIntelligence: !!productIntelligence,
-    hasCompetitorIntelligence: !!competitorIntelligence,
-    hasCampaignIntelligence: !!campaignIntelligence,
-    hasSeoIntelligence,
+      scoreBreakdown: normalizedSeoIntelligence.scoreBreakdown || null,
+    } : null,
+    hasProductIntelligence: hasProduct,
+    hasAudienceIntelligence: hasProduct,
+    hasCompetitorIntelligence: hasCompetitor,
+    hasCampaignIntelligence: hasCampaign,
+    hasSeoIntelligence: hasSeo,
     // Backward compatibility fields
     productIntelligence,
     competitorIntelligence,

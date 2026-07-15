@@ -85,6 +85,24 @@ export async function buildContentBrief(prisma, userId, chatId) {
     return { rejected: true, reason: 'Complete Growth Analysis before generating content.', code: 'EVIDENCE_MISSING' };
   }
 
+  if (!productIdentity.resolved || !productIdentity.productName) {
+    console.warn("[Content Brief] Product identity unresolved", {
+      chatId, userId,
+      productName: productIdentity.productName,
+      source: productIdentity.source,
+    });
+    return {
+      rejected: true,
+      reason: 'The product identity could not be resolved from the current analysis.',
+      code: 'PRODUCT_IDENTITY_UNRESOLVED',
+      readiness: {
+        ready: false,
+        missingRequired: ['PRODUCT_IDENTITY'],
+        missingOptional: normalizedSeo.available ? [] : ['SEO_INTELLIGENCE'],
+      },
+    };
+  }
+
   // PART 2: Normalize product features and benefits
   const normalizedProduct = normalizeProductIntelligence(productIntel);
   console.info("[Content Brief] Product normalized", {

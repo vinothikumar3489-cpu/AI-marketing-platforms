@@ -1,8 +1,11 @@
 const GENERIC_LABELS = new Set([
-  'new analysis', 'untitled project', 'growth analysis', 'new project',
-  'untitled', 'new & featured', 'featured', 'home', 'courses',
+  'new analysis', 'new growth analysis', 'new seo analysis', 'new campaign',
+  'growth analysis', 'seo analysis', 'campaign analysis',
+  'untitled project', 'untitled', 'new project',
+  'new & featured', 'featured', 'home', 'courses',
   'project', 'analysis', 'my', 'the', 'test', 'demo', 'sample',
   'unknown product', 'product', 'website', 'landing', 'page',
+  'www', 'app', 'login', 'signin', 'signup',
 ]);
 
 function isGeneric(label) {
@@ -155,8 +158,7 @@ export function resolveProductIdentity({ chat, productIntelligence, evidenceSnap
   }
 
   if (!brandName) brandName = productName;
-  if (!companyName) brandName = productName;
-  if (!brandName) brandName = productName;
+  if (!companyName) companyName = brandName;
 
   const category = analysis?.category || analysis?.industry || null;
 
