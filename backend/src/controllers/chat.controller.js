@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
+import { buildGrowthFrontendPayload } from "../services/growth/growth-frontend-payload.service.js";
 
 export async function getChatIntelligenceReadiness({ userId, chatId }) {
   const [productIntel, competitorIntel, campaignIntel, seoIntel, automationPlan] = await Promise.all([
@@ -597,14 +598,14 @@ export const getFullResults = async (req, res) => {
   const growthStatus = hasProduct ? 'COMPLETED' : 'NOT_RUN';
   const seoStatus = hasSeo ? 'COMPLETED' : 'NOT_RUN';
 
-  // Resolve canonical identity from DB records (not chat.title)
-  const canonicalIdentity = {
-    productName: productIntelligence?.productName || productIntelligence?.inputJson?.productName || null,
-    brandName: productIntelligence?.brandName || null,
-    companyName: productIntelligence?.companyName || productIntelligence?.inputJson?.companyName || null,
-    websiteUrl: chat?.websiteUrl || productIntelligence?.inputJson?.websiteUrl || '',
-    domain: chat?.websiteUrl ? (() => { try { return new URL(chat.websiteUrl.startsWith('http') ? chat.websiteUrl : `https://${chat.websiteUrl}`).hostname.replace(/^www\./, ''); } catch { return null; } })() : null,
-  };
+  // Build canonical Growth Workspace payload
+  const growthWorkspace = buildGrowthFrontendPayload({
+    chat,
+    productIntelligence,
+    competitorIntelligence,
+    campaignIntelligence,
+    website: { url: chat?.websiteUrl }
+  });
 
   const canonicalResult = {
     success: true,
@@ -612,20 +613,8 @@ export const getFullResults = async (req, res) => {
     chatId: chat.id,
     growthStatus,
     seoStatus,
-    productIdentity: canonicalIdentity,
-    growth: hasProduct ? {
-      product: productIntelligence?.productAnalysis ?? null,
-      market: productIntelligence?.marketDiscovery ?? null,
-      audience: productIntelligence?.audienceIntelligence ?? null,
-      competitor: competitorIntelligence?.competitorAnalysis ?? null,
-      intent: competitorIntelligence?.intentPrediction ?? null,
-      positioning: competitorIntelligence?.positioningEngine ?? null,
-      campaign: campaignIntelligence?.campaignGenerator ?? null,
-      channel: campaignIntelligence?.channelRecommendation ?? null,
-      executiveStory: campaignIntelligence?.executiveStory || campaignIntelligence?.campaignGenerator?.executiveStory || campaignIntelligence?.campaignGenerator?.metadata?.executiveStory || null,
-      actionPlan: campaignIntelligence?.actionPlan || campaignIntelligence?.campaignGenerator?.actionPlan || campaignIntelligence?.campaignGenerator?.metadata?.actionPlan || null,
-      summary: campaignIntelligence?.campaignGenerator?.growthSummary || campaignIntelligence?.campaignGenerator?.metadata?.growthSummary || null
-    } : null,
+    productIdentity: growthWorkspace.productIdentity,
+    growthWorkspace: growthWorkspace.status === 'COMPLETED' ? growthWorkspace : null,
     seoIntelligence: hasSeo ? {
       technicalAudit: normalizedSeoIntelligence.technicalAudit || null,
       keywordIntelligence: normalizedSeoIntelligence.keywordIntelligence || null,

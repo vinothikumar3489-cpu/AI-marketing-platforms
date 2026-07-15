@@ -62,7 +62,27 @@ export default function GrowthWorkspacePage() {
     if (analysisRunningRef.current) return;
     const gs = fullResults.growthStatus;
     if (gs === 'COMPLETED' || gs === 'COMPLETED_WITH_WARNINGS') {
-      const r = fullResults.growth || {};
+      // PRIORITY: Use canonical growthWorkspace if available
+      const workspace = fullResults.growthWorkspace;
+      const r = workspace ? {
+        product: workspace.productDNA,
+        market: workspace.marketIntelligence,
+        audience: workspace.audienceIntelligence,
+        competitor: workspace.competitorIntelligence,
+        intent: workspace.competitorIntelligence?.intentPrediction,
+        positioning: workspace.positioning,
+        campaign: workspace.campaignStrategy,
+        channel: workspace.channelStrategy,
+        executiveStory: workspace.campaignStrategy?.executiveStory,
+        actionPlan: workspace.actionPlan,
+        summary: workspace.scoreSummary,
+        productIdentity: workspace.productIdentity,
+        companyOverview: workspace.companyOverview,
+        executiveSummary: workspace.executiveSummary,
+        opportunities: workspace.opportunities,
+        risks: workspace.risks,
+        dataCompleteness: workspace.dataCompleteness
+      } : fullResults.growth || {};
       setResults(r);
       setStatus(gs);
     } else if (gs === 'NOT_RUN' || gs === 'FAILED') {
@@ -429,11 +449,11 @@ function ExecutiveSnapshot({ results }: { results: any }) {
   );
   
   const radarData = hasScores ? [
-    { subject: 'Product Fit', A: asNumber(sum.productFitScore || results.product?.confidenceScore), fullMark: 100 },
-    { subject: 'Market Size', A: asNumber(sum.marketSizeScore || results.market?.confidenceScore), fullMark: 100 },
-    { subject: 'Audience Clarity', A: asNumber(sum.audienceClarityScore || results.audience?.confidenceScore), fullMark: 100 },
-    { subject: 'Competitive Defense', A: asNumber(sum.competitiveDefensibilityScore || results.competitor?.confidenceScore), fullMark: 100 },
-    { subject: 'Campaign Readiness', A: asNumber(sum.campaignReadinessScore || results.campaign?.confidenceScore), fullMark: 100 },
+    { subject: 'Product Fit', A: sum.productFitScore != null ? asNumber(sum.productFitScore) : (results.product?.confidenceScore != null ? asNumber(results.product.confidenceScore) : null), fullMark: 100 },
+    { subject: 'Market Size', A: sum.marketSizeScore != null ? asNumber(sum.marketSizeScore) : (results.market?.confidenceScore != null ? asNumber(results.market.confidenceScore) : null), fullMark: 100 },
+    { subject: 'Audience Clarity', A: sum.audienceClarityScore != null ? asNumber(sum.audienceClarityScore) : (results.audience?.confidenceScore != null ? asNumber(results.audience.confidenceScore) : null), fullMark: 100 },
+    { subject: 'Competitive Defense', A: sum.competitiveDefensibilityScore != null ? asNumber(sum.competitiveDefensibilityScore) : (results.competitor?.confidenceScore != null ? asNumber(results.competitor.confidenceScore) : null), fullMark: 100 },
+    { subject: 'Campaign Readiness', A: sum.campaignReadinessScore != null ? asNumber(sum.campaignReadinessScore) : (results.campaign?.confidenceScore != null ? asNumber(results.campaign.confidenceScore) : null), fullMark: 100 },
   ].filter(d => d.A !== null) : [];
 
   // Phase 6C: Build executive summary data from existing results
@@ -564,10 +584,10 @@ function ExecutiveSnapshot({ results }: { results: any }) {
 
   // Phase 6C: Confidence data
   const confidenceData = useMemo(() => [
-    sum?.overallGrowthScore != null ? { section: 'Growth Analysis', confidence: asNumber(sum?.overallGrowthScore), evidenceStrength: null, sourceCount: results.evidence?.sources?.length || 0, dataFreshness: 'Today' } : null,
-    sum?.marketOpportunityScore != null ? { section: 'Market Intelligence', confidence: asNumber(sum?.marketOpportunityScore), evidenceStrength: null, sourceCount: results.market?.sources?.length || 0, dataFreshness: 'Today' } : null,
-    sum?.audienceClarityScore != null ? { section: 'Audience Intelligence', confidence: asNumber(sum?.audienceClarityScore), evidenceStrength: null, sourceCount: results.audience?.sources?.length || 0, dataFreshness: 'Today' } : null,
-    sum?.competitiveDefensibilityScore != null ? { section: 'Competitor Intelligence', confidence: asNumber(sum?.competitiveDefensibilityScore), evidenceStrength: null, sourceCount: results.competitor?.sources?.length || 0, dataFreshness: 'Today' } : null,
+    sum?.overallGrowthScore != null ? { section: 'Growth Analysis', confidence: asNumber(sum?.overallGrowthScore), evidenceStrength: null, sourceCount: results.evidence?.sources?.length ?? 0, dataFreshness: 'Today' } : null,
+    sum?.marketOpportunityScore != null ? { section: 'Market Intelligence', confidence: asNumber(sum?.marketOpportunityScore), evidenceStrength: null, sourceCount: results.market?.sources?.length ?? 0, dataFreshness: 'Today' } : null,
+    sum?.audienceClarityScore != null ? { section: 'Audience Intelligence', confidence: asNumber(sum?.audienceClarityScore), evidenceStrength: null, sourceCount: results.audience?.sources?.length ?? 0, dataFreshness: 'Today' } : null,
+    sum?.competitiveDefensibilityScore != null ? { section: 'Competitor Intelligence', confidence: asNumber(sum?.competitiveDefensibilityScore), evidenceStrength: null, sourceCount: results.competitor?.sources?.length ?? 0, dataFreshness: 'Today' } : null,
   ].filter(Boolean), [sum, results]);
 
   const filterOptions = [
@@ -1623,15 +1643,35 @@ function ActionCard({ item }: { item: any }) {
 function ReportView({ data, chatId }: { data: any, chatId?: string }) {
   const sections = ['Executive Snapshot', 'Executive Story', 'Product DNA', 'Market Intelligence', 'Audience Intelligence', 'Competitor Intelligence', 'Intent Prediction', 'Positioning Strategy', 'Campaign Strategy', 'Channel Strategy', 'Action Plan'];
   const hasSection = (key: string) => {
-    if (key === 'Executive Snapshot') return !!(data.summary || data.growthSummary);
+    if (key === 'Executive Snapshot') return !!(data.summary || data.growthSummary || data.scoreSummary);
     if (key === 'Executive Story') return !!(data.executiveStory && Object.keys(data.executiveStory).length > 0);
     if (key === 'Product DNA') return !!(data.product && Object.keys(data.product).length > 0);
-    if (key === 'Market Intelligence') return !!(data.market && Object.keys(data.market).length > 0);
-    if (key === 'Audience Intelligence') return !!(data.audience && Object.keys(data.audience).length > 0);
-    if (key === 'Competitor Intelligence') return !!(data.competitor && Object.keys(data.competitor).length > 0);
+    if (key === 'Market Intelligence') {
+      const market = data.market || {};
+      return !!(market.tam || market.sam || market.som || market.industry || 
+                (market.marketTrends && market.marketTrends.length > 0) ||
+                (market.growthOpportunities && market.growthOpportunities.length > 0));
+    }
+    if (key === 'Audience Intelligence') {
+      const audience = data.audience || {};
+      return !!((audience.personas && audience.personas.length > 0) ||
+                (audience.painPoints && audience.painPoints.length > 0) ||
+                (audience.targetUsers && audience.targetUsers.length > 0) ||
+                (audience.decisionMakers && audience.decisionMakers.length > 0));
+    }
+    if (key === 'Competitor Intelligence') {
+      const competitor = data.competitor || {};
+      return !!((competitor.competitors && competitor.competitors.length > 0) ||
+                (competitor.marketGaps && competitor.marketGaps.length > 0));
+    }
     if (key === 'Intent Prediction') return !!(data.intent && Object.keys(data.intent).length > 0);
     if (key === 'Positioning Strategy') return !!(data.positioning && Object.keys(data.positioning).length > 0);
-    if (key === 'Campaign Strategy') return !!(data.campaign && Object.keys(data.campaign).length > 0);
+    if (key === 'Campaign Strategy') {
+      const campaign = data.campaign || {};
+      return !!((campaign.objectives && campaign.objectives.length > 0) ||
+                (campaign.channels && campaign.channels.length > 0) ||
+                (campaign.marketingAngles && campaign.marketingAngles.length > 0));
+    }
     if (key === 'Channel Strategy') return !!(data.channel && Object.keys(data.channel).length > 0);
     if (key === 'Action Plan') return !!(data.actionPlan && Object.keys(data.actionPlan).length > 0);
     return false;
@@ -1641,9 +1681,9 @@ function ReportView({ data, chatId }: { data: any, chatId?: string }) {
   const totalPages = Math.max(1, Math.round(includedSections.length * 2.5));
 
   const reportSections = [
-    { name: 'Executive Snapshot', content: `Data Completeness: ${data.evidence?.sourceSummary?.completenessScore || 'N/A'}%\nGrowth Signals: ${data.evidence?.growthSignals?.length || 0}\nEvidence Sources: ${data.evidence?.sourceSummary?.sourcesCollected || 0}/${data.evidence?.sourceSummary?.totalSources || '?'}` },
+    { name: 'Executive Snapshot', content: `Data Completeness: ${data.evidence?.sourceSummary?.completenessScore ?? 'N/A'}%\nGrowth Signals: ${data.evidence?.growthSignals?.length ?? 0}\nEvidence Sources: ${data.evidence?.sourceSummary?.sourcesCollected ?? 0}/${data.evidence?.sourceSummary?.totalSources ?? '?'}` },
     { name: 'Executive Story', content: data.executiveStory?.executiveSummary?.title || 'Enterprise Business Intelligence Report' },
-    { name: 'Market Intelligence', content: `Market size data (TAM/SAM/SOM) not available without paid API sources. Growth Signals: ${data.evidence?.growthSignals?.length || data.market?.growthSignals?.length || 0}` },
+    { name: 'Market Intelligence', content: `Market size data (TAM/SAM/SOM) not available without paid API sources. Growth Signals: ${data.evidence?.growthSignals?.length ?? data.market?.growthSignals?.length ?? 0}` },
   ];
 
   return (

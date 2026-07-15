@@ -1329,9 +1329,9 @@ function renderAnalyticsTab(data: any) {
     <div style={{ display: 'grid', gap: '20px' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
         <Card><div style={{ padding: '16px', textAlign: 'center' }}><div style={{ fontSize: '32px', fontWeight: 'bold', color: '#10e18b' }}>{totalAssets}</div><div style={{ color: '#9aa7bd', fontSize: '12px' }}>Execution Assets</div></div></Card>
-        <Card><div style={{ padding: '16px', textAlign: 'center' }}><div style={{ fontSize: '32px', fontWeight: 'bold', color: '#53a7ff' }}>{analytics?.modulesGenerated || 0}</div><div style={{ color: '#9aa7bd', fontSize: '12px' }}>Modules Generated</div></div></Card>
+        <Card><div style={{ padding: '16px', textAlign: 'center' }}><div style={{ fontSize: '32px', fontWeight: 'bold', color: '#53a7ff' }}>{analytics?.modulesGenerated ?? 0}</div><div style={{ color: '#9aa7bd', fontSize: '12px' }}>Modules Generated</div></div></Card>
         <Card><div style={{ padding: '16px', textAlign: 'center' }}><div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f59e0b' }}>{existingAssets}</div><div style={{ color: '#9aa7bd', fontSize: '12px' }}>Automation Assets</div></div></Card>
-        <Card><div style={{ padding: '16px', textAlign: 'center' }}><div style={{ fontSize: '32px', fontWeight: 'bold', color: '#a855f7' }}>{plan?.readinessScore || 0}%</div><div style={{ color: '#9aa7bd', fontSize: '12px' }}>Readiness Score</div></div></Card>
+        <Card><div style={{ padding: '16px', textAlign: 'center' }}><div style={{ fontSize: '32px', fontWeight: 'bold', color: '#a855f7' }}>{plan?.readinessScore ?? 0}%</div><div style={{ color: '#9aa7bd', fontSize: '12px' }}>Readiness Score</div></div></Card>
       </div>
 
       <Card>

@@ -1718,10 +1718,10 @@ function ContentGaps({ data }: { data: any }) {
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
       <div className="score-grid">
-        <ScoreCard label="Total Content Gaps" value={contentGaps.length || 0} tone="pink" />
-        <ScoreCard label="Landing Page Ideas" value={landingPageIdeas.length || 0} tone="blue" />
-        <ScoreCard label="Comparison Pages" value={comparisonPageIdeas.length || 0} tone="green" />
-        <ScoreCard label="Resource Pages" value={resourcePageIdeas.length || 0} tone="yellow" />
+        <ScoreCard label="Total Content Gaps" value={contentGaps.length} tone="pink" />
+        <ScoreCard label="Landing Page Ideas" value={landingPageIdeas.length} tone="blue" />
+        <ScoreCard label="Comparison Pages" value={comparisonPageIdeas.length} tone="green" />
+        <ScoreCard label="Resource Pages" value={resourcePageIdeas.length} tone="yellow" />
       </div>
 
       {!hasData && (
@@ -1925,8 +1925,8 @@ function BlogIntelligence({ data }: { data: any }) {
     <div style={{ display: 'grid', gap: '20px' }}>
       <div className="score-grid">
         <ScoreCard label="Blog Ideas" value={totalIdeas} tone="blue" />
-        <ScoreCard label="Clusters" value={blogClusters.length || 0} tone="green" />
-        <ScoreCard label="High Priority" value={blogIdeas.filter((b: any) => b.priority === 'high' || b.priority === 'critical').length || 0} tone="pink" />
+        <ScoreCard label="Clusters" value={blogClusters.length} tone="green" />
+        <ScoreCard label="High Priority" value={blogIdeas.filter((b: any) => b.priority === 'high' || b.priority === 'critical').length} tone="pink" />
       </div>
 
       {!hasData && (

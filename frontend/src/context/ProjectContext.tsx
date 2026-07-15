@@ -60,7 +60,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     // Only clear results if switching to a different chat
     if (id !== selectedChatId) {
       console.log('[ProjectContext] Clearing results for chat switch');
-      setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null });
+      setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null, growthWorkspace: null });
     }
     
     setSelectedChatId(id);
@@ -72,7 +72,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
   async function loadFullResults(id = selectedChatId) {
     if (!id) {
-      return { growth: null, seo: null, executive: null, profile: null, chat: null };
+      return { growth: null, seo: null, executive: null, profile: null, chat: null, growthWorkspace: null };
     }
     
     if (abortRef.current) {
@@ -85,20 +85,20 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     
     try {
       await new Promise(resolve => setTimeout(resolve, 100));
-      if (!mountedRef.current || signal.aborted) return { growth: null, seo: null, executive: null, profile: null, chat: null };
+      if (!mountedRef.current || signal.aborted) return { growth: null, seo: null, executive: null, profile: null, chat: null, growthWorkspace: null };
       
       const res: any = await api.get(`/chats/${id}/full-results`, signal);
-      if (!mountedRef.current || signal.aborted) return { growth: null, seo: null, executive: null, profile: null, chat: null };
+      if (!mountedRef.current || signal.aborted) return { growth: null, seo: null, executive: null, profile: null, chat: null, growthWorkspace: null };
       
       const normalized = normalizeFullResults(res);
 
       setFullResults(normalized);
       return normalized;
     } catch (error: any) {
-      if (error.name === 'AbortError') return { growth: null, seo: null, executive: null, profile: null, chat: null };
+      if (error.name === 'AbortError') return { growth: null, seo: null, executive: null, profile: null, chat: null, growthWorkspace: null };
       console.error('Failed to load full results:', error.message || error);
       
-      const emptyResults = { growth: null, seo: null, executive: null, profile: null, chat: null };
+      const emptyResults = { growth: null, seo: null, executive: null, profile: null, chat: null, growthWorkspace: null };
       
       if (error.response?.status === 404) {
         if (mountedRef.current) setFullResults(emptyResults);
@@ -142,7 +142,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   function clearSelection() {
     setSelectedChatId('');
     localStorage.removeItem('selectedChatId');
-    setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null });
+    setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null, growthWorkspace: null });
   }
 
   async function deleteChat(id: string) {
