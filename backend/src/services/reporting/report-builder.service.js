@@ -34,12 +34,16 @@ export async function buildReportData(chatId, userId) {
     })
   ]);
 
+  if (!chat) {
+    throw new Error('Chat not found: ' + chatId);
+  }
+
   // Use canonical Growth payload for consistency with frontend
   const growthWorkspace = buildGrowthFrontendPayload({
     chat,
-    productIntelligence,
-    competitorIntelligence,
-    campaignIntelligence,
+    productIntelligence: productIntel,
+    competitorIntelligence: competitorIntel,
+    campaignIntelligence: campaignIntel,
     website: { url: chat?.websiteUrl }
   });
 
@@ -139,10 +143,10 @@ export async function buildReportData(chatId, userId) {
 
   return {
     company, market: marketData, audience: audienceData, competitor: competitorData,
-    intent, positioning: positioningData, pricing,
+    intent: null, positioning: positioningData, pricing,
     technology: technologyData, scores, actionPlan: actionPlanData,
     channelData, product, campaign, seo, executiveStory,
-    chat: { id: chatId, input }
+    chat: { id: chatId, input: chat?.inputJson || null }
   };
 }
 

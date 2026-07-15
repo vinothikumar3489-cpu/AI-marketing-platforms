@@ -159,6 +159,7 @@ export default function SEOIntelligencePage() {
   const [creatingChat, setCreatingChat] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentStage, setCurrentStage] = useState('Starting...');
+  const seoInFlightRef = useRef(false);
   const seoProgressStages = [
     'Starting...',
     'Scraping website',
@@ -315,7 +316,12 @@ export default function SEOIntelligencePage() {
   }, [fullResults, selectedChatId, isNewAnalysis]);
 
   async function run() {
+    if (seoInFlightRef.current) {
+      console.info('[SEO UI] run already in flight, ignoring duplicate call');
+      return;
+    }
     if (!url) { setError('Website URL is required'); return; }
+    seoInFlightRef.current = true;
     setLoading(true);
     setError('');
     
@@ -379,6 +385,7 @@ export default function SEOIntelligencePage() {
       setMode('error');
     } finally {
       setLoading(false);
+      seoInFlightRef.current = false;
     }
   }
 

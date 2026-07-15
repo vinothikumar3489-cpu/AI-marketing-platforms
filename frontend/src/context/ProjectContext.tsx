@@ -110,33 +110,53 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const createChatInFlightRef = useRef(false);
+  const createChatPromiseRef = useRef<Promise<string> | null>(null);
+
   async function createChat(title: string) {
-    const res: any = await api.post('/chats', { title: title || 'New Product Analysis' });
-    const chat = res.chat || res.data || res;
-    const id = chat.id;
-    
-    if (!id) {
-      throw new Error('Failed to create chat: No chat ID returned');
+    if (createChatInFlightRef.current && createChatPromiseRef.current) {
+      console.info('[ProjectContext createChat] request already in-flight, reusing existing promise', { title });
+      return createChatPromiseRef.current;
     }
-    
-    console.log('');
-    console.log('[ProjectContext createChat]');
-    console.log('chatId:', id);
-    console.log('previousSelectedChatId:', selectedChatId);
-    console.log('');
-    
-    // IMMEDIATELY set the selected chat ID - don't wait for refresh
-    setSelectedChatId(id);
-    localStorage.setItem('selectedChatId', id);
-    
-    // Clear results while new chat is being created
-    setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null });
-    
-    // Refresh chat list in background (non-blocking)
-    refreshChats().catch(err => console.warn('Chat refresh failed:', err));
-    
-    // Return ID immediately so analysis can start
-    return id;
+
+    createChatInFlightRef.current = true;
+    const promise = (async () => {
+      console.info('[ProjectContext createChat requested]', { title, selectedChatId, pending: createChatInFlightRef.current });
+      const res: any = await api.post('/chats', { title: title || 'New Product Analysis' });
+      const chat = res.chat || res.data || res;
+      const id = chat.id;
+      
+      if (!id) {
+        throw new Error('Failed to create chat: No chat ID returned');
+      }
+      
+      console.log('');
+      console.log('[ProjectContext createChat]');
+      console.log('chatId:', id);
+      console.log('previousSelectedChatId:', selectedChatId);
+      console.log('');
+      
+      // IMMEDIATELY set the selected chat ID - don't wait for refresh
+      setSelectedChatId(id);
+      localStorage.setItem('selectedChatId', id);
+      
+      // Clear results while new chat is being created
+      setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null });
+      
+      // Refresh chat list in background (non-blocking)
+      refreshChats().catch(err => console.warn('Chat refresh failed:', err));
+      
+      return id;
+    })();
+
+    createChatPromiseRef.current = promise;
+
+    try {
+      return await promise;
+    } finally {
+      createChatInFlightRef.current = false;
+      createChatPromiseRef.current = null;
+    }
   }
 
   function clearSelection() {

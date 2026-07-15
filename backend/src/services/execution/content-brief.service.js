@@ -234,6 +234,7 @@ export async function buildContentBrief(prisma, userId, chatId) {
     limitations: [],
     warnings: [],
     _briefId: `brief_${chatId}_${Date.now()}`,
+    _productIdentity: productIdentity,
     _chatId: chatId,
     _userId: userId,
     _builtAt: new Date().toISOString(),
