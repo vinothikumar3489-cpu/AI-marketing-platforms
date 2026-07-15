@@ -31,44 +31,53 @@ export function generateProductFallback(input, websiteData, businessIntelligence
     industry: bi?.companyIntelligence?.industry || bi?.marketIntelligence?.industry
   });
 
-  // Extract features from BI technology and product evidence
   const biFeatures = [];
   if (bi?.technologyIntelligence?.technologies?.length) {
     biFeatures.push(...bi.technologyIntelligence.technologies.map(t => ({
-      name: t.name || t,
-      category: t.category || 'Technology',
-      evidence: 'business_intelligence'
+      value: t.name || t,
+      confidence: null,
+      impact: null
     })));
   }
-  
-  // Extract pricing from BI
+
   const biPricing = bi?.pricingIntelligence || {};
   const pricingTiers = preferNonEmptyArray(biPricing.tiers);
-  
-  // Extract audience from BI
+
   const biPersonas = preferNonEmptyArray(bi?.audienceIntelligence?.personas);
   const biPainPoints = preferNonEmptyArray(bi?.audienceIntelligence?.painPoints);
-  
-  // Extract market from BI
+
   const biIndustry = preferDefinedValue(bi?.marketIntelligence?.industry, bi?.companyIntelligence?.industry);
   const biTrends = preferNonEmptyArray(bi?.marketIntelligence?.trends);
-  
+
+  const benefitItems = biPainPoints.map(p => ({
+    value: p,
+    confidence: null,
+    impact: null
+  }));
+
+  const jtbdItems = (bi?.audienceIntelligence?.buyingTriggers || []).map(t => ({
+    value: t,
+    confidence: null,
+    impact: null
+  }));
+
   return {
     identity: productIdentity,
     summary: description || bi?.companyIntelligence?.description || 'Insufficient Data - Analysis unavailable from verified sources',
+    productSummary: description || bi?.companyIntelligence?.description || 'Insufficient Data - Analysis unavailable from verified sources',
     category: preferDefinedValue(biIndustry, productIdentity.category, 'Unknown'),
-    usp: biFeatures.length > 0 ? `Built with ${biFeatures.slice(0, 3).map(f => f.name).join(', ')}` : null,
+    usp: biFeatures.length > 0 ? `Built with ${biFeatures.slice(0, 3).map(f => f.value).join(', ')}` : null,
+    uniqueSellingProposition: biFeatures.length > 0 ? `Built with ${biFeatures.slice(0, 3).map(f => f.value).join(', ')}` : null,
     features: preferNonEmptyArray(biFeatures),
-    benefits: preferNonEmptyArray(bi?.audienceIntelligence?.painPoints?.map(p => ({
-      name: p,
-      category: 'Benefit',
-      evidence: 'business_intelligence'
-    }))),
-    jobsToBeDone: preferNonEmptyArray(bi?.audienceIntelligence?.buyingTriggers?.map(t => ({
-      name: t,
-      category: 'Job to be Done',
-      evidence: 'business_intelligence'
-    }))),
+    keyFeatures: preferNonEmptyArray(biFeatures),
+    benefits: preferNonEmptyArray(benefitItems),
+    coreBenefits: preferNonEmptyArray(benefitItems),
+    jobsToBeDone: preferNonEmptyArray(jtbdItems),
+    jtbd: preferNonEmptyArray(jtbdItems),
+    painPointsSolved: biPainPoints.map(p => ({ value: p, confidence: null, impact: null })),
+    painPoints: biPainPoints.map(p => ({ value: p, confidence: null, impact: null })),
+    targetUsers: (bi?.audienceIntelligence?.targetUsers || []).map(u => ({ value: u, confidence: null, impact: null })),
+    differentiators: [],
     pricing: {
       tiers: pricingTiers,
       hasFreePlan: biPricing.hasFreePlan ?? null,
@@ -78,16 +87,6 @@ export function generateProductFallback(input, websiteData, businessIntelligence
       source: 'business_intelligence'
     },
     personas: biPersonas,
-    painPoints: biPainPoints,
-    targetUsers: preferNonEmptyArray(bi?.audienceIntelligence?.targetUsers),
-    market: {
-      industry: biIndustry,
-      trends: biTrends,
-      opportunities: preferNonEmptyArray(bi?.marketIntelligence?.opportunities),
-      tam: preferDefinedValue(bi?.marketIntelligence?.tam),
-      sam: preferDefinedValue(bi?.marketIntelligence?.sam),
-      som: preferDefinedValue(bi?.marketIntelligence?.som)
-    },
     sources: preferNonEmptyArray(bi?.sources),
     limitations: biFeatures.length === 0 ? ['Product features not verified from Business Intelligence'] : [],
     confidenceScore: bi?.sources?.length > 0 ? Math.min(85, bi.sources.length * 15) : null,
@@ -106,26 +105,47 @@ export function generateProductFallback(input, websiteData, businessIntelligence
  */
 export function generateMarketFallback(input, productData, businessIntelligence = null) {
   const bi = businessIntelligence;
-  
+
+  const trends = (bi?.marketIntelligence?.trends || []).map(t => ({
+    value: typeof t === 'string' ? t : t.value || t.trend || '',
+    confidence: null,
+    impact: null
+  }));
+
+  const opportunities = (bi?.marketIntelligence?.opportunities || []).map(o => ({
+    value: typeof o === 'string' ? o : o.value || o.opportunity || '',
+    confidence: null,
+    impact: null
+  }));
+
+  const risks = (bi?.marketIntelligence?.risks || []).map(r => ({
+    value: typeof r === 'string' ? r : r.value || r.risk || '',
+    confidence: null,
+    impact: null
+  }));
+
   return {
-    tam: preferDefinedValue(bi?.marketIntelligence?.tam),
-    sam: preferDefinedValue(bi?.marketIntelligence?.sam),
-    som: preferDefinedValue(bi?.marketIntelligence?.som),
-    cagr: preferDefinedValue(bi?.marketIntelligence?.cagr),
-    marketTrends: preferNonEmptyArray(bi?.marketIntelligence?.trends),
     demandScore: bi?.marketIntelligence?.demandScore ?? null,
-    growthOpportunities: preferNonEmptyArray(bi?.marketIntelligence?.opportunities),
-    marketRisks: preferNonEmptyArray(bi?.marketIntelligence?.risks),
+    confidence: null,
+    confidenceScore: null,
+    marketTrends: trends,
+    trends: trends,
+    growthOpportunities: opportunities,
+    opportunities: opportunities,
+    marketRisks: risks,
+    risks: risks,
+    growthSignals: [],
     entryStrategy: bi?.marketIntelligence?.entryStrategy || 'Insufficient Data - Market discovery unavailable from verified sources',
     competitiveLandscape: bi?.marketIntelligence?.competitiveLandscape || 'Insufficient Data - Competitive landscape unavailable from verified sources',
     industry: preferDefinedValue(bi?.marketIntelligence?.industry, bi?.companyIntelligence?.industry),
     growthRate: preferDefinedValue(bi?.marketIntelligence?.growthRate),
+    demand: bi?.marketIntelligence?.demandScore ?? null,
     sources: preferNonEmptyArray(bi?.sources),
-    confidenceScore: bi?.marketIntelligence?.tam ? 70 : null,
-    provider: bi?.marketIntelligence?.tam ? 'business_intelligence_fallback' : 'fallback_unavailable',
+    confidenceScore: (trends.length > 0 || opportunities.length > 0) ? 70 : null,
+    provider: (trends.length > 0 || opportunities.length > 0) ? 'business_intelligence_fallback' : 'fallback_unavailable',
     evidence: {
       sources: bi?.sources || [],
-      confidence: bi?.marketIntelligence?.tam ? 'Medium - Business Intelligence verified' : 'Low - No verified sources',
+      confidence: (trends.length > 0 || opportunities.length > 0) ? 'Medium - Business Intelligence verified' : 'Low - No verified sources',
       inferenceStatus: 'deterministic'
     }
   };
@@ -137,24 +157,52 @@ export function generateMarketFallback(input, productData, businessIntelligence 
  */
 export function generateAudienceFallback(input, productData, businessIntelligence = null) {
   const bi = businessIntelligence;
-  
-  const biPersonas = preferNonEmptyArray(bi?.audienceIntelligence?.personas);
-  const biDecisionMakers = preferNonEmptyArray(bi?.audienceIntelligence?.decisionMakers);
-  const biBuyingCommittee = preferNonEmptyArray(bi?.audienceIntelligence?.buyingCommittee);
-  const biPainPoints = preferNonEmptyArray(bi?.audienceIntelligence?.painPoints);
-  const biBuyingTriggers = preferNonEmptyArray(bi?.audienceIntelligence?.buyingTriggers);
-  const biChannels = preferNonEmptyArray(bi?.audienceIntelligence?.channels);
-  const biTargetUsers = preferNonEmptyArray(bi?.audienceIntelligence?.targetUsers);
-  
+
+  const biPersonas = (bi?.audienceIntelligence?.personas || []).map(p => ({
+    name: typeof p === 'string' ? p : p.name || p.persona || '',
+    demographics: typeof p === 'object' ? (p.demographics || p.description || '') : '',
+    intentScore: null,
+    goals: typeof p === 'object' ? (p.goals || []) : [],
+    painPoints: typeof p === 'object' ? (p.painPoints || []) : [],
+    buyingMotivations: typeof p === 'object' ? (p.motivations || []) : []
+  })).filter(p => p.name);
+
+  const biDecisionMakers = (bi?.audienceIntelligence?.decisionMakers || []).map(d => ({
+    value: typeof d === 'string' ? d : d.title || d.name || d,
+    confidence: null,
+    impact: null
+  }));
+
+  const biChannels = (bi?.audienceIntelligence?.channels || []).map(c => ({
+    value: typeof c === 'string' ? c : c.channel || c.name || c,
+    confidence: null,
+    impact: null
+  }));
+
+  const biBuyingTriggers = (bi?.audienceIntelligence?.buyingTriggers || []).map(t => ({
+    value: typeof t === 'string' ? t : t.value || t.trigger || t,
+    confidence: null,
+    impact: null
+  }));
+
+  const biPainPoints = (bi?.audienceIntelligence?.painPoints || []).map(p => ({
+    value: typeof p === 'string' ? p : p.value || p.pain || p,
+    confidence: null,
+    impact: null
+  }));
+
   return {
     personas: biPersonas,
     buyerPersonas: biPersonas,
     decisionMakers: biDecisionMakers,
-    buyingCommittee: biBuyingCommittee,
+    buyingCommittee: biDecisionMakers,
     painPoints: biPainPoints,
     buyingTriggers: biBuyingTriggers,
     preferredChannels: biChannels,
-    targetUsers: biTargetUsers,
+    bestChannels: biChannels,
+    commonObjections: [],
+    objections: [],
+    targetUsers: (bi?.audienceIntelligence?.targetUsers || []).map(u => ({ value: u, confidence: null, impact: null })),
     messagingStyle: biPersonas.length > 0 ? 'Based on verified Business Intelligence personas' : 'Insufficient Data - Audience intelligence unavailable from verified sources',
     sources: preferNonEmptyArray(bi?.sources),
     confidenceScore: biPersonas.length > 0 ? Math.min(85, biPersonas.length * 20) : null,
@@ -173,10 +221,20 @@ export function generateAudienceFallback(input, productData, businessIntelligenc
  */
 export function generateCompetitorFallback(input, productData, orchestratorCompetitors = [], businessIntelligence = null) {
   const bi = businessIntelligence;
-  
-  // Combine BI competitors with orchestrator competitors
-  const biCompetitors = preferNonEmptyArray(bi?.competitorIntelligence?.direct);
-  const orchestratorCompetitorsFormatted = orchestratorCompetitors.length > 0 
+
+  const biCompetitors = (bi?.competitorIntelligence?.direct || []).map(c => ({
+    name: c.name || c,
+    domain: c.domain || '',
+    opportunityScore: c.opportunityScore || null,
+    trafficEstimate: 'Unknown',
+    seoAuthority: null,
+    strengths: c.strengths || [],
+    weaknesses: c.weaknesses || [],
+    evidence: 'business_intelligence',
+    source: 'business_intelligence'
+  }));
+
+  const orchestratorCompetitorsFormatted = orchestratorCompetitors.length > 0
     ? orchestratorCompetitors.slice(0, 5).map(c => ({
         name: c.name,
         domain: c.domain,
@@ -189,28 +247,55 @@ export function generateCompetitorFallback(input, productData, orchestratorCompe
         source: c.source || 'orchestrator'
       }))
     : [];
-  
+
   const allCompetitors = preferNonEmptyArray(biCompetitors, orchestratorCompetitorsFormatted);
-  
+
+  const gaps = (bi?.competitorIntelligence?.marketGaps || []).map(g => ({
+    value: typeof g === 'string' ? g : g.value || g.gap || g.opportunity || '',
+    confidence: null,
+    impact: null
+  }));
+
+  const diffOpps = (bi?.competitorIntelligence?.opportunities || []).map(o => ({
+    value: typeof o === 'string' ? o : o.value || o.opportunity || '',
+    confidence: null,
+    impact: null
+  }));
+
   return {
     competitors: allCompetitors,
-    marketGaps: preferNonEmptyArray(bi?.competitorIntelligence?.marketGaps),
     directCompetitors: allCompetitors.map(c => ({
       name: c.name,
       domain: c.domain,
       opportunityScore: c.opportunityScore || null,
       strengths: c.strengths || [],
       weaknesses: c.weaknesses || [],
-      evidence: c.evidence,
-      source: c.source
+      positioning: c.positioning || c.evidence || '',
     })),
-    indirectCompetitors: preferNonEmptyArray(bi?.competitorIntelligence?.indirect),
-    competitorMatrix: allCompetitors.length > 0 
+    indirectCompetitors: (bi?.competitorIntelligence?.indirect || []).map(c => ({
+      name: c.name || c,
+      domain: c.domain || '',
+    })),
+    marketGaps: gaps,
+    differentiationOpportunities: diffOpps,
+    competitorWeaknesses: (bi?.competitorIntelligence?.weaknesses || []).map(w => ({
+      value: typeof w === 'string' ? w : w.value || w.weakness || '',
+      confidence: null,
+      impact: null
+    })),
+    strengths: (bi?.competitorIntelligence?.strengths || []).map(s => ({
+      value: typeof s === 'string' ? s : s.value || s.strength || '',
+      confidence: null,
+      impact: null
+    })),
+    weaknesses: (bi?.competitorIntelligence?.weaknesses || []).map(w => ({
+      value: typeof w === 'string' ? w : w.value || w.weakness || '',
+      confidence: null,
+      impact: null
+    })),
+    competitorMatrix: allCompetitors.length > 0
       ? `${allCompetitors.length} competitors identified from verified sources`
       : 'Insufficient Data - Competitor analysis unavailable from verified sources',
-    differentiationOpportunities: preferNonEmptyArray(bi?.competitorIntelligence?.opportunities),
-    strengths: preferNonEmptyArray(bi?.competitorIntelligence?.strengths),
-    weaknesses: preferNonEmptyArray(bi?.competitorIntelligence?.weaknesses),
     sources: preferNonEmptyArray(bi?.sources),
     confidenceScore: allCompetitors.length > 0 ? Math.min(85, allCompetitors.length * 15) : null,
     provider: allCompetitors.length > 0 ? 'business_intelligence_fallback' : 'fallback_unavailable',
@@ -228,20 +313,33 @@ export function generateCompetitorFallback(input, productData, orchestratorCompe
  */
 export function generateIntentFallback(input, audienceData, businessIntelligence = null) {
   const bi = businessIntelligence;
-  const biChannels = preferNonEmptyArray(bi?.audienceIntelligence?.channels);
-  
+
+  const signals = (bi?.audienceIntelligence?.buyingTriggers || []).map(t => ({
+    value: typeof t === 'string' ? t : t.value || t.trigger || t,
+    confidence: null,
+    impact: null
+  }));
+
   return {
-    highIntentSegments: preferNonEmptyArray(bi?.audienceIntelligence?.highIntentSegments),
-    mediumIntentSegments: preferNonEmptyArray(bi?.audienceIntelligence?.mediumIntentSegments),
-    lowIntentSegments: preferNonEmptyArray(bi?.audienceIntelligence?.lowIntentSegments),
-    buyingSignals: preferNonEmptyArray(bi?.audienceIntelligence?.buyingTriggers),
-    hotSegments: preferNonEmptyArray(bi?.audienceIntelligence?.hotSegments),
-    channels: biChannels,
-    confidenceScore: biChannels.length > 0 ? 65 : null,
-    provider: biChannels.length > 0 ? 'business_intelligence_fallback' : 'fallback_unavailable',
+    hotSegments: signals.map(s => ({ value: s.value, confidence: null, impact: null })),
+    highIntentSegments: signals.map(s => ({ value: s.value, confidence: null, impact: null })),
+    warmSegments: [],
+    mediumIntentSegments: [],
+    coldSegments: [],
+    lowIntentSegments: [],
+    buyingSignals: signals,
+    triggerEvents: [],
+    leadScoringRules: [],
+    channels: (bi?.audienceIntelligence?.channels || []).map(c => ({
+      value: typeof c === 'string' ? c : c.channel || c.name || c,
+      confidence: null,
+      impact: null
+    })),
+    confidenceScore: signals.length > 0 ? 65 : null,
+    provider: signals.length > 0 ? 'business_intelligence_fallback' : 'fallback_unavailable',
     evidence: {
       sources: bi?.sources || [],
-      confidence: biChannels.length > 0 ? 'Medium - Business Intelligence verified' : 'Low - No verified sources',
+      confidence: signals.length > 0 ? 'Medium - Business Intelligence verified' : 'Low - No verified sources',
       inferenceStatus: 'deterministic'
     }
   };
@@ -255,17 +353,34 @@ export function generatePositioningFallback(input, productData, competitorData, 
   const bi = businessIntelligence;
   const productName = input?.productName || input?.companyName || 'the product';
   const industry = preferDefinedValue(bi?.marketIntelligence?.industry, bi?.companyIntelligence?.industry);
-  
+
+  const pillars = (bi?.audienceIntelligence?.painPoints || []).slice(0, 3).map(p => ({
+    value: typeof p === 'string' ? p : p.value || p.pain || p,
+    confidence: null,
+    impact: null
+  }));
+
+  const weaknessesToAttack = (bi?.competitorIntelligence?.weaknesses || []).map(w => ({
+    value: typeof w === 'string' ? w : w.value || w.weakness || w,
+    confidence: null,
+    impact: null
+  }));
+
   return {
-    positioningStatement: industry 
+    positioningStatement: industry
+      ? `Leading ${industry} solution for ${productName}`
+      : 'Insufficient Data - Positioning unavailable from verified sources',
+    statement: industry
       ? `Leading ${industry} solution for ${productName}`
       : 'Insufficient Data - Positioning unavailable from verified sources',
     valueProposition: bi?.companyIntelligence?.description || 'Insufficient Data - Value proposition unavailable from verified sources',
-    differentiationAngle: bi?.competitorIntelligence?.opportunities?.[0] || 'Insufficient Data - Differentiation unavailable from verified sources',
-    messagingPillars: preferNonEmptyArray(bi?.audienceIntelligence?.painPoints?.slice(0, 3)),
+    differentiationAngle: (bi?.competitorIntelligence?.opportunities || [])[0] || 'Insufficient Data - Differentiation unavailable from verified sources',
+    messagingPillars: pillars,
+    pillars: pillars,
     brandPromise: bi?.companyIntelligence?.mission || 'Insufficient Data - Brand promise unavailable from verified sources',
-    competitorWeaknessToAttack: preferNonEmptyArray(bi?.competitorIntelligence?.weaknesses),
-    targetPerception: bi?.audienceIntelligence?.personas?.[0]?.name 
+    competitorWeaknessesToAttack: weaknessesToAttack,
+    competitorWeaknessToAttack: weaknessesToAttack.map(w => w.value),
+    targetPerception: (bi?.audienceIntelligence?.personas || [])[0]?.name
       ? `Perceived as solution for ${bi.audienceIntelligence.personas[0].name}`
       : 'Insufficient Data - Target perception unavailable from verified sources',
     sources: preferNonEmptyArray(bi?.sources),
@@ -286,72 +401,83 @@ export function generatePositioningFallback(input, productData, competitorData, 
 export function generateCampaignFallback(input, websiteData, allResults, businessIntelligence = null) {
   const bi = businessIntelligence;
   const productName = input?.productName || input?.companyName || 'the product';
-  const biPersonas = preferNonEmptyArray(bi?.audienceIntelligence?.personas);
-  const biChannels = preferNonEmptyArray(bi?.audienceIntelligence?.channels);
-  const biPainPoints = preferNonEmptyArray(bi?.audienceIntelligence?.painPoints);
-  
-  // Only generate action plan if we have real findings
+
+  const biPersonas = (bi?.audienceIntelligence?.personas || []).map(p => ({
+    name: typeof p === 'string' ? p : p.name || p.persona || '',
+  })).filter(p => p.name);
+
+  const biChannels = (bi?.audienceIntelligence?.channels || []).map(c => ({
+    value: typeof c === 'string' ? c : c.channel || c.name || c,
+    confidence: null,
+    impact: null
+  }));
+
+  const biPainPoints = (bi?.audienceIntelligence?.painPoints || []).map(p => ({
+    value: typeof p === 'string' ? p : p.value || p.pain || p,
+    confidence: null,
+    impact: null
+  }));
+
+  const biAngles = biPainPoints.slice(0, 3).map(p => ({
+    value: `Solve ${p.value}`,
+    confidence: null,
+    impact: null
+  }));
+
+  const biHooks = biPersonas.slice(0, 3).map(p => ({
+    value: `For ${p.name}`,
+    confidence: null,
+    impact: null
+  }));
+
   let actionPlan = null;
   if (biPainPoints.length > 0 && biChannels.length > 0) {
     actionPlan = {
-      immediate: biPainPoints.slice(0, 2).map(p => ({
-        action: `Address ${p}`,
-        reason: 'Verified pain point from Business Intelligence',
+      sevenDay: biPainPoints.slice(0, 2).map(p => ({
+        title: `Address ${p.value}`,
+        problem: p.value,
         evidence: 'business_intelligence',
-        priority: 'high'
+        priority: 'high',
+        difficulty: 'Medium',
+        estimatedTimeline: '1-2 weeks',
+        owner: 'Marketing'
       })),
-      shortTerm: biChannels.slice(0, 2).map(c => ({
-        action: `Launch ${c} campaign`,
-        reason: 'Verified channel from Business Intelligence',
+      thirtyDay: biChannels.slice(0, 2).map(c => ({
+        title: `Launch ${c.value} campaign`,
         evidence: 'business_intelligence',
-        priority: 'medium'
-      }))
+        priority: 'medium',
+        difficulty: 'Medium',
+        estimatedTimeline: '1 month',
+        owner: 'Marketing'
+      })),
+      sixtyDay: [],
+      ninetyDay: []
     };
   }
-  
+
   return {
-    status: actionPlan ? 'PARTIALLY_GENERATED' : 'INSUFFICIENT_DATA',
-    campaignObjective: biPainPoints.length > 0 
-      ? `Address ${biPainPoints[0]} for ${productName}`
-      : 'Insufficient Data - Campaign objective unavailable from verified sources',
-    campaignAngles: biPainPoints.slice(0, 3).map(p => ({
-      angle: `Solve ${p}`,
-      reason: 'Based on verified pain point)',
-      evidence: 'business_intelligence'
-    })),
-    hooks: biPersonas.slice(0, 3).map(p => ({
-      hook: `For ${p.name}`,
-      reason: 'Based on verified persona',
-      evidence: 'business_intelligence'
-    })),
-    campaignIdeas: [],
-    adHooks: [],
-    actionPlan: actionPlan,
+    creativeAngles: biAngles,
+    angles: biAngles,
+    copyHooks: biHooks,
+    hooks: biHooks,
     ctaSuggestions: [],
+    ctas: [],
+    emailSequence: [],
+    socialPostIdeas: [],
+    socialPosts: [],
+    videoIdeas: [],
+    campaignIdeas: biAngles,
+    nextActions: actionPlan ? ['Campaign partially generated from Business Intelligence evidence'] : ['Run complete Growth Analysis'],
+    actionPlan: actionPlan || {
+      sevenDay: [],
+      thirtyDay: [],
+      sixtyDay: [],
+      ninetyDay: []
+    },
     channels: biChannels,
-    objectives: biPainPoints.slice(0, 3).map(p => ({
-      objective: `Address ${p}`,
-      reason: 'Verified pain point',
-      evidence: 'business_intelligence'
-    })),
     sources: preferNonEmptyArray(bi?.sources),
     confidenceScore: (biPainPoints.length > 0 && biChannels.length > 0) ? 60 : null,
     provider: (biPainPoints.length > 0 && biChannels.length > 0) ? 'business_intelligence_fallback' : 'fallback_unavailable',
-    availableRecommendations: actionPlan ? [] : [
-      `Run complete Growth Analysis for ${productName} to generate campaign angles`,
-      'Configure website URL for audience and competitor evidence',
-      'Complete Product Analysis for feature-based messaging'
-    ],
-    missingEvidence: actionPlan ? [] : [
-      'Product features and USP analysis',
-      'Audience persona definitions',
-      'Competitor positioning data',
-      'Market trend signals'
-    ],
-    generationWarnings: actionPlan ? [] : [
-      'AI providers unavailable or returned empty results',
-      'Fallback used - campaign not generated from evidence'
-    ],
     evidence: {
       sources: bi?.sources || [],
       confidence: (biPainPoints.length > 0 && biChannels.length > 0) ? 'Medium - Business Intelligence verified' : 'Low - No verified sources',
@@ -366,16 +492,31 @@ export function generateCampaignFallback(input, websiteData, allResults, busines
  */
 export function generateChannelFallback(input, audienceData, campaignData, businessIntelligence = null) {
   const bi = businessIntelligence;
-  const biChannels = preferNonEmptyArray(bi?.audienceIntelligence?.channels);
-  
+
+  const biChannels = (bi?.audienceIntelligence?.channels || []).map(c => ({
+    channel: typeof c === 'string' ? c : c.channel || c.name || c,
+    name: typeof c === 'string' ? c : c.channel || c.name || c,
+    reasoning: 'Verified from Business Intelligence',
+    reason: 'Verified from Business Intelligence',
+    evidence: 'business_intelligence',
+    priority: 'medium',
+    fit: 'Good fit based on audience evidence'
+  }));
+
   return {
-    primaryChannel: biChannels[0]?.channel || biChannels[0] || 'Unknown',
-    recommendedChannels: biChannels.map(c => ({
-      channel: c.channel || c,
-      reason: 'Verified from Business Intelligence',
-      evidence: 'business_intelligence',
-      priority: 'medium'
+    primaryChannel: biChannels[0]?.channel || 'Unknown',
+    recommendedChannels: biChannels,
+    channels: biChannels.map(c => ({
+      channel: c.channel,
+      name: c.name,
+      reasoning: c.reasoning
     })),
+    budgetSplit: [],
+    channelFitScores: [],
+    postingFrequency: [],
+    contentTypes: [],
+    channelStrategy: biChannels.length > 0 ? 'Multi-channel approach based on verified audience channels' : 'Insufficient Data - Channel recommendation unavailable from verified sources',
+    budgetRecommendation: biChannels.length > 0 ? 'Allocate budget proportionally to channel priority' : 'Unknown',
     sources: preferNonEmptyArray(bi?.sources),
     confidenceScore: biChannels.length > 0 ? Math.min(85, biChannels.length * 15) : null,
     provider: biChannels.length > 0 ? 'business_intelligence_fallback' : 'fallback_unavailable',
