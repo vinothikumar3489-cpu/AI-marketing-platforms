@@ -1,7 +1,11 @@
 /**
- * Product Identity Resolver — single source of truth for product identity.
- * Priority: 1) ProductIntelligence, 2) Website evidence, 3) Product summary, 4) EvidenceSnapshot, 5) User input, 6) Chat title.
+ * LEGACY PRODUCT IDENTITY RESOLVER - DEPRECATED
+ * 
+ * This file is deprecated. Use canonical-product-identity.resolver.js instead.
+ * This file is kept for backward compatibility during migration.
  */
+
+import { resolveProductIdentity as canonicalResolve } from '../resolvers/canonical-product-identity.resolver.js';
 
 function extractDomain(url) {
   if (!url || typeof url !== 'string') return null;
@@ -15,6 +19,8 @@ function cleanTitle(title) {
 }
 
 export async function resolveProductIdentity({ prisma, userId, chatId, chatTitle }) {
+  console.warn('[DEPRECATED] Using legacy execution/product-identity.resolver.js. Migrate to canonical-product-identity.resolver.js');
+  
   const identity = {
     projectTitle: cleanTitle(chatTitle) || 'Product Analysis',
     productName: null,
@@ -27,68 +33,42 @@ export async function resolveProductIdentity({ prisma, userId, chatId, chatTitle
   };
 
   try {
-    // Priority 1: ProductIntelligence product identity
-    const productIntel = await prisma.productIntelligence.findFirst({
-      where: { chatId },
-      orderBy: { updatedAt: 'desc' },
+    // Fetch data needed for canonical resolver
+    const [productIntel, snapshot] = await Promise.all([
+      prisma.productIntelligence.findFirst({
+        where: { chatId },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      prisma.evidenceSnapshot.findFirst({
+        where: { chatId },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    // Use canonical resolver
+    const canonical = canonicalResolve({
+      websiteUrl: productIntel?.websiteUrl,
+      productIntelligence,
+      evidenceSnapshot: snapshot,
+      chat: { productName: productIntel?.productName, websiteUrl: productIntel?.websiteUrl }
     });
 
-    if (productIntel) {
-      const productName = productIntel.productName || productIntel.brandName || null;
-      const analysis = productIntel.productAnalysis || {};
-
-      identity.productName = productName || analysis.productName || analysis.brandName || null;
-      identity.brandName = productIntel.brandName || analysis.brandName || identity.productName || null;
-      identity.companyName = productIntel.companyName || analysis.companyName || null;
-      identity.websiteUrl = productIntel.websiteUrl || analysis.websiteUrl || analysis.url || null;
-      identity.domain = productIntel.domain || extractDomain(identity.websiteUrl) || null;
-      identity.category = analysis.category || analysis.industry || null;
-      identity.source = 'product_intelligence';
-
-      if (identity.productName) return identity;
+    if (canonical.resolved) {
+      Object.assign(identity, {
+        productName: canonical.productName,
+        brandName: canonical.brandName || canonical.productName,
+        companyName: canonical.companyName || canonical.brandName,
+        websiteUrl: canonical.websiteUrl,
+        domain: canonical.domain,
+        category: canonical.category,
+        source: canonical.source,
+      });
+      return identity;
     }
 
-    // Priority 2: EvidenceSnapshot website data
-    const snapshot = await prisma.evidenceSnapshot.findFirst({
-      where: { chatId },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (snapshot?.data) {
-      const data = typeof snapshot.data === 'string' ? JSON.parse(snapshot.data) : snapshot.data;
-      const website = data.website || data.companyWebsite || {};
-      const product = data.product || {};
-      const company = data.company || {};
-
-      identity.productName = product.name || website.productName || null;
-      identity.brandName = product.brandName || website.brandName || identity.productName || null;
-      identity.companyName = company.name || data.companyName || null;
-      identity.websiteUrl = website.url || company.website || null;
-      identity.domain = website.domain || extractDomain(identity.websiteUrl) || null;
-      identity.category = product.category || company.industry || null;
-      identity.source = 'evidence_snapshot';
-
-      if (identity.productName) return identity;
-    }
-
-    // Priority 3: Product summary detected brand
-    if (productIntel?.productSummary) {
-      const summary = typeof productIntel.productSummary === 'string'
-        ? productIntel.productSummary
-        : productIntel.productSummary.text || productIntel.productSummary.description || '';
-      const brandMatch = summary.match(/([A-Z][a-z]+(?:[A-Z][a-z]+)*)/g);
-      if (brandMatch) {
-        identity.productName = brandMatch[0];
-        identity.brandName = brandMatch[0];
-        identity.source = 'product_summary_brand_detection';
-        return identity;
-      }
-    }
-
-    // Priority 4: Chat title as project title only
+    // Fallback to chat title only
     identity.projectTitle = chatTitle || 'Product Analysis';
     identity.source = 'chat_title_only';
-
     return identity;
   } catch (error) {
     console.error('[ProductIdentity] Resolve error:', error.message);
@@ -119,16 +99,17 @@ export function resolveProductFeatures(productIntel) {
     for (const item of path) {
       if (!item) continue;
       const name = typeof item === 'string' ? item : (item.name || item.feature || item.title || '');
-      if (!name || seen.has(name.toLowerCase())) continue;
-      seen.add(name.toLowerCase());
-
-      features.push({
-        name,
-        description: typeof item === 'object' ? (item.description || item.details || '') : '',
-        benefit: typeof item === 'object' ? (item.benefit || item.value || '') : '',
-        source: productIntel?.id ? `product_intelligence:${productIntel.id}` : 'product_intelligence',
-        inferenceStatus: 'EVIDENCE_BACKED',
-      });
+      if (!name) continue;
+      if (!seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        features.push({
+          name,
+          description: typeof item === 'object' ? (item.description || item.details || '') : '',
+          benefit: typeof item === 'object' ? (item.benefit || item.value || '') : '',
+          source: productIntel?.id ? `product_intelligence:${productIntel.id}` : 'product_intelligence',
+          inferenceStatus: 'EVIDENCE_BACKED',
+        });
+      }
     }
   }
 
