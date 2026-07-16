@@ -1026,6 +1026,54 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     console.info('[Growth Stage]', { stage: 'TRANSACTION_COMMITTED', status: 'completed', chatId: validChatId });
 
+    // Preserve evidence snapshot after successful analysis
+    try {
+      if (input.websiteUrl && (researchData || websiteData)) {
+        console.log('💾 [Growth Workspace] Preserving evidence snapshot after analysis...');
+        
+        // Build evidence from research data if available
+        const preservedEvidence = {
+          website: researchData?.websiteContent || websiteData || null,
+          openGraph: researchData?.websiteContent?.openGraph || websiteData?.openGraph || null,
+          schemas: researchData?.websiteContent?.schemas || websiteData?.schemas || null,
+          technology: researchData?.technologyStack || [],
+          robots: researchData?.technical?.robots || null,
+          sitemap: researchData?.technical?.sitemap || null,
+          pageSpeed: researchData?.technical?.pageSpeed || null,
+          github: researchData?.github || null,
+        };
+
+        const sourcesCollected = [];
+        if (preservedEvidence.website) sourcesCollected.push('website');
+        if (preservedEvidence.technology && preservedEvidence.technology.length > 0) sourcesCollected.push('technology');
+        if (preservedEvidence.robots) sourcesCollected.push('robots');
+        if (preservedEvidence.sitemap) sourcesCollected.push('sitemap');
+        if (preservedEvidence.pageSpeed) sourcesCollected.push('pageSpeed');
+        if (preservedEvidence.github && preservedEvidence.github.repos) sourcesCollected.push('github');
+
+        const savedSnapshot = await saveEvidenceSnapshot({
+          chatId: validChatId,
+          userId,
+          analysisId: null,
+          websiteUrl: input.websiteUrl,
+          companyName: input.companyName || '',
+          evidence: preservedEvidence,
+          sourcesCollected
+        });
+
+        if (savedSnapshot) {
+          console.log('✅ [Growth Workspace] Evidence snapshot preserved:', {
+            snapshotId: savedSnapshot.id,
+            sourcesCollected: sourcesCollected.length,
+            sources: sourcesCollected
+          });
+        }
+      }
+    } catch (evidenceError) {
+      console.error('⚠️ [Growth Workspace] Evidence preservation failed (non-fatal):', evidenceError.message);
+      warnings.push({ code: 'EVIDENCE_PRESERVATION_FAILED', message: 'Analysis completed successfully, but evidence snapshot could not be preserved.' });
+    }
+
     // Save optional derived data (executive story, action plan) separately
     try {
       await prisma.campaignIntelligence.update({
