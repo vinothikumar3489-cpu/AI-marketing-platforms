@@ -9,6 +9,9 @@ import {
   generateGrowthMatrixChart, generateScoreRadarChart
 } from './chart-generator.service.js';
 import { prisma } from '../../config/prisma.js';
+import { resolveCanonicalProductIdentity } from '../canonical/product-identity.resolver.js';
+import { buildCanonicalGrowthPayload } from '../canonical/growth-payload.builder.js';
+import { buildCanonicalSeoPayload } from '../canonical/seo-payload.builder.js';
 
 export async function buildReportData(chatId, userId) {
   console.log('[Report] Building report data for chat:', chatId);
@@ -20,46 +23,63 @@ export async function buildReportData(chatId, userId) {
     prisma.seoIntelligence.findUnique({
       where: { chatId },
       include: {
-        rawCrawlData: true,
-        technicalAuditDetail: true,
-        keywordIntelligence: true,
-        competitorSeoRecord: true,
-        contentGapRecord: true,
-        geoIntelligence: true,
-        blogIntelligenceRecord: true
-      }
-    })
+        rawCrawlData: true, technicalAuditDetail: true, keywordIntelligence: true,
+        competitorSeoRecord: true, contentGapRecord: true, geoIntelligence: true,
+        blogIntelligenceRecord: true,
+      },
+    }),
   ]);
 
-  const input = productIntel?.inputJson || campaignIntel?.inputJson || {};
+  const chat = await prisma.chat.findUnique({ where: { id: chatId } });
 
+  const productIdentity = resolveCanonicalProductIdentity({
+    chat,
+    productIntelligence: productIntel,
+    websiteEvidence: null,
+  });
+
+  const canonicalGrowth = buildCanonicalGrowthPayload({
+    chat,
+    productIntelligence: productIntel,
+    audienceIntelligence: productIntel?.audienceIntelligence || null,
+    competitorIntelligence: competitorIntel,
+    campaignIntelligence: campaignIntel,
+  });
+
+  if (canonicalGrowth) {
+    canonicalGrowth.productIdentity = productIdentity;
+    canonicalGrowth.company.name = productIdentity.companyName;
+    canonicalGrowth.company.domain = productIdentity.domain;
+    canonicalGrowth.company.industry = productIdentity.industry;
+    canonicalGrowth.company.category = productIdentity.category;
+    canonicalGrowth.product.name = productIdentity.productName;
+  }
+
+  const canonicalSeo = seoIntel
+    ? buildCanonicalSeoPayload({
+        chat,
+        productIdentity,
+        seoIntelligence: seoIntel,
+        seoScoreBreakdown: seoIntel.scoreBreakdown || null,
+        technicalAuditDetail: seoIntel.technicalAuditDetail || null,
+        keywordIntelligence: seoIntel.keywordIntelligence || seoIntel.keywordOpportunities || null,
+        contentGapRecord: seoIntel.contentGapRecord || null,
+        competitorSeoAnalysis: seoIntel.competitorSeoRecord || null,
+        blogIntelligence: seoIntel.blogIntelligenceRecord || seoIntel.blogIntelligenceItems || null,
+        validatedGrowthCompetitors: canonicalGrowth?.competitors || [],
+      })
+    : null;
+
+  const reportData = formatForReport(canonicalGrowth, canonicalSeo, productIntel, competitorIntel, campaignIntel, chat);
+  return reportData;
+}
+
+function formatForReport(canonicalGrowth, canonicalSeo, productIntel, competitorIntel, campaignIntel, chat) {
+  const input = productIntel?.inputJson || {};
   const product = productIntel?.productAnalysis || {};
-  const market = productIntel?.marketDiscovery || {};
-  const audience = productIntel?.audienceIntelligence || {};
-
-  const competitor = competitorIntel?.competitorAnalysis || {};
-  const intent = competitorIntel?.intentPrediction || {};
-  const positioning = competitorIntel?.positioningEngine || {};
-
-  const campaign = campaignIntel?.campaignGenerator || {};
-  const channel = campaignIntel?.channelRecommendation || {};
   const executiveStory = campaignIntel?.executiveStory || {};
-  const actionPlan = campaignIntel?.actionPlan || {};
 
-  const seo = seoIntel ? normalizeSeoIntelligence(seoIntel) : null;
-
-  const scores = {
-    overallGrowthScore: campaign?.growthSummary?.overallGrowthScore ?? campaign?.growthSummary?.dataCompletenessScore ?? null,
-    dataCompletenessScore: campaign?.growthSummary?.dataCompletenessScore ?? null,
-    evidenceBased: campaign?.growthSummary?.evidenceBased ?? false,
-    evidenceSourcesCount: campaign?.growthSummary?.evidenceSourcesCount ?? 0,
-    marketOpportunityScore: campaign?.growthSummary?.evidenceBased ? campaign?.growthSummary?.overallGrowthScore : null,
-    audienceClarityScore: null,
-    competitiveDefensibilityScore: null,
-    campaignReadinessScore: null
-  };
-
-  const company = executiveStory?.companyOverview || {
+  const company = canonicalGrowth?.company || {
     name: input?.companyName || input?.productName || 'Unknown',
     website: input?.websiteUrl || '',
     industry: input?.industry || 'Unknown',
@@ -70,68 +90,138 @@ export async function buildReportData(chatId, userId) {
     employeeEstimate: 'Unknown',
     fundingStage: 'Unknown',
     domain: '',
-    category: 'Unknown'
+    category: 'Unknown',
   };
 
-  const technologyData = {
-    technologies: extractTechnologies(market, product, seo)
+  const seo = canonicalSeo
+    ? {
+        scores: {
+          seoScore: canonicalSeo.dataCompleteness?.hasTechnicalAudit ? null : null,
+          overall: canonicalSeo.executiveSummary?.overallScore || null,
+          performanceScore: canonicalSeo.technicalAudit?.mobile?.performance || null,
+          accessibilityScore: canonicalSeo.technicalAudit?.mobile?.accessibility || null,
+          bestPracticesScore: canonicalSeo.technicalAudit?.mobile?.bestPractices || null,
+        },
+        keywords: (canonicalSeo.keywords || []).map(k => ({
+          keyword: k.keyword || '',
+          volume: k.volume || null,
+          difficulty: k.difficulty || null,
+          keywordDifficulty: k.difficulty || null,
+          intent: k.intent || '',
+        })),
+        competitors: (canonicalSeo.competitors || []).map(c => ({
+          name: c.name || '',
+          domain: c.domain || '',
+          type: c.type || '',
+          seoAuthority: c.confidence || null,
+          source: c.source || '',
+        })),
+        gaps: (canonicalSeo.contentGaps || []).map(g => ({
+          topic: g.topic || '',
+          title: g.topic || '',
+          priority: g.priority || 'medium',
+          reason: g.reason || '',
+        })),
+        geo: canonicalSeo.aiSearchReadiness?.available
+          ? {
+              aiVisibilityScore: canonicalSeo.aiSearchReadiness.overallScore || null,
+              ...(canonicalSeo.aiSearchReadiness.platforms || {}),
+            }
+          : {},
+        blogs: (canonicalSeo.blogOpportunities || []).map(b => ({
+          title: b.title || '',
+          topic: b.title || '',
+          keyword: b.keyword || '',
+        })),
+        actionPlan: {
+          immediate: (canonicalSeo.actionPlan || []).filter(a => a.category === 'immediate' || a.priority === 'high'),
+          day7: (canonicalSeo.actionPlan || []).filter(a => a.category === 'day7'),
+          day30: (canonicalSeo.actionPlan || []).filter(a => a.category === 'day30'),
+          day60: (canonicalSeo.actionPlan || []).filter(a => a.category === 'day60'),
+          day90: (canonicalSeo.actionPlan || []).filter(a => a.category === 'day90'),
+        },
+        technicalAudit: canonicalSeo.technicalAudit?.available
+          ? {
+              overallScore: canonicalSeo.executiveSummary?.overallScore || null,
+              performanceScore: canonicalSeo.technicalAudit?.mobile?.performance || null,
+              seoScore: canonicalSeo.technicalAudit?.mobile?.seo || null,
+              accessibilityScore: canonicalSeo.technicalAudit?.mobile?.accessibility || null,
+              bestPracticesScore: canonicalSeo.technicalAudit?.mobile?.bestPractices || null,
+              issues: canonicalSeo.technicalAudit.issues || [],
+            }
+          : null,
+      }
+    : null;
+
+  const technologyData = { technologies: extractTechnologies(product, canonicalGrowth, seo) };
+
+  const competitorData = {
+    direct: (canonicalGrowth?.competitors || []).filter(c => c.type === 'direct' || !c.type),
+    indirect: (canonicalGrowth?.competitors || []).filter(c => c.type === 'indirect'),
+    all: canonicalGrowth?.competitors || [],
   };
 
-  const pricing = {
-    tiers: extractArray(product?.pricingTiers || product?.pricing),
+  const audienceData = {
+    personas: canonicalGrowth?.audience?.personas || [],
+    segments: canonicalGrowth?.audience?.segments || [],
+    channels: canonicalGrowth?.channels || [],
+  };
+
+  const marketData = {
+    tam: canonicalGrowth?.market?.tam ?? 'Not measured',
+    sam: canonicalGrowth?.market?.sam ?? 'Not measured',
+    som: canonicalGrowth?.market?.som ?? 'Not measured',
+    growthRate: canonicalGrowth?.market?.growthRate ?? 'Not measured',
+    trends: canonicalGrowth?.market?.trends || [],
+    opportunities: canonicalGrowth?.market?.opportunities || [],
+    risks: canonicalGrowth?.market?.risks || [],
+    growthSignals: [],
+  };
+
+  const positioningData = canonicalGrowth?.positioning || {
+    positioningStatement: 'Unknown',
+    valueProposition: 'Unknown',
+  };
+
+  const actionPlanData = canonicalGrowth?.roadmap || {};
+
+  const scores = canonicalGrowth?.scores || {
+    overallGrowthScore: null,
+    marketOpportunityScore: null,
+    audienceClarityScore: null,
+    competitiveDefensibilityScore: null,
+    campaignReadinessScore: null,
+  };
+
+  const pricing = canonicalGrowth?.product?.pricing || {
+    tiers: [],
     hasFree: false,
     hasFreeTrial: false,
     hasEnterprise: false,
     hasCustomPricing: false,
     currency: null,
-    billingPeriods: []
+    billingPeriods: [],
   };
-
-  const competitorData = {
-    direct: extractArray(competitor?.directCompetitors || competitor?.competitors),
-    indirect: extractArray(competitor?.indirectCompetitors),
-    all: [...extractArray(competitor?.directCompetitors || competitor?.competitors), ...extractArray(competitor?.indirectCompetitors)]
-  };
-
-  const audienceData = {
-    personas: extractArray(audience?.buyerPersonas || audience?.personas),
-    segments: extractArray(audience?.audienceSegments),
-    channels: extractArray(audience?.bestChannels)
-  };
-
-  const marketData = {
-    tam: market?.tam ?? market?.marketSize?.tam ?? 'Not measured',
-    sam: market?.sam ?? market?.marketSize?.sam ?? 'Not measured',
-    som: market?.som ?? market?.marketSize?.som ?? 'Not measured',
-    growthRate: market?.growthRate ?? market?.marketGrowthRate ?? 'Not measured',
-    trends: extractArray(market?.marketTrends || market?.trends),
-    opportunities: extractArray(market?.growthOpportunities || market?.opportunities),
-    risks: extractArray(market?.marketRisks || market?.risks),
-    growthSignals: extractArray(market?.growthSignals),
-  };
-
-  const positioningData = {
-    positioningStatement: positioning?.positioningStatement || 'Unknown',
-    valueProposition: positioning?.valueProposition || 'Unknown'
-  };
-
-  const actionPlanData = {
-    day7: extractArray(actionPlan?.day7 || actionPlan?.sevenDay),
-    day30: extractArray(actionPlan?.day30 || actionPlan?.thirtyDay),
-    day60: extractArray(actionPlan?.day60 || actionPlan?.sixtyDay),
-    day90: extractArray(actionPlan?.day90 || actionPlan?.ninetyDay),
-    day180: extractArray(actionPlan?.day180),
-    day365: extractArray(actionPlan?.day365)
-  };
-
-  const channelData = extractArray(channel?.recommendedChannels || channel?.channels);
 
   return {
-    company, market: marketData, audience: audienceData, competitor: competitorData,
-    intent, positioning: positioningData, pricing,
-    technology: technologyData, scores, actionPlan: actionPlanData,
-    channelData, product, campaign, seo, executiveStory,
-    chat: { id: chatId, input }
+    company,
+    market: marketData,
+    audience: audienceData,
+    competitor: competitorData,
+    intent: competitorIntel?.intentPrediction || {},
+    positioning: positioningData,
+    pricing,
+    technology: technologyData,
+    scores,
+    actionPlan: actionPlanData,
+    channelData: canonicalGrowth?.channels || [],
+    product: canonicalGrowth?.product || {},
+    campaign: canonicalGrowth?.campaign || {},
+    seo,
+    executiveStory,
+    canonicalGrowth,
+    canonicalSeo,
+    chat: { id: chat?.id || '', input },
   };
 }
 
@@ -600,7 +690,7 @@ function generateMarkdown(data, type = 'executive') {
   return md;
 }
 
-function extractTechnologies(market, product, seo) {
+function extractTechnologies(product, canonicalGrowth, seo) {
   const tech = [];
   const seen = new Set();
 
@@ -611,7 +701,7 @@ function extractTechnologies(market, product, seo) {
     }
   };
 
-  const source = product?.technologyStack || product?.technologies || market?.technologyStack || [];
+  const source = product?.technologyStack || product?.technologies || canonicalGrowth?.product?.features || [];
   if (Array.isArray(source)) {
     source.forEach(t => {
       if (typeof t === 'string') addTech(t, 'detected');

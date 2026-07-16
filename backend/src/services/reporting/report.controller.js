@@ -1,5 +1,35 @@
 import { buildReportData, generateExecutiveReport, generateGrowthReport, generateSeoReport } from './report-builder.service.js';
 import { prisma } from '../../config/prisma.js';
+import { validateReport, validateAndFilterSections } from '../validators/report-validator.service.js';
+
+function validateBeforeExport(data, reportType) {
+  const canonicalGrowth = data?.canonicalGrowth || null;
+  const canonicalSeo = data?.canonicalSeo || null;
+
+  const { valid, blockingIssues, removableSections, summary } = validateReport(canonicalGrowth, canonicalSeo, reportType);
+
+  if (!valid) {
+    const { payload: filtered, validation } = validateAndFilterSections(
+      { canonicalGrowth, canonicalSeo },
+      reportType,
+    );
+
+    const remainingBlocking = validation.blockingIssues.length;
+    if (remainingBlocking > 0) {
+      return {
+        allowed: false,
+        code: 'REPORT_VALIDATION_FAILED',
+        blockingIssues,
+        removableSections,
+        summary,
+      };
+    }
+
+    return { allowed: true, filtered, summary };
+  }
+
+  return { allowed: true, filtered: { canonicalGrowth, canonicalSeo }, summary };
+}
 
 export const exportExecutiveReportHandler = async (req, res) => {
   const { chatId, format } = req.params;
@@ -17,6 +47,21 @@ export const exportExecutiveReportHandler = async (req, res) => {
   }
 
   try {
+    const data = await buildReportData(chatId, userId);
+    const validation = validateBeforeExport(data, 'all');
+
+    if (!validation.allowed) {
+      return res.status(422).json({
+        success: false,
+        error: {
+          code: validation.code,
+          message: 'Report validation failed with blocking issues',
+          blockingIssues: validation.blockingIssues,
+          removableSections: validation.removableSections,
+        },
+      });
+    }
+
     let buffer = await generateExecutiveReport(chatId, userId, format);
     if (!Buffer.isBuffer(buffer)) buffer = Buffer.from(buffer);
     sendFileResponse(res, buffer, format, `ExecutiveReport_${chatId}`);
@@ -40,6 +85,21 @@ export const exportGrowthReportHandler = async (req, res) => {
   }
 
   try {
+    const data = await buildReportData(chatId, userId);
+    const validation = validateBeforeExport(data, 'growth');
+
+    if (!validation.allowed) {
+      return res.status(422).json({
+        success: false,
+        error: {
+          code: validation.code,
+          message: 'Growth report validation failed with blocking issues',
+          blockingIssues: validation.blockingIssues,
+          removableSections: validation.removableSections,
+        },
+      });
+    }
+
     let buffer = await generateGrowthReport(chatId, userId, format);
     if (!Buffer.isBuffer(buffer)) buffer = Buffer.from(buffer);
     sendFileResponse(res, buffer, format, `GrowthReport_${chatId}`);
@@ -63,6 +123,21 @@ export const exportSeoReportHandler = async (req, res) => {
   }
 
   try {
+    const data = await buildReportData(chatId, userId);
+    const validation = validateBeforeExport(data, 'seo');
+
+    if (!validation.allowed) {
+      return res.status(422).json({
+        success: false,
+        error: {
+          code: validation.code,
+          message: 'SEO report validation failed with blocking issues',
+          blockingIssues: validation.blockingIssues,
+          removableSections: validation.removableSections,
+        },
+      });
+    }
+
     let buffer = await generateSeoReport(chatId, userId, format);
     if (!Buffer.isBuffer(buffer)) buffer = Buffer.from(buffer);
     sendFileResponse(res, buffer, format, `SEOReport_${chatId}`);

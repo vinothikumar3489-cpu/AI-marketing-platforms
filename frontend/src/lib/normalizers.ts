@@ -366,125 +366,86 @@ export const safeParse = (value: any, fallback: any = {}): any => {
 // GROWTH WORKSPACE NORMALIZATION
 export function normalizeFullResults(data: any) {
   const root = data?.data || data || {};
+
   const growthStatus = root.growthStatus || 'NOT_RUN';
   const seoStatus = root.seoStatus || 'NOT_RUN';
-  const hasProduct = root.hasProductIntelligence === true || !!root.productIntelligence;
-  const hasGrowth = growthStatus !== 'NOT_RUN' && growthStatus !== 'FAILED';
 
-  // PRIORITY 1: Use canonical growthWorkspace from backend
-  if (root.growthWorkspace && typeof root.growthWorkspace === 'object' && root.growthWorkspace.status === 'COMPLETED') {
-    const workspace = root.growthWorkspace;
+  const growthWorkspace = root.growthWorkspace || null;
+  const seoIntelligence = root.seoIntelligence || null;
 
+  const hasGrowthWorkspace = !!growthWorkspace && growthWorkspace.status === 'COMPLETED';
+  const hasSeoIntelligence = !!seoIntelligence && seoIntelligence.status === 'COMPLETED';
+
+  // Derive legacy growth shape from canonical growthWorkspace
+  const deriveGrowth = (gw: any) => {
+    if (!gw) return null;
     return {
-      chat: root.chat || {},
-      chatId: root.chatId || root.chat?.id || '',
-      growthStatus,
-      seoStatus,
-      productIdentity: root.productIdentity || workspace.productIdentity || null,
-      growthWorkspace: workspace, // Canonical payload - use as-is
-      // Legacy growth shape for backward compatibility (derived from canonical)
-      growth: {
-        product: safeParse(workspace.productDNA, workspace.productDNA),
-        market: safeParse(workspace.marketIntelligence, workspace.marketIntelligence),
-        audience: safeParse(workspace.audienceIntelligence, workspace.audienceIntelligence),
-        competitor: safeParse(workspace.competitorIntelligence, workspace.competitorIntelligence),
-        intent: safeParse(workspace.competitorIntelligence?.intentPrediction, workspace.competitorIntelligence?.intentPrediction),
-        positioning: safeParse(workspace.positioning, workspace.positioning),
-        campaign: safeParse(workspace.campaignStrategy, workspace.campaignStrategy),
-        channel: safeParse(workspace.channelStrategy, workspace.channelStrategy),
-        executiveStory: safeParse(workspace.campaignStrategy?.executiveStory, workspace.campaignStrategy?.executiveStory),
-        actionPlan: safeParse(workspace.actionPlan, workspace.actionPlan),
-        summary: workspace.scoreSummary || null,
-      },
-      seoIntelligence: seoStatus !== 'NOT_RUN' && root.seoIntelligence ? normalizeSeo(root.seoIntelligence) : null,
-      seo: seoStatus !== 'NOT_RUN' && root.seoIntelligence ? normalizeSeo(root.seoIntelligence) : null,
-      agents: asArray(root.agentRuns || []),
-      automation: root.automationPlan || null,
-      hasGrowthWorkspace: hasProduct,
-      hasSeoIntelligence: seoStatus === 'COMPLETED' || seoStatus === 'COMPLETED_WITH_WARNINGS',
-      hasProductIntelligence: hasProduct,
-      hasCompetitorIntelligence: root.hasCompetitorIntelligence === true,
-      hasCampaignIntelligence: root.hasCampaignIntelligence === true,
+      product: safeParse(gw.product, gw.product),
+      market: safeParse(gw.market, gw.market),
+      audience: safeParse(gw.audience, gw.audience),
+      competitor: gw.competitors ? { directCompetitors: gw.competitors, competitors: gw.competitors } : null,
+      intent: null,
+      positioning: safeParse(gw.positioning, gw.positioning),
+      campaign: safeParse(gw.campaign, gw.campaign),
+      channel: gw.channels ? { recommendedChannels: gw.channels, channels: gw.channels } : null,
+      executiveStory: null,
+      actionPlan: gw.roadmap || null,
+      summary: gw.scores || null,
     };
-  }
+  };
 
-  // PRIORITY 2: Handle legacy growth shape (backward compatibility)
-  if (hasGrowth && root.growth && typeof root.growth === 'object') {
-    const growth = root.growth;
-
+  // Derive legacy SEO shape from canonical seoIntelligence
+  const deriveSeo = (si: any) => {
+    if (!si) return null;
     return {
-      chat: root.chat || {},
-      chatId: root.chatId || root.chat?.id || '',
-      growthStatus,
-      seoStatus,
-      productIdentity: root.productIdentity || null,
-      growthWorkspace: null, // No canonical workspace available
-      growth: {
-        product: safeParse(growth.product, growth.product),
-        market: safeParse(growth.market, growth.market),
-        audience: safeParse(growth.audience, growth.audience),
-        competitor: safeParse(growth.competitor, growth.competitor),
-        intent: safeParse(growth.intent, growth.intent),
-        positioning: safeParse(growth.positioning, growth.positioning),
-        campaign: safeParse(growth.campaign, growth.campaign),
-        channel: safeParse(growth.channel, growth.channel),
-        executiveStory: safeParse(growth.executiveStory, growth.executiveStory),
-        actionPlan: safeParse(growth.actionPlan, growth.actionPlan),
-        summary: growth.summary || null,
-      },
-      seoIntelligence: seoStatus !== 'NOT_RUN' && root.seoIntelligence ? normalizeSeo(root.seoIntelligence) : null,
-      seo: seoStatus !== 'NOT_RUN' && root.seoIntelligence ? normalizeSeo(root.seoIntelligence) : null,
-      agents: asArray(root.agentRuns || []),
-      automation: root.automationPlan || null,
-      hasGrowthWorkspace: hasProduct,
-      hasSeoIntelligence: seoStatus === 'COMPLETED' || seoStatus === 'COMPLETED_WITH_WARNINGS',
-      hasProductIntelligence: hasProduct,
-      hasCompetitorIntelligence: root.hasCompetitorIntelligence === true,
-      hasCampaignIntelligence: root.hasCampaignIntelligence === true,
+      executiveSummary: si.executiveSummary || null,
+      technicalAudit: si.technicalAudit || null,
+      keywords: si.keywords || [],
+      competitors: si.competitors || [],
+      contentGaps: si.contentGaps || [],
+      aiSearchReadiness: si.aiSearchReadiness || null,
+      blogOpportunities: si.blogOpportunities || [],
+      actionPlan: si.actionPlan || [],
+      dataCompleteness: si.dataCompleteness || null,
+      warnings: si.warnings || [],
     };
-  }
+  };
 
-  // PRIORITY 3: Fallback to legacy raw records
-  const productIntel = root.productIntelligence || root.growthWorkspace?.results?.product || {};
-  const competitorIntel = root.competitorIntelligence || root.growthWorkspace?.results?.competitor || {};
-  const campaignIntel = root.campaignIntelligence || root.growthWorkspace?.results?.campaign || {};
-  const channelIntel = root.channelRecommendation || root.growthWorkspace?.results?.channel || {};
-  const growth = root.growthWorkspace || root.growth || {};
-  const hasProd = root.hasProductIntelligence === true || !!productIntel?.productAnalysis;
-
-  const execStory = campaignIntel.executiveStory || campaignIntel.campaignGenerator?.executiveStory || channelIntel.executiveStory || channelIntel.channelRecommendation?.executiveStory || growth.executiveStory;
-  const actPlan = campaignIntel.actionPlan || campaignIntel.campaignGenerator?.actionPlan || channelIntel.actionPlan || channelIntel.channelRecommendation?.actionPlan || growth.actionPlan;
-
-  return {
-    chat: root.chat || {},
+  const result = {
+    chat: root.chat || root.chatId ? { id: root.chatId } : {},
     chatId: root.chatId || root.chat?.id || '',
     growthStatus,
     seoStatus,
-    productIdentity: root.productIdentity || null,
-    growthWorkspace: null,
-    growth: {
-      product: safeParse(productIntel.productAnalysis, productIntel.productAnalysis),
-      market: safeParse(productIntel.marketDiscovery, productIntel.marketDiscovery),
-      audience: safeParse(productIntel.audienceIntelligence, productIntel.audienceIntelligence),
-      competitor: safeParse(competitorIntel.competitorAnalysis, competitorIntel.competitorAnalysis),
-      intent: safeParse(competitorIntel.intentPrediction, competitorIntel.intentPrediction),
-      positioning: safeParse(competitorIntel.positioningEngine, competitorIntel.positioningEngine),
-      campaign: safeParse(campaignIntel.campaignGenerator, campaignIntel.campaignGenerator),
-      channel: safeParse(campaignIntel.channelRecommendation, campaignIntel.channelRecommendation),
-      executiveStory: safeParse(execStory, execStory),
-      actionPlan: safeParse(actPlan, actPlan),
-      summary: growth.summary || safeParse(growth.summary, growth.summary) || null,
-    },
-    seoIntelligence: seoStatus !== 'NOT_RUN' ? normalizeSeo(root.seoIntelligence || root.seo || root.seoData || root.seoAnalysis) : null,
-    seo: seoStatus !== 'NOT_RUN' ? normalizeSeo(root.seoIntelligence || root.seo || root.seoData || root.seoAnalysis) : null,
-    agents: asArray(root.agentRuns || []),
-    automation: root.automationPlan || root.automationPlans || root.automation || {},
-    hasGrowthWorkspace: hasProd,
-    hasSeoIntelligence: seoStatus === 'COMPLETED' || seoStatus === 'COMPLETED_WITH_WARNINGS',
-    hasProductIntelligence: hasProd,
-    hasCompetitorIntelligence: root.hasCompetitorIntelligence === true,
-    hasCampaignIntelligence: root.hasCampaignIntelligence === true,
+    productIdentity: growthWorkspace?.productIdentity || null,
+    growthWorkspace,
+    seoIntelligence: hasSeoIntelligence ? seoIntelligence : null,
+    growth: deriveGrowth(growthWorkspace),
+    seo: deriveSeo(seoIntelligence),
+    agents: asArray(root.agentRuns || root.agents || []),
+    automation: root.automationPlan || null,
+    hasGrowthWorkspace,
+    hasSeoIntelligence,
+    hasProductIntelligence: !!root.persistence?.productIntelligence || hasGrowthWorkspace,
+    hasCompetitorIntelligence: !!root.persistence?.competitorIntelligence || !!(growthWorkspace?.competitors?.length),
+    hasCampaignIntelligence: !!root.persistence?.campaignIntelligence || !!growthWorkspace?.campaign,
   };
+
+  // Fallback for legacy response shapes (no data wrapper)
+  if (!root.growthWorkspace && !root.seoIntelligence) {
+    const legacyGrowth = root.growth || root.growthWorkspace || {};
+    const legacySeo = root.seoIntelligence || root.seo || root.seoData || root.seoAnalysis || {};
+
+    if (Object.keys(legacyGrowth).length > 0 || Object.keys(legacySeo).length > 0) {
+      result.growthWorkspace = null;
+      result.seoIntelligence = null;
+      result.growth = legacyGrowth;
+      result.seo = normalizeSeo(legacySeo);
+      result.hasGrowthWorkspace = Object.keys(legacyGrowth).length > 0;
+      result.hasSeoIntelligence = Object.keys(legacySeo).length > 0;
+    }
+  }
+
+  return result;
 }
 
 // SEO INTELLIGENCE NORMALIZATION

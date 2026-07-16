@@ -58,7 +58,7 @@ export default function GrowthWorkspacePage() {
   useEffect(() => {
     if (analysisRunningRef.current) return;
     let cancelled = false;
-    const r = fullResults.growth || {};
+    const r = fullResults.growthWorkspace || fullResults.growth || {};
     const hasGrowthData = fullResults.hasGrowthWorkspace === true ||
       hasRealContent(r.product) || hasRealContent(r.market) || hasRealContent(r.audience) ||
       hasRealContent(r.competitor) || hasRealContent(r.intent) || hasRealContent(r.positioning) ||

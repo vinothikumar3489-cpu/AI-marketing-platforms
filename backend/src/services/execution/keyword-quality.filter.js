@@ -7,16 +7,49 @@ const LOW_QUALITY_KEYWORDS = new Set([
   'settings', 'dashboard', 'profile', 'account', 'billing',
   'review', 'reviews', 'download', 'free', 'trial', 'demo', 'video',
   'tutorial', 'guide', 'manual', 'instructions', 'overview',
+  'google', 'cloud', 'receive', 'meet', 'workspace', 'newsletters',
+  'personal', 'accordance', 'google.', 'workspace.', 'gmail',
+  'chrome', 'android', 'youtube', 'maps', 'drive', 'calendar',
+  'docs', 'sheets', 'slides', 'keep', 'photos', 'translate',
+  'news', 'shopping', 'books', 'finance', 'ads', 'analytics',
+  'tag', 'manager', 'optimize', 'domains', 'cloud platform',
+  'firebase', 'flutter', 'angular', 'material', 'welcome',
+  'javascript', 'python', 'node', 'react', 'api', 'sdk',
+  'click', 'here', 'learn', 'more', 'read', 'view', 'see',
+  'menu', 'nav', 'navigation', 'footer', 'header', 'sidebar',
+  'submit', 'cancel', 'close', 'open', 'back', 'next',
+  'cookie', 'cookies', 'privacy', 'policy', 'terms', 'conditions',
+  'accept', 'decline', 'subscribe', 'unsubscribe', 'newsletter',
+  'sign in', 'signout', 'logout', 'my account', 'my profile',
+  'edit', 'delete', 'remove', 'add', 'create', 'update',
+  'save', 'discard', 'reset', 'restore', 'default',
+  'loading', 'processing', 'pending', 'complete', 'error',
+  'success', 'warning', 'info', 'notice', 'message',
 ]);
+
+function hasPunctuationVariant(keyword) {
+  const stripped = keyword.replace(/[^a-zA-Z0-9\s]/g, '').trim();
+  if (stripped !== keyword && LOW_QUALITY_KEYWORDS.has(stripped)) return true;
+  if (stripped !== keyword && stripped.length < 3) return true;
+  return false;
+}
 
 export function isLowQualityKeyword(keyword) {
   if (!keyword || typeof keyword !== 'string') return true;
   const trimmed = keyword.trim().toLowerCase();
   if (trimmed.length < 3) return true;
-  if (LOW_QUALITY_KEYWORDS.has(trimmed)) return true;
   if (/^\d+$/.test(trimmed)) return true;
+  if (/^[^a-zA-Z0-9]+$/.test(trimmed)) return true;
   if (trimmed.startsWith('http') || trimmed.startsWith('www')) return true;
   if (/^(new\s+analysis|untitled|new\s+project|growth\s+analysis|project)$/i.test(trimmed)) return true;
+  if (hasPunctuationVariant(trimmed)) return true;
+  if (LOW_QUALITY_KEYWORDS.has(trimmed)) return true;
+
+  const words = trimmed.split(/[\s\-–—]+/).filter(w => w.length > 0);
+  if (words.length === 0) return true;
+  const meaningfulWords = words.filter(w => !/^[^a-z0-9]+$/.test(w) && w.length > 1);
+  if (meaningfulWords.length === 0) return true;
+
   return false;
 }
 
