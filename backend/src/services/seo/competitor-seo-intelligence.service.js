@@ -2,6 +2,7 @@ import fetch from 'node-fetch';
 import { getSerpCompetitors, normalizeSerpCompetitors, separateCompetitorsByType, isDataForSEOConfigured, getDomainData } from '../dataforseo.service.js';
 import { researchCompetitors } from '../tavily.service.js';
 import { asArray } from '../../utils/text.util.js';
+import { prisma } from '../../config/prisma.js';
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
@@ -35,17 +36,44 @@ export async function generateCompetitorSeoIntelligence({
   const industry = safeIdentity.industry || category;
 
   try {
-    // Step 1: Discover competitors (use orchestrator data if available)
+    // Step 1: Discover competitors (orchestrator > Growth CompetitorIntelligence > external APIs)
     console.log('🔍 [Competitor SEO] Step 1: Discovering competitors...');
-    const rawCompetitors = orchestratorCompetitors.length > 0 
+    const rawCompetitors = orchestratorCompetitors.length > 0
       ? orchestratorCompetitors
-      : await discoverCompetitors({
-          productName: identity.productName,
-          industry: identity.industry,
-          websiteUrl: identity.websiteUrl,
-          keywordIntelligence,
-          identity
-        });
+      : await (async () => {
+          // Fallback to Growth CompetitorIntelligence table
+          const chatId = identity.chatId || (global.currentChatId);
+          if (chatId) {
+            try {
+              const growthIntel = await prisma.competitorIntelligence.findUnique({ where: { chatId } });
+              if (growthIntel?.competitorAnalysis) {
+                const analysis = growthIntel.competitorAnalysis;
+                const directCompetitors = analysis.directCompetitors || analysis.competitors || [];
+                if (directCompetitors.length > 0) {
+                  console.log(`[Competitor SEO] Using ${directCompetitors.length} competitors from Growth CompetitorIntelligence`);
+                  return directCompetitors.map(c => ({
+                    name: c.name,
+                    domain: c.domain || (c.websiteUrl ? new URL(c.websiteUrl).hostname.replace(/^www\./, '') : ''),
+                    competitorType: 'direct',
+                    source: 'GROWTH_INTELLIGENCE',
+                    evidence: c.evidence || 'From Growth CompetitorIntelligence',
+                    websiteUrl: c.websiteUrl || c.domain || ''
+                  }));
+                }
+              }
+            } catch (e) {
+              console.log('[Competitor SEO] Growth CompetitorIntelligence fallback failed:', e.message);
+            }
+          }
+          // Fall back to external API discovery
+          return discoverCompetitors({
+            productName: identity.productName,
+            industry: identity.industry,
+            websiteUrl: identity.websiteUrl,
+            keywordIntelligence,
+            identity
+          });
+        })();
     
     // Filter self-links and bad competitors even for orchestrator-sourced data
     let competitors = filterAllCompetitors(rawCompetitors, identity);

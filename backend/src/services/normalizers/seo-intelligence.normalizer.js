@@ -312,4 +312,255 @@ export function normalizeSeoForFrontend(seoInfo) {
   };
 }
 
-export default { normalizeSeoForExecution, normalizeSeoForFrontend };
+/**
+ * Normalize SEO intelligence for consumers (frontend, PDF, report builder).
+ * Splits keywords into measuredKeywords (with DataForSEO metrics) and topicCandidates (topic_idea_only).
+ * Returns unified counts object so all consumers agree.
+ */
+export function normalizeSeoIntelligenceForConsumers(seoInfo) {
+  if (!seoInfo || typeof seoInfo !== 'object') {
+    return {
+      measuredKeywords: [],
+      topicCandidates: [],
+      contentGaps: [],
+      blogIdeas: [],
+      technicalAudit: null,
+      counts: { measured: 0, topicCandidates: 0, contentGaps: 0, blogIdeas: 0, competitors: 0, total: 0 }
+    };
+  }
+
+  // Collect ALL keyword items from all possible locations
+  const allItems = [];
+
+  const keywordOpportunitiesRaw = seoInfo.keywordOpportunities ??
+    seoInfo.keywordIntelligence?.opportunities ??
+    seoInfo.keywordIntelligence?.keywords ??
+    seoInfo.keywords ??
+    seoInfo.keywordData ?? [];
+
+  const nestedItems = extractNestedKeywords(keywordOpportunitiesRaw);
+  allItems.push(...asArray(nestedItems));
+
+  const topLevelArrays = [
+    seoInfo.primaryKeywords,
+    seoInfo.secondaryKeywords,
+    seoInfo.longTailKeywords,
+    seoInfo.questionKeywords,
+    seoInfo.competitorKeywords,
+    keywordOpportunitiesRaw?.primaryKeywords,
+    keywordOpportunitiesRaw?.secondaryKeywords,
+    keywordOpportunitiesRaw?.longTailKeywords,
+    keywordOpportunitiesRaw?.questionKeywords,
+    keywordOpportunitiesRaw?.competitorKeywords,
+    keywordOpportunitiesRaw?.geoKeywords,
+    keywordOpportunitiesRaw?.contentOpportunities,
+  ];
+
+  for (const arr of topLevelArrays) {
+    allItems.push(...asArray(arr));
+  }
+
+  // Also flatten clusters
+  const clustersRaw = seoInfo.clusters ?? keywordOpportunitiesRaw?.clusters ?? [];
+  for (const cluster of asArray(clustersRaw)) {
+    allItems.push(...asArray(cluster.keywords));
+  }
+
+  // Normalize all items
+  const normalizedItems = allItems.map(normalizeKeywordItem).filter(Boolean);
+
+  // Deduplicate by keyword text
+  const seen = new Set();
+  const deduped = normalizedItems.filter(k => {
+    const lower = k.keyword.toLowerCase();
+    if (seen.has(lower)) return false;
+    seen.add(lower);
+    return true;
+  });
+
+  // Split by metric availability: measuredKeywords have real volume/difficulty/cpc ≥ 1
+  const measuredKeywords = deduped.filter(k =>
+    k.source !== 'topic_idea_only' &&
+    k.source !== 'ai_extracted' &&
+    k.source !== 'topic_candidate' &&
+    ((k.volume !== null && k.volume >= 1) ||
+     (k.difficulty !== null && k.difficulty >= 1) ||
+     (k.cpc !== null && k.cpc >= 1))
+  );
+
+  const topicCandidates = deduped.filter(k =>
+    !measuredKeywords.includes(k) &&
+    k.volume === null &&
+    k.difficulty === null &&
+    k.cpc === null
+  );
+
+  // Normalize content gaps
+  const contentGapsRaw = seoInfo.contentGaps ??
+    seoInfo.gapAnalysis ??
+    seoInfo.contentGapRecord?.contentGaps ??
+    seoInfo.contentGaps?.gaps ??
+    seoInfo.contentGaps?.items ??
+    seoInfo.contentGaps?.missingPages ??
+    seoInfo.contentGaps?.contentOpportunities ??
+    seoInfo.contentGaps?.topGaps ?? [];
+
+  const normalizedContentGaps = asArray(contentGapsRaw).map(gap => ({
+    topic: gap.topic || gap.opportunity || gap.title || (typeof gap === 'string' ? gap : ''),
+    targetKeyword: gap.targetKeyword || null,
+    reason: gap.reason || gap.gap || gap.description || null,
+    priority: gap.priority ?? gap.importance ?? null,
+    contentType: gap.contentType || gap.recommendedType || 'content',
+    evidence: gap.evidence || null,
+    recommendedSections: gap.recommendedSections || null
+  })).filter(g => g.topic);
+
+  // Normalize blog ideas
+  const blogIdeasRaw = seoInfo.blogIdeas ??
+    seoInfo.contentIdeas ??
+    seoInfo.topicIdeas ??
+    seoInfo.blogTopics ?? [];
+
+  const normalizedBlogIdeas = asArray(blogIdeasRaw).map(idea => ({
+    topic: idea.topic || idea.title || idea.idea || (typeof idea === 'string' ? idea : ''),
+    targetKeyword: idea.targetKeyword || idea.keyword || null,
+    reason: idea.reason || idea.description || null,
+    evidence: idea.evidence || null,
+    contentType: idea.contentType ?? idea.type ?? 'blog',
+    intent: idea.intent || null,
+    priority: idea.priority ?? idea.importance ?? null
+  })).filter(b => b.topic);
+
+  // Normalize technical audit
+  const technicalAudit = normalizeTechnicalAuditForConsumers(
+    seoInfo.technicalAudit ?? seoInfo.audit ?? seoInfo.technicalAnalysis ?? null
+  );
+
+  // Build unified counts
+  const counts = {
+    measured: measuredKeywords.length,
+    topicCandidates: topicCandidates.length,
+    contentGaps: normalizedContentGaps.length,
+    blogIdeas: normalizedBlogIdeas.length,
+    competitors: (seoInfo.competitorKeywords && asArray(seoInfo.competitorKeywords).length) || 0,
+    total: measuredKeywords.length + topicCandidates.length + normalizedContentGaps.length + normalizedBlogIdeas.length
+  };
+
+  return {
+    measuredKeywords: measuredKeywords.slice(0, 50),
+    topicCandidates: topicCandidates.slice(0, 100),
+    contentGaps: normalizedContentGaps.slice(0, 20),
+    blogIdeas: normalizedBlogIdeas.slice(0, 20),
+    technicalAudit,
+    counts
+  };
+}
+
+/**
+ * Normalize technical audit data for consumers (frontend, PDF, report builder).
+ * Maps from actual stored database paths to a normalized consumer shape.
+ * Database stores technical audit data in json columns with variable structures:
+ * - auditData { mobile, desktop, scores, issues, pageSpeed }
+ * - lighthouse { categories, audits, performance, accessibility, best-practices, seo }
+ * - pageSpeed { mobile, desktop }
+ * - cores { webVitals, mobile, desktop }
+ * - scores { performance, accessibility, seo, bestPractices }
+ * - issues { critical, major, minor }
+ */
+export function normalizeTechnicalAuditForConsumers(audit) {
+  if (!audit || typeof audit !== 'object') return null;
+
+  // Walk through all common access paths
+  const ad = audit.auditData || audit;
+
+  // Lighthouse data (from PageSpeed Insights / Lighthouse API)
+  const lighthouse = ad.lighthouse || ad.lighthouseResult || null;
+
+  // PageSpeed data (mobile/desktop split)
+  const pageSpeed = ad.pageSpeed || ad.pageSpeedInsights || ad.lighthouse?.pageSpeed || null;
+
+  // Extract mobile and desktop data from various locations
+  const mobData = ad.mobile || pageSpeed?.mobile || audit.mobile || null;
+  const deskData = ad.desktop || pageSpeed?.desktop || audit.desktop || null;
+
+  // Core Web Vitals
+  const cores = ad.cores || audit.cores || null;
+
+  // Scores from various locations
+  const scores = ad.scores || audit.scores || lighthouse?.categories || null;
+
+  // Issues
+  const issues = ad.issues || ad.auditIssues || audit.issues || lighthouse?.audits || null;
+
+  // Normalize performance score
+  const extractScore = (source, key) => {
+    if (!source) return null;
+    const val = source[key] ?? source.score ?? source[key + 'Score'] ?? null;
+    if (typeof val === 'number') return val;
+    if (typeof val === 'object' && val !== null) return val.score ?? val.value ?? null;
+    return null;
+  };
+
+  const performance = mobData ? (mobData.performance ?? mobData.performanceScore ?? null)
+    : deskData ? (deskData.performance ?? deskData.performanceScore ?? null)
+    : scores ? (scores.performance?.score ?? null)
+    : null;
+
+  const accessibility = scores?.accessibility?.score ?? null;
+  const bestPractices = scores?.['best-practices']?.score ?? scores?.bestPractices?.score ?? null;
+  const seo = scores?.seo?.score ?? null;
+
+  // Count issues
+  const criticalIssues = asArray(issues?.critical || issues?.errors || []).length;
+  const majorIssues = asArray(issues?.major || issues?.warnings || []).length;
+  const minorIssues = asArray(issues?.minor || issues?.info || issues?.notices || []).length;
+  const totalIssues = criticalIssues + majorIssues + minorIssues;
+
+  return {
+    performance: performance !== null ? Math.round(performance * (performance > 1 ? 1 : 1)) : null,
+    accessibility: accessibility !== null ? Math.round(accessibility * (accessibility > 1 ? 1 : 1)) : null,
+    bestPractices: bestPractices !== null ? Math.round(bestPractices * (bestPractices > 1 ? 1 : 1)) : null,
+    seo: seo !== null ? Math.round(seo * (seo > 1 ? 1 : 1)) : null,
+    mobile: mobData ? {
+      score: extractScore(mobData, 'performance'),
+      fcp: mobData.firstContentfulPaint || mobData.fcp || null,
+      lcp: mobData.largestContentfulPaint || mobData.lcp || null,
+      tbt: mobData.totalBlockingTime || mobData.tbt || null,
+      cls: mobData.cumulativeLayoutShift || mobData.cls || null,
+      si: mobData.speedIndex || mobData.si || null,
+    } : null,
+    desktop: deskData ? {
+      score: extractScore(deskData, 'performance'),
+      fcp: deskData.firstContentfulPaint || deskData.fcp || null,
+      lcp: deskData.largestContentfulPaint || deskData.lcp || null,
+      tbt: deskData.totalBlockingTime || deskData.tbt || null,
+      cls: deskData.cumulativeLayoutShift || deskData.cls || null,
+      si: deskData.speedIndex || deskData.si || null,
+    } : null,
+    coreWebVitals: cores ? {
+      lcp: cores.lcp || cores.largestContentfulPaint || null,
+      fid: cores.fid || cores.firstInputDelay || null,
+      cls: cores.cls || cores.cumulativeLayoutShift || null,
+      inp: cores.inp || cores.interactionToNextPaint || null,
+    } : null,
+    issues: {
+      critical: criticalIssues,
+      major: majorIssues,
+      minor: minorIssues,
+      total: totalIssues,
+      items: [
+        ...asArray(issues?.critical || issues?.errors || []).slice(0, 10),
+        ...asArray(issues?.major || issues?.warnings || []).slice(0, 10),
+        ...asArray(issues?.minor || issues?.info || issues?.notices || []).slice(0, 10),
+      ].map(i => ({
+        title: i.title || i.message || i.description || '',
+        severity: i.severity || i.level || 'info',
+        category: i.category || i.type || 'other',
+        description: i.description || i.message || '',
+        impact: i.impact || null
+      }))
+    }
+  };
+}
+
+export default { normalizeSeoForExecution, normalizeSeoForFrontend, normalizeSeoIntelligenceForConsumers, normalizeTechnicalAuditForConsumers };

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
+import { normalizeSeoIntelligenceForConsumers, normalizeTechnicalAuditForConsumers } from '../services/normalizers/seo-intelligence.normalizer.js';
 
 export async function getChatIntelligenceReadiness({ userId, chatId }) {
   const [productIntel, competitorIntel, campaignIntel, seoIntel, automationPlan] = await Promise.all([
@@ -645,6 +646,8 @@ export const getFullResults = async (req, res) => {
       executiveStory: normalizedSeoIntelligence.executiveStory || null,
       actionPlan: normalizedSeoIntelligence.actionPlan || null,
       scoreBreakdown: normalizedSeoIntelligence.scoreBreakdown || {},
+      // Computed normalized counts for consumers (measuredKeywords vs topicCandidates, unified counts)
+      normalized: normalizeSeoIntelligenceForConsumers(seoIntelligence),
       // Raw JSON columns included so consumers can read whichever format they need
       keywordOpportunities: normalizedSeoIntelligence.keywordOpportunities,
       competitorKeywords: normalizedSeoIntelligence.competitorKeywords,
