@@ -5,6 +5,7 @@ import { renderVideo, getVideoStatus } from '../services/integrations/videoExecu
 import { getProviderHealth } from '../services/integrations/providerConfig.service.js';
 import { checkImageProviders, testPollinationsConnection, testFalConnection } from '../services/integrations/image.service.js';
 import { checkVideoProvider, testShotstackConnection, testCreatomateConnection } from '../services/integrations/video.service.js';
+import { checkDataForSeoHealth, isDataForSEOConfigured } from '../services/dataforseo.service.js';
 import { prisma } from '../config/prisma.js';
 
 export async function getHealth(req, res) {
@@ -41,6 +42,15 @@ export async function getHealth(req, res) {
   } catch (error) {
     console.error('[IntegrationsHealth] Error:', error.message);
     res.status(500).json({ success: false, error: 'Failed to check provider health' });
+  }
+}
+
+export async function getDataForSeoHealth(req, res) {
+  try {
+    const health = await checkDataForSeoHealth();
+    return res.json({ success: true, dataforseo: health });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
   }
 }
 

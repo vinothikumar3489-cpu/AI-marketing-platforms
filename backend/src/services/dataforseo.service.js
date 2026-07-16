@@ -102,9 +102,8 @@ async function dataforseoRequest(endpoint, method = 'POST', body = null) {
 
     if (response.status === 401) {
       const errorText = await response.text();
-      console.warn('⚠️ [DataForSEO] Authentication failed - marking as unavailable');
+      console.warn('[DataForSEO] Authentication failed - marking as unavailable');
 
-      // Check for account verification failure
       if (errorText.includes('40104') || errorText.includes('verify your account')) {
         return {
           success: false,
@@ -113,7 +112,7 @@ async function dataforseoRequest(endpoint, method = 'POST', body = null) {
           available: false,
           reason: 'DataForSEO account not verified',
           source: 'DataForSEO',
-          statusCode: 40104
+          statusCode: 401
         };
       }
 
@@ -123,14 +122,25 @@ async function dataforseoRequest(endpoint, method = 'POST', body = null) {
         unavailable: true,
         available: false,
         reason: 'DataForSEO authentication failed',
-        source: 'DataForSEO'
+        source: 'DataForSEO',
+        statusCode: 401
+      };
+    }
+
+    if (response.status === 404) {
+      const errorText = await response.text();
+      console.warn(`[DataForSEO] Endpoint not found: ${response.status} - ${errorText}`);
+      return {
+        success: false,
+        error: `Endpoint not found: ${response.status}`,
+        statusCode: 404
       };
     }
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`❌ [DataForSEO] API error: ${response.status} - ${errorText}`);
-      return { success: false, error: `API error: ${response.status}` };
+      console.error(`[DataForSEO] API error: ${response.status} - ${errorText}`);
+      return { success: false, error: `API error: ${response.status}`, statusCode: response.status };
     }
 
     const data = await response.json();
@@ -789,8 +799,114 @@ export async function getDomainData(domain) {
       }
     };
   } catch (error) {
-    console.error(`❌ [DataForSEO] Domain data fetch failed:`, error.message);
+    console.error(`[DataForSEO] Domain data fetch failed:`, error.message);
     return { success: false, error: error.message };
   }
 }
+
+// ============================================
+// DATAFORSEO HEALTH CHECK
+// ============================================
+
+export async function checkDataForSeoHealth() {
+  const configured = isDataForSEOConfigured();
+  if (!configured) {
+    return {
+      configured: false,
+      authenticated: false,
+      baseUrlValid: false,
+      endpointValid: false,
+      failureType: 'NOT_CONFIGURED',
+      statusCode: null,
+      message: 'DataForSEO credentials not configured. Set DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD.'
+    };
+  }
+
+  // Test the keyword search volume endpoint
+  try {
+    const testBody = [{
+      keywords: ['test keyword health check'],
+      location_name: 'United States',
+      language_name: 'English'
+    }];
+    const response = await dataforseoRequest('/keywords_data/google_ads/search_volume/live', 'POST', testBody);
+
+    if (!response.success) {
+      if (response.statusCode === 401 || (response.error && response.error.includes('401'))) {
+        const statusCode = response.statusCode || 401;
+        return {
+          configured: true,
+          authenticated: false,
+          baseUrlValid: true,
+          endpointValid: false,
+          failureType: 'AUTH_FAILED',
+          statusCode,
+          message: response.reason || 'DataForSEO authentication failed. Check DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD.'
+        };
+      }
+
+      if (response.statusCode === 402) {
+        return {
+          configured: true,
+          authenticated: true,
+          baseUrlValid: true,
+          endpointValid: true,
+          failureType: 'INSUFFICIENT_FUNDS',
+          statusCode: 402,
+          message: 'DataForSEO API responded (credentials valid) but account has insufficient balance for this endpoint.'
+        };
+      }
+
+      if (response.statusCode === 404) {
+        return {
+          configured: true,
+          authenticated: true,
+          baseUrlValid: true,
+          endpointValid: false,
+          failureType: 'ENDPOINT_NOT_FOUND',
+          statusCode: 404,
+          message: 'DataForSEO endpoint returned 404. Check endpoint path: /keywords_data/google_ads/search_volume/live'
+        };
+      }
+
+      return {
+        configured: true,
+        authenticated: true,
+        baseUrlValid: true,
+        endpointValid: false,
+        failureType: 'UNEXPECTED_STATUS',
+        statusCode: response.statusCode || 0,
+        message: `DataForSEO returned unexpected status ${response.statusCode}. ${response.error || ''}`
+      };
+    }
+
+    return {
+      configured: true,
+      authenticated: true,
+      baseUrlValid: true,
+      endpointValid: true,
+      failureType: 'AVAILABLE',
+      statusCode: 200,
+      message: 'DataForSEO API is available and authenticated.'
+    };
+  } catch (error) {
+    return {
+      configured: true,
+      authenticated: false,
+      baseUrlValid: false,
+      endpointValid: false,
+      failureType: 'NETWORK_FAILED',
+      statusCode: null,
+      message: `DataForSEO network error: ${error.message}`
+    };
+  }
+}
+
+// Log DataForSEO configuration status at startup
+console.log('[DataForSEO Config]', JSON.stringify({
+  provider: 'DataForSEO',
+  loginConfigured: !!DATAFORSEO_LOGIN,
+  passwordConfigured: !!DATAFORSEO_PASSWORD,
+  baseUrl: DATAFORSEO_API_URL
+}));
 

@@ -492,7 +492,20 @@ export function normalizeTechnicalAuditForConsumers(audit) {
   // Issues
   const issues = ad.issues || ad.auditIssues || audit.issues || lighthouse?.audits || null;
 
-  // Normalize performance score
+  // Normalize performance score from multiple paths
+  const getDeviceScore = (deviceData, metric) => {
+    if (!deviceData) return null;
+    // Common paths: lighthouseScores.performance, performance, performanceScore, scores.performance
+    const ls = deviceData.lighthouseScores;
+    if (ls) {
+      const v = ls[metric] ?? ls[metric === 'bestPractices' ? 'bestPractices' : metric] ?? null;
+      if (v !== null && v !== undefined) return v;
+    }
+    const v = deviceData[metric] ?? deviceData[metric + 'Score'] ?? deviceData.scores?.[metric] ?? null;
+    if (v !== null && v !== undefined) return v;
+    return null;
+  };
+
   const extractScore = (source, key) => {
     if (!source) return null;
     const val = source[key] ?? source.score ?? source[key + 'Score'] ?? null;
@@ -501,14 +514,22 @@ export function normalizeTechnicalAuditForConsumers(audit) {
     return null;
   };
 
-  const performance = mobData ? (mobData.performance ?? mobData.performanceScore ?? null)
-    : deskData ? (deskData.performance ?? deskData.performanceScore ?? null)
+  const performance = mobData ? getDeviceScore(mobData, 'performance')
+    : deskData ? getDeviceScore(deskData, 'performance')
     : scores ? (scores.performance?.score ?? null)
     : null;
 
-  const accessibility = scores?.accessibility?.score ?? null;
-  const bestPractices = scores?.['best-practices']?.score ?? scores?.bestPractices?.score ?? null;
-  const seo = scores?.seo?.score ?? null;
+  const accessibility = mobData ? getDeviceScore(mobData, 'accessibility')
+    : deskData ? getDeviceScore(deskData, 'accessibility')
+    : scores?.accessibility?.score ?? null;
+
+  const bestPractices = mobData ? getDeviceScore(mobData, 'bestPractices')
+    : deskData ? getDeviceScore(deskData, 'bestPractices')
+    : scores?.['best-practices']?.score ?? scores?.bestPractices?.score ?? null;
+
+  const seo = mobData ? getDeviceScore(mobData, 'seo')
+    : deskData ? getDeviceScore(deskData, 'seo')
+    : scores?.seo?.score ?? null;
 
   // Count issues
   const criticalIssues = asArray(issues?.critical || issues?.errors || []).length;
@@ -516,27 +537,35 @@ export function normalizeTechnicalAuditForConsumers(audit) {
   const minorIssues = asArray(issues?.minor || issues?.info || issues?.notices || []).length;
   const totalIssues = criticalIssues + majorIssues + minorIssues;
 
+  const buildDeviceDetail = (deviceData) => {
+    if (!deviceData) return null;
+    const ls = deviceData.lighthouseScores || {};
+    const pa = deviceData.performanceAudits || {};
+    const cv = deviceData.coreWebVitals || {};
+    return {
+      score: getDeviceScore(deviceData, 'performance') ?? null,
+      fcp: pa.firstContentfulPaint ?? deviceData.firstContentfulPaint ?? deviceData.fcp ?? cv.fcp ?? null,
+      lcp: pa.largestContentfulPaint ?? deviceData.largestContentfulPaint ?? deviceData.lcp ?? cv.lcp ?? null,
+      tbt: pa.totalBlockingTime ?? deviceData.totalBlockingTime ?? deviceData.tbt ?? null,
+      cls: pa.cumulativeLayoutShift ?? deviceData.cumulativeLayoutShift ?? deviceData.cls ?? cv.cls ?? null,
+      si: pa.speedIndex ?? deviceData.speedIndex ?? deviceData.si ?? null,
+    };
+  };
+
+  // Normalize score: 0-1 range to 0-100
+  const toPercent = (v) => v !== null && v !== undefined ? Math.round(v * (v > 1 ? 1 : 100)) : null;
+
   return {
-    performance: performance !== null ? Math.round(performance * (performance > 1 ? 1 : 1)) : null,
-    accessibility: accessibility !== null ? Math.round(accessibility * (accessibility > 1 ? 1 : 1)) : null,
-    bestPractices: bestPractices !== null ? Math.round(bestPractices * (bestPractices > 1 ? 1 : 1)) : null,
-    seo: seo !== null ? Math.round(seo * (seo > 1 ? 1 : 1)) : null,
-    mobile: mobData ? {
-      score: extractScore(mobData, 'performance'),
-      fcp: mobData.firstContentfulPaint || mobData.fcp || null,
-      lcp: mobData.largestContentfulPaint || mobData.lcp || null,
-      tbt: mobData.totalBlockingTime || mobData.tbt || null,
-      cls: mobData.cumulativeLayoutShift || mobData.cls || null,
-      si: mobData.speedIndex || mobData.si || null,
-    } : null,
-    desktop: deskData ? {
-      score: extractScore(deskData, 'performance'),
-      fcp: deskData.firstContentfulPaint || deskData.fcp || null,
-      lcp: deskData.largestContentfulPaint || deskData.lcp || null,
-      tbt: deskData.totalBlockingTime || deskData.tbt || null,
-      cls: deskData.cumulativeLayoutShift || deskData.cls || null,
-      si: deskData.speedIndex || deskData.si || null,
-    } : null,
+    available: performance !== null || accessibility !== null || bestPractices !== null || seo !== null ||
+               !!(mobData && Object.keys(mobData).length > 0) ||
+               !!(deskData && Object.keys(deskData).length > 0),
+    source: 'PageSpeed',
+    performance: toPercent(performance),
+    accessibility: toPercent(accessibility),
+    bestPractices: toPercent(bestPractices),
+    seo: toPercent(seo),
+    mobile: buildDeviceDetail(mobData),
+    desktop: buildDeviceDetail(deskData),
     coreWebVitals: cores ? {
       lcp: cores.lcp || cores.largestContentfulPaint || null,
       fid: cores.fid || cores.firstInputDelay || null,

@@ -9,6 +9,7 @@ import {
   generateGrowthMatrixChart, generateScoreRadarChart
 } from './chart-generator.service.js';
 import { prisma } from '../../config/prisma.js';
+import { normalizeSeoIntelligenceForConsumers, normalizeTechnicalAuditForConsumers } from '../normalizers/seo-intelligence.normalizer.js';
 
 export async function buildReportData(chatId, userId) {
   console.log('[Report] Building report data for chat:', chatId);
@@ -331,7 +332,7 @@ function normalizeSeoIntelligence(seoIntel) {
   const blogRecord = seoIntel.blogIdeas || seoIntel.blogIntelligenceRecord || {};
 
   return {
-    scores: seoIntel.technicalAuditDetail || seoIntel.technicalAudit || {},
+    scores: normalizeTechnicalAuditForConsumers(seoIntel?.technicalAuditDetail || seoIntel?.technicalAudit || {}),
     keywords: normalizeSeoKeywordArray(keywordRecord),
     competitors: extractArray(competitorRecord?.competitors || competitorRecord?.competitorProfiles || competitorRecord),
     gaps: extractArray(gapRecord?.contentGaps || gapRecord?.gaps || gapRecord?.missingPages || []),

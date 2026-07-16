@@ -4,8 +4,52 @@
  */
 import { sanitizeText, extractText } from './text.util.js';
 
+// UI/navigation text patterns that must never be used as product identity
+const UI_IDENTITY_PATTERNS = [
+  'chat history', 'new chat', 'new & featured', 'home', 'dashboard',
+  'pricing', 'products', 'explore', 'settings', 'new analysis',
+  'new growth analysis', 'unknown product', 'none', 'untitled',
+  'sign in', 'sign up', 'log in', 'login', 'register', 'create account',
+  'welcome', 'get started', 'learn more', 'read more', 'contact us',
+  'about us', 'our story', 'search', 'menu', 'navigation',
+  'video conferencing for business', 'start free trial', 'book a demo',
+];
+
+export function isValidProductIdentity(value) {
+  if (!value || typeof value !== 'string') return false;
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return false;
+  if (trimmed.length <= 2) return false;
+  if (UI_IDENTITY_PATTERNS.includes(trimmed)) return false;
+  for (const pattern of UI_IDENTITY_PATTERNS) {
+    if (trimmed === pattern) return false;
+  }
+  return true;
+}
+
+function extractJsonLdName(scrapedData) {
+  if (!scrapedData) return null;
+  const jsonld = scrapedData.jsonld || scrapedData.structuredData || scrapedData.json_ld || [];
+  const items = Array.isArray(jsonld) ? jsonld : [jsonld];
+  for (const item of items) {
+    if (!item || typeof item !== 'object') continue;
+    const type = item['@type'] || '';
+    if (type === 'Product' || type === 'Organization' || type === 'SoftwareApplication' || type === 'WebSite') {
+      const name = item.name || item.alternateName || null;
+      if (name && typeof name === 'string' && isValidProductIdentity(name)) return name;
+    }
+  }
+  return null;
+}
+
 // Well-known domain overrides: maps domains to their canonical brand/product name
 const KNOWN_DOMAINS = {
+  'chatgpt.com': { productName: 'ChatGPT', companyName: 'OpenAI', brandName: 'ChatGPT' },
+  'openai.com': { productName: 'OpenAI Platform', companyName: 'OpenAI', brandName: 'OpenAI' },
+  'perplexity.ai': { productName: 'Perplexity', companyName: 'Perplexity AI', brandName: 'Perplexity' },
+  'claude.ai': { productName: 'Claude', companyName: 'Anthropic', brandName: 'Claude' },
+  'anthropic.com': { productName: 'Anthropic', companyName: 'Anthropic', brandName: 'Anthropic' },
+  'gemini.google.com': { productName: 'Google Gemini', companyName: 'Google', brandName: 'Google Gemini' },
   'meet.google.com': { productName: 'Google Meet', companyName: 'Google', brandName: 'Google Meet' },
   'calendar.google.com': { productName: 'Google Calendar', companyName: 'Google', brandName: 'Google Calendar' },
   'docs.google.com': { productName: 'Google Docs', companyName: 'Google', brandName: 'Google Docs' },
@@ -167,17 +211,24 @@ export function deriveWebsiteIdentity(params = {}) {
 
   const meta = scrapedData?.meta || {};
   const ogSiteName = meta?.ogSiteName || meta?.['og:site_name'];
-  
+
+  // Extract JSON-LD name first — highest authority
+  const jsonLdName = extractJsonLdName(scrapedData);
+
   // Extract title from multiple sources in priority order
+  // JSON-LD > og:site_name > og:title > meta title > scraped title > H1 > domain
   const titleSources = [
-    scrapedData?.title,
-    meta?.title,
+    jsonLdName,
+    ogSiteName,
     meta?.ogTitle,
     meta?.['og:title'],
-    scrapedData?.h1?.[0],
-    ogSiteName
+    meta?.title,
+    scrapedData?.title,
   ];
-  const titlePart = cleanTitle(titleSources.find(t => t) || '');
+  // Only include H1 if it passes the UI identity filter
+  const h1Candidate = scrapedData?.h1?.[0];
+  const h1Valid = h1Candidate && isValidProductIdentity(h1Candidate);
+  const titlePart = cleanTitle(titleSources.find(t => t && isValidProductIdentity(t)) || (h1Valid ? h1Candidate : ''));
   
   // Extract description from multiple sources in priority order
   const descriptionSources = [
@@ -214,7 +265,9 @@ export function deriveWebsiteIdentity(params = {}) {
   const domainDerivedName = formatDomain(domain);
 
   // Pick the best company/product/brand name - prioritize scraped title/meta over domain
-  let brandName = ogSiteName || titlePart || h1 || domainDerivedName || domain;
+  // Filter through isValidProductIdentity to reject UI/navigation text
+  const nameCandidates = [jsonLdName, ogSiteName, titlePart, domainDerivedName, domain].filter(Boolean);
+  const brandName = nameCandidates.find(c => isValidProductIdentity(c)) || 'Unknown';
   let companyName = brandName;
   let productName = brandName;
 
