@@ -10,6 +10,7 @@ import {
 } from './chart-generator.service.js';
 import { prisma } from '../../config/prisma.js';
 import { normalizeSeoIntelligenceForConsumers, normalizeTechnicalAuditForConsumers } from '../normalizers/seo-intelligence.normalizer.js';
+import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
 
 export async function buildReportData(chatId, userId) {
   console.log('[Report] Building report data for chat:', chatId);
@@ -33,6 +34,25 @@ export async function buildReportData(chatId, userId) {
   ]);
 
   const input = productIntel?.inputJson || campaignIntel?.inputJson || {};
+
+  // Phase 22: Use canonical product identity resolver for consistent reporting
+  const productIdentity = resolveProductIdentity({
+    chat: { id: chatId, title: input?.companyName || input?.productName, websiteUrl: input?.websiteUrl },
+    productIntelligence: productIntel?.productAnalysis ? {
+      productName: input?.productName || productIntel?.productAnalysis?.productName,
+      brandName: productIntel?.productAnalysis?.brandName,
+      companyName: input?.companyName || productIntel?.productAnalysis?.companyName
+    } : null,
+    evidenceSnapshot: productIntel?.evidenceSnapshot || null,
+    website: input?.websiteUrl ? { url: input.websiteUrl } : null
+  });
+
+  console.log('[Report] Product identity resolved for report', {
+    chatId,
+    productName: productIdentity.productName,
+    brandName: productIdentity.brandName,
+    source: productIdentity.source
+  });
 
   const product = productIntel?.productAnalysis || {};
   const market = productIntel?.marketDiscovery || {};
@@ -60,8 +80,9 @@ export async function buildReportData(chatId, userId) {
     campaignReadinessScore: null
   };
 
+  // Use canonical product identity for consistent company naming across reports
   const company = executiveStory?.companyOverview || {
-    name: input?.companyName || input?.productName || 'Unknown',
+    name: productIdentity.companyName || input?.companyName || input?.productName || 'Unknown',
     website: input?.websiteUrl || '',
     industry: input?.industry || 'Unknown',
     businessModel: 'Unknown',
@@ -132,6 +153,7 @@ export async function buildReportData(chatId, userId) {
     intent, positioning: positioningData, pricing,
     technology: technologyData, scores, actionPlan: actionPlanData,
     channelData, product, campaign, seo, executiveStory,
+    productIdentity, // Phase 22: Include canonical product identity for consistency
     chat: { id: chatId, input }
   };
 }

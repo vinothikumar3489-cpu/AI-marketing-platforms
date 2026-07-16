@@ -143,13 +143,94 @@ export async function generateSingleModule(type, context) {
 }
 
 export function getExecutionSummary(data) {
-  if (!data) return { total: 0, modules: [] };
+  if (!data) return { total: 0, modules: [], tabQuality: {} };
   const modules = [];
-  if (data.contentStudio?.totalGenerated) modules.push({ name: 'Content Studio', count: data.contentStudio.totalGenerated });
-  if (data.emailCampaigns?.totalGenerated) modules.push({ name: 'Email Campaigns', count: data.emailCampaigns.totalGenerated });
-  if (data.creativeStudio?.totalGenerated) modules.push({ name: 'Creative Studio', count: data.creativeStudio.totalGenerated });
-  if (data.videoStudio?.totalGenerated) modules.push({ name: 'Video Studio', count: data.videoStudio.totalGenerated });
-  if (data.campaignPlans?.totalGenerated) modules.push({ name: 'Campaign Planner', count: data.campaignPlans.totalGenerated });
-  if (data.socialCalendars?.totalGenerated) modules.push({ name: 'Social Calendar', count: data.socialCalendars.totalGenerated });
-  return { total: modules.reduce((s, m) => s + m.count, 0), modules };
+  const tabQuality = {};
+
+  // Content Studio - core tab, always show
+  const contentStudioCount = data.contentStudio?.totalGenerated || 0;
+  if (contentStudioCount > 0) {
+    modules.push({ name: 'Content Studio', count: contentStudioCount });
+  }
+  tabQuality.contentStudio = {
+    available: true,
+    core: true,
+    dataQuality: contentStudioCount > 0 ? 'good' : 'empty',
+    itemCount: contentStudioCount,
+    shouldShow: true // Core tab always shows
+  };
+
+  // Email Campaigns - core tab, always show
+  const emailCampaignsCount = data.emailCampaigns?.totalGenerated || 0;
+  if (emailCampaignsCount > 0) {
+    modules.push({ name: 'Email Campaigns', count: emailCampaignsCount });
+  }
+  tabQuality.emailCampaigns = {
+    available: true,
+    core: true,
+    dataQuality: emailCampaignsCount > 0 ? 'good' : 'empty',
+    itemCount: emailCampaignsCount,
+    shouldShow: true // Core tab always shows
+  };
+
+  // Creative Studio - hide if less than 2 briefs
+  const creativeStudioCount = data.creativeStudio?.totalGenerated || 0;
+  if (creativeStudioCount >= 2) {
+    modules.push({ name: 'Creative Studio', count: creativeStudioCount });
+  }
+  tabQuality.creativeStudio = {
+    available: true,
+    core: false,
+    dataQuality: creativeStudioCount >= 2 ? 'good' : 'low',
+    itemCount: creativeStudioCount,
+    shouldShow: creativeStudioCount >= 2,
+    reason: creativeStudioCount < 2 ? 'Insufficient creative briefs (minimum 2 required)' : null
+  };
+
+  // Video Studio - hide if less than 2 scripts
+  const videoStudioCount = data.videoStudio?.totalGenerated || 0;
+  if (videoStudioCount >= 2) {
+    modules.push({ name: 'Video Studio', count: videoStudioCount });
+  }
+  tabQuality.videoStudio = {
+    available: true,
+    core: false,
+    dataQuality: videoStudioCount >= 2 ? 'good' : 'low',
+    itemCount: videoStudioCount,
+    shouldShow: videoStudioCount >= 2,
+    reason: videoStudioCount < 2 ? 'Insufficient video scripts (minimum 2 required)' : null
+  };
+
+  // Campaign Plans - core tab, always show
+  const campaignPlansCount = data.campaignPlans?.totalGenerated || 0;
+  if (campaignPlansCount > 0) {
+    modules.push({ name: 'Campaign Planner', count: campaignPlansCount });
+  }
+  tabQuality.campaignPlans = {
+    available: true,
+    core: true,
+    dataQuality: campaignPlansCount > 0 ? 'good' : 'empty',
+    itemCount: campaignPlansCount,
+    shouldShow: true // Core tab always shows
+  };
+
+  // Social Calendar - hide if less than 5 entries
+  const socialCalendarsCount = data.socialCalendars?.totalGenerated || 0;
+  if (socialCalendarsCount >= 5) {
+    modules.push({ name: 'Social Calendar', count: socialCalendarsCount });
+  }
+  tabQuality.socialCalendars = {
+    available: true,
+    core: false,
+    dataQuality: socialCalendarsCount >= 5 ? 'good' : 'low',
+    itemCount: socialCalendarsCount,
+    shouldShow: socialCalendarsCount >= 5,
+    reason: socialCalendarsCount < 5 ? 'Insufficient calendar entries (minimum 5 required)' : null
+  };
+
+  return { 
+    total: modules.reduce((s, m) => s + m.count, 0), 
+    modules,
+    tabQuality
+  };
 }

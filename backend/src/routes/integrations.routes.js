@@ -1,7 +1,7 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
 import { requireAuth } from "../middleware/auth.middleware.js";
-import { getHealth, getDataForSeoHealth, sendEmail, generatePosterImage, renderVideoHandler, getVideoStatusHandler, debugTestPollinations, debugTestFal, debugTestCloudinary, debugTestShotstack, debugTestCreatomate } from "../controllers/integrations.controller.js";
+import { getHealth, getDataForSeoHealth, getAllProviderHealth, sendEmail, generatePosterImage, renderVideoHandler, getVideoStatusHandler, debugTestPollinations, debugTestFal, debugTestCloudinary, debugTestShotstack, debugTestCreatomate } from "../controllers/integrations.controller.js";
 
 export const integrationsRouter = express.Router();
 
@@ -39,6 +39,9 @@ integrationsRouter.get("/health", getHealth);
 
 // DataForSEO health check (admin/debug endpoint)
 integrationsRouter.get("/dataforseo/health", getDataForSeoHealth);
+
+// Full provider health check — all AI/research providers tested
+integrationsRouter.get("/providers/health", getAllProviderHealth);
 
 // Email sending — rate limited
 integrationsRouter.post("/:chatId/studio/email/send-test", emailLimiter, sendEmail);

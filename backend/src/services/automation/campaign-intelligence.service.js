@@ -90,6 +90,26 @@ export async function generateCampaignIntelligence({ userId, chatId, evidenceCon
     source: productIdentity.source
   });
 
+  // Validate product identity is not generic before proceeding
+  const INVALID_PRODUCT_IDENTITIES = new Set([
+    'unknown product', 'new analysis', 'new & featured', 'untitled',
+    'new project', 'growth analysis', 'featured', 'home',
+  ]);
+  
+  const normalizedName = (productIdentity.productName || '').toLowerCase().trim();
+  if (!productIdentity.productName || INVALID_PRODUCT_IDENTITIES.has(normalizedName) || normalizedName.length < 2) {
+    console.warn("[CampaignIntelligence] Invalid product identity - blocking campaign generation", {
+      userId, chatId,
+      productName: productIdentity.productName,
+      normalizedName
+    });
+    return {
+      _noData: true,
+      reason: `Invalid product identity: "${productIdentity.productName || 'none'}" — campaign generation requires verified product`,
+      code: 'INVALID_PRODUCT_IDENTITY'
+    };
+  }
+
   // PART 12: Reconcile evidence before generation
   const evidenceReconciliation = reconcileEvidence({
     product, company, website, audience, competitors, seo, channels, growth, sources

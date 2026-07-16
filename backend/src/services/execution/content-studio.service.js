@@ -1186,132 +1186,202 @@ const GENERATORS = {
 };
 
 export async function generateContent(assetType, brief, evidenceContext, callAiFn, userId, chatId) {
-  const typeConfig = CONTENT_TYPES[assetType];
-  if (!typeConfig) throw new Error(`Unknown content type: ${assetType}`);
+  try {
+    const typeConfig = CONTENT_TYPES[assetType];
+    if (!typeConfig) throw new Error(`Unknown content type: ${assetType}`);
 
-  const schemaEntry = SCHEMA_REGISTRY[assetType];
-  if (!schemaEntry) throw new Error(`No schema registered for: ${assetType}`);
+    const schemaEntry = SCHEMA_REGISTRY[assetType];
+    if (!schemaEntry) throw new Error(`No schema registered for: ${assetType}`);
 
-  const generator = GENERATORS[assetType];
-  if (!generator) throw new Error(`No generator for: ${assetType}`);
+    const generator = GENERATORS[assetType];
+    if (!generator) throw new Error(`No generator for: ${assetType}`);
 
-  const briefValidation = validateBriefContent(brief);
-  if (briefValidation.status === 'blocked') {
-    return {
-      _type: assetType,
-      _label: typeConfig.label,
-      _status: 'blocked',
-      _reason: briefValidation.issues.join('; '),
-      _generatedAt: new Date().toISOString(),
-    };
-  }
-
-  const identity = resolveProductIdentity(brief?._productIdentity || {});
-  const productName = (identity?.productName || '').toLowerCase().trim();
-  if (INVALID_PRODUCT_LABELS.has(productName) || !productName || productName.length < 2) {
-    return {
-      _type: assetType,
-      _label: typeConfig.label,
-      _status: 'blocked',
-      _reason: `Invalid product identity: "${identity?.productName || 'none'}" — content generation requires a verified product`,
-      _generatedAt: new Date().toISOString(),
-    };
-  }
-
-  const result = await generator(brief);
-
-  if (!result) {
-    return {
-      _type: assetType,
-      _label: typeConfig.label,
-      _status: 'generation_failed',
-      _generatedAt: new Date().toISOString(),
-    };
-  }
-
-  let repairedResult = repairAIOutput(result, assetType);
-  let schemaValidation = validateContentOutput(repairedResult, assetType);
-
-  if (!schemaValidation.valid) {
-    const retryBrief = {
-      ...brief,
-      _retryInstructions: `Schema validation failed. Errors:\n${schemaValidation.errors.join('\n')}\nReturn valid JSON matching the original schema.`,
-    };
-    const retryResult = await generator(retryBrief);
-    if (retryResult) {
-      repairedResult = repairAIOutput(retryResult, assetType);
-      schemaValidation = validateContentOutput(repairedResult, assetType);
+    const briefValidation = validateBriefContent(brief);
+    if (briefValidation.status === 'blocked') {
+      return {
+        _type: assetType,
+        _label: typeConfig.label,
+        _status: 'blocked',
+        _reason: briefValidation.issues.join('; '),
+        _generatedAt: new Date().toISOString(),
+      };
     }
-  }
 
-  if (!schemaValidation.valid) {
+    const identity = resolveProductIdentity(brief?._productIdentity || {});
+    const productName = (identity?.productName || '').toLowerCase().trim();
+    if (INVALID_PRODUCT_LABELS.has(productName) || !productName || productName.length < 2) {
+      return {
+        _type: assetType,
+        _label: typeConfig.label,
+        _status: 'blocked',
+        _reason: `Invalid product identity: "${identity?.productName || 'none'}" — content generation requires a verified product`,
+        _generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const result = await generator(brief);
+
+    if (!result) {
+      return {
+        _type: assetType,
+        _label: typeConfig.label,
+        _status: 'generation_failed',
+        _generatedAt: new Date().toISOString(),
+      };
+    }
+
+    let repairedResult = repairAIOutput(result, assetType);
+    let schemaValidation = validateContentOutput(repairedResult, assetType);
+
+    if (!schemaValidation.valid) {
+      const retryBrief = {
+        ...brief,
+        _retryInstructions: `Schema validation failed. Errors:\n${schemaValidation.errors.join('\n')}\nReturn valid JSON matching the original schema.`,
+      };
+      const retryResult = await generator(retryBrief);
+      if (retryResult) {
+        repairedResult = repairAIOutput(retryResult, assetType);
+        schemaValidation = validateContentOutput(repairedResult, assetType);
+      }
+    }
+
+    if (!schemaValidation.valid) {
+      return {
+        content: { ...repairedResult, _type: assetType },
+        metadata: {
+          type: assetType,
+          label: typeConfig.label,
+          status: 'schema_rejected',
+          generatedAt: new Date().toISOString(),
+          provider: repairedResult._provider || 'content_studio_ai',
+          schemaErrors: schemaValidation.errors,
+        },
+      };
+    }
+
+    const claimValidation = validateContentClaims(result, assetType);
+
+    const validatedContent = {
+      ...schemaValidation.data,
+      _type: assetType,
+    };
+
     return {
-      content: { ...repairedResult, _type: assetType },
+      content: validatedContent,
       metadata: {
         type: assetType,
         label: typeConfig.label,
-        status: 'schema_rejected',
         generatedAt: new Date().toISOString(),
-        provider: repairedResult._provider || 'content_studio_ai',
-        schemaErrors: schemaValidation.errors,
+        provider: result._provider || 'content_studio_ai',
+        claimStatus: claimValidation.status,
+        claimFindings: claimValidation.findings,
+        schemaValid: true,
       },
     };
+  } catch (error) {
+    console.error('[Content Studio] Unexpected error in generateContent:', {
+      assetType,
+      error: error.message,
+      stack: error.stack,
+      briefKeys: Object.keys(brief || {}),
+      hasEvidenceContext: !!evidenceContext,
+      userId,
+      chatId
+    });
+    
+    return {
+      _type: assetType,
+      _label: CONTENT_TYPES[assetType]?.label || assetType,
+      _status: 'generation_failed',
+      _reason: `Unexpected error: ${error.message}`,
+      _generatedAt: new Date().toISOString(),
+      _errorDetails: {
+        message: error.message,
+        name: error.name,
+        stage: 'content_generation'
+      }
+    };
   }
-
-  const claimValidation = validateContentClaims(result, assetType);
-
-  const validatedContent = {
-    ...schemaValidation.data,
-    _type: assetType,
-  };
-
-  return {
-    content: validatedContent,
-    metadata: {
-      type: assetType,
-      label: typeConfig.label,
-      generatedAt: new Date().toISOString(),
-      provider: result._provider || 'content_studio_ai',
-      claimStatus: claimValidation.status,
-      claimFindings: claimValidation.findings,
-      schemaValid: true,
-    },
-  };
 }
 
 export async function generateContentStudioPlan(typesOrCtx, brief, evidenceContext, callAiFn, userId, chatId) {
-  if (typesOrCtx && typeof typesOrCtx === 'object' && !Array.isArray(typesOrCtx)) {
-    const execCtx = typesOrCtx;
-    const minimalBrief = {
-      product: { name: execCtx.productName || 'N/A', summary: null, features: [], benefits: [], usp: execCtx.productUsp || null },
-      company: { name: execCtx.companyName || null, websiteUrl: null, industry: execCtx.industry || null },
-      targetPersonas: execCtx.targetAudience ? [{ name: execCtx.targetAudience, role: null, painPoints: [], goals: [] }] : [],
-      painPoints: [], objections: [], validatedCompetitors: [], verifiedKeywords: [], topicIdeas: [],
-      contentGaps: [], tone: execCtx.tone || 'professional', CTA: [], evidenceSources: {}, limitations: [],
-      _briefId: `legacy_${Date.now()}`, _chatId: null, _userId: null, _builtAt: new Date().toISOString(),
+  try {
+    if (typesOrCtx && typeof typesOrCtx === 'object' && !Array.isArray(typesOrCtx)) {
+      const execCtx = typesOrCtx;
+      const minimalBrief = {
+        product: { name: execCtx.productName || 'N/A', summary: null, features: [], benefits: [], usp: execCtx.productUsp || null },
+        company: { name: execCtx.companyName || null, websiteUrl: null, industry: execCtx.industry || null },
+        targetPersonas: execCtx.targetAudience ? [{ name: execCtx.targetAudience, role: null, painPoints: [], goals: [] }] : [],
+        painPoints: [], objections: [], validatedCompetitors: [], verifiedKeywords: [], topicIdeas: [],
+        contentGaps: [], tone: execCtx.tone || 'professional', CTA: [], evidenceSources: {}, limitations: [],
+        _briefId: `legacy_${Date.now()}`, _chatId: null, _userId: null, _builtAt: new Date().toISOString(),
+      };
+      const allTypes = Object.keys(CONTENT_TYPES);
+      return generateContentStudioPlan(allTypes, minimalBrief, null, null, null, null);
+    }
+
+    const types = typesOrCtx;
+    const results = [];
+
+    for (const type of types) {
+      try {
+        const genResult = await generateContent(type, brief, evidenceContext, callAiFn, userId, chatId);
+        if (genResult) results.push({ type, content: genResult.content || genResult, metadata: genResult.metadata || null });
+      } catch (typeError) {
+        console.error('[Content Studio Plan] Error generating type:', {
+          type,
+          error: typeError.message,
+          stack: typeError.stack
+        });
+        results.push({
+          type,
+          content: {
+            _type: type,
+            _status: 'generation_failed',
+            _reason: typeError.message,
+            _generatedAt: new Date().toISOString()
+          },
+          metadata: {
+            error: typeError.message,
+            status: 'failed'
+          }
+        });
+      }
+    }
+
+    return {
+      assets: results,
+      totalGenerated: results.length,
+      _metadata: {
+        evidenceVersion: '2.0.0',
+        generatedAt: new Date().toISOString(),
+        typesGenerated: types,
+        provider: 'content_studio',
+      },
     };
-    const allTypes = Object.keys(CONTENT_TYPES);
-    return generateContentStudioPlan(allTypes, minimalBrief, null, null, null, null);
+  } catch (error) {
+    console.error('[Content Studio Plan] Unexpected error in generateContentStudioPlan:', {
+      error: error.message,
+      stack: error.stack,
+      typesOrCtx: typeof typesOrCtx,
+      hasBrief: !!brief,
+      hasEvidenceContext: !!evidenceContext,
+      userId,
+      chatId
+    });
+    
+    return {
+      assets: [],
+      totalGenerated: 0,
+      error: `Content plan generation failed: ${error.message}`,
+      _metadata: {
+        evidenceVersion: '2.0.0',
+        generatedAt: new Date().toISOString(),
+        provider: 'content_studio',
+        error: error.message
+      },
+    };
   }
-
-  const types = typesOrCtx;
-  const results = [];
-
-  for (const type of types) {
-    const genResult = await generateContent(type, brief, evidenceContext, callAiFn, userId, chatId);
-    if (genResult) results.push({ type, content: genResult.content || genResult, metadata: genResult.metadata || null });
-  }
-
-  return {
-    assets: results,
-    totalGenerated: results.length,
-    _metadata: {
-      evidenceVersion: '2.0.0',
-      generatedAt: new Date().toISOString(),
-      typesGenerated: types,
-      provider: 'content_studio',
-    },
-  };
 }
 
 export { generateLinkedInPost, generateInstagramPost, generateTwitterPost, generateFacebookPost, generateYouTubeDescription, generateEmailCopy, generateCreativeBrief, generateVideoScript, generateBlogArticle, generateFAQ, generateLandingPage, generateProductPage, generateComparisonPage, generateFeatureAnnouncement, generateWhitepaper };

@@ -176,6 +176,22 @@ export function validateBriefContent(brief) {
     issues.push('No features or benefits');
   }
 
+  // Validate product identity is not generic
+  const INVALID_PRODUCT_LABELS = new Set([
+    'unknown product', 'new analysis', 'new & featured', 'untitled',
+    'new project', 'growth analysis', 'featured', 'home',
+  ]);
+  
+  const productName = brief.product?.name?.toLowerCase().trim();
+  if (productName && (INVALID_PRODUCT_LABELS.has(productName) || productName.length < 2)) {
+    return { 
+      valid: false, 
+      status: 'blocked', 
+      reason: `Invalid product identity: "${brief.product.name}" — content generation requires verified product`,
+      code: 'INVALID_PRODUCT_IDENTITY'
+    };
+  }
+
   // Only block if there is truly no product identity at all
   const blocked = !brief.product?.name;
   const status = blocked ? 'blocked' : issues.length === 0 ? 'passed' : 'needs_review';
@@ -184,6 +200,7 @@ export function validateBriefContent(brief) {
     valid: !blocked,
     status,
     issues,
+    code: status === 'blocked' ? 'BRIEF_BLOCKED' : undefined
   };
 }
 

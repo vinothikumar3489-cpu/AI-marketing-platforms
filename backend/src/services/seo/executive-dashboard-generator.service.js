@@ -1376,31 +1376,9 @@ function generateExecutiveActionPlan(seoData) {
     });
   }
 
-  // For Canva products, inject specific high-priority action plan items
-  const isCanva = brandName.toLowerCase().includes('canva') || domain.toLowerCase().includes('canva');
-  if (isCanva) {
-    day7.push(
-      { title: 'Review AI search visibility baseline', why: 'Measure current AI search engine visibility across ChatGPT, Gemini, Perplexity, Claude.', owner: 'SEO Specialist', dependencies: ['GEO Intelligence data'], estimatedEffort: 2, seoImpact: 'medium', businessImpact: 'high', confidence: null, source: 'GEO Intelligence', completionCriteria: 'AI visibility baseline established' },
-      { title: 'Validate PageSpeed and technical SEO scores', why: 'Ensure canva.com meets Core Web Vitals thresholds and technical SEO best practices.', owner: 'SEO Specialist', dependencies: [], estimatedEffort: 4, seoImpact: 'high', businessImpact: 'high', confidence: null, source: 'Technical Audit', completionCriteria: 'PageSpeed scores verified and Core Web Vitals passed' },
-      { title: 'Optimize top design tool landing pages', why: 'Improve on-page SEO for high-traffic design and template landing pages to maximize organic traffic.', owner: 'Content Team', dependencies: [], estimatedEffort: 8, seoImpact: 'high', businessImpact: 'high', confidence: null, source: 'Technical Audit', completionCriteria: 'Top 5 landing pages optimized' }
-    );
-    day30.push(
-      { title: 'Publish Canva vs Adobe Express comparison page', why: 'Capture commercial comparison search intent from users evaluating Canva alternatives.', owner: 'Content Writer', dependencies: ['Keyword research', 'Competitor analysis'], estimatedEffort: 12, seoImpact: 'high', businessImpact: 'high', confidence: null, source: 'Content Gap Analysis', completionCriteria: 'Comparison page published and indexed' },
-      { title: 'Create Canva Brand Kit guide', why: 'Educate users on building brand kits to increase product adoption and brand-related search visibility.', owner: 'Content Writer', dependencies: [], estimatedEffort: 8, seoImpact: 'medium', businessImpact: 'medium', confidence: null, source: 'Content Gap Analysis', completionCriteria: 'Brand Kit guide published' },
-      { title: 'Improve internal linking to design/template pages', why: 'Strengthen internal linking structure to distribute page authority to key design and template landing pages.', owner: 'SEO Specialist', dependencies: ['Site architecture review'], estimatedEffort: 6, seoImpact: 'medium', businessImpact: 'medium', confidence: null, source: 'Technical Audit', completionCriteria: 'Internal link audit completed and improvements deployed' }
-    );
-    day60.push(
-      { title: 'Build AI design tool content cluster', why: 'Create a comprehensive content cluster around AI design tools to dominate AI-generated search results.', owner: 'Content Team', dependencies: ['Keyword cluster analysis'], estimatedEffort: 16, seoImpact: 'high', businessImpact: 'high', confidence: null, source: 'Keyword Intelligence', completionCriteria: 'Content cluster of 5+ articles published' },
-      { title: 'Publish Canva alternatives content', why: 'Target high-volume commercial keywords for users seeking Canva competitors and comparison tools.', owner: 'Content Writer', dependencies: [], estimatedEffort: 10, seoImpact: 'high', businessImpact: 'high', confidence: null, source: 'Content Gap Analysis', completionCriteria: 'Alternatives content published and ranking' },
-      { title: 'Add FAQ/schema for AI search', why: 'Implement structured data and FAQ content optimized for AI overview responses in ChatGPT and Google SGE.', owner: 'SEO Specialist', dependencies: ['FAQ content creation', 'Schema markup knowledge'], estimatedEffort: 8, seoImpact: 'medium', businessImpact: 'high', confidence: null, source: 'GEO Intelligence', completionCriteria: 'FAQ schema implemented on key pages' }
-    );
-    day90.push(
-      { title: 'Start backlink outreach for comparison pages', why: 'Build high-quality backlinks to comparison and landing pages to improve domain authority and rankings.', owner: 'PR/Link Building', dependencies: ['Comparison pages published'], estimatedEffort: 20, seoImpact: 'high', businessImpact: 'high', confidence: null, source: 'Competitor SEO Intelligence', completionCriteria: '10+ high-quality backlinks acquired' },
-      { title: 'Refresh high-intent landing pages', why: 'Update and optimize high-intent landing pages with fresh content, improved CTAs, and current data to maintain rankings.', owner: 'Content Team', dependencies: ['Performance data review'], estimatedEffort: 12, seoImpact: 'medium', businessImpact: 'high', confidence: null, source: 'Technical Audit', completionCriteria: 'Top 10 landing pages refreshed' },
-      { title: 'Track keyword ranking growth', why: 'Monitor keyword ranking changes across primary, secondary, and long-tail keywords to measure SEO program ROI.', owner: 'SEO Specialist', dependencies: ['Rank tracking tool setup'], estimatedEffort: 2, seoImpact: 'low', businessImpact: 'medium', confidence: null, source: 'Keyword Intelligence', completionCriteria: 'Monthly rank tracking report delivered' }
-    );
-    console.log('✅ [Exec ActionPlan] Injected Canva-specific action plan items');
-  }
+  // REMOVED: Hardcoded Canva-specific actions - all actions must be evidence-based
+  // Previously injected hardcoded actions for Canva products without evidence validation
+  // All actions now generated only from actual SEO intelligence data
 
   // Ensure at least some action items exist even if data is limited
   // Generate from available data sources to never return blank

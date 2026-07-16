@@ -178,3 +178,32 @@ export async function debugTestCreatomate(req, res) {
   const result = await testCreatomateConnection();
   res.json(result);
 }
+
+import { checkGroqHealth, checkGeminiHealth, checkOpenRouterHealth, checkFirecrawlHealth, checkPageSpeedHealth, logProviderConfig } from '../services/provider-health.service.js';
+
+export async function getAllProviderHealth(req, res) {
+  try {
+    const [groq, gemini, openrouter, firecrawl, pagespeed, dataforseo] = await Promise.allSettled([
+      checkGroqHealth(),
+      checkGeminiHealth(),
+      checkOpenRouterHealth(),
+      checkFirecrawlHealth(),
+      checkPageSpeedHealth(),
+      checkDataForSeoHealth(),
+    ]);
+    res.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      providers: {
+        groq: groq.status === 'fulfilled' ? groq.value : { provider: 'Groq', failureType: 'NETWORK_FAILED', message: groq.reason?.message },
+        gemini: gemini.status === 'fulfilled' ? gemini.value : { provider: 'Gemini', failureType: 'NETWORK_FAILED', message: gemini.reason?.message },
+        openrouter: openrouter.status === 'fulfilled' ? openrouter.value : { provider: 'OpenRouter', failureType: 'NETWORK_FAILED', message: openrouter.reason?.message },
+        firecrawl: firecrawl.status === 'fulfilled' ? firecrawl.value : { provider: 'Firecrawl', failureType: 'NETWORK_FAILED', message: firecrawl.reason?.message },
+        pagespeed: pagespeed.status === 'fulfilled' ? pagespeed.value : { provider: 'PageSpeed', failureType: 'NETWORK_FAILED', message: pagespeed.reason?.message },
+        dataforseo: dataforseo.status === 'fulfilled' ? dataforseo.value : { provider: 'DataForSEO', failureType: 'NETWORK_FAILED', message: dataforseo.reason?.message },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
