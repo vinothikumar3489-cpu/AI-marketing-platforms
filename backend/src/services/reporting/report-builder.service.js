@@ -323,17 +323,18 @@ export async function generateReportCharts(chatId, userId) {
 }
 
 function normalizeSeoIntelligence(seoIntel) {
-  const keywordRecord = seoIntel.keywordIntelligence || seoIntel.keywordOpportunities || {};
-  const competitorRecord = seoIntel.competitorSeoRecord || seoIntel.competitorKeywords || {};
-  const gapRecord = seoIntel.contentGapRecord || { contentGaps: seoIntel.contentGaps || [] };
-  const geoRecord = seoIntel.geoIntelligence || seoIntel.aiVisibility || {};
-  const blogRecord = seoIntel.blogIntelligenceRecord || { blogIdeas: seoIntel.blogIdeas || [] };
+  // Prefer JSON columns (always complete) over structured relations (may be empty)
+  const keywordRecord = seoIntel.keywordOpportunities || seoIntel.keywordIntelligence || {};
+  const competitorRecord = seoIntel.competitorKeywords || seoIntel.competitorSeoRecord || {};
+  const gapRecord = seoIntel.contentGaps || seoIntel.contentGapRecord || {};
+  const geoRecord = seoIntel.aiVisibility || seoIntel.geoIntelligence || {};
+  const blogRecord = seoIntel.blogIdeas || seoIntel.blogIntelligenceRecord || {};
 
   return {
     scores: seoIntel.technicalAuditDetail || seoIntel.technicalAudit || {},
     keywords: normalizeSeoKeywordArray(keywordRecord),
     competitors: extractArray(competitorRecord?.competitors || competitorRecord?.competitorProfiles || competitorRecord),
-    gaps: extractArray(gapRecord?.contentGaps || seoIntel.contentGaps),
+    gaps: extractArray(gapRecord?.contentGaps || gapRecord?.gaps || gapRecord?.missingPages || []),
     geo: {
       ...geoRecord,
       chatgpt: geoRecord.chatGptScore ?? geoRecord.chatGpt,
@@ -342,7 +343,7 @@ function normalizeSeoIntelligence(seoIntel) {
       perplexity: geoRecord.perplexityScore ?? geoRecord.perplexity,
       googleAiOverview: geoRecord.googleAiOverviewScore ?? geoRecord.googleAiOverview,
     },
-    blogs: extractArray(blogRecord?.blogIdeas || seoIntel.blogIdeas),
+    blogs: extractArray(blogRecord?.blogIdeas || blogRecord?.ideas || []),
     backlinks: seoIntel.rawCrawlData?.[0]?.metadata?.backlinks || {},
     actionPlan: seoIntel.actionPlan || {}
   };

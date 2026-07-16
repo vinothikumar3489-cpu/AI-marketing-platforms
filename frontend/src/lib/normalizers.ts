@@ -730,22 +730,18 @@ export function normalizeSeo(data: any) {
     : tabKeywordsRaw;
 
   // Competitors: JSON column = competitorKeywords (exact raw format), relation = competitorSeoRecord (partial subset)
-  const rawCompetitorJson = seo.competitorKeywords;
-  const rawCompetitorRelation = seo.competitorSeoRecord;
   const tabCompetitors = safeParse(
-    rawCompetitorJson ||
-    rawCompetitorRelation ||
-    seo.competitors ||
+    seo.competitorKeywords ||
+    seo.competitorSeoRecord ||
     seo.competitorIntelligence ||
+    seo.competitors ||
     {}
   );
 
   // Content gaps: JSON column = contentGaps (exact format), relation = contentGapRecord
-  const rawContentGapJson = seo.contentGaps;
-  const rawContentGapRelation = seo.contentGapRecord;
   const tabContentGaps = safeParse(
-    rawContentGapJson ||
-    rawContentGapRelation ||
+    seo.contentGaps ||
+    seo.contentGapRecord ||
     seo.contentGapAnalysis ||
     normalizedContentGaps ||
     {}
@@ -760,13 +756,11 @@ export function normalizeSeo(data: any) {
   );
 
   // Blogs: JSON column = blogIdeas (exact format), relation = blogIntelligenceRecord
-  const rawBlogJson = seo.blogIdeas;
-  const rawBlogRelation = seo.blogIntelligenceRecord;
   const blogWeakKeywords = ['general', 'account', 'semrush', 'competitors', 'alternatives'];
   const tabBlogs = (() => {
     const blogData = safeParse(
-      rawBlogJson ||
-      rawBlogRelation ||
+      seo.blogIdeas ||
+      seo.blogIntelligenceRecord ||
       seo.blogIntelligence ||
       {}
     );

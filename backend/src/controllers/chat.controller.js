@@ -209,10 +209,18 @@ export const getFullResults = async (req, res) => {
   console.log('chatId:', chatId);
   console.log('hasSeoIntelligence:', !!seoIntelligence);
   console.log('seoIntelligenceId:', seoIntelligence?.id || 'N/A');
-  console.log('keywordCount:', (seoIntelligence?.keywordIntelligence?.primaryKeywords || []).length);
-  console.log('competitorCount:', (seoIntelligence?.competitorSeoRecord?.competitorProfiles || []).length);
-  console.log('contentGapCount:', (seoIntelligence?.contentGapRecord?.contentGaps || []).length);
-  console.log('blogCount:', (seoIntelligence?.blogIntelligenceRecord?.blogIdeas || []).length);
+  const kwFromStructured = (seoIntelligence?.keywordIntelligence?.primaryKeywords || []).length;
+  const kwFromJsonColumn = seoIntelligence?.keywordOpportunities ? (seoIntelligence.keywordOpportunities.primaryKeywords || []).length : 0;
+  console.log('keywordCount (structured):', kwFromStructured, '| (JSON column):', kwFromJsonColumn);
+  const compFromStructured = (seoIntelligence?.competitorSeoRecord?.competitorProfiles || []).length;
+  const compFromJsonColumn = seoIntelligence?.competitorKeywords ? (seoIntelligence.competitorKeywords.competitorProfiles || []).length : 0;
+  console.log('competitorCount (structured):', compFromStructured, '| (JSON column):', compFromJsonColumn);
+  const cgFromStructured = (seoIntelligence?.contentGapRecord?.contentGaps || []).length;
+  const cgFromJsonColumn = seoIntelligence?.contentGaps ? (seoIntelligence.contentGaps.contentGaps || []).length : 0;
+  console.log('contentGapCount (structured):', cgFromStructured, '| (JSON column):', cgFromJsonColumn);
+  const blogFromStructured = (seoIntelligence?.blogIntelligenceRecord?.blogIdeas || []).length;
+  const blogFromJsonColumn = seoIntelligence?.blogIdeas ? (seoIntelligence.blogIdeas.blogIdeas || []).length : 0;
+  console.log('blogCount (structured):', blogFromStructured, '| (JSON column):', blogFromJsonColumn);
   console.log('technicalHasAuditData:', !!seoIntelligence?.technicalAuditDetail?.auditData);
   console.log('');
 
@@ -555,24 +563,31 @@ export const getFullResults = async (req, res) => {
     null;
 
   const normalizedSeoIntelligence = seoIntelligence ? {
-    // Canonical structure
+    // Canonical structure — PREFER JSON columns (always complete) over structured relations (may be empty/missing)
     identity: seoIntelligence.identity || {},
     technicalAudit: normalizedTechnicalAuditRecord || {},
-    keywordIntelligence: seoIntelligence.keywordIntelligence || (seoIntelligence.keywordOpportunities ? { primaryKeywords: (seoIntelligence.keywordOpportunities.primaryKeywords || seoIntelligence.keywordOpportunities || []) } : {}),
-    competitorIntelligence: seoIntelligence.competitorSeoRecord || (seoIntelligence.competitorKeywords ? { competitorProfiles: (seoIntelligence.competitorKeywords.competitorProfiles || seoIntelligence.competitorKeywords.competitors || []), competitors: (seoIntelligence.competitorKeywords.competitors || []) } : {}),
-    contentGapAnalysis: seoIntelligence.contentGapRecord || (seoIntelligence.contentGaps ? { contentGaps: (seoIntelligence.contentGaps.contentGaps || seoIntelligence.contentGaps.missingPages || []) } : {}),
-    blogIntelligence: seoIntelligence.blogIntelligenceRecord || (seoIntelligence.blogIdeas ? { blogIdeas: (seoIntelligence.blogIdeas.blogIdeas || seoIntelligence.blogIdeas.ideas || []) } : {}),
-    geoIntelligence: seoIntelligence.geoIntelligence || (seoIntelligence.aiVisibility ? { aiVisibilityScore: seoIntelligence.aiVisibility.aiVisibilityScore || seoIntelligence.aiVisibility.overall, entities: seoIntelligence.aiVisibility.entities || [] } : {}),
+    keywordIntelligence: seoIntelligence?.keywordOpportunities ?? seoIntelligence?.keywordIntelligence ?? {},
+    competitorIntelligence: seoIntelligence?.competitorKeywords ?? seoIntelligence?.competitorSeoRecord ?? {},
+    contentGapAnalysis: seoIntelligence?.contentGaps ?? seoIntelligence?.contentGapRecord ?? {},
+    blogIntelligence: seoIntelligence?.blogIdeas ?? seoIntelligence?.blogIntelligenceRecord ?? {},
+    geoIntelligence: seoIntelligence?.aiVisibility ?? seoIntelligence?.geoIntelligence ?? {},
     executiveDashboard: executiveDashboard,
     executiveStory: executiveStory,
     actionPlan: normalizedActionPlan,
     scoreBreakdown: seoIntelligence.scoreBreakdown || {},
+    // Raw JSON columns (full service output) so consumers can read whichever format they need
+    keywordOpportunities: seoIntelligence?.keywordOpportunities ?? null,
+    competitorKeywords: seoIntelligence?.competitorKeywords ?? null,
+    contentGaps: seoIntelligence?.contentGaps ?? null,
+    blogIdeas: seoIntelligence?.blogIdeas ?? null,
+    aiVisibility: seoIntelligence?.aiVisibility ?? null,
     // Legacy fields for backward compatibility (under _legacy)
     _legacy: {
       technicalAuditDetail: seoIntelligence.technicalAuditDetail,
       competitorSeoRecord: seoIntelligence.competitorSeoRecord,
       contentGapRecord: seoIntelligence.contentGapRecord,
-      blogIntelligenceRecord: seoIntelligence.blogIntelligenceRecord
+      blogIntelligenceRecord: seoIntelligence.blogIntelligenceRecord,
+      keywordIntelligenceRecord: seoIntelligence.keywordIntelligence
     }
   } : null;
 
@@ -630,6 +645,12 @@ export const getFullResults = async (req, res) => {
       executiveStory: normalizedSeoIntelligence.executiveStory || null,
       actionPlan: normalizedSeoIntelligence.actionPlan || null,
       scoreBreakdown: normalizedSeoIntelligence.scoreBreakdown || {},
+      // Raw JSON columns included so consumers can read whichever format they need
+      keywordOpportunities: normalizedSeoIntelligence.keywordOpportunities,
+      competitorKeywords: normalizedSeoIntelligence.competitorKeywords,
+      contentGaps: normalizedSeoIntelligence.contentGaps,
+      blogIdeas: normalizedSeoIntelligence.blogIdeas,
+      aiVisibility: normalizedSeoIntelligence.aiVisibility,
     } : {},
     hasGrowthWorkspace,
     hasProductIntelligence: !!productIntelligence,

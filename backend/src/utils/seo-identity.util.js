@@ -4,6 +4,96 @@
  */
 import { sanitizeText, extractText } from './text.util.js';
 
+// Well-known domain overrides: maps domains to their canonical brand/product name
+const KNOWN_DOMAINS = {
+  'meet.google.com': { productName: 'Google Meet', companyName: 'Google', brandName: 'Google Meet' },
+  'calendar.google.com': { productName: 'Google Calendar', companyName: 'Google', brandName: 'Google Calendar' },
+  'docs.google.com': { productName: 'Google Docs', companyName: 'Google', brandName: 'Google Docs' },
+  'sheets.google.com': { productName: 'Google Sheets', companyName: 'Google', brandName: 'Google Sheets' },
+  'slides.google.com': { productName: 'Google Slides', companyName: 'Google', brandName: 'Google Slides' },
+  'drive.google.com': { productName: 'Google Drive', companyName: 'Google', brandName: 'Google Drive' },
+  'mail.google.com': { productName: 'Gmail', companyName: 'Google', brandName: 'Gmail' },
+  'gmail.com': { productName: 'Gmail', companyName: 'Google', brandName: 'Gmail' },
+  'workspace.google.com': { productName: 'Google Workspace', companyName: 'Google', brandName: 'Google Workspace' },
+  'admin.google.com': { productName: 'Google Admin Console', companyName: 'Google', brandName: 'Google Admin Console' },
+  'analytics.google.com': { productName: 'Google Analytics', companyName: 'Google', brandName: 'Google Analytics' },
+  'search.google.com': { productName: 'Google Search Console', companyName: 'Google', brandName: 'Google Search Console' },
+  'ads.google.com': { productName: 'Google Ads', companyName: 'Google', brandName: 'Google Ads' },
+  'business.google.com': { productName: 'Google Business Profile', companyName: 'Google', brandName: 'Google Business Profile' },
+  'notion.so': { productName: 'Notion', companyName: 'Notion Labs', brandName: 'Notion' },
+  'notion.com': { productName: 'Notion', companyName: 'Notion Labs', brandName: 'Notion' },
+  'figma.com': { productName: 'Figma', companyName: 'Figma', brandName: 'Figma' },
+  'slack.com': { productName: 'Slack', companyName: 'Salesforce', brandName: 'Slack' },
+  'zoom.us': { productName: 'Zoom', companyName: 'Zoom Video Communications', brandName: 'Zoom' },
+  'zoom.com': { productName: 'Zoom', companyName: 'Zoom Video Communications', brandName: 'Zoom' },
+  'microsoft.com': { productName: 'Microsoft', companyName: 'Microsoft', brandName: 'Microsoft' },
+  'office.com': { productName: 'Microsoft 365', companyName: 'Microsoft', brandName: 'Microsoft 365' },
+  'teams.microsoft.com': { productName: 'Microsoft Teams', companyName: 'Microsoft', brandName: 'Microsoft Teams' },
+  'linkedin.com': { productName: 'LinkedIn', companyName: 'Microsoft', brandName: 'LinkedIn' },
+  'twitter.com': { productName: 'X (Twitter)', companyName: 'X Corp', brandName: 'X' },
+  'x.com': { productName: 'X', companyName: 'X Corp', brandName: 'X' },
+  'instagram.com': { productName: 'Instagram', companyName: 'Meta', brandName: 'Instagram' },
+  'facebook.com': { productName: 'Facebook', companyName: 'Meta', brandName: 'Facebook' },
+  'whatsapp.com': { productName: 'WhatsApp', companyName: 'Meta', brandName: 'WhatsApp' },
+  'atlassian.com': { productName: 'Atlassian', companyName: 'Atlassian', brandName: 'Atlassian' },
+  'jira.com': { productName: 'Jira', companyName: 'Atlassian', brandName: 'Jira' },
+  'confluence.com': { productName: 'Confluence', companyName: 'Atlassian', brandName: 'Confluence' },
+  'trello.com': { productName: 'Trello', companyName: 'Atlassian', brandName: 'Trello' },
+  'asana.com': { productName: 'Asana', companyName: 'Asana', brandName: 'Asana' },
+  'clickup.com': { productName: 'ClickUp', companyName: 'ClickUp', brandName: 'ClickUp' },
+  'monday.com': { productName: 'Monday.com', companyName: 'Monday.com', brandName: 'Monday.com' },
+  'airtable.com': { productName: 'Airtable', companyName: 'Airtable', brandName: 'Airtable' },
+  'shopify.com': { productName: 'Shopify', companyName: 'Shopify', brandName: 'Shopify' },
+  'wordpress.com': { productName: 'WordPress.com', companyName: 'Automattic', brandName: 'WordPress' },
+  'woocommerce.com': { productName: 'WooCommerce', companyName: 'Automattic', brandName: 'WooCommerce' },
+  'sendgrid.com': { productName: 'SendGrid', companyName: 'Twilio', brandName: 'SendGrid' },
+  'twilio.com': { productName: 'Twilio', companyName: 'Twilio', brandName: 'Twilio' },
+  'stripe.com': { productName: 'Stripe', companyName: 'Stripe', brandName: 'Stripe' },
+  'square.com': { productName: 'Square', companyName: 'Block', brandName: 'Square' },
+  'godaddy.com': { productName: 'GoDaddy', companyName: 'GoDaddy', brandName: 'GoDaddy' },
+  'wix.com': { productName: 'Wix', companyName: 'Wix', brandName: 'Wix' },
+  'squarespace.com': { productName: 'Squarespace', companyName: 'Squarespace', brandName: 'Squarespace' },
+  'salesforce.com': { productName: 'Salesforce', companyName: 'Salesforce', brandName: 'Salesforce' },
+  'hubspot.com': { productName: 'HubSpot', companyName: 'HubSpot', brandName: 'HubSpot' },
+  'zendesk.com': { productName: 'Zendesk', companyName: 'Zendesk', brandName: 'Zendesk' },
+  'intercom.com': { productName: 'Intercom', companyName: 'Intercom', brandName: 'Intercom' },
+  'calendly.com': { productName: 'Calendly', companyName: 'Calendly', brandName: 'Calendly' },
+  'loom.com': { productName: 'Loom', companyName: 'Atlassian', brandName: 'Loom' },
+  'miro.com': { productName: 'Miro', companyName: 'Miro', brandName: 'Miro' },
+  'canva.com': { productName: 'Canva', companyName: 'Canva', brandName: 'Canva' },
+  'adobe.com': { productName: 'Adobe', companyName: 'Adobe', brandName: 'Adobe' },
+  'docusign.com': { productName: 'DocuSign', companyName: 'DocuSign', brandName: 'DocuSign' },
+  'hellosign.com': { productName: 'Dropbox Sign', companyName: 'Dropbox', brandName: 'Dropbox Sign' },
+  'dropbox.com': { productName: 'Dropbox', companyName: 'Dropbox', brandName: 'Dropbox' },
+  'box.com': { productName: 'Box', companyName: 'Box', brandName: 'Box' },
+  'evernote.com': { productName: 'Evernote', companyName: 'Evernote', brandName: 'Evernote' },
+  'todoist.com': { productName: 'Todoist', companyName: 'Doist', brandName: 'Todoist' },
+  'github.com': { productName: 'GitHub', companyName: 'Microsoft', brandName: 'GitHub' },
+  'gitlab.com': { productName: 'GitLab', companyName: 'GitLab', brandName: 'GitLab' },
+  'bitbucket.com': { productName: 'Bitbucket', companyName: 'Atlassian', brandName: 'Bitbucket' },
+  'vercel.com': { productName: 'Vercel', companyName: 'Vercel', brandName: 'Vercel' },
+  'netlify.com': { productName: 'Netlify', companyName: 'Netlify', brandName: 'Netlify' },
+  'heroku.com': { productName: 'Heroku', companyName: 'Salesforce', brandName: 'Heroku' },
+  'digitalocean.com': { productName: 'DigitalOcean', companyName: 'DigitalOcean', brandName: 'DigitalOcean' },
+  'aws.amazon.com': { productName: 'Amazon Web Services', companyName: 'Amazon', brandName: 'AWS' },
+  'cloud.google.com': { productName: 'Google Cloud', companyName: 'Google', brandName: 'Google Cloud' },
+  'azure.microsoft.com': { productName: 'Microsoft Azure', companyName: 'Microsoft', brandName: 'Azure' },
+  'datadog.com': { productName: 'Datadog', companyName: 'Datadog', brandName: 'Datadog' },
+  'newrelic.com': { productName: 'New Relic', companyName: 'New Relic', brandName: 'New Relic' },
+  'sentry.io': { productName: 'Sentry', companyName: 'Functional Software', brandName: 'Sentry' },
+  'datadoghq.com': { productName: 'Datadog', companyName: 'Datadog', brandName: 'Datadog' },
+  'hotjar.com': { productName: 'Hotjar', companyName: 'Hotjar (Contentsquare)', brandName: 'Hotjar' },
+  'mixpanel.com': { productName: 'Mixpanel', companyName: 'Mixpanel', brandName: 'Mixpanel' },
+  'amplitude.com': { productName: 'Amplitude', companyName: 'Amplitude', brandName: 'Amplitude' },
+  'segment.com': { productName: 'Segment', companyName: 'Twilio', brandName: 'Segment' },
+  'mailchimp.com': { productName: 'Mailchimp', companyName: 'Intuit', brandName: 'Mailchimp' },
+  'sendfox.com': { productName: 'SendFox', companyName: 'SendFox', brandName: 'SendFox' },
+  'convertkit.com': { productName: 'ConvertKit', companyName: 'ConvertKit', brandName: 'ConvertKit' },
+  'activecampaign.com': { productName: 'ActiveCampaign', companyName: 'ActiveCampaign', brandName: 'ActiveCampaign' },
+  'getresponse.com': { productName: 'GetResponse', companyName: 'GetResponse', brandName: 'GetResponse' },
+  'constantcontact.com': { productName: 'Constant Contact', companyName: 'Constant Contact', brandName: 'Constant Contact' },
+};
+
 export function deriveWebsiteIdentity(params = {}) {
   // Safe extraction with defaults
   const {
@@ -39,6 +129,30 @@ export function deriveWebsiteIdentity(params = {}) {
     domain = urlObj.hostname.replace(/^www\./, '');
   } catch (e) {
     domain = websiteUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+  }
+
+  // Check well-known domain override first — takes priority over scraped data
+  const knownOverride = KNOWN_DOMAINS[domain];
+  if (knownOverride) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[SEO Identity] Using known domain override for', domain, '→', knownOverride.productName);
+    }
+    return {
+      websiteUrl,
+      domain,
+      brandName: knownOverride.brandName,
+      companyName: knownOverride.companyName,
+      productName: knownOverride.productName,
+      industry: 'Technology',
+      category: 'SaaS',
+      targetAudience: 'General',
+      websiteTitle: knownOverride.productName,
+      websiteDescription: knownOverride.productName + ' — ' + (scrapedData?.meta?.description || scrapedData?.description || ''),
+      businessModel: 'B2B SaaS',
+      businessCategory: 'Technology',
+      companySize: 'Enterprise',
+      source: 'known_domain_override'
+    };
   }
 
   // Helper to safely split titles
