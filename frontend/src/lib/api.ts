@@ -88,10 +88,11 @@ async function request<T>(method: Method, path: string, body?: any, signal?: Abo
 
   // Normalize deep to prevent React error #31 while preserving data structure
   if (path.includes('full-results') && data && typeof data === 'object') {
-    if (data.seoIntelligence) {
-      data.seoIntelligence = normalizeDeep(data.seoIntelligence);
-    }
-    return data as T;
+    return {
+      ...data,
+      seoIntelligence: normalizeDeep(data?.seoIntelligence),
+      seo: normalizeDeep(data?.seo),
+    } as T;
   }
 
   return data as T;

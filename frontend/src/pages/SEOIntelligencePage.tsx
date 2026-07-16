@@ -224,11 +224,11 @@ export default function SEOIntelligencePage() {
     if (import.meta.env.DEV) {
       findRiskyObjects(fullResults, "fullResults");
     }
-    if (r && r.status === 'COMPLETED' || hasRealSeoData(r)) {
+    if (hasRealSeoData(r)) {
       storedChatRef.current = selectedChatId;
       setSeo(r);
       setMode('results');
-      if (!url) setUrl(r.websiteUrl || r.productIdentity?.websiteUrl || '');
+      if (!url) setUrl(r.websiteUrl || '');
     }
   }, []);
 
@@ -237,11 +237,11 @@ export default function SEOIntelligencePage() {
     if (isNewAnalysis) return;
     if (!selectedChatId) return;
     const r = fullResults.seoIntelligence || fullResults.seo || {};
-    if ((r && r.status === 'COMPLETED') || hasRealSeoData(r)) {
+    if (hasRealSeoData(r)) {
       storedChatRef.current = selectedChatId;
       setSeo(r);
       setMode('results');
-      if (!url) setUrl(r.websiteUrl || r.productIdentity?.websiteUrl || '');
+      if (!url) setUrl(r.websiteUrl || '');
     }
   }, [fullResults]);
 

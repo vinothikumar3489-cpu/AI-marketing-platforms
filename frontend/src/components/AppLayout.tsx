@@ -67,21 +67,16 @@ function ProjectDropdown() {
   const [search, setSearch] = useState('');
 
   const currentChat = chats.find(c => c.id === selectedChatId);
-  const gw = fullResults?.growthWorkspace;
-  const si = fullResults?.seoIntelligence;
-  const hasGrowth = fullResults?.hasGrowthWorkspace === true || (fullResults?.growth && Object.keys(fullResults.growth).length > 0) || !!gw;
-  const hasSeo = fullResults?.hasSeoIntelligence === true || (fullResults?.seo && Object.keys(fullResults.seo).length > 0) || !!si;
+  const hasGrowth = fullResults?.growth && Object.keys(fullResults.growth).length > 0;
+  const hasSeo = fullResults?.seo && Object.keys(fullResults.seo).length > 0;
   
-  const productName = gw?.productIdentity?.productName || gw?.product?.name || si?.productIdentity?.productName || '';
-  const companyName = gw?.productIdentity?.companyName || gw?.company?.name || si?.productIdentity?.companyName || '';
-  const websiteUrl = gw?.productIdentity?.websiteUrl || si?.productIdentity?.websiteUrl || '';
-  
-  const displayTitle = hasGrowth || hasSeo
-    ? (productName || currentChat?.productName || currentChat?.title || 'Untitled Project')
+  // Determine display values
+  const displayTitle = hasGrowth || hasSeo 
+    ? (fullResults?.profile?.productName || fullResults?.profile?.brandName || currentChat?.productName || currentChat?.title || 'Untitled Project')
     : 'New Project';
     
   const displayCompany = hasGrowth || hasSeo
-    ? (companyName || websiteUrl || currentChat?.companyName || currentChat?.websiteUrl || 'No company')
+    ? (fullResults?.profile?.companyName || fullResults?.profile?.websiteUrl || currentChat?.companyName || currentChat?.websiteUrl || 'No company')
     : 'No company';
   
   const filtered = chats.filter(c => (c.productName || c.title || '').toLowerCase().includes(search.toLowerCase()) || (c.companyName || '').toLowerCase().includes(search.toLowerCase()));
