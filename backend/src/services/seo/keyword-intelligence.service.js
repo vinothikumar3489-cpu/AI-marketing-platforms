@@ -198,9 +198,17 @@ async function enrichWithDataForSEO(result, extractedKeywords) {
       result.secondaryKeywords = result.secondaryKeywords.map(enrichKeyword);
       result.longTailKeywords = result.longTailKeywords.map(enrichKeyword);
       result.questionKeywords = result.questionKeywords.map(enrichKeyword);
+    } else {
+      console.warn('⚠️ [Keyword Intelligence] DataForSEO enrichment failed:', metricsResult.error || 'No data returned');
+      // DataForSEO failure is not fatal - continue with topic candidates
+      result.metadata.dataForSeoEnriched = false;
+      result.metadata.dataForSeoError = metricsResult.error || 'Unknown error';
     }
-  } catch (err) {
-    logEvidenceError("keywordIntelligence.enrich", null, err);
+  } catch (error) {
+    console.error('❌ [Keyword Intelligence] DataForSEO enrichment error:', error.message);
+    // DataForSEO failure is not fatal - continue with topic candidates
+    result.metadata.dataForSeoEnriched = false;
+    result.metadata.dataForSeoError = error.message;
   }
 }
 

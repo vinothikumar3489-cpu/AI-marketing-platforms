@@ -7,7 +7,23 @@ import fetch from 'node-fetch';
 
 const DATAFORSEO_LOGIN = process.env.DATAFORSEO_LOGIN?.trim();
 const DATAFORSEO_PASSWORD = process.env.DATAFORSEO_PASSWORD?.trim();
-const DATAFORSEO_API_URL = 'https://api.dataforseo.com/v3';
+const DATAFORSEO_BASE_URL = process.env.DATAFORSEO_BASE_URL || 'https://api.dataforseo.com/v3';
+
+// Centralized endpoint definitions
+const DATAFORSEO_ENDPOINTS = {
+  keywordSearchVolume: '/keywords_data/google_ads/search_volume/live',
+  keywordSuggestions: '/keywords_data/google_ads/keyword_suggestions/live',
+  relatedKeywords: '/keywords_data/google_ads/keywords_for_keywords/live',
+  serpLive: '/serp/google/organic/live/regular',
+  backlinksSummary: '/backlinks/summary/live',
+  referringDomains: '/backlinks/referring_domains/live',
+  domainAnalytics: '/domain_analytics/domain_intersection/live'
+};
+
+// Authentication failure cache to prevent repeated calls
+let dataforseoAuthFailed = false;
+let dataforseoAuthFailureTime = 0;
+const AUTH_FAILURE_COOLDOWN_MS = 300000; // 5 minutes
 
 // Safe debug logging
 console.log("[DataForSEO] login loaded", !!DATAFORSEO_LOGIN);
@@ -76,13 +92,24 @@ function getAuthHeader() {
  * Make authenticated request to DataForSEO API
  */
 async function dataforseoRequest(endpoint, method = 'POST', body = null) {
+  // Check auth failure cache to prevent repeated calls
+  if (dataforseoAuthFailed && Date.now() - dataforseoAuthFailureTime < AUTH_FAILURE_COOLDOWN_MS) {
+    console.warn('[DataForSEO] Skipping request due to recent authentication failure (cooldown active)');
+    return { 
+      success: false, 
+      error: 'DataForSEO authentication failed (cooldown active)', 
+      unavailable: true,
+      statusCode: 401 
+    };
+  }
+
   const authHeader = getAuthHeader();
   if (!authHeader) {
     return { success: false, error: 'DataForSEO credentials not configured', unavailable: true };
   }
 
   try {
-    const url = `${DATAFORSEO_API_URL}${endpoint}`;
+    const url = `${DATAFORSEO_BASE_URL}${endpoint}`;
     const options = {
       method,
       headers: {
@@ -102,7 +129,11 @@ async function dataforseoRequest(endpoint, method = 'POST', body = null) {
 
     if (response.status === 401) {
       const errorText = await response.text();
-      console.warn('[DataForSEO] Authentication failed - marking as unavailable');
+      console.warn('[DataForSEO] Authentication failed - marking as unavailable and setting cooldown');
+      
+      // Set auth failure cache
+      dataforseoAuthFailed = true;
+      dataforseoAuthFailureTime = Date.now();
 
       if (errorText.includes('40104') || errorText.includes('verify your account')) {
         return {
@@ -141,6 +172,13 @@ async function dataforseoRequest(endpoint, method = 'POST', body = null) {
       const errorText = await response.text();
       console.error(`[DataForSEO] API error: ${response.status} - ${errorText}`);
       return { success: false, error: `API error: ${response.status}`, statusCode: response.status };
+    }
+
+    // Clear auth failure cache on success
+    if (dataforseoAuthFailed) {
+      dataforseoAuthFailed = false;
+      dataforseoAuthFailureTime = 0;
+      console.log('[DataForSEO] Authentication recovered - clearing cooldown');
     }
 
     const data = await response.json();
@@ -203,7 +241,7 @@ export async function getKeywordMetrics(keywords, location = 'United States', la
     language_name: language
   }];
 
-  const endpoint = '/keywords_data/google_ads/search_volume/live';
+  const endpoint = DATAFORSEO_ENDPOINTS.keywordSearchVolume;
   
   console.log('🔍 [DataForSEO] Keywords sent to API:', {
     endpoint,
@@ -301,7 +339,7 @@ export async function getKeywordSuggestions(seedKeywords, location = 'United Sta
     limit: 10
   }];
 
-  const response = await dataforseoRequest('/keywords_data/google_ads/keyword_suggestions/live', 'POST', body);
+  const response = await dataforseoRequest(DATAFORSEO_ENDPOINTS.keywordSuggestions, 'POST', body);
 
   if (!response.success) {
     return response;
@@ -350,7 +388,7 @@ export async function getRelatedKeywords(seedKeyword, location = 'United States'
     limit: 20
   }];
 
-  const response = await dataforseoRequest('/keywords_data/google_ads/keywords_for_keywords/live', 'POST', body);
+  const response = await dataforseoRequest(DATAFORSEO_ENDPOINTS.relatedKeywords, 'POST', body);
 
   if (!response.success) {
     return response;
@@ -400,7 +438,7 @@ export async function getSerpResults(keyword, location = 'United States', langua
     device: 'desktop'
   }];
 
-  const response = await dataforseoRequest('/serp/google/organic/live/regular', 'POST', body);
+  const response = await dataforseoRequest(DATAFORSEO_ENDPOINTS.serpLive, 'POST', body);
 
   if (!response.success) {
     return response;
@@ -645,7 +683,7 @@ export async function getBacklinksSummary(domain) {
     limit: 100
   }];
 
-  const response = await dataforseoRequest('/backlinks/summary/live', 'POST', body);
+  const response = await dataforseoRequest(DATAFORSEO_ENDPOINTS.backlinksSummary, 'POST', body);
 
   if (!response.success) {
     return response;
@@ -669,7 +707,7 @@ export async function getReferringDomains(domain) {
     order_by: ['domain_rank_alexa,desc']
   }];
 
-  const response = await dataforseoRequest('/backlinks/referring_domains/live', 'POST', body);
+  const response = await dataforseoRequest(DATAFORSEO_ENDPOINTS.referringDomains, 'POST', body);
 
   if (!response.success) {
     return response;
@@ -704,7 +742,7 @@ export async function getDomainAnalytics(domain) {
     target: domain
   }];
 
-  const response = await dataforseoRequest('/domain_analytics/domain_intersection/live', 'POST', body);
+  const response = await dataforseoRequest(DATAFORSEO_ENDPOINTS.domainAnalytics, 'POST', body);
 
   if (!response.success) {
     return response;
@@ -829,7 +867,7 @@ export async function checkDataForSeoHealth() {
       location_name: 'United States',
       language_name: 'English'
     }];
-    const response = await dataforseoRequest('/keywords_data/google_ads/search_volume/live', 'POST', testBody);
+    const response = await dataforseoRequest(DATAFORSEO_ENDPOINTS.keywordSearchVolume, 'POST', testBody);
 
     if (!response.success) {
       if (response.statusCode === 401 || (response.error && response.error.includes('401'))) {
@@ -865,7 +903,7 @@ export async function checkDataForSeoHealth() {
           endpointValid: false,
           failureType: 'ENDPOINT_NOT_FOUND',
           statusCode: 404,
-          message: 'DataForSEO endpoint returned 404. Check endpoint path: /keywords_data/google_ads/search_volume/live'
+          message: `DataForSEO endpoint returned 404. Check endpoint path: ${DATAFORSEO_ENDPOINTS.keywordSearchVolume}`
         };
       }
 
@@ -902,11 +940,20 @@ export async function checkDataForSeoHealth() {
   }
 }
 
+/**
+ * Clear DataForSEO auth failure cache (for testing/recovery)
+ */
+export function clearDataForSeoAuthFailureCache() {
+  dataforseoAuthFailed = false;
+  dataforseoAuthFailureTime = 0;
+  console.log('[DataForSEO] Auth failure cache cleared');
+}
+
 // Log DataForSEO configuration status at startup
 console.log('[DataForSEO Config]', JSON.stringify({
   provider: 'DataForSEO',
   loginConfigured: !!DATAFORSEO_LOGIN,
   passwordConfigured: !!DATAFORSEO_PASSWORD,
-  baseUrl: DATAFORSEO_API_URL
+  baseUrl: DATAFORSEO_BASE_URL
 }));
 
