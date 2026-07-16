@@ -154,14 +154,14 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
   }
 
   const steps = [
-    { key: 'product', label: 'Product Analysis', status: 'pending' },
-    { key: 'market', label: 'Market Discovery', status: 'pending' },
-    { key: 'audience', label: 'Audience Intelligence', status: 'pending' },
-    { key: 'competitor', label: 'Competitor Analysis', status: 'pending' },
-    { key: 'intent', label: 'Intent Prediction', status: 'pending' },
-    { key: 'positioning', label: 'Positioning Engine', status: 'pending' },
-    { key: 'campaign', label: 'Campaign Generator', status: 'pending' },
-    { key: 'channel', label: 'Channel Recommendation', status: 'pending' }
+    { key: 'product', label: 'Product Analysis', status: 'pending', startTime: null, endTime: null, duration: null, provider: null, statusCode: null, failureType: null, responseReceived: false, jsonParsed: false, schemaValidated: false },
+    { key: 'market', label: 'Market Discovery', status: 'pending', startTime: null, endTime: null, duration: null, provider: null, statusCode: null, failureType: null, responseReceived: false, jsonParsed: false, schemaValidated: false },
+    { key: 'audience', label: 'Audience Intelligence', status: 'pending', startTime: null, endTime: null, duration: null, provider: null, statusCode: null, failureType: null, responseReceived: false, jsonParsed: false, schemaValidated: false },
+    { key: 'competitor', label: 'Competitor Analysis', status: 'pending', startTime: null, endTime: null, duration: null, provider: null, statusCode: null, failureType: null, responseReceived: false, jsonParsed: false, schemaValidated: false },
+    { key: 'intent', label: 'Intent Prediction', status: 'pending', startTime: null, endTime: null, duration: null, provider: null, statusCode: null, failureType: null, responseReceived: false, jsonParsed: false, schemaValidated: false },
+    { key: 'positioning', label: 'Positioning Engine', status: 'pending', startTime: null, endTime: null, duration: null, provider: null, statusCode: null, failureType: null, responseReceived: false, jsonParsed: false, schemaValidated: false },
+    { key: 'campaign', label: 'Campaign Generator', status: 'pending', startTime: null, endTime: null, duration: null, provider: null, statusCode: null, failureType: null, responseReceived: false, jsonParsed: false, schemaValidated: false },
+    { key: 'channel', label: 'Channel Recommendation', status: 'pending', startTime: null, endTime: null, duration: null, provider: null, statusCode: null, failureType: null, responseReceived: false, jsonParsed: false, schemaValidated: false }
   ];
 
   let results = {};
@@ -298,18 +298,35 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     // Step 1: Product Analysis (evidence-backed)
     console.log('✨ [Growth Workspace] Running Product Analysis...');
     steps[0].status = 'running';
+    steps[0].startTime = Date.now();
     try {
       const rawResult = await runProductAnalysis(input, websiteData, evidenceGrowthData);
       results.product = validateProductAnalysis(rawResult, input);
       steps[0].status = 'completed';
+      steps[0].endTime = Date.now();
+      steps[0].duration = steps[0].endTime - steps[0].startTime;
       steps[0].provider = results.product.provider || 'groq';
+      steps[0].statusCode = rawResult.statusCode || 200;
+      steps[0].failureType = rawResult.success ? null : (rawResult.status || 'UNKNOWN');
+      steps[0].responseReceived = !!rawResult.data;
+      steps[0].jsonParsed = !!rawResult.data;
+      steps[0].schemaValidated = true;
       steps[0].confidenceScore = results.product.confidenceScore ?? null;
       console.log('✅ [Growth Workspace] Product Analysis complete & validated:', {
         hasUSP: !!results.product.usp,
         featuresCount: results.product.features?.length || 0,
-        provider: results.product.provider
+        provider: results.product.provider,
+        duration: steps[0].duration,
+        failureType: steps[0].failureType
       });
     } catch (error) {
+      steps[0].endTime = Date.now();
+      steps[0].duration = steps[0].endTime - steps[0].startTime;
+      steps[0].failureType = error.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_FAILED';
+      steps[0].statusCode = 0;
+      steps[0].responseReceived = false;
+      steps[0].jsonParsed = false;
+      steps[0].schemaValidated = false;
       console.log('⚠️ [Growth Workspace] Product Analysis failed:', error.message);
       warnings.push(`Product Analysis fallback: ${error.message}`);
       results.product = validateProductAnalysis(null, input);
@@ -322,18 +339,35 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Market Discovery...');
     steps[1].status = 'running';
+    steps[1].startTime = Date.now();
     try {
       const rawResult = await runMarketDiscovery(input, results.product);
       results.market = validateMarketDiscovery(rawResult, input);
       steps[1].status = 'completed';
+      steps[1].endTime = Date.now();
+      steps[1].duration = steps[1].endTime - steps[1].startTime;
       steps[1].provider = results.market.provider || 'groq';
+      steps[1].statusCode = rawResult.statusCode || 200;
+      steps[1].failureType = rawResult.success ? null : (rawResult.status || 'UNKNOWN');
+      steps[1].responseReceived = !!rawResult.data;
+      steps[1].jsonParsed = !!rawResult.data;
+      steps[1].schemaValidated = true;
       steps[1].confidenceScore = results.market.confidenceScore ?? null;
       console.log('✅ [Growth Workspace] Market Discovery complete & validated:', {
         trendsCount: results.market.marketTrends?.length || 0,
         opportunitiesCount: results.market.opportunities?.length || 0,
-        provider: results.market.provider
+        provider: results.market.provider,
+        duration: steps[1].duration,
+        failureType: steps[1].failureType
       });
     } catch (error) {
+      steps[1].endTime = Date.now();
+      steps[1].duration = steps[1].endTime - steps[1].startTime;
+      steps[1].failureType = error.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_FAILED';
+      steps[1].statusCode = 0;
+      steps[1].responseReceived = false;
+      steps[1].jsonParsed = false;
+      steps[1].schemaValidated = false;
       console.log('⚠️ [Growth Workspace] Market Discovery failed:', error.message);
       warnings.push(`Market Discovery fallback: ${error.message}`);
       results.market = validateMarketDiscovery(null, input);
@@ -346,18 +380,35 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Audience Intelligence...');
     steps[2].status = 'running';
+    steps[2].startTime = Date.now();
     try {
       const rawResult = await runAudienceIntelligence(input, results.product);
       results.audience = validateAudienceIntelligence(rawResult, input);
       steps[2].status = 'completed';
+      steps[2].endTime = Date.now();
+      steps[2].duration = steps[2].endTime - steps[2].startTime;
       steps[2].provider = results.audience.provider || 'groq';
+      steps[2].statusCode = rawResult.statusCode || 200;
+      steps[2].failureType = rawResult.success ? null : (rawResult.status || 'UNKNOWN');
+      steps[2].responseReceived = !!rawResult.data;
+      steps[2].jsonParsed = !!rawResult.data;
+      steps[2].schemaValidated = true;
       steps[2].confidenceScore = results.audience.confidenceScore ?? null;
       console.log('✅ [Growth Workspace] Audience Intelligence complete & validated:', {
         personasCount: results.audience.buyerPersonas?.length || 0,
         channelsCount: results.audience.bestChannels?.length || 0,
-        provider: results.audience.provider
+        provider: results.audience.provider,
+        duration: steps[2].duration,
+        failureType: steps[2].failureType
       });
     } catch (error) {
+      steps[2].endTime = Date.now();
+      steps[2].duration = steps[2].endTime - steps[2].startTime;
+      steps[2].failureType = error.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_FAILED';
+      steps[2].statusCode = 0;
+      steps[2].responseReceived = false;
+      steps[2].jsonParsed = false;
+      steps[2].schemaValidated = false;
       console.log('⚠️ [Growth Workspace] Audience Intelligence failed:', error.message);
       warnings.push(`Audience Intelligence fallback: ${error.message}`);
       results.audience = validateAudienceIntelligence(null, input);
@@ -370,19 +421,36 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Competitor Analysis...');
     steps[3].status = 'running';
+    steps[3].startTime = Date.now();
     try {
       const rawResult = await runCompetitorAnalysis(input, results.product, researchData?.competitors || []);
       results.competitor = validateCompetitorAnalysis(rawResult, input);
       steps[3].status = 'completed';
+      steps[3].endTime = Date.now();
+      steps[3].duration = steps[3].endTime - steps[3].startTime;
       steps[3].provider = results.competitor.provider || 'groq';
+      steps[3].statusCode = rawResult.statusCode || 200;
+      steps[3].failureType = rawResult.success ? null : (rawResult.status || 'UNKNOWN');
+      steps[3].responseReceived = !!rawResult.data;
+      steps[3].jsonParsed = !!rawResult.data;
+      steps[3].schemaValidated = true;
       steps[3].confidenceScore = results.competitor.confidenceScore ?? null;
       console.log('✅ [Growth Workspace] Competitor Analysis complete & validated:', {
         competitorsCount: results.competitor.directCompetitors?.length || 0,
         gapsCount: results.competitor.marketGaps?.length || 0,
         provider: results.competitor.provider,
-        orchestratorCompetitorsUsed: researchData?.competitors?.length || 0
+        orchestratorCompetitorsUsed: researchData?.competitors?.length || 0,
+        duration: steps[3].duration,
+        failureType: steps[3].failureType
       });
     } catch (error) {
+      steps[3].endTime = Date.now();
+      steps[3].duration = steps[3].endTime - steps[3].startTime;
+      steps[3].failureType = error.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_FAILED';
+      steps[3].statusCode = 0;
+      steps[3].responseReceived = false;
+      steps[3].jsonParsed = false;
+      steps[3].schemaValidated = false;
       console.log('⚠️ [Growth Workspace] Competitor Analysis failed:', error.message);
       warnings.push(`Competitor Analysis fallback: ${error.message}`);
       results.competitor = validateCompetitorAnalysis(null, input);
@@ -395,18 +463,35 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Intent Prediction...');
     steps[4].status = 'running';
+    steps[4].startTime = Date.now();
     try {
       const rawResult = await runIntentPrediction(input, results.audience);
       results.intent = validateIntentPrediction(rawResult, input);
       steps[4].status = 'completed';
+      steps[4].endTime = Date.now();
+      steps[4].duration = steps[4].endTime - steps[4].startTime;
       steps[4].provider = results.intent.provider || 'groq';
+      steps[4].statusCode = rawResult.statusCode || 200;
+      steps[4].failureType = rawResult.success ? null : (rawResult.status || 'UNKNOWN');
+      steps[4].responseReceived = !!rawResult.data;
+      steps[4].jsonParsed = !!rawResult.data;
+      steps[4].schemaValidated = true;
       steps[4].confidenceScore = results.intent.confidenceScore ?? null;
       console.log('✅ [Growth Workspace] Intent Prediction complete & validated:', {
         hotSegmentsCount: results.intent.hotSegments?.length || 0,
         signalsCount: results.intent.buyingSignals?.length || 0,
-        provider: results.intent.provider
+        provider: results.intent.provider,
+        duration: steps[4].duration,
+        failureType: steps[4].failureType
       });
     } catch (error) {
+      steps[4].endTime = Date.now();
+      steps[4].duration = steps[4].endTime - steps[4].startTime;
+      steps[4].failureType = error.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_FAILED';
+      steps[4].statusCode = 0;
+      steps[4].responseReceived = false;
+      steps[4].jsonParsed = false;
+      steps[4].schemaValidated = false;
       console.log('⚠️ [Growth Workspace] Intent Prediction failed:', error.message);
       warnings.push(`Intent Prediction fallback: ${error.message}`);
       results.intent = validateIntentPrediction(null, input);
@@ -419,18 +504,35 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Positioning Engine...');
     steps[5].status = 'running';
+    steps[5].startTime = Date.now();
     try {
       const rawResult = await runPositioningEngine(input, results.product, results.competitor);
       results.positioning = validatePositioningEngine(rawResult, input);
       steps[5].status = 'completed';
+      steps[5].endTime = Date.now();
+      steps[5].duration = steps[5].endTime - steps[5].startTime;
       steps[5].provider = results.positioning.provider || 'groq';
+      steps[5].statusCode = rawResult.statusCode || 200;
+      steps[5].failureType = rawResult.success ? null : (rawResult.status || 'UNKNOWN');
+      steps[5].responseReceived = !!rawResult.data;
+      steps[5].jsonParsed = !!rawResult.data;
+      steps[5].schemaValidated = true;
       steps[5].confidenceScore = results.positioning.confidenceScore ?? null;
       console.log('✅ [Growth Workspace] Positioning Engine complete & validated:', {
         hasStatement: !!results.positioning.positioningStatement,
         pillarsCount: results.positioning.messagingPillars?.length || 0,
-        provider: results.positioning.provider
+        provider: results.positioning.provider,
+        duration: steps[5].duration,
+        failureType: steps[5].failureType
       });
     } catch (error) {
+      steps[5].endTime = Date.now();
+      steps[5].duration = steps[5].endTime - steps[5].startTime;
+      steps[5].failureType = error.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_FAILED';
+      steps[5].statusCode = 0;
+      steps[5].responseReceived = false;
+      steps[5].jsonParsed = false;
+      steps[5].schemaValidated = false;
       console.log('⚠️ [Growth Workspace] Positioning Engine failed:', error.message);
       warnings.push(`Positioning Engine fallback: ${error.message}`);
       results.positioning = validatePositioningEngine(null, input);
@@ -443,19 +545,36 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Campaign Generator...');
     steps[6].status = 'running';
+    steps[6].startTime = Date.now();
     try {
       const rawResult = await runCampaignGenerator(input, results);
       results.campaign = validateCampaignGenerator(rawResult, input);
       steps[6].status = 'completed';
+      steps[6].endTime = Date.now();
+      steps[6].duration = steps[6].endTime - steps[6].startTime;
       steps[6].provider = results.campaign.provider || 'groq';
+      steps[6].statusCode = rawResult.statusCode || 200;
+      steps[6].failureType = rawResult.success ? null : (rawResult.status || 'UNKNOWN');
+      steps[6].responseReceived = !!rawResult.data;
+      steps[6].jsonParsed = !!rawResult.data;
+      steps[6].schemaValidated = true;
       steps[6].confidenceScore = results.campaign.confidenceScore ?? null;
       console.log('✅ [Growth Workspace] Campaign Generator complete & validated:', {
         anglesCount: results.campaign.creativeAngles?.length || 0,
         hooksCount: results.campaign.copyHooks?.length || 0,
         hasActionPlan: !!(results.campaign.actionPlan?.sevenDay?.length || results.campaign.actionPlan?.thirtyDay?.length),
-        provider: results.campaign.provider
+        provider: results.campaign.provider,
+        duration: steps[6].duration,
+        failureType: steps[6].failureType
       });
     } catch (error) {
+      steps[6].endTime = Date.now();
+      steps[6].duration = steps[6].endTime - steps[6].startTime;
+      steps[6].failureType = error.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_FAILED';
+      steps[6].statusCode = 0;
+      steps[6].responseReceived = false;
+      steps[6].jsonParsed = false;
+      steps[6].schemaValidated = false;
       console.log('⚠️ [Growth Workspace] Campaign Generator failed:', error.message);
       warnings.push(`Campaign Generator fallback: ${error.message}`);
       results.campaign = validateCampaignGenerator(null, input);
@@ -468,18 +587,35 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Channel Recommendation...');
     steps[7].status = 'running';
+    steps[7].startTime = Date.now();
     try {
       const rawResult = await runChannelRecommendation(input, results.audience, results.campaign);
       results.channel = validateChannelRecommendation(rawResult, input);
       steps[7].status = 'completed';
+      steps[7].endTime = Date.now();
+      steps[7].duration = steps[7].endTime - steps[7].startTime;
       steps[7].provider = results.channel.provider || 'groq';
+      steps[7].statusCode = rawResult.statusCode || 200;
+      steps[7].failureType = rawResult.success ? null : (rawResult.status || 'UNKNOWN');
+      steps[7].responseReceived = !!rawResult.data;
+      steps[7].jsonParsed = !!rawResult.data;
+      steps[7].schemaValidated = true;
       steps[7].confidenceScore = results.channel.confidenceScore ?? null;
       console.log('✅ [Growth Workspace] Channel Recommendation complete & validated:', {
         channelsCount: results.channel.recommendedChannels?.length || 0,
         primaryChannel: results.channel.primaryChannel,
-        provider: results.channel.provider
+        provider: results.channel.provider,
+        duration: steps[7].duration,
+        failureType: steps[7].failureType
       });
     } catch (error) {
+      steps[7].endTime = Date.now();
+      steps[7].duration = steps[7].endTime - steps[7].startTime;
+      steps[7].failureType = error.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_FAILED';
+      steps[7].statusCode = 0;
+      steps[7].responseReceived = false;
+      steps[7].jsonParsed = false;
+      steps[7].schemaValidated = false;
       console.log('⚠️ [Growth Workspace] Channel Recommendation failed:', error.message);
       warnings.push(`Channel Recommendation fallback: ${error.message}`);
       results.channel = validateChannelRecommendation(null, input);
@@ -488,7 +624,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[7].confidenceScore = results.channel.confidenceScore ?? null;
     }
 
-    overallStatus = 'completed';
+    overallStatus = warnings.length > 0 ? 'completed_with_warnings' : 'completed';
 
     // Apply quality filters to ensure evidence-based data
     results = enforceGrowthQualityFilters(results);
@@ -1349,12 +1485,16 @@ CRITICAL INSTRUCTION: Do NOT invent budget allocations or ROI percentages. Retur
 
 
 async function callBestAI(prompt, maxTokens = 2000, moduleName = 'unknown', fallbackData = null) {
+  const start = Date.now();
   console.log(`🚀 [AI][${moduleName}] Calling AI...`);
   const result = await callAI(prompt);
+  const durationMs = Date.now() - start;
   if (result.success && result.data) {
+    console.log(`✅ [AI][${moduleName}] ${result.provider} succeeded in ${durationMs}ms`);
     return { ...result.data, provider: result.provider };
   }
-  console.log(`🗑️ [AI][${moduleName}] All providers failed, using rule-based fallback.`);
+  const diag = result.diagnostics || [];
+  console.log(`🗑️ [AI][${moduleName}] All ${diag.length} provider(s) failed in ${durationMs}ms:`, JSON.stringify(diag));
   if (fallbackData) {
     return { ...fallbackData, provider: 'fallback' };
   }

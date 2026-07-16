@@ -15,9 +15,9 @@ const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
 const CEREBRAS_MODEL = process.env.CEREBRAS_MODEL || "cerebras-c1-mini";
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-business-intel";
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "qwen-7b-chat";
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.1-8b-instant";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "anthropic/claude-3-haiku";
+const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
 const MAX_PROMPT_LENGTH = 3200;
 
