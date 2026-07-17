@@ -1,21 +1,14 @@
 import fetch from 'node-fetch';
 
-// ============================================
-// DATAFORSEO SERVICE
-// Real keyword data from DataForSEO API
-// ============================================
-
 const DATAFORSEO_LOGIN = process.env.DATAFORSEO_LOGIN?.trim();
 const DATAFORSEO_PASSWORD = process.env.DATAFORSEO_PASSWORD?.trim();
 const DATAFORSEO_API_URL = 'https://api.dataforseo.com/v3';
 
-// Safe debug logging
 console.log("[DataForSEO] login loaded", !!DATAFORSEO_LOGIN);
 console.log("[DataForSEO] password loaded", !!DATAFORSEO_PASSWORD);
 
 let _dataforseoAuthenticated = true;
 
-// Generic junk keywords to filter out (must be multi-word real topics)
 const GENERIC_KEYWORDS = new Set([
   'business', 'custom', 'systems', 'built', 'everything', 'right', 'before',
   'https', 'apple', 'services', 'customer', 'product', 'all', 'software',
@@ -26,45 +19,38 @@ const GENERIC_KEYWORDS = new Set([
   'download', 'sign', 'learn', 'watch', 'read', 'view', 'click', 'search'
 ]);
 
-export function sanitizeKeywords(keywords) {
-  if (!Array.isArray(keywords)) return [];
-  const seen = new Set();
-  return keywords
-    .map(kw => {
-      if (typeof kw !== 'string') return null;
-      let cleaned = kw.normalize('NFKC').trim();
-      // Replace ampersands with "and"
-      cleaned = cleaned.replace(/&/g, ' and ');
-      // Remove unsupported punctuation (keep hyphens, apostrophes, spaces)
-      cleaned = cleaned.replace(/[^\w\s\-'&]/g, ' ');
-      // Collapse multiple spaces
-      cleaned = cleaned.replace(/\s+/g, ' ').trim();
-      return cleaned;
-    })
-    .filter(kw => {
-      if (!kw) return false;
-      if (kw.length < 3) return false;
-      // Reject single-word generic terms
-      const words = kw.split(' ');
-      if (words.length === 1 && GENERIC_KEYWORDS.has(words[0].toLowerCase())) return false;
-      // Deduplicate case-insensitively
-      const lower = kw.toLowerCase();
-      if (seen.has(lower)) return false;
-      seen.add(lower);
-      return true;
-    });
-}
+const VALID_ENDPOINTS = new Set([
+  '/keywords_data/google_ads/search_volume/live',
+  '/keywords_data/google_ads/keyword_suggestions/live',
+  '/keywords_data/google_ads/keywords_for_keywords/live',
+  '/serp/google/organic/live/regular',
+  '/backlinks/summary/live',
+  '/backlinks/referring_domains/live',
+  '/domain_analytics/domain_intersection/live',
+]);
 
-// Directory and research sites to classify separately
+const LOCATION_MAP = {
+  'global': { location_code: 2840, language_code: 'en', location_name: 'United States' },
+  'worldwide': { location_code: 2840, language_code: 'en', location_name: 'United States' },
+  'united states': { location_code: 2840, language_code: 'en', location_name: 'United States' },
+  'us': { location_code: 2840, language_code: 'en', location_name: 'United States' },
+  'india': { location_code: 2034, language_code: 'en', location_name: 'India' },
+  'united kingdom': { location_code: 2826, language_code: 'en', location_name: 'United Kingdom' },
+  'uk': { location_code: 2826, language_code: 'en', location_name: 'United Kingdom' },
+  'canada': { location_code: 2124, language_code: 'en', location_name: 'Canada' },
+  'australia': { location_code: 2036, language_code: 'en', location_name: 'Australia' },
+  'germany': { location_code: 2276, language_code: 'de', location_name: 'Germany' },
+  'france': { location_code: 2250, language_code: 'fr', location_name: 'France' },
+  'brazil': { location_code: 2076, language_code: 'pt', location_name: 'Brazil' },
+  'japan': { location_code: 2392, language_code: 'ja', location_name: 'Japan' },
+};
+
 const DIRECTORY_SITES = new Set([
   'gartner.com', 'similarweb.com', 'clutch.co', 'capterra.com', 'g2.com',
   'trustpilot.com', 'softwareadvice.com', 'getapp.com', 'pcmag.com',
   'forbes.com', 'techradar.com', 'cnet.com', 'zdnet.com', 'wikipedia.org'
 ]);
 
-/**
- * Create Basic Auth header for DataForSEO
- */
 function getAuthHeader() {
   if (!DATAFORSEO_LOGIN || !DATAFORSEO_PASSWORD) {
     console.warn('⚠️ DataForSEO credentials not configured');
@@ -74,18 +60,81 @@ function getAuthHeader() {
   return `Basic ${auth}`;
 }
 
-/**
- * Make authenticated request to DataForSEO API
- */
+export function resolveLocation(location) {
+  const input = (location || '').trim().toLowerCase();
+
+  if (!input || input === 'global' || input === 'worldwide') {
+    return {
+      ...LOCATION_MAP['global'],
+      requestedLocation: location || null,
+      fallbackApplied: true,
+    };
+  }
+
+  const known = LOCATION_MAP[input];
+  if (known) {
+    return {
+      ...known,
+      requestedLocation: location,
+      fallbackApplied: false,
+    };
+  }
+
+  return {
+    location_name: location,
+    language_name: 'English',
+    requestedLocation: location,
+    fallbackApplied: false,
+    unresolved: true,
+  };
+}
+
+export function sanitizeKeywords(keywords) {
+  if (!Array.isArray(keywords)) return [];
+  const seen = new Set();
+  return keywords
+    .map(kw => {
+      if (typeof kw !== 'string') return null;
+      let cleaned = kw.normalize('NFKC').trim();
+      cleaned = cleaned.replace(/&/g, ' and ');
+      cleaned = cleaned.replace(/[^\w\s\-'&]/g, ' ');
+      cleaned = cleaned.replace(/\s+/g, ' ').trim();
+      return cleaned;
+    })
+    .filter(kw => {
+      if (!kw) return false;
+      if (kw.length < 3) return false;
+      const words = kw.split(' ');
+      if (words.length === 1 && GENERIC_KEYWORDS.has(words[0].toLowerCase())) return false;
+      const lower = kw.toLowerCase();
+      if (seen.has(lower)) return false;
+      seen.add(lower);
+      return true;
+    });
+}
+
 async function dataforseoRequest(endpoint, method = 'POST', body = null) {
   if (!_dataforseoAuthenticated) {
     return { success: false, error: 'DataForSEO unavailable: authentication previously failed', unavailable: true, available: false, reason: 'AUTHENTICATION_FAILED' };
   }
+
+  if (!VALID_ENDPOINTS.has(endpoint)) {
+    console.error(`❌ [DataForSEO] Invalid endpoint: ${endpoint}`);
+    return { success: false, error: `Invalid DataForSEO endpoint: ${endpoint}`, statusCode: 40400 };
+  }
+
   const authHeader = getAuthHeader();
   if (!authHeader) {
     _dataforseoAuthenticated = false;
     return { success: false, error: 'DataForSEO credentials not configured', unavailable: true };
   }
+
+  console.log('[DataForSEO] Request:', {
+    service: 'DataForSEO',
+    endpoint,
+    method,
+    taskCount: Array.isArray(body) ? body.length : 1,
+  });
 
   try {
     const url = `${DATAFORSEO_API_URL}${endpoint}`;
@@ -103,13 +152,12 @@ async function dataforseoRequest(endpoint, method = 'POST', body = null) {
 
     const response = await fetch(url, options);
 
-    // Log response status only
-    console.log(`📊 [DataForSEO] Response Status: ${response.status}`);
+    console.log(`[DataForSEO] Response Status: ${response.status}`);
 
     if (response.status === 401) {
       _dataforseoAuthenticated = false;
       const errorText = await response.text();
-      console.warn('⚠️ [DataForSEO] Authentication failed - marking unavailable for remainder of analysis');
+      console.warn('⚠️ [DataForSEO] Authentication failed');
 
       if (errorText.includes('40104') || errorText.includes('verify your account')) {
         return {
@@ -133,6 +181,12 @@ async function dataforseoRequest(endpoint, method = 'POST', body = null) {
       };
     }
 
+    if (response.status === 404) {
+      const errorText = await response.text();
+      console.error(`❌ [DataForSEO] 404 Not Found: ${endpoint} - ${errorText}`);
+      return { success: false, error: `DataForSEO endpoint not found: ${endpoint}`, statusCode: 40400, httpStatus: 404 };
+    }
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`❌ [DataForSEO] API error: ${response.status} - ${errorText}`);
@@ -140,6 +194,21 @@ async function dataforseoRequest(endpoint, method = 'POST', body = null) {
     }
 
     const data = await response.json();
+
+    if (data && data.tasks && data.tasks.length > 0) {
+      const failedTask = data.tasks.find(t => t.status_code && t.status_code !== 20000);
+      if (failedTask) {
+        console.error(`❌ [DataForSEO] Task failed: ${failedTask.status_code} - ${failedTask.status_message}`);
+        return {
+          success: false,
+          error: failedTask.status_message || `DataForSEO task error: ${failedTask.status_code}`,
+          statusCode: failedTask.status_code,
+          statusMessage: failedTask.status_message,
+          results: [],
+        };
+      }
+    }
+
     return { success: true, data };
   } catch (error) {
     console.error(`❌ [DataForSEO] Request failed:`, error.message);
@@ -147,9 +216,6 @@ async function dataforseoRequest(endpoint, method = 'POST', body = null) {
   }
 }
 
-/**
- * Normalize keyword metrics from DataForSEO response
- */
 function normalizeKeywordMetrics(response) {
   if (!response || !response.tasks || !response.tasks[0]) {
     return null;
@@ -177,68 +243,49 @@ function normalizeKeywordMetrics(response) {
   };
 }
 
-/**
- * Get keyword metrics for specific keywords
- */
 export async function getKeywordMetrics(keywords, location = 'United States', language = 'English') {
   if (!Array.isArray(keywords) || keywords.length === 0) {
     return { success: false, error: 'No keywords provided' };
   }
 
-  // Sanitize keywords (normalize, replace &, remove punctuation, deduplicate)
   const filteredKeywords = sanitizeKeywords(keywords);
 
   if (filteredKeywords.length === 0) {
     return { success: false, error: 'No valid keywords after sanitization' };
   }
 
-  // DataForSEO v3 expects a single task with 'keywords' array
+  const loc = resolveLocation(location);
+
   const body = [{
     keywords: filteredKeywords,
-    location_name: location,
-    language_name: language
+    location_code: loc.location_code,
+    language_code: loc.language_code,
   }];
 
   const endpoint = '/keywords_data/google_ads/search_volume/live';
-  
-  console.log('🔍 [DataForSEO] Keywords sent to API:', {
+
+  console.log('[DataForSEO] Keywords sent to API:', {
     endpoint,
     count: filteredKeywords.length,
     keywords: filteredKeywords,
     location,
-    language
+    resolvedCode: loc.location_code,
+    resolvedName: loc.location_name,
+    fallbackApplied: loc.fallbackApplied,
   });
 
   const response = await dataforseoRequest(endpoint, 'POST', body);
 
-  console.log('� [DataForSEO] Response status:', {
-    success: response.success,
-    statusCode: response.statusCode,
-    error: response.error
-  });
-
   if (!response.success) {
-    console.log('⚠️ [DataForSEO] Metrics unavailable from DataForSEO:', response.error);
-    return { success: false, error: response.error, message: 'Metrics unavailable from DataForSEO' };
+    return response;
   }
 
-  // Log task status_code
-  if (response.data && response.data.tasks) {
-    console.log('🔍 [DataForSEO] Task status codes:', response.data.tasks.map(t => ({
-      keyword: t.keyword,
-      status_code: t.status_code,
-      status_message: t.status_message
-    })));
-  }
-
-  const normalized = response.data.tasks
+  const normalized = (response.data.tasks || [])
     .filter(task => task.status_code === 20000)
     .flatMap(task => {
       if (!task.result) return [];
-      // Flatten all task result records - handle nested arrays
       const taskResults = Array.isArray(task.result) ? task.result : [task.result];
       return taskResults.flatMap(result => {
-        // Handle nested result arrays (some endpoints return arrays of arrays)
         const items = Array.isArray(result) ? result : [result];
         return items.map(item => ({
           keyword: item.keyword || '',
@@ -257,43 +304,29 @@ export async function getKeywordMetrics(keywords, location = 'United States', la
     })
     .filter(item => item !== null && item.keyword && item.keyword.length > 0);
 
-  // Log first 3 normalized results
-  console.log('🔍 [DataForSEO] First 3 normalized results:', normalized.slice(0, 3));
-
   if (normalized.length === 0) {
-    console.log('⚠️ [DataForSEO] No valid metrics returned from DataForSEO');
-    return { 
-      success: false, 
-      error: 'No valid metrics returned', 
+    return {
+      success: false,
+      error: 'No valid metrics returned',
       message: 'Metrics unavailable from DataForSEO',
       data: []
     };
   }
 
-  const successfulResults = normalized.filter(
-    item => typeof item.keyword === 'string' && item.keyword.length > 0
-  );
-  console.log('🔍 [DataForSEO] Normalized keyword results:', {
-    total: normalized.length,
-    successful: successfulResults.length,
-    first3: normalized.slice(0, 3).map(k => ({ keyword: k.keyword, volume: k.volume }))
-  });
-
   return { success: true, data: normalized };
 }
 
-/**
- * Get keyword suggestions based on seed keywords
- */
 export async function getKeywordSuggestions(seedKeywords, location = 'United States', language = 'English') {
   if (!Array.isArray(seedKeywords) || seedKeywords.length === 0) {
     return { success: false, error: 'No seed keywords provided' };
   }
 
+  const loc = resolveLocation(location);
+
   const body = [{
     keywords: seedKeywords,
-    location_name: location,
-    language_name: language,
+    location_code: loc.location_code,
+    language_code: loc.language_code,
     limit: 10
   }];
 
@@ -303,7 +336,7 @@ export async function getKeywordSuggestions(seedKeywords, location = 'United Sta
     return response;
   }
 
-  const suggestions = response.data.tasks
+  const suggestions = (response.data.tasks || [])
     .filter(task => task.status_code === 20000)
     .flatMap(task => {
       if (!task.result) return [];
@@ -320,7 +353,6 @@ export async function getKeywordSuggestions(seedKeywords, location = 'United Sta
       }));
     })
     .filter(item => {
-      // Filter generic keywords
       const lowerKw = item.keyword.toLowerCase().trim();
       if (lowerKw.split(' ').length === 1 && GENERIC_KEYWORDS.has(lowerKw)) {
         return false;
@@ -331,18 +363,17 @@ export async function getKeywordSuggestions(seedKeywords, location = 'United Sta
   return { success: true, data: suggestions };
 }
 
-/**
- * Get related keywords for a seed keyword
- */
 export async function getRelatedKeywords(seedKeyword, location = 'United States', language = 'English') {
   if (!seedKeyword || typeof seedKeyword !== 'string') {
     return { success: false, error: 'Invalid seed keyword' };
   }
 
+  const loc = resolveLocation(location);
+
   const body = [{
     keywords: [seedKeyword],
-    location_name: location,
-    language_name: language,
+    location_code: loc.location_code,
+    language_code: loc.language_code,
     limit: 20
   }];
 
@@ -352,7 +383,7 @@ export async function getRelatedKeywords(seedKeyword, location = 'United States'
     return response;
   }
 
-  const related = response.data.tasks
+  const related = (response.data.tasks || [])
     .filter(task => task.status_code === 20000)
     .flatMap(task => {
       if (!task.result) return [];
@@ -369,7 +400,6 @@ export async function getRelatedKeywords(seedKeyword, location = 'United States'
       }));
     })
     .filter(item => {
-      // Filter generic keywords
       const lowerKw = item.keyword.toLowerCase().trim();
       if (lowerKw.split(' ').length === 1 && GENERIC_KEYWORDS.has(lowerKw)) {
         return false;
@@ -380,18 +410,17 @@ export async function getRelatedKeywords(seedKeyword, location = 'United States'
   return { success: true, data: related };
 }
 
-/**
- * Get SERP results for a keyword
- */
 export async function getSerpResults(keyword, location = 'United States', language = 'English') {
   if (!keyword || typeof keyword !== 'string') {
     return { success: false, error: 'Invalid keyword' };
   }
 
+  const loc = resolveLocation(location);
+
   const body = [{
     keyword,
-    location_name: location,
-    language_name: language,
+    location_code: loc.location_code,
+    language_code: loc.language_code,
     depth: 10,
     device: 'desktop'
   }];
@@ -402,7 +431,7 @@ export async function getSerpResults(keyword, location = 'United States', langua
     return response;
   }
 
-  const results = response.data.tasks
+  const results = (response.data.tasks || [])
     .filter(task => task.status_code === 20000)
     .flatMap(task => {
       if (!task.result) return [];
@@ -421,15 +450,11 @@ export async function getSerpResults(keyword, location = 'United States', langua
   return { success: true, data: results };
 }
 
-/**
- * Get SERP competitors from multiple keywords
- */
 export async function getSerpCompetitors(keywords, location = 'United States', language = 'English') {
   if (!Array.isArray(keywords) || keywords.length === 0) {
     return { success: false, error: 'No keywords provided' };
   }
 
-  // Filter out generic keywords
   const filteredKeywords = keywords.filter(kw => {
     const lowerKw = kw.toLowerCase().trim();
     if (lowerKw.split(' ').length === 1 && GENERIC_KEYWORDS.has(lowerKw)) {
@@ -442,7 +467,6 @@ export async function getSerpCompetitors(keywords, location = 'United States', l
     return { success: false, error: 'No valid keywords after filtering' };
   }
 
-  // Limit to top 5 keywords to avoid excessive API calls
   const keywordsToUse = filteredKeywords.slice(0, 5);
 
   const allResults = [];
@@ -456,9 +480,36 @@ export async function getSerpCompetitors(keywords, location = 'United States', l
   return { success: true, data: allResults };
 }
 
-/**
- * Normalize SERP competitors and classify types
- */
+const ARTICLE_TITLE_PATTERNS = [
+  /^what\s+is\s+/i,
+  /^how\s+to\s+/i,
+  /^top\s+\d+/i,
+  /^best\s+/i,
+  /^guide\s+to\s+/i,
+  /^ultimate\s+guide/i,
+  /^introducing\s+/i,
+  /^why\s+/i,
+  /^when\s+/i,
+  /^\d+\s+/,
+];
+
+function isArticleTitle(title) {
+  if (!title) return true;
+  return ARTICLE_TITLE_PATTERNS.some(p => p.test(title.trim()));
+}
+
+function isKnowledgeDomain(domain) {
+  if (!domain) return true;
+  const lower = domain.toLowerCase();
+  return /(wikipedia|reddit|quora|medium\.com|hubspot\.com|blog\.|news\.|docs\.)/.test(lower);
+}
+
+function isJobOrCareerPage(url) {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return /\/jobs\b|\/careers\b|\/apply\b/i.test(lower);
+}
+
 export function normalizeSerpCompetitors(serpResults, identity = {}) {
   if (!Array.isArray(serpResults) || serpResults.length === 0) {
     return [];
@@ -468,6 +519,11 @@ export function normalizeSerpCompetitors(serpResults, identity = {}) {
 
   serpResults.forEach(result => {
     const domain = result.domain.toLowerCase();
+
+    if (isKnowledgeDomain(domain)) return;
+    if (isJobOrCareerPage(result.url)) return;
+    if (isArticleTitle(result.title)) return;
+
     if (!domainMap.has(domain)) {
       domainMap.set(domain, {
         name: extractCompanyName(result.title, domain),
@@ -507,15 +563,11 @@ export function normalizeSerpCompetitors(serpResults, identity = {}) {
   return competitors;
 }
 
-/**
- * Classify competitor type
- */
 function classifyCompetitorType(competitor, identity = {}) {
   const domain = competitor.domain.toLowerCase();
   const title = competitor.title.toLowerCase();
   const snippet = competitor.snippet.toLowerCase();
 
-  // Check if it's a directory/research site
   for (const dirSite of DIRECTORY_SITES) {
     if (domain.includes(dirSite)) {
       return {
@@ -526,8 +578,7 @@ function classifyCompetitorType(competitor, identity = {}) {
     }
   }
 
-  // Check for blog/content sites
-  if (title.includes('blog') || title.includes('news') || title.includes('guide') || 
+  if (title.includes('blog') || title.includes('news') || title.includes('guide') ||
       snippet.includes('blog') || snippet.includes('article')) {
     return {
       type: 'serpCompetitor',
@@ -536,11 +587,9 @@ function classifyCompetitorType(competitor, identity = {}) {
     };
   }
 
-  // Check for business relevance based on identity
   const industry = (identity.industry || '').toLowerCase();
   const productName = (identity.productName || '').toLowerCase();
 
-  // High relevance: industry-specific terms in title/snippet
   if (industry && (title.includes(industry) || snippet.includes(industry))) {
     return {
       type: 'directBusinessCompetitor',
@@ -549,7 +598,6 @@ function classifyCompetitorType(competitor, identity = {}) {
     };
   }
 
-  // Medium relevance: similar business terms
   const businessTerms = ['software', 'development', 'consulting', 'services', 'solutions', 'company', 'agency'];
   const hasBusinessTerms = businessTerms.some(term => title.includes(term) || snippet.includes(term));
 
@@ -561,7 +609,6 @@ function classifyCompetitorType(competitor, identity = {}) {
     };
   }
 
-  // Low relevance: general SERP result
   return {
     type: 'serpCompetitor',
     relevanceScore: 40,
@@ -569,36 +616,25 @@ function classifyCompetitorType(competitor, identity = {}) {
   };
 }
 
-/**
- * Extract company name from title
- */
 function extractCompanyName(title, domain) {
   if (!title) return domain;
-  
-  // Remove common suffixes
+
   const cleaned = title
-    .replace(/\s*-\s*.+$/, '') // Remove everything after dash
-    .replace(/\s*\|\s*.+$/, '') // Remove everything after pipe
-    .replace(/\s*:\s*.+$/, '') // Remove everything after colon
-    .replace(/\s*\(.+\)$/, '') // Remove parenthetical content
+    .replace(/\s*-\s*.+$/, '')
+    .replace(/\s*\|\s*.+$/, '')
+    .replace(/\s*:\s*.+$/, '')
+    .replace(/\s*\(.+\)$/, '')
     .trim();
 
   return cleaned || domain;
 }
 
-/**
- * Calculate confidence based on appearances and rank
- */
 function calculateConfidence(appearances, rank) {
-  // More appearances and better rank = higher confidence
   const appearanceScore = Math.min(appearances * 10, 50);
   const rankScore = Math.max(0, 50 - rank * 2);
   return Math.min(100, appearanceScore + rankScore);
 }
 
-/**
- * Separate competitors by type
- */
 export function separateCompetitorsByType(competitors) {
   if (!Array.isArray(competitors)) {
     return {
@@ -617,9 +653,6 @@ export function separateCompetitorsByType(competitors) {
   };
 }
 
-/**
- * Check if DataForSEO is configured
- */
 export function isDataForSEOConfigured() {
   return !!(DATAFORSEO_LOGIN && DATAFORSEO_PASSWORD);
 }
@@ -640,9 +673,6 @@ export function getDataForSEOStatus() {
 // BACKLINKS & DOMAIN ANALYTICS
 // ============================================
 
-/**
- * Get backlinks summary for a domain
- */
 export async function getBacklinksSummary(domain) {
   if (!domain || typeof domain !== 'string') {
     return { success: false, error: 'Domain is required' };
@@ -663,9 +693,6 @@ export async function getBacklinksSummary(domain) {
   return { success: true, data: normalized };
 }
 
-/**
- * Get referring domains for a domain
- */
 export async function getReferringDomains(domain) {
   if (!domain || typeof domain !== 'string') {
     return { success: false, error: 'Domain is required' };
@@ -683,7 +710,7 @@ export async function getReferringDomains(domain) {
     return response;
   }
 
-  const results = response.data.tasks
+  const results = (response.data.tasks || [])
     .filter(task => task.status_code === 20000)
     .flatMap(task => {
       if (!task.result) return [];
@@ -700,9 +727,6 @@ export async function getReferringDomains(domain) {
   return { success: true, data: results };
 }
 
-/**
- * Get domain analytics
- */
 export async function getDomainAnalytics(domain) {
   if (!domain || typeof domain !== 'string') {
     return { success: false, error: 'Domain is required' };
@@ -722,9 +746,6 @@ export async function getDomainAnalytics(domain) {
   return { success: true, data: normalized };
 }
 
-/**
- * Normalize backlink summary response
- */
 function normalizeBacklinkSummary(response) {
   if (!response || !response.tasks || !response.tasks[0]) {
     return null;
@@ -745,8 +766,8 @@ function normalizeBacklinkSummary(response) {
     referringPages: result.referring_pages || null,
     dofollowBacklinks: result.dofollow_backlinks || null,
     nofollowBacklinks: result.nofollow_backlinks || null,
-    dofollowRatio: result.dofollow_backlinks && result.total_backlinks 
-      ? (result.dofollow_backlinks / result.total_backlinks * 100).toFixed(2) 
+    dofollowRatio: result.dofollow_backlinks && result.total_backlinks
+      ? (result.dofollow_backlinks / result.total_backlinks * 100).toFixed(2)
       : null,
     domainRank: result.domain_rank || null,
     spamScore: result.spam_score || null,
@@ -756,9 +777,6 @@ function normalizeBacklinkSummary(response) {
   };
 }
 
-/**
- * Normalize domain authority response
- */
 function normalizeDomainAuthority(response) {
   if (!response || !response.tasks || !response.tasks[0]) {
     return null;
@@ -785,9 +803,6 @@ function normalizeDomainAuthority(response) {
   };
 }
 
-/**
- * Get comprehensive domain data (backlinks + analytics)
- */
 export async function getDomainData(domain) {
   if (!domain) {
     return { success: false, error: 'Domain is required' };
@@ -811,4 +826,3 @@ export async function getDomainData(domain) {
     return { success: false, error: error.message };
   }
 }
-
