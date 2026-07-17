@@ -115,33 +115,32 @@ export function GrowthWorkspacePage() {
     setSummary(null);
 
     try {
-      console.log('≡ƒÜÇ Starting full growth analysis...');
+      console.log('🚀 Starting full growth analysis...');
       
       const res = await api.post(`/api/chats/${project.id}/growth-workspace/run-full-analysis`, formData);
 
-      console.log('≡ƒôª FULL ANALYSIS RESPONSE:', res.data);
-      console.log('≡ƒôè RESULTS:', res.data.results);
-      console.log('≡ƒôï STEPS:', res.data.steps);
+      console.log('📪 FULL ANALYSIS RESPONSE:', res);
+      console.log('📬 RESULTS:', res.results);
+      console.log('📋 STEPS:', res.steps);
 
-      if (res.data.success) {
-        console.log('Γ£à Analysis complete!');
-        setAnalysisData(res.data.results);
-        setSteps(res.data.steps || initialSteps);
-        setSummary(res.data.summary || null);
+      if (res.success) {
+        console.log('✅ Analysis complete!');
+        setAnalysisData(res.results);
+        setSteps(res.steps || initialSteps);
+        setSummary(res.summary || null);
         setSavedInput(formData);
         setAnalysisStage('completed');
         toast.success('Full growth analysis completed successfully!');
       } else {
-        console.error('ΓÜá∩╕Å Analysis failed:', res.data.error);
-        setSteps(res.data.steps || initialSteps);
+        console.error('⚠️ Analysis failed:', res.error);
+        setSteps(res.steps || initialSteps);
         setAnalysisStage('error');
-        setAnalysisError(res.data.error || 'Unknown error');
+        setAnalysisError(res.error || 'Unknown error');
         
-        // Show user-friendly error message
-        if (res.data.errorCode === 'CHAT_NOT_FOUND') {
+        if (res.errorCode === 'CHAT_NOT_FOUND') {
           toast.error('Project not found. Please create or select a valid project first.');
         } else {
-          toast.error(`Analysis failed: ${res.data.error || 'Unknown error'}`);
+          toast.error(`Analysis failed: ${res.error || 'Unknown error'}`);
         }
       }
     } catch (err: any) {

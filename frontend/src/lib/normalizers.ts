@@ -366,9 +366,9 @@ export const safeParse = (value: any, fallback: any = {}): any => {
 // GROWTH WORKSPACE NORMALIZATION
 export function normalizeFullResults(data: any) {
   const root = data?.data || data || {};
-  const growthStatus = root.growthStatus || 'NOT_RUN';
-  const seoStatus = root.seoStatus || 'NOT_RUN';
   const hasProduct = root.hasProductIntelligence === true || !!root.productIntelligence;
+  const growthStatus = root.growthStatus || (hasProduct ? 'COMPLETED' : 'NOT_RUN');
+  const seoStatus = root.seoStatus || (root.seoIntelligence && typeof root.seoIntelligence === 'object' && Object.keys(root.seoIntelligence).length > 0 ? 'COMPLETED' : 'NOT_RUN');
   const hasGrowth = growthStatus !== 'NOT_RUN' && growthStatus !== 'FAILED';
 
   // PRIORITY 1: Use canonical growthWorkspace from backend
@@ -481,7 +481,7 @@ export function normalizeFullResults(data: any) {
     agents: asArray(root.agentRuns || []),
     automation: root.automationPlan || root.automationPlans || root.automation || {},
     hasGrowthWorkspace: hasProd,
-    hasSeoIntelligence: seoStatus === 'COMPLETED' || seoStatus === 'COMPLETED_WITH_WARNINGS',
+    hasSeoIntelligence: seoStatus === 'COMPLETED' || seoStatus === 'COMPLETED_WITH_WARNINGS' || seoStatus === 'PARTIAL',
     hasProductIntelligence: hasProd,
     hasCompetitorIntelligence: root.hasCompetitorIntelligence === true,
     hasCampaignIntelligence: root.hasCampaignIntelligence === true,
