@@ -29,9 +29,10 @@ export function CampaignGeneratorModule() {
     if (!chatId) return;
     (async () => {
       try {
-        const resp = await api.get(`/api/chats/${chatId}/campaign-intelligence`);
-        if (resp?.data?.success && resp.data.campaignGenerator) {
-          setData(resp.data.campaignGenerator);
+        const resp = await api.get(`/chats/${chatId}/campaign-intelligence`);
+        const gen = resp?.campaignGenerator || resp?.campaignPlan || null;
+        if (gen) {
+          setData(gen);
         }
       } catch (e) {
         // silent
@@ -48,10 +49,9 @@ export function CampaignGeneratorModule() {
     setLoading(true);
     setError(null);
     try {
-      const resp = await api.post(`/api/chats/${chatId}/campaign-intelligence/campaign/run`, form);
-      if (resp?.data?.success) {
-        setData(resp.data.campaignGenerator);
-      }
+      const resp = await api.post(`/chats/${chatId}/campaign-intelligence/campaign/run`, form);
+      const gen = resp?.campaignGenerator || resp?.campaignPlan || resp;
+      setData(gen);
     } catch (e: any) {
       const msg = e?.response?.data?.error || "Failed to generate campaign";
       setError(msg);

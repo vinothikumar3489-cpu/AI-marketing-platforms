@@ -205,10 +205,12 @@ export const generateCampaignPlan = async (req, res) => {
         error: "Campaign plan could not be persisted. Please retry.",
       });
     }
+    const campaignGenerator = extractCampaignGenerator(savedPlan);
 
     return res.status(201).json({
       success: true,
-      data: savedPlan,
+      campaignPlan: savedPlan,
+      campaignGenerator,
     });
   } catch (error) {
     console.error("[Campaign] Error generating intelligence:", error);
@@ -220,6 +222,40 @@ export const generateCampaignPlan = async (req, res) => {
     inProgressCampaign.delete(dedupKey);
   }
 };
+
+function extractCampaignGenerator(plan) {
+  if (!plan) return null;
+  const execSummary = plan.executiveSummary || {};
+  const campaignObjective = plan.campaignObjective || {};
+  const timeline = plan.timeline || {};
+  const channelRecs = plan.channelRecommendations || [];
+  const kpis = plan.kpiFramework || [];
+
+  const sevenDayContentCalendar = [];
+  if (timeline.week1 && Array.isArray(timeline.week1)) {
+    timeline.week1.slice(0, 7).forEach((task, i) => {
+      sevenDayContentCalendar.push({ day: `Day ${i + 1}`, content: typeof task === 'string' ? task : (task.task || task.title || '') });
+    });
+  } else if (Array.isArray(timeline)) {
+    timeline.slice(0, 7).forEach((item, i) => {
+      sevenDayContentCalendar.push({ day: `Day ${i + 1}`, content: typeof item === 'string' ? item : (item.task || item.title || '') });
+    });
+  }
+
+  return {
+    campaignStrategy: execSummary.theme || execSummary.campaignName || plan.campaignName || '',
+    adCopies: (campaignObjective.adCopies || []).concat(
+      channelRecs.filter(r => r.channel === 'Google Ads' || r.channel === 'Paid Search').map(r => r.recommendedContent || r.recommendedCTA || '')
+    ),
+    socialMediaPosts: channelRecs.filter(r => ['LinkedIn', 'Instagram', 'Facebook', 'Twitter', 'TikTok'].includes(r.channel)).map(r => r.recommendedContent || '').filter(Boolean),
+    emailCampaign: channelRecs.filter(r => r.channel === 'Email').map(r => r.recommendedContent || '').filter(Boolean),
+    hashtags: campaignObjective.hashtags || [],
+    landingPageHeadline: execSummary.headline || campaignObjective.primary || '',
+    ctaSuggestions: (campaignObjective.ctas || []).concat(channelRecs.map(r => r.recommendedCTA || '').filter(Boolean)),
+    sevenDayContentCalendar,
+    finalRecommendation: execSummary.goal || campaignObjective.successDefinition || execSummary.campaignName || '',
+  };
+}
 
 /**
  * GET /api/campaign/:chatId/plan
@@ -243,7 +279,9 @@ export const getCampaignPlan = async (req, res) => {
       return res.json({ success: true, exists: false, campaignPlan: null });
     }
 
-    return res.json({ success: true, exists: true, campaignPlan: plan });
+    const campaignGenerator = extractCampaignGenerator(plan);
+
+    return res.json({ success: true, exists: true, campaignPlan: plan, campaignGenerator });
   } catch (error) {
     console.error("[Campaign] Error fetching plan:", error);
     return res.status(500).json({
