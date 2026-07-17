@@ -11,7 +11,8 @@
     "prisma:generate": "prisma generate",
     "seed": "node prisma/seed.js",
     "postinstall": "prisma generate",
-    "build": "prisma generate"
+    "build": "prisma generate",
+    "test": "node --test tests/"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
