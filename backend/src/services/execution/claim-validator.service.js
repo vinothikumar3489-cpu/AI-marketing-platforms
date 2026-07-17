@@ -154,6 +154,7 @@ export function validateContentClaims(content, assetType) {
     rejectedCount: findings.filter(f => f.action === 'removed').length,
     flaggedCount: findings.filter(f => f.action === 'flagged_for_review').length,
     status: hasRejections ? 'blocked' : hasFlags ? 'needs_review' : 'passed',
+    sanitized: cleanCopy,
   };
 }
 

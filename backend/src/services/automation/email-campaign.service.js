@@ -163,6 +163,9 @@ function validateEmailContent(emails) {
       }
     }
     const claimResult = validateContentClaims(email, `email_${email.sequenceOrder}`);
+    if (claimResult.sanitized) {
+      Object.assign(email, claimResult.sanitized);
+    }
     if (!claimResult.valid) {
       for (const finding of claimResult.findings) {
         if (finding.action === "removed") {

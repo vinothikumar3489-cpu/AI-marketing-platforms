@@ -1258,10 +1258,10 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
     };
   }
 
-  const claimValidation = validateContentClaims(result, assetType);
+  const claimValidation = validateContentClaims(schemaValidation.data, assetType);
 
   const validatedContent = {
-    ...schemaValidation.data,
+    ...(claimValidation.sanitized || schemaValidation.data),
     _type: assetType,
   };
 
