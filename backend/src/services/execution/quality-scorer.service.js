@@ -29,6 +29,12 @@ const QUALITY_CHECKS = {
       
       if (!productName) return { status: 'blocked', detail: 'No product name available' };
       
+      // Validate product identity is not generic
+      const normalizedName = productName.toLowerCase().trim();
+      if (INVALID_PRODUCT_IDENTITIES.has(normalizedName) || normalizedName.length < 2) {
+        return { status: 'blocked', detail: `Invalid product identity: "${productName}" — content generation requires verified product` };
+      }
+      
       const contentStr = JSON.stringify(content).toLowerCase();
       
       // Check for product name, brand name, or verified features

@@ -128,165 +128,100 @@ export async function generateBlogIntelligence({
 // BLOG IDEAS GENERATION
 // ============================================
 
+function isValidBlogKeyword(keyword) {
+  if (!keyword || typeof keyword !== 'string') return false;
+  const trimmed = keyword.trim();
+  if (!trimmed) return false;
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return false;
+  const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+    'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had',
+    'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'must', 'can', 'this',
+    'that', 'these', 'those']);
+  if (stopWords.has(words[0]) || stopWords.has(words[words.length - 1])) return false;
+  if (/^[a-z]{15,}$/.test(trimmed) || /^[a-z]+[A-Z]/.test(trimmed)) return false;
+  if (trimmed.length < 5) return false;
+  return true;
+}
+
 async function generateBlogIdeas({ keywordIntelligence, competitorIntelligence, geoIntelligence, productName, industry, newsSignals = [], marketSignals = [] }) {
-  console.log('💡 [Blog Ideas] Generating blog titles from real data...');
+  console.log('[Blog Ideas] Generating blog titles from real data...');
   try {
   const ideas = [];
 
-  // Use only validated keywords (confidence ≥ 70 or from DataForSEO)
   const allKeywords = [
     ...(keywordIntelligence.primaryKeywords || []),
     ...(keywordIntelligence.secondaryKeywords || []),
     ...(keywordIntelligence.longTailKeywords || [])
-  ];
+  ].filter(kw => {
+    const key = (kw.keyword || kw || '').toLowerCase().trim();
+    return isValidBlogKeyword(key);
+  });
   
   if (!allKeywords || allKeywords.length === 0) {
-    console.log('⚠️ [Blog Ideas] No keyword data available');
+    console.log('[Blog Ideas] No keyword data available');
     return ideas;
   }
 
-  console.log(`✅ [Blog Ideas] Using ${allKeywords.length} keywords for blog generation`);
+  console.log(`[Blog Ideas] Using ${allKeywords.length} keywords for blog generation`);
 
-  // Filter to only validated keywords (confidence ≥ 50 or from DataForSEO)
-  // Also allow clean category-based seed keywords with lower confidence
   const validatedKeywords = allKeywords.filter(kw => {
     const confidence = kw.confidence || 0;
     const source = kw.source || '';
 
-    // Accept DataForSEO keywords (high confidence by default)
     if (source === 'DataForSEO') return true;
-
-    // Accept keywords with confidence ≥ 50 (lowered from 70)
     if (confidence >= 50) return true;
 
-    // Accept clean category-based seed keywords (source includes 'Category Seed' or similar)
     if (source && source.includes('Category Seed')) {
       const keyword = (kw.keyword || '').toLowerCase().trim();
       if (!keyword) return false;
-      // Additional check: ensure keyword is not a bad phrase
       const badPhrases = ['general', 'account', 'semrush', 'platform for', 'for building', 'the collaborative interface', 'for building meaningful'];
       if (badPhrases.some(bp => keyword.includes(bp))) return false;
-      // Reject concatenated junk keywords
       if (/^[a-z]{15,}$/.test(keyword) || /^[a-z]+[A-Z]/.test(keyword) || /^[a-z]{2,}[A-Z]{2,}/.test(keyword)) return false;
       const concatenatedBrands = ['canva', 'gamma', 'figma', 'notion', 'adobe', 'google'];
       if (concatenatedBrands.some(p => keyword.includes(p)) && !keyword.includes(' ')) return false;
       return true;
     }
 
-    // Reject other seed/weak keywords
     return false;
   });
 
   if (validatedKeywords.length === 0) {
-    console.log('⚠️ [Blog Ideas] No validated keywords (confidence ≥ 50 or DataForSEO) available');
-    // Fall back to allKeywords if they exist (category seeds, AI-extracted)
+    console.log('[Blog Ideas] No validated keywords available');
     if (allKeywords.length > 0) {
-      console.log(`🔄 [Blog Ideas] Falling back to ${allKeywords.length} unvalidated keywords for blog ideas`);
-      const validKeywords = allKeywords.filter(kw => {
+      console.log(`[Blog Ideas] Falling back to ${allKeywords.length} unvalidated keywords`);
+      allKeywords.slice(0, 10).forEach(kw => {
         const keyword = (kw.keyword || kw || '').toLowerCase().trim();
-        if (!keyword || keyword.length < 4) return false;
-        const rejectTerms = ['general', 'account', 'semrush', 'whatever', 'tools', 'compare'];
-        if (rejectTerms.some(t => keyword.includes(t))) return false;
-        const words = keyword.split(' ');
-        const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-          'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had',
-          'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'must', 'can', 'this',
-          'that', 'these', 'those']);
-        if (stopWords.has(words[0]) || stopWords.has(words[words.length - 1])) return false;
-        return true;
-      });
-      
-      validKeywords.slice(0, 10).forEach(kw => {
-        const keyword = kw.keyword || kw;
-        const volume = kw.searchVolume;
-        const difficulty = kw.difficulty || kw.keywordDifficulty;
+        if (!isValidBlogKeyword(keyword)) return;
         ideas.push({
           title: generateBlogTitle(keyword, productName, 'informational'),
           targetKeyword: keyword,
-          searchVolume: volume,
-          keywordDifficulty: difficulty,
+          searchVolume: kw.searchVolume,
+          keywordDifficulty: kw.difficulty || kw.keywordDifficulty,
           intent: 'informational',
           outline: generateOutline('informational', keyword),
           estimatedTrafficPotential: null,
           source: 'CategorySeed',
-          evidence: 'Category-based seed keyword for blog topic exploration',
+          evidence: 'Keyword for blog topic exploration',
           internalLinkSuggestions: generateInternalLinks(keyword, productName)
         });
       });
       
       if (ideas.length > 0) {
-        console.log(`✅ [Blog Ideas] Generated ${ideas.length} blog ideas from fallback keywords`);
+        console.log(`[Blog Ideas] Generated ${ideas.length} blog ideas from fallback keywords`);
         return ideas.sort((a, b) => (b.searchVolume || 0) - (a.searchVolume || 0));
       }
     }
     return ideas;
   }
   
-  console.log(`✅ [Blog Ideas] Using ${validatedKeywords.length} validated keywords out of ${allKeywords.length} total`);
+  console.log(`[Blog Ideas] Using ${validatedKeywords.length} validated keywords out of ${allKeywords.length} total`);
 
-  // Filter out junk keywords before generating blog ideas
-  const validKeywords = validatedKeywords.filter(kw => {
-    const keyword = kw.keyword?.toLowerCase().trim();
-    if (!keyword) return false;
-    
-    // Reject concatenated junk keywords (no spaces, camelCase, or all-lowercase word-soup)
-    if (/^[a-z]{15,}$/.test(keyword) || /^[a-z]+[A-Z]/.test(keyword) || /^[a-z]{2,}[A-Z]{2,}/.test(keyword)) {
-      return false;
-    }
-    const concatenatedBrandPatterns = ['canva', 'gamma', 'figma', 'notion', 'adobe', 'google'];
-    if (concatenatedBrandPatterns.some(p => keyword.includes(p)) && !keyword.includes(' ')) {
-      return false;
-    }
-    
-    // Reject tool names, UI words, and generic terms
-    const rejectTerms = ['shell', 'clipagent', 'studio', 'assistbot', 'fluxframe', 'motionly', 'whatever', 'what', 'used', 'take', 'google', 'tools', 'compare', 'home', 'about', 'contact', 'services', 'products', 'blog', 'news', 'careers', 'pricing', 'login', 'signup', 'register', 'dashboard', 'profile', 'settings', 'help', 'support', 'faq', 'terms', 'privacy', 'cookie', 'legal', 'sitemap', 'search', 'menu', 'nav', 'header', 'footer', 'sidebar'];
-    if (rejectTerms.some(term => keyword.includes(term))) {
-      return false;
-    }
-    
-    // Reject very short words
-    if (keyword.length < 4) {
-      return false;
-    }
-    
-    // Reject single generic words
-    const genericWords = ['software', 'system', 'platform', 'service', 'solution', 'tool', 'app', 'product', 'company', 'business', 'team', 'data', 'tech', 'code', 'cloud', 'web', 'site', 'page', 'user', 'client', 'general', 'account', 'semrush'];
-    if (keyword.split(' ').length === 1 && genericWords.includes(keyword)) {
-      return false;
-    }
-    
-    // Reject stopword-starting or stopword-ending phrases
-    const words = keyword.split(' ');
-    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-      'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had',
-      'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'must', 'can', 'this',
-      'that', 'these', 'those']);
-    if (stopWords.has(words[0]) || stopWords.has(words[words.length - 1])) {
-      return false;
-    }
-    
-    return true;
-  });
-
-  if (validKeywords.length === 0) {
-    console.log('⚠️ [Blog Ideas] No valid keywords available after filtering');
-    return ideas;
-  }
-
-  console.log(`✅ [Blog Ideas] Using ${validKeywords.length} valid keywords out of ${validatedKeywords.length} validated`);
-
-  const keywords = validKeywords || [];
-
-  // Filter out weak keywords that generate generic blog topics
-  const weakKeywords = [
-    'general', 'account', 'semrush', 'competitors', 'alternatives',
-    'strategies', 'best practices', 'platform for', 'for building',
-    'gamma app', 'figma com', 'notion com', 'shell', 'studio', 'assistbot'
-  ];
+  const keywords = validatedKeywords || [];
 
   const filteredKeywords = keywords.filter(kw => {
     const keyword = (kw.keyword || kw).toLowerCase();
-    return !weakKeywords.includes(keyword) && !weakKeywords.some(weak => keyword.startsWith(weak + ' '));
+    return isValidBlogKeyword(keyword);
   });
 
   // From informational keywords with high volume or seed keywords
@@ -438,9 +373,15 @@ function isDuplicateKeyword(keyword, existingIdeas) {
 }
 
 function generateBlogTitle(keyword, productName, type) {
-  if (!keyword) return `${productName}: Tips and Best Practices`;
+  if (!keyword || !keyword.trim()) return `${productName}: Tips and Best Practices`;
   const lower = keyword.trim();
-  const titleCase = lower.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  const words = lower.split(/\s+/).filter(Boolean);
+  // Never produce single-word titles — append product context
+  if (words.length < 2) {
+    const cap = words[0].charAt(0).toUpperCase() + words[0].slice(1);
+    return `${cap} - ${productName} Insights`;
+  }
+  const titleCase = words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
   if (type === 'question' || lower.startsWith('how') || lower.startsWith('what') || lower.startsWith('why') || lower.startsWith('when') || lower.startsWith('where') || lower.startsWith('which') || lower.startsWith('who') || lower.startsWith('is') || lower.startsWith('can') || lower.startsWith('does')) {
     const q = titleCase.endsWith('?') ? titleCase : titleCase + '?';

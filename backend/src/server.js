@@ -7,9 +7,12 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import compression from "compression";
 import path from "path";
-import { exec } from "child_process";
+import { exec, execSync } from "child_process";
 import { promisify } from "util";
 import { prisma } from "./config/prisma.js";
+import { logProviderConfig } from "./services/provider-health.service.js";
+import { fileURLToPath } from "url";
+import { readFileSync } from "fs";
 
 import { authRouter } from "./routes/auth.routes.js";
 import { chatRouter } from "./routes/chat.routes.js";
@@ -36,6 +39,32 @@ import { salesCopilotRouter } from "./routes/sales-copilot.routes.js";
 
 dotenv.config();
 
+// Build metadata logging
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+function getBuildMetadata() {
+  try {
+    const branch = execSync('git branch --show-current').toString().trim();
+    const commitSha = execSync('git rev-parse HEAD').toString().trim();
+    return {
+      branch,
+      commitSha,
+      nodeEnv: process.env.NODE_ENV || 'development'
+    };
+  } catch (error) {
+    console.warn('⚠️ Could not retrieve git metadata:', error.message);
+    return {
+      branch: 'unknown',
+      commitSha: 'unknown',
+      nodeEnv: process.env.NODE_ENV || 'development'
+    };
+  }
+}
+
+const buildMetadata = getBuildMetadata();
+console.log('📦 Build Metadata:', JSON.stringify(buildMetadata, null, 2));
+
 // Startup env validation
 const REQUIRED_ENV_VARS = ['JWT_SECRET', 'DATABASE_URL'];
 const MISSING_VARS = REQUIRED_ENV_VARS.filter(v => !process.env[v]);
@@ -46,6 +75,8 @@ if (MISSING_VARS.length > 0) {
 if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
   console.warn('⚠️ JWT_SECRET is too short (< 32 chars). Use a random 64-character string.');
 }
+
+logProviderConfig();
 
 const execAsync = promisify(exec);
 const app = express();

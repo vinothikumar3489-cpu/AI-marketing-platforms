@@ -116,15 +116,61 @@ function extractNestedKeywords(keywordOpportunities) {
 
 /**
  * Normalize SEO intelligence for execution modules
- * Handles all known legacy and current data shapes
+ * DEPRECATED: Use normalizeSeoIntelligenceForConsumers instead
+ * This function now delegates to the canonical consumer payload
  */
 export function normalizeSeoForExecution(seoInfo) {
-  if (!seoInfo || typeof seoInfo !== 'object' || seoInfo.exists === false || seoInfo.status === 'NOT_RUN') {
+  console.warn('[SEO Normalizer] normalizeSeoForExecution is deprecated, use normalizeSeoIntelligenceForConsumers');
+  const canonical = normalizeSeoIntelligenceForConsumers(seoInfo);
+  
+  // Legacy compatibility: map to old structure
+  return {
+    available: canonical.available,
+    status: canonical.status,
+    keywords: canonical.allKeywords,
+    keywordOpportunities: canonical.measuredKeywords,
+    primaryKeywords: canonical.primaryKeywords,
+    secondaryKeywords: canonical.secondaryKeywords,
+    longTailKeywords: canonical.longTailKeywords,
+    questionKeywords: canonical.questionKeywords,
+    competitorKeywords: canonical.competitorKeywords,
+    allKeywords: canonical.allKeywords,
+    contentOpportunities: canonical.contentOpportunities,
+    contentGaps: canonical.contentGaps,
+    clusters: canonical.clusters,
+    blogIdeas: canonical.blogIdeas,
+    technicalAudit: canonical.technicalAudit,
+    seoScore: canonical.seoScore,
+    actionPlan: canonical.actionPlan,
+    warnings: canonical.warnings
+  };
+}
+
+/**
+ * Normalize SEO intelligence for frontend display
+ * DEPRECATED: Use normalizeSeoIntelligenceForConsumers instead
+ * This function now delegates to the canonical consumer payload
+ */
+export function normalizeSeoForFrontend(seoInfo) {
+  console.warn('[SEO Normalizer] normalizeSeoForFrontend is deprecated, use normalizeSeoIntelligenceForConsumers');
+  return normalizeSeoIntelligenceForConsumers(seoInfo);
+}
+
+/**
+ * ONE CANONICAL SEO CONSUMER PAYLOAD
+ * This is the single source of truth for all SEO consumers (frontend, PDF, report builder, execution modules).
+ * Replaces: normalizeSeoForExecution, normalizeSeoForFrontend, normalizeSeoIntelligenceForConsumers
+ * 
+ * Splits keywords into measuredKeywords (with DataForSEO metrics) and topicCandidates (topic_idea_only).
+ * Returns unified counts object so all consumers agree.
+ */
+export function normalizeSeoIntelligenceForConsumers(seoInfo) {
+  if (!seoInfo || typeof seoInfo !== 'object') {
     return {
       available: false,
-      status: seoInfo?.status || 'NOT_RUN',
-      keywords: [],
-      keywordOpportunities: [],
+      status: 'NOT_RUN',
+      measuredKeywords: [],
+      topicCandidates: [],
       primaryKeywords: [],
       secondaryKeywords: [],
       longTailKeywords: [],
@@ -134,182 +180,320 @@ export function normalizeSeoForExecution(seoInfo) {
       contentOpportunities: [],
       contentGaps: [],
       clusters: [],
+      blogIdeas: [],
       technicalAudit: null,
       seoScore: null,
-      actionPlan: [],
-      warnings: seoInfo?.exists === false ? [] : ['SEO intelligence not available']
+      actionPlan: null,
+      competitors: null,
+      aiSearchReadiness: null,
+      dataCompleteness: {
+        hasKeywords: false,
+        hasContentGaps: false,
+        hasTechnicalAudit: false,
+        hasCompetitors: false,
+      },
+      counts: { measured: 0, topicCandidates: 0, contentGaps: 0, blogIdeas: 0, competitors: 0, total: 0 },
+      warnings: ['SEO intelligence not available']
     };
   }
 
-  const warnings = [];
+  // Collect ALL keyword items from all possible locations
+  const allItems = [];
 
-  // Extract keywords from various possible locations
-  const keywordOpportunitiesRaw = seoInfo.keywordOpportunities ?? 
-    seoInfo.keywordIntelligence?.opportunities ?? 
-    seoInfo.keywordIntelligence?.keywords ?? 
-    seoInfo.keywords ?? 
+  const keywordOpportunitiesRaw = seoInfo.keywordOpportunities ??
+    seoInfo.keywordIntelligence?.opportunities ??
+    seoInfo.keywordIntelligence?.keywords ??
+    seoInfo.keywords ??
     seoInfo.keywordData ?? [];
 
-  // Extract nested keywords from keywordOpportunities object
-  const nestedKeywords = extractNestedKeywords(keywordOpportunitiesRaw);
+  const nestedItems = extractNestedKeywords(keywordOpportunitiesRaw);
+  allItems.push(...asArray(nestedItems));
 
-  // Extract top-level keyword arrays
-  const primaryKeywordsRaw = seoInfo.primaryKeywords ?? 
-    seoInfo.keywordIntelligence?.primary ?? 
-    seoInfo.keywordIntelligence?.primaryKeywords ?? 
-    keywordOpportunitiesRaw?.primaryKeywords ?? [];
-
-  const secondaryKeywordsRaw = seoInfo.secondaryKeywords ?? 
-    seoInfo.keywordIntelligence?.secondary ?? 
-    seoInfo.keywordIntelligence?.secondaryKeywords ?? 
-    keywordOpportunitiesRaw?.secondaryKeywords ?? [];
-
-  const longTailKeywordsRaw = seoInfo.longTailKeywords ?? 
-    seoInfo.keywordIntelligence?.longTail ?? 
-    keywordOpportunitiesRaw?.longTailKeywords ?? [];
-
-  const questionKeywordsRaw = seoInfo.questionKeywords ?? 
-    keywordOpportunitiesRaw?.questionKeywords ?? [];
-
-  const competitorKeywordsRaw = seoInfo.competitorKeywords ?? 
-    keywordOpportunitiesRaw?.competitorKeywords ?? [];
-
-  // Extract content opportunities
-  const contentOpportunitiesRaw = seoInfo.contentOpportunities ?? 
-    keywordOpportunitiesRaw?.contentOpportunities ?? [];
-
-  const clustersRaw = seoInfo.clusters ?? 
-    keywordOpportunitiesRaw?.clusters ?? [];
-
-  // Extract content gaps from all known shapes
-  const contentGapsRaw = seoInfo.contentGaps ?? 
-    seoInfo.gapAnalysis ?? 
-    seoInfo.contentGapRecord?.contentGaps ?? 
-    seoInfo.contentGaps?.gaps ?? 
-    seoInfo.contentGaps?.items ?? 
-    seoInfo.contentGaps?.missingPages ?? 
-    seoInfo.contentGaps?.contentOpportunities ?? 
-    seoInfo.contentGaps?.topGaps ?? [];
-
-  const blogIdeasRaw = seoInfo.blogIdeas ?? 
-    seoInfo.contentIdeas ?? 
-    seoInfo.topicIdeas ?? 
-    seoInfo.blogTopics ?? [];
-
-  // Normalize all keyword arrays, filtering out low-quality entries
-  const normalizedNested = asArray(nestedKeywords).map(normalizeKeywordItem).filter(Boolean);
-  const normalizedPrimary = asArray(primaryKeywordsRaw).map(normalizeKeywordItem).filter(Boolean);
-  const normalizedSecondary = asArray(secondaryKeywordsRaw).map(normalizeKeywordItem).filter(Boolean);
-  const normalizedLongTail = asArray(longTailKeywordsRaw).map(normalizeKeywordItem).filter(Boolean);
-  const normalizedQuestion = asArray(questionKeywordsRaw).map(normalizeKeywordItem).filter(Boolean);
-  const normalizedCompetitor = asArray(competitorKeywordsRaw).map(normalizeKeywordItem).filter(Boolean);
-
-  // Combine all keywords and deduplicate
-  const allKeywordsRaw = [
-    ...normalizedNested,
-    ...normalizedPrimary,
-    ...normalizedSecondary,
-    ...normalizedLongTail,
-    ...normalizedQuestion,
-    ...normalizedCompetitor
+  const topLevelArrays = [
+    seoInfo.primaryKeywords,
+    seoInfo.secondaryKeywords,
+    seoInfo.longTailKeywords,
+    seoInfo.questionKeywords,
+    seoInfo.competitorKeywords,
+    keywordOpportunitiesRaw?.primaryKeywords,
+    keywordOpportunitiesRaw?.secondaryKeywords,
+    keywordOpportunitiesRaw?.longTailKeywords,
+    keywordOpportunitiesRaw?.questionKeywords,
+    keywordOpportunitiesRaw?.competitorKeywords,
+    keywordOpportunitiesRaw?.geoKeywords,
+    keywordOpportunitiesRaw?.contentOpportunities,
   ];
-  const allKeywords = deduplicateKeywords(allKeywordsRaw);
 
-  // Normalize content opportunities
-  const normalizedContentOpportunities = asArray(contentOpportunitiesRaw).map(opp => ({
-    topic: opp.topic || opp.opportunity || opp.title || opp,
-    reason: opp.reason || opp.description || null,
-    priority: opp.priority ?? opp.importance ?? null,
-    contentType: opp.contentType ?? 'content'
-  }));
+  for (const arr of topLevelArrays) {
+    allItems.push(...asArray(arr));
+  }
 
-  // Normalize clusters
-  const normalizedClusters = asArray(clustersRaw).map(cluster => ({
-    name: cluster.name || cluster.topic || 'Cluster',
-    keywords: asArray(cluster.keywords).map(normalizeKeywordItem).filter(Boolean),
-    volume: cluster.volume ?? null,
-    difficulty: cluster.difficulty ?? null
-  }));
+  // Also flatten clusters
+  const clustersRaw = seoInfo.clusters ?? keywordOpportunitiesRaw?.clusters ?? [];
+  for (const cluster of asArray(clustersRaw)) {
+    allItems.push(...asArray(cluster.keywords));
+  }
+
+  // Normalize all items
+  const normalizedItems = allItems.map(normalizeKeywordItem).filter(Boolean);
+
+  // Deduplicate by keyword text
+  const seen = new Set();
+  const deduped = normalizedItems.filter(k => {
+    const lower = k.keyword.toLowerCase();
+    if (seen.has(lower)) return false;
+    seen.add(lower);
+    return true;
+  });
+
+  // Split by metric availability: measuredKeywords have real volume/difficulty/cpc ≥ 1
+  const measuredKeywords = deduped.filter(k =>
+    k.source !== 'topic_idea_only' &&
+    k.source !== 'ai_extracted' &&
+    k.source !== 'topic_candidate' &&
+    ((k.volume !== null && k.volume >= 1) ||
+     (k.difficulty !== null && k.difficulty >= 1) ||
+     (k.cpc !== null && k.cpc >= 1))
+  );
+
+  const topicCandidates = deduped.filter(k =>
+    !measuredKeywords.includes(k) &&
+    k.volume === null &&
+    k.difficulty === null &&
+    k.cpc === null
+  );
 
   // Normalize content gaps
+  const contentGapsRaw = seoInfo.contentGaps ??
+    seoInfo.gapAnalysis ??
+    seoInfo.contentGapRecord?.contentGaps ??
+    seoInfo.contentGaps?.gaps ??
+    seoInfo.contentGaps?.items ??
+    seoInfo.contentGaps?.missingPages ??
+    seoInfo.contentGaps?.contentOpportunities ??
+    seoInfo.contentGaps?.topGaps ?? [];
+
   const normalizedContentGaps = asArray(contentGapsRaw).map(gap => ({
-    topic: gap.topic || gap.opportunity || gap.title || gap,
+    topic: gap.topic || gap.opportunity || gap.title || (typeof gap === 'string' ? gap : ''),
+    targetKeyword: gap.targetKeyword || null,
     reason: gap.reason || gap.gap || gap.description || null,
-    priority: gap.priority ?? gap.importance ?? null
-  }));
+    priority: gap.priority ?? gap.importance ?? null,
+    contentType: gap.contentType || gap.recommendedType || 'content',
+    evidence: gap.evidence || null,
+    recommendedSections: gap.recommendedSections || null
+  })).filter(g => g.topic);
 
   // Normalize blog ideas
-  const normalizedBlogIdeas = asArray(blogIdeasRaw).map(idea => ({
-    topic: idea.topic || idea.title || idea.idea || idea,
-    reason: idea.reason || idea.description || null,
-    contentType: idea.contentType ?? idea.type ?? 'blog'
-  }));
+  const blogIdeasRaw = seoInfo.blogIdeas ??
+    seoInfo.contentIdeas ??
+    seoInfo.topicIdeas ??
+    seoInfo.blogTopics ?? [];
 
-  // Extract technical audit
-  const technicalAudit = seoInfo.technicalAudit ?? seoInfo.audit ?? seoInfo.technicalAnalysis ?? null;
+  const normalizedBlogIdeas = asArray(blogIdeasRaw).map(idea => ({
+    topic: idea.topic || idea.title || idea.idea || (typeof idea === 'string' ? idea : ''),
+    targetKeyword: idea.targetKeyword || idea.keyword || null,
+    reason: idea.reason || idea.description || null,
+    evidence: idea.evidence || null,
+    contentType: idea.contentType ?? idea.type ?? 'blog',
+    intent: idea.intent || null,
+    priority: idea.priority ?? idea.importance ?? null
+  })).filter(b => b.topic);
+
+  // Normalize technical audit
+  const technicalAudit = normalizeTechnicalAuditForConsumers(
+    seoInfo.technicalAudit ?? seoInfo.audit ?? seoInfo.technicalAnalysis ?? null
+  );
+
+  // Build unified counts
+  const counts = {
+    measured: measuredKeywords.length,
+    topicCandidates: topicCandidates.length,
+    contentGaps: normalizedContentGaps.length,
+    blogIdeas: normalizedBlogIdeas.length,
+    competitors: (seoInfo.competitorKeywords && asArray(seoInfo.competitorKeywords).length) || 0,
+    total: measuredKeywords.length + topicCandidates.length + normalizedContentGaps.length + normalizedBlogIdeas.length
+  };
 
   // Extract SEO score
   const seoScore = seoInfo.seoScore ?? seoInfo.score ?? seoInfo.overallScore ?? null;
 
-  // Add warnings for missing critical data
-  if (allKeywords.length === 0) {
+  // Extract action plan
+  const actionPlan = seoInfo.actionPlan ?? seoInfo.executiveActionPlan ?? null;
+
+  // Build warnings
+  const warnings = [];
+  if (measuredKeywords.length === 0 && topicCandidates.length === 0) {
     warnings.push('No keyword data available in SEO intelligence');
   }
-
-  if (normalizedContentGaps.length === 0 && normalizedContentOpportunities.length === 0) {
+  if (normalizedContentGaps.length === 0) {
     warnings.push('No content gap analysis available');
   }
 
   return {
     available: true,
-    keywords: allKeywords.slice(0, 50),
-    keywordOpportunities: normalizedNested.slice(0, 20),
-    primaryKeywords: normalizedPrimary.slice(0, 10),
-    secondaryKeywords: normalizedSecondary.slice(0, 10),
-    longTailKeywords: normalizedLongTail.slice(0, 15),
-    questionKeywords: normalizedQuestion.slice(0, 10),
-    competitorKeywords: normalizedCompetitor.slice(0, 10),
-    allKeywords: allKeywords.slice(0, 100),
-    contentOpportunities: normalizedContentOpportunities.slice(0, 15),
-    contentGaps: normalizedContentGaps.slice(0, 10),
-    clusters: normalizedClusters.slice(0, 10),
-    blogIdeas: normalizedBlogIdeas.slice(0, 10),
+    status: 'COMPLETED',
+    measuredKeywords: measuredKeywords.slice(0, 50),
+    topicCandidates: topicCandidates.slice(0, 100),
+    primaryKeywords: measuredKeywords.slice(0, 10),
+    secondaryKeywords: topicCandidates.slice(0, 10),
+    longTailKeywords: topicCandidates.slice(0, 15),
+    questionKeywords: topicCandidates.filter(k => k.keyword.startsWith('how') || k.keyword.startsWith('what') || k.keyword.startsWith('why')).slice(0, 10),
+    competitorKeywords: [],
+    allKeywords: [...measuredKeywords, ...topicCandidates].slice(0, 100),
+    contentOpportunities: normalizedContentGaps.slice(0, 15),
+    contentGaps: normalizedContentGaps.slice(0, 20),
+    clusters: [],
+    blogIdeas: normalizedBlogIdeas.slice(0, 20),
     technicalAudit,
     seoScore,
+    actionPlan,
+    competitors: null,
+    aiSearchReadiness: null,
+    dataCompleteness: {
+      hasKeywords: measuredKeywords.length > 0 || topicCandidates.length > 0,
+      hasContentGaps: normalizedContentGaps.length > 0,
+      hasTechnicalAudit: !!technicalAudit,
+      hasCompetitors: false,
+    },
+    counts,
     warnings
   };
 }
 
 /**
- * Normalize SEO intelligence for frontend display.
- * Returns cleaner output suitable for rendering in UI components.
+ * Normalize technical audit data for consumers (frontend, PDF, report builder).
+ * Maps from actual stored database paths to a normalized consumer shape.
+ * Database stores technical audit data in json columns with variable structures:
+ * - auditData { mobile, desktop, scores, issues, pageSpeed }
+ * - lighthouse { categories, audits, performance, accessibility, best-practices, seo }
+ * - pageSpeed { mobile, desktop }
+ * - cores { webVitals, mobile, desktop }
+ * - scores { performance, accessibility, seo, bestPractices }
+ * - issues { critical, major, minor }
  */
-export function normalizeSeoForFrontend(seoInfo) {
-  const exec = normalizeSeoForExecution(seoInfo);
+export function normalizeTechnicalAuditForConsumers(audit) {
+  if (!audit || typeof audit !== 'object') return null;
+
+  // Walk through all common access paths
+  const ad = audit.auditData || audit;
+
+  // Lighthouse data (from PageSpeed Insights / Lighthouse API)
+  const lighthouse = ad.lighthouse || ad.lighthouseResult || null;
+
+  // PageSpeed data (mobile/desktop split)
+  const pageSpeed = ad.pageSpeed || ad.pageSpeedInsights || ad.lighthouse?.pageSpeed || null;
+
+  // Extract mobile and desktop data from various locations
+  const mobData = ad.mobile || pageSpeed?.mobile || audit.mobile || null;
+  const deskData = ad.desktop || pageSpeed?.desktop || audit.desktop || null;
+
+  // Core Web Vitals
+  const cores = ad.cores || audit.cores || null;
+
+  // Scores from various locations
+  const scores = ad.scores || audit.scores || lighthouse?.categories || null;
+
+  // Issues
+  const issues = ad.issues || ad.auditIssues || audit.issues || lighthouse?.audits || null;
+
+  // Normalize performance score from multiple paths
+  const getDeviceScore = (deviceData, metric) => {
+    if (!deviceData) return null;
+    // Common paths: lighthouseScores.performance, performance, performanceScore, scores.performance
+    const ls = deviceData.lighthouseScores;
+    if (ls) {
+      const v = ls[metric] ?? ls[metric === 'bestPractices' ? 'bestPractices' : metric] ?? null;
+      if (v !== null && v !== undefined) return v;
+    }
+    const v = deviceData[metric] ?? deviceData[metric + 'Score'] ?? deviceData.scores?.[metric] ?? null;
+    if (v !== null && v !== undefined) return v;
+    return null;
+  };
+
+  const extractScore = (source, key) => {
+    if (!source) return null;
+    const val = source[key] ?? source.score ?? source[key + 'Score'] ?? null;
+    if (typeof val === 'number') return val;
+    if (typeof val === 'object' && val !== null) return val.score ?? val.value ?? null;
+    return null;
+  };
+
+  const performance = mobData ? getDeviceScore(mobData, 'performance')
+    : deskData ? getDeviceScore(deskData, 'performance')
+    : scores ? (scores.performance?.score ?? null)
+    : null;
+
+  const accessibility = mobData ? getDeviceScore(mobData, 'accessibility')
+    : deskData ? getDeviceScore(deskData, 'accessibility')
+    : scores?.accessibility?.score ?? null;
+
+  const bestPractices = mobData ? getDeviceScore(mobData, 'bestPractices')
+    : deskData ? getDeviceScore(deskData, 'bestPractices')
+    : scores?.['best-practices']?.score ?? scores?.bestPractices?.score ?? null;
+
+  const seo = mobData ? getDeviceScore(mobData, 'seo')
+    : deskData ? getDeviceScore(deskData, 'seo')
+    : scores?.seo?.score ?? null;
+
+  // Count issues
+  const criticalIssues = asArray(issues?.critical || issues?.errors || []).length;
+  const majorIssues = asArray(issues?.major || issues?.warnings || []).length;
+  const minorIssues = asArray(issues?.minor || issues?.info || issues?.notices || []).length;
+  const totalIssues = criticalIssues + majorIssues + minorIssues;
+
+  const buildDeviceDetail = (deviceData) => {
+    if (!deviceData) return null;
+    const ls = deviceData.lighthouseScores || {};
+    const pa = deviceData.performanceAudits || {};
+    const cv = deviceData.coreWebVitals || {};
+    return {
+      score: getDeviceScore(deviceData, 'performance') ?? null,
+      fcp: pa.firstContentfulPaint ?? deviceData.firstContentfulPaint ?? deviceData.fcp ?? cv.fcp ?? null,
+      lcp: pa.largestContentfulPaint ?? deviceData.largestContentfulPaint ?? deviceData.lcp ?? cv.lcp ?? null,
+      tbt: pa.totalBlockingTime ?? deviceData.totalBlockingTime ?? deviceData.tbt ?? null,
+      cls: pa.cumulativeLayoutShift ?? deviceData.cumulativeLayoutShift ?? deviceData.cls ?? cv.cls ?? null,
+      si: pa.speedIndex ?? deviceData.speedIndex ?? deviceData.si ?? null,
+    };
+  };
+
+  // Normalize score: 0-1 range to 0-100
+  const toPercent = (v) => v !== null && v !== undefined ? Math.round(v * (v > 1 ? 1 : 100)) : null;
 
   return {
-    available: exec.available,
-    status: exec.status || (exec.available ? 'COMPLETED' : 'NOT_RUN'),
-    technicalAudit: exec.technicalAudit || null,
-    primaryKeywords: exec.primaryKeywords,
-    secondaryKeywords: exec.secondaryKeywords,
-    longTailKeywords: exec.longTailKeywords,
-    questionKeywords: exec.questionKeywords,
-    allKeywords: exec.allKeywords,
-    contentOpportunities: exec.contentOpportunities,
-    contentGaps: exec.contentGaps,
-    blogIdeas: exec.blogIdeas || [],
-    competitors: null,
-    aiSearchReadiness: null,
-    actionPlan: exec.actionPlan || null,
-    dataCompleteness: {
-      hasKeywords: exec.allKeywords.length > 0,
-      hasContentGaps: exec.contentGaps.length > 0 || exec.contentOpportunities.length > 0,
-      hasTechnicalAudit: !!exec.technicalAudit,
-      hasCompetitors: false,
-    },
-    warnings: exec.warnings,
+    available: performance !== null || accessibility !== null || bestPractices !== null || seo !== null ||
+               !!(mobData && Object.keys(mobData).length > 0) ||
+               !!(deskData && Object.keys(deskData).length > 0),
+    source: 'PageSpeed',
+    performance: toPercent(performance),
+    accessibility: toPercent(accessibility),
+    bestPractices: toPercent(bestPractices),
+    seo: toPercent(seo),
+    mobile: buildDeviceDetail(mobData),
+    desktop: buildDeviceDetail(deskData),
+    coreWebVitals: cores ? {
+      lcp: cores.lcp || cores.largestContentfulPaint || null,
+      fid: cores.fid || cores.firstInputDelay || null,
+      cls: cores.cls || cores.cumulativeLayoutShift || null,
+      inp: cores.inp || cores.interactionToNextPaint || null,
+    } : null,
+    issues: {
+      critical: criticalIssues,
+      major: majorIssues,
+      minor: minorIssues,
+      total: totalIssues,
+      items: [
+        ...asArray(issues?.critical || issues?.errors || []).slice(0, 10),
+        ...asArray(issues?.major || issues?.warnings || []).slice(0, 10),
+        ...asArray(issues?.minor || issues?.info || issues?.notices || []).slice(0, 10),
+      ].map(i => ({
+        title: i.title || i.message || i.description || '',
+        severity: i.severity || i.level || 'info',
+        category: i.category || i.type || 'other',
+        description: i.description || i.message || '',
+        impact: i.impact || null
+      }))
+    }
   };
 }
 
-export default { normalizeSeoForExecution, normalizeSeoForFrontend };
+export default { normalizeSeoForExecution, normalizeSeoForFrontend, normalizeSeoIntelligenceForConsumers, normalizeTechnicalAuditForConsumers };

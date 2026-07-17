@@ -168,9 +168,11 @@ async function extractEntities(websiteData, productName) {
     try {
       const aiEntities = await extractEntitiesWithAI(allText, productName);
       if (aiEntities) {
+        const scoreResult = calculateEntityScore(aiEntities);
         return {
           list: aiEntities,
-          score: calculateEntityScore(aiEntities),
+          score: scoreResult.score,
+          evidence: scoreResult.evidence,
           coverage: 'comprehensive'
         };
       }
@@ -181,10 +183,12 @@ async function extractEntities(websiteData, productName) {
 
   // Fallback: Rule-based extraction
   const ruleBasedEntities = extractEntitiesRuleBased(allText, productName);
+  const scoreResult = calculateEntityScore(ruleBasedEntities);
   
   return {
     list: ruleBasedEntities,
-    score: calculateEntityScore(ruleBasedEntities),
+    score: scoreResult.score,
+    evidence: scoreResult.evidence,
     coverage: 'basic'
   };
 }
@@ -255,7 +259,18 @@ function calculateEntityScore(entities) {
   const coverage = Math.min(entities.length * 5, 60);
   const mentionBonus = Math.min(entities.reduce((sum, e) => sum + (e.mentions || 1), 0) * 2, 40);
   
-  return Math.round(Math.min(coverage + mentionBonus, 100));
+  const score = Math.round(Math.min(coverage + mentionBonus, 100));
+  
+  // Evidence tracking: score derived from actual entity count and mentions
+  return {
+    score,
+    evidence: {
+      entityCount: entities.length,
+      totalMentions: entities.reduce((sum, e) => sum + (e.mentions || 1), 0),
+      calculationMethod: 'entity_coverage + mention_bonus',
+      source: 'website_content_analysis'
+    }
+  };
 }
 
 // ============================================
@@ -300,12 +315,27 @@ function analyzeKnowledgeGraphReadiness(websiteData, technicalAudit) {
 
 function calculateKnowledgeGraphScore(data) {
   let score = 0;
+  const evidence = {
+    hasOrganization: data.hasOrganization,
+    hasFAQ: data.hasFAQ,
+    hasArticle: data.hasArticle,
+    hasBreadcrumb: data.hasBreadcrumb,
+    schemaCount: data.schemaCount,
+    calculationMethod: 'weighted_schema_presence',
+    source: 'technical_audit_schema_analysis'
+  };
+  
   if (data.hasOrganization) score += 30;
   if (data.hasFAQ) score += 20;
   if (data.hasArticle) score += 15;
   if (data.hasBreadcrumb) score += 10;
   score += Math.min(data.schemaCount * 5, 25);
-  return Math.min(score, 100);
+  
+  evidence.finalScore = Math.min(score, 100);
+  return {
+    score: evidence.finalScore,
+    evidence
+  };
 }
 
 // ============================================
@@ -365,12 +395,27 @@ function analyzeCitationReadiness(websiteData) {
 
 function calculateCitationScore(data) {
   let score = 0;
+  const evidence = {
+    hasDefinitions: data.hasDefinitions,
+    hasFAQs: data.hasFAQs,
+    hasGuides: data.hasGuides,
+    hasResources: data.hasResources,
+    wordCount: data.wordCount,
+    calculationMethod: 'weighted_content_type_presence',
+    source: 'website_content_analysis'
+  };
+  
   if (data.hasDefinitions) score += 25;
   if (data.hasFAQs) score += 25;
   if (data.hasGuides) score += 20;
   if (data.hasResources) score += 15;
   if (data.wordCount > 1000) score += 15;
-  return Math.min(score, 100);
+  
+  evidence.finalScore = Math.min(score, 100);
+  return {
+    score: evidence.finalScore,
+    evidence
+  };
 }
 
 // ============================================
@@ -535,6 +580,14 @@ function extractTopics(text, headings, productName, industry) {
 
 function calculateTopicalAuthorityScore({ topicCount, wordCount, headingCount, depth }) {
   let score = 0;
+  const evidence = {
+    topicCount,
+    wordCount,
+    headingCount,
+    depthScore: depth,
+    calculationMethod: 'weighted_topic_coverage + content_length + structure + depth',
+    source: 'website_content_analysis'
+  };
   
   // Topic coverage (0-30 points)
   score += Math.min(topicCount * 2, 30);
@@ -552,7 +605,11 @@ function calculateTopicalAuthorityScore({ topicCount, wordCount, headingCount, d
   // Content depth (0-25 points)
   score += Math.min(depth, 25);
   
-  return Math.min(Math.round(score), 100);
+  evidence.finalScore = Math.min(Math.round(score), 100);
+  return {
+    score: evidence.finalScore,
+    evidence
+  };
 }
 
 function assessContentDepth(text, wordCount, headings) {
@@ -643,24 +700,45 @@ function calculatePlatformScores(data) {
   // When unavailable, return null for aggregate scores to avoid fabricated metrics.
   const platformApisAvailable = !!(GROQ_API_KEY || TAVILY_API_KEY || EXA_API_KEY);
 
+  const evidence = {
+    platformApisAvailable,
+    componentScores: {
+      entityScore: data.entities.score,
+      knowledgeGraphScore: data.knowledgeGraphReadiness.score,
+      answerabilityScore: data.answerability.score,
+      citationScore: data.citationReadiness.score,
+      topicalAuthorityScore: data.topicalAuthority.score
+    },
+    calculationMethod: 'weighted_average_of_component_scores',
+    source: 'geo_intelligence_aggregation'
+  };
+
+  const overall = platformApisAvailable ? Math.round(
+    (data.entities.score * 0.25) +
+    (data.knowledgeGraphReadiness.score * 0.20) +
+    (data.answerability.score * 0.25) +
+    (data.citationReadiness.score * 0.15) +
+    (data.topicalAuthority.score * 0.15)
+  ) : null;
+
+  const googleAiOverview = platformApisAvailable ? Math.round(
+    (data.knowledgeGraphReadiness.score * 0.35) +
+    (data.entities.score * 0.25) +
+    (data.answerability.score * 0.25) +
+    (data.citationReadiness.score * 0.15)
+  ) : null;
+
+  evidence.overallScore = overall;
+  evidence.googleAiOverviewScore = googleAiOverview;
+
   return {
-    overall: platformApisAvailable ? Math.round(
-      (data.entities.score * 0.25) +
-      (data.knowledgeGraphReadiness.score * 0.20) +
-      (data.answerability.score * 0.25) +
-      (data.citationReadiness.score * 0.15) +
-      (data.topicalAuthority.score * 0.15)
-    ) : null,
+    overall,
     chatgpt: 'Not measured',
     gemini: 'Not measured',
     claude: 'Not measured',
     perplexity: 'Not measured',
-    googleAiOverview: platformApisAvailable ? Math.round(
-      (data.knowledgeGraphReadiness.score * 0.35) +
-      (data.entities.score * 0.25) +
-      (data.answerability.score * 0.25) +
-      (data.citationReadiness.score * 0.15)
-    ) : null
+    googleAiOverview,
+    evidence
   };
 }
 
@@ -795,12 +873,20 @@ function analyzeTrustSignals(websiteData) {
   if (!signals.hasCertifications) recommendations.push('Display certifications/compliance badges');
   if (!signals.hasNumbers) recommendations.push('Add social proof numbers (users, customers)');
 
+  const evidence = {
+    signals,
+    presentCount: Object.values(signals).filter(Boolean).length,
+    calculationMethod: 'trust_signal_presence_count * 12.5',
+    source: 'website_content_analysis'
+  };
+
   return {
     score: Math.round(score),
     signals,
     recommendations,
     present: Object.entries(signals).filter(([_, v]) => v).map(([k]) => k),
-    missing: Object.entries(signals).filter(([_, v]) => !v).map(([k]) => k)
+    missing: Object.entries(signals).filter(([_, v]) => !v).map(([k]) => k),
+    evidence
   };
 }
 

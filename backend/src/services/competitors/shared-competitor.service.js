@@ -18,12 +18,17 @@ import { preferNonEmptyArray, preferDefinedValue, extractDomainFromUrl } from '.
  * Combines multiple discovery sources and validates results
  */
 export async function getValidatedCompetitorsForChat({ userId, chatId, productIdentity, category, useCases }) {
-  console.log('[Shared Competitor Engine] Getting validated competitors for chat:', chatId);
+  console.log('[Shared Competitor Engine] Getting validated competitors for chat:', { chatId, userId });
   
   const competitors = [];
   const sources = [];
   
-  // Source 1: Existing CompetitorIntelligence
+  // Helper: check that competitor belongs to this chat
+  function belongsToChat(competitorSource) {
+    return true; // All sources query by chatId
+  }
+  
+  // Source 1: Existing CompetitorIntelligence (scoped by chatId)
   try {
     const existingCompetitorIntel = await prisma.competitorIntelligence.findUnique({
       where: { chatId }
@@ -34,6 +39,7 @@ export async function getValidatedCompetitorsForChat({ userId, chatId, productId
       const directCompetitors = preferNonEmptyArray(analysis.directCompetitors, analysis.competitors);
       
       directCompetitors.forEach(c => {
+        if (!c || !c.name) return;
         competitors.push({
           name: c.name,
           domain: c.domain || extractDomainFromUrl(c.websiteUrl),
@@ -53,7 +59,7 @@ export async function getValidatedCompetitorsForChat({ userId, chatId, productId
     console.log('[Shared Competitor Engine] Failed to load existing competitor intelligence:', error.message);
   }
   
-  // Source 2: Business Intelligence competitor data
+  // Source 2: Business Intelligence competitor data (scoped by chatId)
   try {
     const productIntel = await prisma.productIntelligence.findUnique({
       where: { chatId }
@@ -65,18 +71,19 @@ export async function getValidatedCompetitorsForChat({ userId, chatId, productId
         : productIntel.inputJson.competitors.split(',').map(c => c.trim());
       
       biCompetitors.forEach(c => {
-        const domain = extractDomainFromUrl(c);
-        const name = domain ? deriveBrandFromDomain(domain) : c;
+        if (!c || typeof c !== 'string' && !c.name) return;
+        const name = typeof c === 'string' ? c : c.name;
+        const domain = extractDomainFromUrl(typeof c === 'string' ? c : c.websiteUrl || c.domain);
         
         // Avoid duplicates
-        if (!competitors.some(comp => comp.name === name || comp.domain === domain)) {
+        if (!competitors.some(comp => comp.name === name || (comp.domain && domain && comp.domain === domain))) {
           competitors.push({
             name,
             domain,
             competitorType: 'direct',
             sharedCategory: category,
             sharedUseCase: useCases?.[0],
-            sourceUrl: c.startsWith('http') ? c : null,
+            sourceUrl: typeof c === 'string' && c.startsWith('http') ? c : null,
             validationStatus: 'validated',
             evidence: 'Business Intelligence input',
             source: 'business_intelligence'
@@ -90,7 +97,7 @@ export async function getValidatedCompetitorsForChat({ userId, chatId, productId
     console.log('[Shared Competitor Engine] Failed to load Business Intelligence competitors:', error.message);
   }
   
-  // Source 3: Growth Workspace competitor analysis (if available)
+  // Source 3: Growth Workspace competitor analysis (scoped by chatId)
   try {
     const growthIntel = await prisma.competitorIntelligence.findUnique({
       where: { chatId }
@@ -100,8 +107,9 @@ export async function getValidatedCompetitorsForChat({ userId, chatId, productId
       const growthCompetitors = preferNonEmptyArray(growthIntel.competitorAnalysis.competitors);
       
       growthCompetitors.forEach(c => {
+        if (!c || !c.name) return;
         // Avoid duplicates
-        if (!competitors.some(comp => comp.name === c.name || comp.domain === c.domain)) {
+        if (!competitors.some(comp => comp.name === c.name || (comp.domain && c.domain && comp.domain === c.domain))) {
           competitors.push({
             name: c.name,
             domain: c.domain,
@@ -124,6 +132,12 @@ export async function getValidatedCompetitorsForChat({ userId, chatId, productId
   
   // Filter and validate competitors
   const validatedCompetitors = competitors.filter(comp => validateCompetitor(comp, productIdentity));
+  
+  // After validation, log rejected competitors for debugging
+  const rejected = competitors.filter(c => !validatedCompetitors.some(v => v.name === c.name));
+  if (rejected.length > 0) {
+    console.log('[Shared Competitor Engine] Rejected competitors:', rejected.map(c => ({ name: c.name, domain: c.domain, reason: 'validation_failed' })));
+  }
   
   console.log('[Shared Competitor Engine] Validation results:', {
     totalFound: competitors.length,

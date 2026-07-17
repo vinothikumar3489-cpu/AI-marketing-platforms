@@ -74,20 +74,31 @@ export async function generateKeywordIntelligence({
       ? await generateTopicClusters(extractedKeywords, safeProductName)
       : [];
 
+    const rawPrimary = markAsTopicIdeas(extractedKeywords.primary || []);
+    const rawSecondary = markAsTopicIdeas(extractedKeywords.secondary || []);
+    const rawLongTail = markAsTopicIdeas(extractedKeywords.longTail || []);
+    const rawQuestions = markAsTopicIdeas(extractedKeywords.questions || []);
+
+    // Filter ALL extracted keywords through the junk filter to reject single-word tokens
+    const filteredPrimary = filterJunkKeywords(rawPrimary, 'ai_extracted');
+    const filteredSecondary = filterJunkKeywords(rawSecondary, 'ai_extracted');
+    const filteredLongTail = filterJunkKeywords(rawLongTail, 'ai_extracted');
+    const filteredQuestions = filterJunkKeywords(rawQuestions, 'ai_extracted');
+
     const result = {
-      primaryKeywords: markAsTopicIdeas(extractedKeywords.primary || []),
-      secondaryKeywords: markAsTopicIdeas(extractedKeywords.secondary || []),
-      longTailKeywords: markAsTopicIdeas(extractedKeywords.longTail || []),
-      questionKeywords: markAsTopicIdeas(extractedKeywords.questions || []),
+      primaryKeywords: filteredPrimary,
+      secondaryKeywords: filteredSecondary,
+      longTailKeywords: filteredLongTail,
+      questionKeywords: filteredQuestions,
       clusters: clusters || [],
       competitorKeywords: [],
       contentOpportunities: [],
       geoKeywords: [],
       metadata: {
         totalKeywords:
-          (extractedKeywords.primary?.length || 0) +
-          (extractedKeywords.secondary?.length || 0) +
-          (extractedKeywords.longTail?.length || 0),
+          filteredPrimary.length +
+          filteredSecondary.length +
+          filteredLongTail.length,
         clustersCount: clusters?.length || 0,
         opportunitiesCount: 0,
         analyzedAt: new Date().toISOString(),
@@ -187,9 +198,17 @@ async function enrichWithDataForSEO(result, extractedKeywords) {
       result.secondaryKeywords = result.secondaryKeywords.map(enrichKeyword);
       result.longTailKeywords = result.longTailKeywords.map(enrichKeyword);
       result.questionKeywords = result.questionKeywords.map(enrichKeyword);
+    } else {
+      console.warn('⚠️ [Keyword Intelligence] DataForSEO enrichment failed:', metricsResult.error || 'No data returned');
+      // DataForSEO failure is not fatal - continue with topic candidates
+      result.metadata.dataForSeoEnriched = false;
+      result.metadata.dataForSeoError = metricsResult.error || 'Unknown error';
     }
-  } catch (err) {
-    logEvidenceError("keywordIntelligence.enrich", null, err);
+  } catch (error) {
+    console.error('❌ [Keyword Intelligence] DataForSEO enrichment error:', error.message);
+    // DataForSEO failure is not fatal - continue with topic candidates
+    result.metadata.dataForSeoEnriched = false;
+    result.metadata.dataForSeoError = error.message;
   }
 }
 
@@ -202,11 +221,52 @@ const JUNK_KEYWORDS = new Set([
 ]);
 
 function filterJunkKeywords(keywords, source = 'unknown') {
+  const genericSingleWords = new Set([
+    'google', 'meet', 'workspace', 'cloud', 'receive', 'accordance', 'personal',
+    'newsletters', 'notifications', 'admin', 'storage', 'security', 'privacy',
+    'terms', 'software', 'platform', 'service', 'solution', 'tool', 'app',
+    'product', 'company', 'business', 'team', 'data', 'tech', 'code',
+    'web', 'site', 'page', 'user', 'client', 'general', 'account', 'semrush',
+    'design', 'pricing', 'login', 'signup', 'register', 'dashboard',
+    'profile', 'settings', 'help', 'support', 'faq', 'about', 'contact',
+    'careers', 'blog', 'docs', 'home', 'overview', 'started', 'alerts',
+    'shorts', 'tracking', 'trends', 'outlier', 'content', 'get', 'use',
+    'how', 'what', 'why', 'when', 'where', 'make', 'made', 'take', 'need',
+    'want', 'like', 'best', 'top', 'new', 'free', 'good', 'great',
+  ]);
+
+  const singleWordRejectPatterns = [
+    /^\d+$/, /^[\d,+.$\-‰%]+$/, /^[a-z]{15,}$/,
+    /\.(com|org|net|io|app|ai)$/, /\.$/, /,$/, /;$/, /:$/,
+  ];
+
   return keywords.filter(kw => {
     const keyword = typeof kw === 'string' ? kw : kw.keyword;
     if (!keyword) return false;
 
     const lowerKeyword = keyword.toLowerCase().trim();
+    const words = lowerKeyword.split(/\s+/).filter(Boolean);
+
+    // Reject single-word tokens — they are not valid SEO phrases
+    if (words.length === 1) {
+      const word = words[0];
+      if (genericSingleWords.has(word)) return false;
+      for (const p of singleWordRejectPatterns) {
+        if (p.test(word)) return false;
+      }
+      // Reject single words that aren't clearly product-related (must be part of a phrase)
+      if (word.length <= 3) return false;
+      if (/^[a-z]{15,}$/.test(word)) return false;
+      if (word.endsWith('.') || word.endsWith(',') || word.endsWith(';')) return false;
+    }
+
+    // Multi-word phrase checks
+    if (words.length >= 2) {
+      // All meaningful words are generic single terms
+      const meaningfulWords = words.filter(w => !['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'it', 'its', 'we', 'you', 'they', 'he', 'she'].includes(w));
+      if (meaningfulWords.every(w => genericSingleWords.has(w))) return false;
+    }
+
     const junkPatterns = [
       'canva\'s', 'templates', 'designing', 'design',
       'undefined', 'account', 'semrush', 'general',
@@ -406,14 +466,16 @@ Return ONLY valid JSON:
   "questions": ["question1", "question2"]
 }
 
-Rules:
+RULES (strict):
+- EACH keyword MUST be 2+ words — NEVER return a single word
 - DO NOT generate fake search volume, difficulty, CPC, or competition metrics
 - DO NOT return generic terms like "software", "business", "platform", "solution"
-- DO NOT return the product name alone without context
+- DO NOT return the product name alone without context (e.g., "Meet" alone is invalid; "Google Meet recording" is valid)
 - Return topic ideas only — all metrics will be null
-- Prioritize product-specific phrases that describe what the product DOES (e.g., "TikTok social listening", "short-form video analytics", "creator analytics", "trend tracking")
-- Include use-case phrases (e.g., "competitor monitoring for TikTok", "viral content research", "ad research for Reels")
-- Include audience pain-point phrases (e.g., "track TikTok trends", "find viral creators", "monitor short-form video performance")
+- Prioritize product-specific phrases that describe features, benefits, use-cases (e.g., "video conferencing recording", "screen sharing security", "meeting transcription", "calendar integration")
+- Include audience pain-point phrases (e.g., "record team meetings", "share meeting notes", "collaborate remotely")
+- Include comparison or alternative intent (e.g., "best video conferencing for business", "vs zoom", "enterprise meeting solution")
+- Every keyword MUST be a complete phrase (noun phrase or question) — never a fragment
 - Max 8 per category`;
 
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -477,6 +539,57 @@ Rules:
     }
   }
 
+  // Build product-specific compound phrases from headings, features, title, and description
+  const compoundPhrases = [];
+  const productLower = productName.toLowerCase();
+  const phraseSeeds = [];
+
+  // Collect feature/benefit-like fragments from structured content
+  if (title) phraseSeeds.push(title);
+  if (description) phraseSeeds.push(description);
+  h1Texts.forEach(h => phraseSeeds.push(typeof h === 'string' ? h : (h.text || h)));
+  h2Texts.forEach(h => phraseSeeds.push(typeof h === 'string' ? h : (h.text || h)));
+  featuresText.forEach(f => phraseSeeds.push(f));
+
+  // Generate compound phrases by seeding with product name + context
+  for (const seed of phraseSeeds) {
+    if (!seed) continue;
+    const clean = seed.replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim();
+    const words = clean.split(' ').filter(w => w.length > 1 && !STOPWORDS.has(w.toLowerCase()));
+    if (words.length === 0) continue;
+
+    // Product name + seed phrase (e.g., "Google Meet" + "video conferencing" → "Google Meet video conferencing")
+    if (!clean.toLowerCase().includes(productLower)) {
+      const compound1 = `${productName} ${clean}`;
+      if (compound1.length >= 8 && compound1.split(' ').length >= 3) {
+        compoundPhrases.push(compound1);
+      }
+    }
+
+    // Seed phrase for product use-case (e.g., "video conferencing for Google Meet")
+    if (!clean.toLowerCase().includes('for') && !clean.toLowerCase().includes(productLower)) {
+      const compound2 = `${clean} for ${productName}`;
+      if (compound2.length >= 8 && compound2.split(' ').length >= 3) {
+        compoundPhrases.push(compound2);
+      }
+    }
+
+    // Key multi-word fragments from the seed itself (3+ words, if not already product-specific)
+    if (words.length >= 3 && !clean.toLowerCase().includes(productLower)) {
+      compoundPhrases.push(clean);
+    }
+  }
+
+  // Deduplicate compound phrases
+  const uniqueCompoundPhrases = [...new Set(compoundPhrases)].filter(p => {
+    const lower = p.toLowerCase();
+    return !BOILERPLATE_PHRASES.some(bp => lower.includes(bp)) && lower.length >= 8;
+  });
+
+  if (uniqueCompoundPhrases.length > 0) {
+    console.log(`[Keyword Extraction] Generated ${uniqueCompoundPhrases.length} product-specific compound phrases`);
+  }
+
   // Heuristic keyword candidate pipeline
   console.log('[Keyword Extraction] Generating keyword candidates from website content...');
 
@@ -489,6 +602,12 @@ Rules:
       source: source.text.substring(0, 50)
     }));
     allPhrases = allPhrases.concat(scored);
+  }
+
+  // Inject product-specific compound phrases with high scores
+  for (const cp of uniqueCompoundPhrases) {
+    const score = 90 + scoreRelevance(cp, productName, companyName, industry);
+    allPhrases.push({ phrase: cp, score: Math.min(100, score), source: 'compound_phrase' });
   }
 
   allPhrases.sort((a, b) => b.score - a.score);

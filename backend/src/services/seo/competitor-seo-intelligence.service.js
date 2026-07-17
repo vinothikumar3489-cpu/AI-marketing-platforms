@@ -2,6 +2,7 @@ import fetch from 'node-fetch';
 import { getSerpCompetitors, normalizeSerpCompetitors, separateCompetitorsByType, isDataForSEOConfigured, getDomainData } from '../dataforseo.service.js';
 import { researchCompetitors } from '../tavily.service.js';
 import { asArray } from '../../utils/text.util.js';
+import { prisma } from '../../config/prisma.js';
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
@@ -35,17 +36,55 @@ export async function generateCompetitorSeoIntelligence({
   const industry = safeIdentity.industry || category;
 
   try {
-    // Step 1: Discover competitors (use orchestrator data if available)
+    // Step 1: Discover competitors (orchestrator > Growth CompetitorIntelligence > external APIs)
     console.log('🔍 [Competitor SEO] Step 1: Discovering competitors...');
-    const rawCompetitors = orchestratorCompetitors.length > 0 
+    const rawCompetitors = orchestratorCompetitors.length > 0
       ? orchestratorCompetitors
-      : await discoverCompetitors({
-          productName: identity.productName,
-          industry: identity.industry,
-          websiteUrl: identity.websiteUrl,
-          keywordIntelligence,
-          identity
-        });
+      : await (async () => {
+          // Fallback to Growth CompetitorIntelligence table
+          const chatId = identity.chatId;
+          if (chatId) {
+            try {
+              const growthIntel = await prisma.competitorIntelligence.findUnique({ where: { chatId } });
+              if (growthIntel?.competitorAnalysis) {
+                const analysis = growthIntel.competitorAnalysis;
+                const directCompetitors = analysis.directCompetitors || analysis.competitors || [];
+                if (directCompetitors.length > 0) {
+                  console.log(`[Competitor SEO] Using ${directCompetitors.length} competitors from Growth CompetitorIntelligence`);
+                  return directCompetitors.map(c => {
+                    let domain = c.domain || '';
+                    if (!domain && c.websiteUrl) {
+                      try { domain = new URL(c.websiteUrl).hostname.replace(/^www\./, ''); }
+                      catch { domain = c.websiteUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0].split('?')[0]; }
+                    }
+                    // Validate domain looks real (has a dot, not a tagline)
+                    if (!domain || !domain.includes('.') || domain.split('.').filter(Boolean).length < 2 || domain.length > 60) {
+                      return null;
+                    }
+                    return {
+                      name: c.name || domain,
+                      domain,
+                      competitorType: 'direct',
+                      source: 'GROWTH_INTELLIGENCE',
+                      evidence: c.evidence || 'From Growth CompetitorIntelligence',
+                      websiteUrl: domain
+                    };
+                  }).filter(Boolean);
+                }
+              }
+            } catch (e) {
+              console.log('[Competitor SEO] Growth CompetitorIntelligence fallback failed:', e.message);
+            }
+          }
+          // Fall back to external API discovery
+          return discoverCompetitors({
+            productName: identity.productName,
+            industry: identity.industry,
+            websiteUrl: identity.websiteUrl,
+            keywordIntelligence,
+            identity
+          });
+        })();
     
     // Filter self-links and bad competitors even for orchestrator-sourced data
     let competitors = filterAllCompetitors(rawCompetitors, identity);
@@ -328,106 +367,109 @@ async function discoverCompetitors({ productName, industry, websiteUrl, keywordI
         console.log('⚠️ [Discovery] No verified competitors found');
         return [];
       } else {
-        console.log('⚠️ [Discovery] DataForSEO SERP returned no results');
-        // Return empty array - do not use fallback competitors
+        console.log('⚠️ [Discovery] DataForSEO SERP returned no results or failed');
+        // DataForSEO failure is not fatal - return empty array to use Growth competitors
         return [];
       }
     } catch (error) {
-      console.log('⚠️ [Discovery] DataForSEO SERP failed:', error.message);
-      
-      // Fallback chain: Tavily → SerpAPI → Exa → AI-estimated
-      let fallbackResult = null;
-      let fallbackSource = null;
+      console.warn('⚠️ [Discovery] DataForSEO SERP failed:', error.message);
+      // DataForSEO failure is not fatal - return empty array to use Growth competitors
+      return [];
+    }
+  } else {
+    console.log('⚠️ [Discovery] DataForSEO not configured - skipping SERP competitor discovery');
+    return [];
+  }
+  
+  // Fallback chain: Tavily → SerpAPI → Exa → AI-estimated (only if DataForSEO not configured)
+  let fallbackResult = null;
+  let fallbackSource = null;
 
-      // Try Tavily
-      if (TAVILY_API_KEY) {
-        console.log('🔄 [Discovery] Trying Tavily fallback for competitors...');
-        try {
-          const tavilyResult = await researchCompetitors(productName, industry, 'software');
-          if (tavilyResult && tavilyResult.success && tavilyResult.competitors && tavilyResult.competitors.length > 0) {
-            console.log(`✅ [Discovery] Tavily returned ${tavilyResult.competitors.length} competitors`);
-            fallbackResult = filterSelfLinks(tavilyResult.competitors.map(comp => ({
-              name: comp.name,
-              website: comp.website || comp.url,
-              domain: extractDomain(comp.website || comp.url),
-              type: 'direct',
-              positioning: 'Direct competitor',
-              source: 'Tavily',
-              isFallback: true
-            })), websiteUrl);
-            fallbackSource = 'Tavily';
-          }
-        } catch (tavilyError) {
-          console.log('⚠️ [Discovery] Tavily fallback failed:', tavilyError.message);
-        }
+  // Try Tavily
+  if (TAVILY_API_KEY) {
+    console.log('🔄 [Discovery] Trying Tavily fallback for competitors...');
+    try {
+      const tavilyResult = await researchCompetitors(productName, industry, 'software');
+      if (tavilyResult && tavilyResult.success && tavilyResult.competitors && tavilyResult.competitors.length > 0) {
+        console.log(`✅ [Discovery] Tavily returned ${tavilyResult.competitors.length} competitors`);
+        fallbackResult = filterSelfLinks(tavilyResult.competitors.map(comp => ({
+          name: comp.name,
+          website: comp.website || comp.url,
+          domain: extractDomain(comp.website || comp.url),
+          type: 'direct',
+          positioning: 'Direct competitor',
+          source: 'Tavily',
+          isFallback: true
+        })), websiteUrl);
+        fallbackSource = 'Tavily';
       }
-
-      // Try SerpAPI if Tavily failed
-      if (!fallbackResult && process.env.SERPAPI_API_KEY) {
-        console.log('🔄 [Discovery] Trying SerpAPI fallback for competitors...');
-        try {
-          const serpapiResult = await getSerpApiCompetitors(productName, industry);
-          if (serpapiResult && serpapiResult.length > 0) {
-            console.log(`✅ [Discovery] SerpAPI returned ${serpapiResult.length} competitors`);
-            fallbackResult = filterSelfLinks(serpapiResult.map(comp => ({
-              name: comp.name || comp.title,
-              website: comp.website || comp.link,
-              domain: extractDomain(comp.website || comp.link),
-              type: 'serp',
-              positioning: 'SERP competitor',
-              source: 'SerpAPI',
-              isFallback: true
-            })), websiteUrl);
-            fallbackSource = 'SerpAPI';
-          }
-        } catch (serpapiError) {
-          console.log('⚠️ [Discovery] SerpAPI fallback failed:', serpapiError.message);
-        }
-      }
-
-      // Try Exa if SerpAPI failed
-      if (!fallbackResult && EXA_API_KEY) {
-        console.log('🔄 [Discovery] Trying Exa fallback for competitors...');
-        try {
-          const exaResult = await getExaCompetitors(productName, industry);
-          if (exaResult && exaResult.length > 0) {
-            console.log(`✅ [Discovery] Exa returned ${exaResult.length} competitors`);
-            fallbackResult = filterSelfLinks(exaResult.map(comp => ({
-              name: comp.title || comp.name,
-              website: comp.url || comp.website,
-              domain: extractDomain(comp.url || comp.website),
-              type: 'estimated',
-              positioning: 'Estimated competitor',
-              source: 'Exa',
-              isFallback: true
-            })), websiteUrl);
-            fallbackSource = 'Exa';
-          }
-        } catch (exaError) {
-          console.log('⚠️ [Discovery] Exa fallback failed:', exaError.message);
-        }
-      }
-
-      if (fallbackResult && fallbackResult.length > 0) {
-        console.log(`✅ [Discovery] Using ${fallbackResult.length} competitors from ${fallbackSource}`);
-        return fallbackResult;
-      }
-
-      // No competitors available from any source
-      console.log('⚠️ [Discovery] No competitors available from any verified source');
-      return {
-        directCompetitors: [],
-        serpCompetitors: [],
-        directories: [],
-        estimatedCompetitors: [],
-        unavailableReason: 'No competitors available from any source',
-        sourcesUsed: fallbackSource ? [fallbackSource] : []
-      };
+    } catch (tavilyError) {
+      console.log('⚠️ [Discovery] Tavily fallback failed:', tavilyError.message);
     }
   }
 
-  // Filter out self-links and non-competitor domains from competitor list
-  function filterSelfLinks(competitors, targetWebsiteUrl) {
+  // Try SerpAPI if Tavily failed
+  if (!fallbackResult && process.env.SERPAPI_API_KEY) {
+    console.log('🔄 [Discovery] Trying SerpAPI fallback for competitors...');
+    try {
+      const serpapiResult = await getSerpApiCompetitors(productName, industry);
+      if (serpapiResult && serpapiResult.length > 0) {
+        console.log(`✅ [Discovery] SerpAPI returned ${serpapiResult.length} competitors`);
+        fallbackResult = filterSelfLinks(serpapiResult.map(comp => ({
+          name: comp.name || comp.title,
+          website: comp.website || comp.link,
+          domain: extractDomain(comp.website || comp.link),
+          type: 'serp',
+          positioning: 'SERP competitor',
+          source: 'SerpAPI',
+          isFallback: true
+        })), websiteUrl);
+        fallbackSource = 'SerpAPI';
+      }
+    } catch (serpapiError) {
+      console.log('⚠️ [Discovery] SerpAPI fallback failed:', serpapiError.message);
+    }
+  }
+
+  // Try Exa if SerpAPI failed
+  if (!fallbackResult && EXA_API_KEY) {
+    console.log('🔄 [Discovery] Trying Exa fallback for competitors...');
+    try {
+      const exaResult = await getExaCompetitors(productName, industry);
+      if (exaResult && exaResult.length > 0) {
+        console.log(`✅ [Discovery] Exa returned ${exaResult.length} competitors`);
+        fallbackResult = filterSelfLinks(exaResult.map(comp => ({
+          name: comp.title || comp.name,
+          website: comp.url || comp.website,
+          domain: extractDomain(comp.url || comp.website),
+          type: 'estimated',
+          positioning: 'Estimated competitor',
+          source: 'Exa',
+          isFallback: true
+        })), websiteUrl);
+        fallbackSource = 'Exa';
+      }
+    } catch (exaError) {
+      console.log('⚠️ [Discovery] Exa fallback failed:', exaError.message);
+    }
+  }
+
+  if (fallbackResult && fallbackResult.length > 0) {
+    console.log(`✅ [Discovery] Using ${fallbackResult.length} competitors from ${fallbackSource}`);
+    return fallbackResult;
+  }
+
+  // No competitors available from any source
+  console.log('⚠️ [Discovery] No competitors available from any verified source');
+  return [];
+}
+
+// ============================================
+// COMPETITOR FILTERING
+// ============================================
+
+// Filter out self-links and non-competitor domains from competitor list
+function filterSelfLinks(competitors, targetWebsiteUrl) {
     const targetDomain = extractDomain(targetWebsiteUrl);
     const excludedDomains = new Set([
       'instagram.com',
@@ -602,11 +644,6 @@ async function discoverCompetitors({ productName, industry, websiteUrl, keywordI
       return [];
     }
   }
-
-  // Do NOT use fallback competitors - return empty array with clean message
-  console.log('⚠️ [Discovery] No verified competitors available - competitor data unavailable');
-  return [];
-}
 
 function extractDomain(url) {
   try {

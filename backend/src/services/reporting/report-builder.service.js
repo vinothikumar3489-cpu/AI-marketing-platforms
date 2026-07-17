@@ -9,6 +9,8 @@ import {
   generateGrowthMatrixChart, generateScoreRadarChart
 } from './chart-generator.service.js';
 import { prisma } from '../../config/prisma.js';
+import { normalizeSeoIntelligenceForConsumers, normalizeTechnicalAuditForConsumers } from '../normalizers/seo-intelligence.normalizer.js';
+import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
 
 export async function buildReportData(chatId, userId) {
   console.log('[Report] Building report data for chat:', chatId);
@@ -32,6 +34,25 @@ export async function buildReportData(chatId, userId) {
   ]);
 
   const input = productIntel?.inputJson || campaignIntel?.inputJson || {};
+
+  // Phase 22: Use canonical product identity resolver for consistent reporting
+  const productIdentity = resolveProductIdentity({
+    chat: { id: chatId, title: input?.companyName || input?.productName, websiteUrl: input?.websiteUrl },
+    productIntelligence: productIntel?.productAnalysis ? {
+      productName: input?.productName || productIntel?.productAnalysis?.productName,
+      brandName: productIntel?.productAnalysis?.brandName,
+      companyName: input?.companyName || productIntel?.productAnalysis?.companyName
+    } : null,
+    evidenceSnapshot: productIntel?.evidenceSnapshot || null,
+    website: input?.websiteUrl ? { url: input.websiteUrl } : null
+  });
+
+  console.log('[Report] Product identity resolved for report', {
+    chatId,
+    productName: productIdentity.productName,
+    brandName: productIdentity.brandName,
+    source: productIdentity.source
+  });
 
   const product = productIntel?.productAnalysis || {};
   const market = productIntel?.marketDiscovery || {};
@@ -59,8 +80,9 @@ export async function buildReportData(chatId, userId) {
     campaignReadinessScore: null
   };
 
+  // Use canonical product identity for consistent company naming across reports
   const company = executiveStory?.companyOverview || {
-    name: input?.companyName || input?.productName || 'Unknown',
+    name: productIdentity.companyName || input?.companyName || input?.productName || 'Unknown',
     website: input?.websiteUrl || '',
     industry: input?.industry || 'Unknown',
     businessModel: 'Unknown',
@@ -131,6 +153,7 @@ export async function buildReportData(chatId, userId) {
     intent, positioning: positioningData, pricing,
     technology: technologyData, scores, actionPlan: actionPlanData,
     channelData, product, campaign, seo, executiveStory,
+    productIdentity, // Phase 22: Include canonical product identity for consistency
     chat: { id: chatId, input }
   };
 }
@@ -323,17 +346,18 @@ export async function generateReportCharts(chatId, userId) {
 }
 
 function normalizeSeoIntelligence(seoIntel) {
-  const keywordRecord = seoIntel.keywordIntelligence || seoIntel.keywordOpportunities || {};
-  const competitorRecord = seoIntel.competitorSeoRecord || seoIntel.competitorKeywords || {};
-  const gapRecord = seoIntel.contentGapRecord || { contentGaps: seoIntel.contentGaps || [] };
-  const geoRecord = seoIntel.geoIntelligence || seoIntel.aiVisibility || {};
-  const blogRecord = seoIntel.blogIntelligenceRecord || { blogIdeas: seoIntel.blogIdeas || [] };
+  // Prefer JSON columns (always complete) over structured relations (may be empty)
+  const keywordRecord = seoIntel.keywordOpportunities || seoIntel.keywordIntelligence || {};
+  const competitorRecord = seoIntel.competitorKeywords || seoIntel.competitorSeoRecord || {};
+  const gapRecord = seoIntel.contentGaps || seoIntel.contentGapRecord || {};
+  const geoRecord = seoIntel.aiVisibility || seoIntel.geoIntelligence || {};
+  const blogRecord = seoIntel.blogIdeas || seoIntel.blogIntelligenceRecord || {};
 
   return {
-    scores: seoIntel.technicalAuditDetail || seoIntel.technicalAudit || {},
+    scores: normalizeTechnicalAuditForConsumers(seoIntel?.technicalAuditDetail || seoIntel?.technicalAudit || {}),
     keywords: normalizeSeoKeywordArray(keywordRecord),
     competitors: extractArray(competitorRecord?.competitors || competitorRecord?.competitorProfiles || competitorRecord),
-    gaps: extractArray(gapRecord?.contentGaps || seoIntel.contentGaps),
+    gaps: extractArray(gapRecord?.contentGaps || gapRecord?.gaps || gapRecord?.missingPages || []),
     geo: {
       ...geoRecord,
       chatgpt: geoRecord.chatGptScore ?? geoRecord.chatGpt,
@@ -342,7 +366,7 @@ function normalizeSeoIntelligence(seoIntel) {
       perplexity: geoRecord.perplexityScore ?? geoRecord.perplexity,
       googleAiOverview: geoRecord.googleAiOverviewScore ?? geoRecord.googleAiOverview,
     },
-    blogs: extractArray(blogRecord?.blogIdeas || seoIntel.blogIdeas),
+    blogs: extractArray(blogRecord?.blogIdeas || blogRecord?.ideas || []),
     backlinks: seoIntel.rawCrawlData?.[0]?.metadata?.backlinks || {},
     actionPlan: seoIntel.actionPlan || {}
   };

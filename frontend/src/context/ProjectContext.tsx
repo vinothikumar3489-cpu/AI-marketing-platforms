@@ -8,6 +8,8 @@ type ProjectCtx = {
   selectedChatId: string;
   fullResults: any;
   loading: boolean;
+  restoringChatId: string | null;
+  restoreStatus: 'idle' | 'restoring' | 'restored' | 'not_found';
   refreshChats: () => Promise<void>;
   selectChat: (id: string) => Promise<void>;
   clearSelection: () => void;
@@ -24,8 +26,11 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [selectedChatId, setSelectedChatId] = useState(localStorage.getItem('selectedChatId') || '');
   const [fullResults, setFullResults] = useState<any>({ growth: null, seo: null, executive: null, profile: null, chat: null });
   const [loading, setLoading] = useState(false);
+  const [restoringChatId, setRestoringChatId] = useState<string | null>(null);
+  const [restoreStatus, setRestoreStatus] = useState<'idle' | 'restoring' | 'restored' | 'not_found'>('idle');
   const mountedRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
   const createChatInFlightRef = useRef(false);
   const createChatPromiseRef = useRef<Promise<string> | null>(null);
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
@@ -75,6 +80,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
   async function loadFullResults(id = selectedChatId) {
     if (!id) {
+      setRestoreStatus('idle');
+      setRestoringChatId(null);
       return { growth: null, seo: null, executive: null, profile: null, chat: null };
     }
     
@@ -84,7 +91,12 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     abortRef.current = new AbortController();
     const signal = abortRef.current.signal;
     
+    const requestId = ++requestIdRef.current;
+    setRestoringChatId(id);
+    setRestoreStatus('restoring');
     setLoading(true);
+    
+    console.info('[ProjectContext] loadFullResults', { event: 'SEO_RESTORE_STARTED', selectedChatId: id, requestId });
     
     try {
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -93,20 +105,52 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       const res: any = await api.get(`/chats/${id}/full-results`, signal);
       if (!mountedRef.current || signal.aborted) return { growth: null, seo: null, executive: null, profile: null, chat: null };
       
+      // Stale response check: ignore if a newer request was started
+      if (requestId !== requestIdRef.current) {
+        console.info('[ProjectContext] Stale response ignored', { requestId, currentRequestId: requestIdRef.current });
+        return { growth: null, seo: null, executive: null, profile: null, chat: null };
+      }
+      
       const normalized = normalizeFullResults(res);
-
+      
+      // Check if restored data is meaningful
+      const hasSeoData = normalized?.seoIntelligence && Object.keys(normalized.seoIntelligence).length > 0;
+      const hasGrowthData = normalized?.hasGrowthWorkspace === true;
+      
+      console.info('[ProjectContext] loadFullResults complete', {
+        event: 'SEO_RESTORE_COMPLETED',
+        selectedChatId: id,
+        hasSeoIntelligence: hasSeoData,
+        hasGrowthData,
+        requestId
+      });
+      
       setFullResults(normalized);
+      setRestoreStatus(hasSeoData || hasGrowthData ? 'restored' : 'not_found');
+      setRestoringChatId(null);
       return normalized;
     } catch (error: any) {
       if (error.name === 'AbortError') return { growth: null, seo: null, executive: null, profile: null, chat: null };
+      
+      // Stale response check: ignore if a newer request was started
+      if (requestId !== requestIdRef.current) {
+        return { growth: null, seo: null, executive: null, profile: null, chat: null };
+      }
+      
       console.error('Failed to load full results:', error.message || error);
       
       const emptyResults = { growth: null, seo: null, executive: null, profile: null, chat: null };
       
       if (error.response?.status === 404) {
-        if (mountedRef.current) setFullResults(emptyResults);
+        if (mountedRef.current) {
+          setFullResults(emptyResults);
+          setRestoreStatus('not_found');
+        }
+      } else {
+        if (mountedRef.current) setRestoreStatus('not_found');
       }
       
+      setRestoringChatId(null);
       return emptyResults;
     } finally {
       if (mountedRef.current) setLoading(false);
@@ -217,7 +261,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
   useEffect(() => { if (user && selectedChatId) loadFullResults(selectedChatId).catch((e) => console.warn('Initial full results load failed:', e)); }, [user, selectedChatId]);
 
-  const value = useMemo(() => ({ chats, selectedChatId, fullResults, loading, refreshChats, selectChat, clearSelection, loadFullResults, createChat, deleteChat, clearHistory }), [chats, selectedChatId, fullResults, loading]);
+  const value = useMemo(() => ({ chats, selectedChatId, fullResults, loading, restoringChatId, restoreStatus, refreshChats, selectChat, clearSelection, loadFullResults, createChat, deleteChat, clearHistory }), [chats, selectedChatId, fullResults, loading, restoringChatId, restoreStatus]);
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
 }
 

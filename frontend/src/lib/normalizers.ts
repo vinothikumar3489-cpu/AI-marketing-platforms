@@ -363,11 +363,31 @@ export const safeParse = (value: any, fallback: any = {}): any => {
   return value;
 };
 
+// Check if an object has meaningful data (not empty, not just status keys)
+function hasMeaningfulData(obj: any): boolean {
+  if (!obj || typeof obj !== 'object') return false;
+  const keys = Object.keys(obj);
+  if (keys.length === 0) return false;
+  // Don't count metadata-only objects as meaningful
+  const metaKeys = ['id', 'chatId', 'createdAt', 'updatedAt', 'status', 'version'];
+  const dataKeys = keys.filter(k => !metaKeys.includes(k));
+  return dataKeys.length > 0;
+}
+
 // GROWTH WORKSPACE NORMALIZATION
 export function normalizeFullResults(data: any) {
   const root = data?.data || data || {};
-  const growthStatus = root.growthStatus || 'NOT_RUN';
-  const seoStatus = root.seoStatus || 'NOT_RUN';
+  // If backend sends explicit status, use it; otherwise detect from data presence
+  const explicitGrowthStatus = root.growthStatus;
+  const explicitSeoStatus = root.seoStatus;
+  const hasExistingGrowthData = !!root.growth || hasMeaningfulData(root.productIntelligence);
+  const hasExistingSeoData = hasMeaningfulData(root.seoIntelligence);
+  const growthStatus = explicitGrowthStatus && explicitGrowthStatus !== 'NOT_RUN'
+    ? explicitGrowthStatus
+    : (hasExistingGrowthData ? 'COMPLETED' : 'NOT_RUN');
+  const seoStatus = explicitSeoStatus && explicitSeoStatus !== 'NOT_RUN'
+    ? explicitSeoStatus
+    : (hasExistingSeoData ? 'COMPLETED' : 'NOT_RUN');
   const hasProduct = root.hasProductIntelligence === true || !!root.productIntelligence;
   const hasGrowth = growthStatus !== 'NOT_RUN' && growthStatus !== 'FAILED';
 
@@ -730,22 +750,18 @@ export function normalizeSeo(data: any) {
     : tabKeywordsRaw;
 
   // Competitors: JSON column = competitorKeywords (exact raw format), relation = competitorSeoRecord (partial subset)
-  const rawCompetitorJson = seo.competitorKeywords;
-  const rawCompetitorRelation = seo.competitorSeoRecord;
   const tabCompetitors = safeParse(
-    rawCompetitorJson ||
-    rawCompetitorRelation ||
-    seo.competitors ||
+    seo.competitorKeywords ||
+    seo.competitorSeoRecord ||
     seo.competitorIntelligence ||
+    seo.competitors ||
     {}
   );
 
   // Content gaps: JSON column = contentGaps (exact format), relation = contentGapRecord
-  const rawContentGapJson = seo.contentGaps;
-  const rawContentGapRelation = seo.contentGapRecord;
   const tabContentGaps = safeParse(
-    rawContentGapJson ||
-    rawContentGapRelation ||
+    seo.contentGaps ||
+    seo.contentGapRecord ||
     seo.contentGapAnalysis ||
     normalizedContentGaps ||
     {}
@@ -760,13 +776,11 @@ export function normalizeSeo(data: any) {
   );
 
   // Blogs: JSON column = blogIdeas (exact format), relation = blogIntelligenceRecord
-  const rawBlogJson = seo.blogIdeas;
-  const rawBlogRelation = seo.blogIntelligenceRecord;
   const blogWeakKeywords = ['general', 'account', 'semrush', 'competitors', 'alternatives'];
   const tabBlogs = (() => {
     const blogData = safeParse(
-      rawBlogJson ||
-      rawBlogRelation ||
+      seo.blogIdeas ||
+      seo.blogIntelligenceRecord ||
       seo.blogIntelligence ||
       {}
     );

@@ -5,6 +5,7 @@ import { renderVideo, getVideoStatus } from '../services/integrations/videoExecu
 import { getProviderHealth } from '../services/integrations/providerConfig.service.js';
 import { checkImageProviders, testPollinationsConnection, testFalConnection } from '../services/integrations/image.service.js';
 import { checkVideoProvider, testShotstackConnection, testCreatomateConnection } from '../services/integrations/video.service.js';
+import { checkDataForSeoHealth, isDataForSEOConfigured } from '../services/dataforseo.service.js';
 import { prisma } from '../config/prisma.js';
 
 export async function getHealth(req, res) {
@@ -41,6 +42,15 @@ export async function getHealth(req, res) {
   } catch (error) {
     console.error('[IntegrationsHealth] Error:', error.message);
     res.status(500).json({ success: false, error: 'Failed to check provider health' });
+  }
+}
+
+export async function getDataForSeoHealth(req, res) {
+  try {
+    const health = await checkDataForSeoHealth();
+    return res.json({ success: true, dataforseo: health });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
   }
 }
 
@@ -167,4 +177,33 @@ export async function debugTestShotstack(req, res) {
 export async function debugTestCreatomate(req, res) {
   const result = await testCreatomateConnection();
   res.json(result);
+}
+
+import { checkGroqHealth, checkGeminiHealth, checkOpenRouterHealth, checkFirecrawlHealth, checkPageSpeedHealth, logProviderConfig } from '../services/provider-health.service.js';
+
+export async function getAllProviderHealth(req, res) {
+  try {
+    const [groq, gemini, openrouter, firecrawl, pagespeed, dataforseo] = await Promise.allSettled([
+      checkGroqHealth(),
+      checkGeminiHealth(),
+      checkOpenRouterHealth(),
+      checkFirecrawlHealth(),
+      checkPageSpeedHealth(),
+      checkDataForSeoHealth(),
+    ]);
+    res.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      providers: {
+        groq: groq.status === 'fulfilled' ? groq.value : { provider: 'Groq', failureType: 'NETWORK_FAILED', message: groq.reason?.message },
+        gemini: gemini.status === 'fulfilled' ? gemini.value : { provider: 'Gemini', failureType: 'NETWORK_FAILED', message: gemini.reason?.message },
+        openrouter: openrouter.status === 'fulfilled' ? openrouter.value : { provider: 'OpenRouter', failureType: 'NETWORK_FAILED', message: openrouter.reason?.message },
+        firecrawl: firecrawl.status === 'fulfilled' ? firecrawl.value : { provider: 'Firecrawl', failureType: 'NETWORK_FAILED', message: firecrawl.reason?.message },
+        pagespeed: pagespeed.status === 'fulfilled' ? pagespeed.value : { provider: 'PageSpeed', failureType: 'NETWORK_FAILED', message: pagespeed.reason?.message },
+        dataforseo: dataforseo.status === 'fulfilled' ? dataforseo.value : { provider: 'DataForSEO', failureType: 'NETWORK_FAILED', message: dataforseo.reason?.message },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 }

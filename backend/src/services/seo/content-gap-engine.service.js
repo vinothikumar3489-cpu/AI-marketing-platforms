@@ -185,15 +185,31 @@ function analyzeExistingPages(websiteData) {
 // KEYWORD OPPORTUNITY ANALYSIS
 // ============================================
 
+function isValidContentGapKeyword(keyword) {
+  if (!keyword || typeof keyword !== 'string') return false;
+  const trimmed = keyword.trim();
+  if (!trimmed) return false;
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return false;
+  const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+    'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had']);
+  if (stopWords.has(words[0]) || stopWords.has(words[words.length - 1])) return false;
+  if (/^[a-z]{15,}$/.test(trimmed) || /^[a-z]+[A-Z]/.test(trimmed)) return false;
+  if (trimmed.length < 5) return false;
+  return true;
+}
+
 function analyzeKeywordOpportunities(keywordIntelligence, existingPages, productName) {
   const gaps = [];
   
-  // Only generate gaps if we have real keyword data
   const allKeywords = [
     ...(keywordIntelligence.primaryKeywords || []),
     ...(keywordIntelligence.secondaryKeywords || []),
     ...(keywordIntelligence.longTailKeywords || [])
-  ];
+  ].filter(kw => {
+    const key = (kw.keyword || kw || '').toLowerCase().trim();
+    return isValidContentGapKeyword(key);
+  });
   
   if (!allKeywords || allKeywords.length === 0) {
     console.log('⚠️ [Content Gap] No keyword data available for gap analysis');
@@ -202,66 +218,38 @@ function analyzeKeywordOpportunities(keywordIntelligence, existingPages, product
 
   console.log(`✅ [Content Gap] Using ${allKeywords.length} keywords for gap analysis`);
 
-  // Filter to only validated keywords (confidence ≥ 70 or from DataForSEO)
-  // Also allow clean category-based seed keywords with lower confidence
   const validatedKeywords = allKeywords.filter(kw => {
     const confidence = kw.confidence || 0;
     const source = kw.source || '';
     
-    // Accept DataForSEO keywords (high confidence by default)
     if (source === 'DataForSEO') return true;
-    
-    // Accept keywords with confidence ≥ 70
     if (confidence >= 70) return true;
     
-    // Accept clean category-based seed keywords (source includes 'Category Seed' or similar)
     if (source && source.includes('Category Seed')) {
       const keyword = (kw.keyword || '').toLowerCase().trim();
       if (!keyword) return false;
-      // Additional check: ensure keyword is not a bad phrase
       const badPhrases = ['general', 'account', 'semrush', 'platform for', 'for building', 'the collaborative interface', 'for building meaningful'];
       if (badPhrases.some(bp => keyword.includes(bp))) return false;
-      // Reject concatenated junk keywords
       if (/^[a-z]{15,}$/.test(keyword) || /^[a-z]+[A-Z]/.test(keyword) || /^[a-z]{2,}[A-Z]{2,}/.test(keyword)) return false;
       const concatenatedBrands = ['canva', 'gamma', 'figma', 'notion', 'adobe', 'google'];
       if (concatenatedBrands.some(p => keyword.includes(p)) && !keyword.includes(' ')) return false;
       return true;
     }
     
-    // Reject other seed/weak keywords
     return false;
   });
   
   if (validatedKeywords.length === 0) {
-    console.log('⚠️ [Content Gap] No validated keywords (confidence ≥ 70 or DataForSEO) available');
-    // Fall back to allKeywords if they exist (category seeds, AI-extracted)
+    console.log('⚠️ [Content Gap] No validated keywords (confidence >= 70 or DataForSEO) available');
     if (allKeywords.length > 0) {
-      console.log(`🔄 [Content Gap] Falling back to ${allKeywords.length} unvalidated keywords for gap generation`);
-      // Process all keywords with lowered confidence threshold
+      console.log(`[Content Gap] Falling back to ${allKeywords.length} unvalidated keywords`);
       allKeywords.forEach(kw => {
         const keyword = (kw.keyword || kw || '').toLowerCase().trim();
-        if (!keyword) return;
+        if (!isValidContentGapKeyword(keyword)) return;
         const volume = kw.searchVolume;
         const difficulty = kw.difficulty || kw.keywordDifficulty;
         const intent = kw.intent || 'informational';
-
-        // Reject concatenated junk keywords (no spaces, camelCase, word-soup)
-        if (/^[a-z]{15,}$/.test(keyword) || /^[a-z]+[A-Z]/.test(keyword) || /^[a-z]{2,}[A-Z]{2,}/.test(keyword)) return;
-        const concatenatedBrands = ['canva', 'gamma', 'figma', 'notion', 'adobe', 'google'];
-        if (concatenatedBrands.some(p => keyword.includes(p)) && !keyword.includes(' ')) return;
-        
         if (isKeywordCovered(keyword, existingPages)) return;
-        
-        const words = keyword.split(' ');
-        const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-          'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had',
-          'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'must', 'can', 'this',
-          'that', 'these', 'those']);
-        if (stopWords.has(words[0]) || stopWords.has(words[words.length - 1])) return;
-        
-        const weakTerms = ['general', 'account', 'tools', 'competitors', 'platform for', 'for building', 'the collaborative'];
-        if (weakTerms.some(wt => keyword.includes(wt))) return;
-        
         gaps.push({
           title: generateTitleFromKeyword(keyword, productName),
           pageType: intent === 'commercial' ? 'landing_page' : 'resource',
@@ -289,31 +277,13 @@ function analyzeKeywordOpportunities(keywordIntelligence, existingPages, product
 
   // Analyze each keyword for content opportunities
   validatedKeywords.forEach(kw => {
-    const keyword = kw.keyword || kw;
+    const keyword = (kw.keyword || kw || '').toLowerCase().trim();
+    if (!isValidContentGapKeyword(keyword)) return;
     const volume = kw.searchVolume;
     const difficulty = kw.difficulty || kw.keywordDifficulty;
     const intent = kw.intent || 'informational';
 
-    // Skip if keyword is already covered in existing content
-    if (isKeywordCovered(keyword, existingPages)) {
-      return;
-    }
-    
-    // Skip malformed titles (sentence fragments, stopword-starting/ending)
-    const words = keyword.split(' ');
-    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-      'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had',
-      'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'must', 'can', 'this',
-      'that', 'these', 'those']);
-    if (stopWords.has(words[0]) || stopWords.has(words[words.length - 1])) {
-      return;
-    }
-    
-    // Skip generic weak terms
-    const weakTerms = ['general', 'account', 'tools', 'competitors', 'alternatives', 'platform for', 'for building', 'the collaborative'];
-    if (weakTerms.some(wt => keyword.includes(wt))) {
-      return;
-    }
+    if (isKeywordCovered(keyword, existingPages)) return;
 
     // Generate content gap based on keyword type and intent
     if (intent === 'transactional' && (volume > 100 || !volume)) {
@@ -645,18 +615,22 @@ function isPageCovered(page, existingPages) {
 }
 
 function generateTitleFromKeyword(keyword, productName) {
-  if (!keyword) return `${productName} - Content Opportunity`;
+  if (!keyword || !keyword.trim()) return `${productName} - Content Opportunity`;
   const lower = keyword.trim();
-  // Convert keyword to readable title
-  const words = lower.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1));
-  const title = words.join(' ');
-  // If it looks like a question, keep as-is
+  const words = lower.split(/\s+/).filter(Boolean);
+  // Never produce single-word titles — skip them entirely
+  if (words.length < 2) {
+    return null;
+  }
+  // Never produce "Complete Guide" template patterns
+  const templatePrefixes = ['complete', 'ultimate', 'definitive'];
+  if (templatePrefixes.includes(words[0].toLowerCase())) {
+    const rest = words.slice(1).join(' ');
+    return rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : `${productName} Content Strategy`;
+  }
+  const title = words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   if (lower.startsWith('how') || lower.startsWith('what') || lower.startsWith('why') || lower.startsWith('when') || lower.startsWith('where') || lower.startsWith('which') || lower.startsWith('who') || lower.startsWith('is') || lower.startsWith('can') || lower.startsWith('does') || lower.includes('?')) {
     return title.endsWith('?') ? title : title + '?';
-  }
-  // Short keywords get product context
-  if (words.length <= 2) {
-    return `${title} - Complete Guide for ${productName}`;
   }
   return title;
 }

@@ -8,7 +8,7 @@ import { KPIDashboard, EnterpriseCompetitorCard, EnterpriseAudienceCard, Enterpr
 import { ExecutiveSummaryCards, BusinessHealthScore, AIDecisionPanel, RecommendationPriorities, CrossModuleInsights, ExplainButton, CompareResults, OpportunityMatrix, RiskMatrix, ConfidenceVisualization, InteractiveFilters, SmartSearch, EnterpriseReportPreview, ProductivityBar, ExecutiveCommandCenter, StoryDrivenResults, AIBusinessAdvisor, DecisionSimulator, CompetitorPositioningMap, MarketOpportunityHeatmap, BusinessTimeline, ExecutiveKPIDashboard, InsightRelationships, EvidenceExplorer, ReportPreview20, PresentationMode, useWorkspaceMemory, SmartEmptyState } from '../components/EnterpriseDecisionSuite';
 import { EnterpriseActionWorkspace } from '../components/EnterpriseActionWorkspace';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, AreaChart, Area } from 'recharts';
-import { Shield, Target, Users, TrendingUp, Zap, Map, Info, Box, Briefcase, Activity, CheckCircle, Flame, Droplets, Snowflake, DollarSign, Clock, AlertTriangle, Building, Star, Code, PieChart, ExternalLink, ChevronDown, ChevronUp, FileText, Search, Eye, Layers, Sliders, GripHorizontal } from 'lucide-react';
+import { Shield, Target, Users, TrendingUp, Zap, Map, Info, Box, Briefcase, Activity, CheckCircle, Flame, Droplets, Snowflake, DollarSign, Clock, AlertTriangle, Building, Star, Code, PieChart, ExternalLink, ChevronDown, ChevronUp, FileText, Search, Eye, Layers, Sliders, GripHorizontal, Loader2 } from 'lucide-react';
 
 const defaults: any = {
   websiteUrl: '',
@@ -32,16 +32,17 @@ const defaults: any = {
 const tabs = ['Executive Snapshot', 'Executive Story', 'Product DNA', 'Market Intelligence', 'Audience Intelligence', 'Competitor Intelligence', 'Intent Prediction', 'Positioning Strategy', 'Campaign Strategy', 'Channel Strategy', 'Action Plan', 'Report Preview'];
 
 export default function GrowthWorkspacePage() {
-  const { selectedChatId, createChat, loadFullResults, fullResults } = useProject();
+  const { selectedChatId, createChat, loadFullResults, fullResults, restoreStatus } = useProject();
   const [form, setForm] = useState(defaults);
   const [activeTab, setActiveTab] = useWorkspaceMemory('gw-activeTab', 'Executive Snapshot');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [results, setResults] = useState<any>({});
   const [creatingChat, setCreatingChat] = useState(false);
-  type Status = 'idle' | 'input_required' | 'running' | 'completed' | 'failed';
-  const [status, setStatus] = useState<Status>('idle');
+  type Status = 'idle' | 'restoring' | 'input_required' | 'running' | 'completed' | 'failed';
+  const [status, setStatus] = useState<Status>(selectedChatId ? 'restoring' : 'idle');
   const analysisRunningRef = useRef(false);
+  const restoreAttemptedRef = useRef(false);
 
   useEffect(() => {
     console.info("[Growth Route Component]", {
@@ -55,32 +56,60 @@ export default function GrowthWorkspacePage() {
     return obj && typeof obj === 'object' && Object.keys(obj).length > 0;
   }
 
+  // On mount, trigger loading if needed
   useEffect(() => {
-    if (analysisRunningRef.current) return;
+    if (!selectedChatId) return;
+    if (restoreAttemptedRef.current) return;
+    
+    const r = fullResults.growth || {};
+    const hasGrowthData = fullResults.hasGrowthWorkspace === true ||
+      hasRealContent(r.product) || hasRealContent(r.market) || hasRealContent(r.audience) ||
+      hasRealContent(r.competitor) || hasRealContent(r.intent) || hasRealContent(r.positioning) ||
+      hasRealContent(r.campaign) || hasRealContent(r.channel) || hasRealContent(r.executiveStory) ||
+      hasRealContent(r.actionPlan) || hasRealContent(r.evidence);
+
+    if (hasGrowthData) {
+      setResults(r);
+      setStatus('completed');
+      restoreAttemptedRef.current = true;
+    } else if (restoreStatus === 'idle') {
+      loadFullResults(selectedChatId).catch(() => {});
+    }
+  }, [selectedChatId]);
+
+  // Restore from fullResults when data arrives
+  useEffect(() => {
+    if (restoreAttemptedRef.current && status === 'completed') return;
+    
     let cancelled = false;
     const r = fullResults.growth || {};
     const hasGrowthData = fullResults.hasGrowthWorkspace === true ||
       hasRealContent(r.product) || hasRealContent(r.market) || hasRealContent(r.audience) ||
       hasRealContent(r.competitor) || hasRealContent(r.intent) || hasRealContent(r.positioning) ||
-  hasRealContent(r.campaign) || hasRealContent(r.channel) || hasRealContent(r.executiveStory) ||
-  hasRealContent(r.actionPlan) || hasRealContent(r.evidence);
+      hasRealContent(r.campaign) || hasRealContent(r.channel) || hasRealContent(r.executiveStory) ||
+      hasRealContent(r.actionPlan) || hasRealContent(r.evidence);
 
     if (!cancelled) {
+      // Reset analysisRunningRef when data is available (page remount after analysis)
       if (hasGrowthData) {
+        analysisRunningRef.current = false;
         setResults(r);
         setStatus('completed');
-      } else {
+        restoreAttemptedRef.current = true;
+      } else if (selectedChatId && restoreStatus === 'restored') {
+        // Chat exists but no growth data yet
+        analysisRunningRef.current = false;
         setResults({});
-        if (selectedChatId) {
-          setStatus('input_required');
-        } else {
-          setStatus('idle');
-        }
+        setStatus('input_required');
         setStep(1);
+        restoreAttemptedRef.current = true;
+      } else if (selectedChatId && !restoreAttemptedRef.current) {
+        // Still waiting for data - show restoring
+        setStatus('restoring');
       }
     }
     return () => { cancelled = true; };
-  }, [fullResults, selectedChatId]);
+  }, [fullResults, selectedChatId, restoreStatus]);
 
   async function run() {
     if (!form.websiteUrl) {
@@ -233,6 +262,15 @@ export default function GrowthWorkspacePage() {
         </Card>
       )}
       
+      {status === 'restoring' && (
+        <Card>
+          <div style={{ padding: '40px', textAlign: 'center' }}>
+            <Loader2 className="spin" size={24} />
+            <p style={{ color: '#9aa7bd', marginTop: '15px' }}>Restoring previous analysis...</p>
+          </div>
+        </Card>
+      )}
+
       {(status === 'input_required' || status === 'idle') && !loading && !creatingChat && (
         <Card style={{ padding: '30px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #293245', paddingBottom: '15px' }}>

@@ -1381,29 +1381,7 @@ function generateRuleBasedAnalysis(websiteData, technicalAudit, researchData, pr
         'Build backlink profile'
       ]
     },
-    contentGaps: {
-      missingTopics: [
-        `How to use ${productName}`,
-        `${productName} best practices`,
-        `${productName} tutorials`,
-        `${productName} case studies`
-      ],
-      comparisonPages: [
-        `${productName} vs [Competitor A]`,
-        `${productName} vs [Competitor B]`,
-        `${productName} alternatives`
-      ],
-      useCasePages: [
-        `${productName} for small businesses`,
-        `${productName} for enterprises`,
-        `${productName} for [industry]`
-      ],
-      educationalContent: [
-        `Complete ${productName} guide`,
-        `${productName} FAQ`,
-        `${productName} troubleshooting`
-      ]
-    },
+    contentGaps: null,
     aiVisibility: {
       aiVisibilityScore: null,
       note: 'AI visibility score requires DataForSEO API; not currently available',
@@ -1418,29 +1396,7 @@ function generateRuleBasedAnalysis(websiteData, technicalAudit, researchData, pr
       conversionTips: []
     },
     blogOpportunities: generateBlogOpportunities(productName),
-    actionPlan: {
-      day30: [
-        { action: 'Fix critical technical SEO issues (title, meta, headings)', reason: 'Technical audit identified missing or suboptimal elements', evidence: 'Technical SEO Analysis', effort: 'medium', impact: 'SEO Rankings' },
-        { action: 'Create 3-5 core product pages with optimized content', reason: 'Product pages are primary conversion drivers', evidence: 'Website Content Audit', effort: 'medium', impact: 'Organic Traffic, Conversions' },
-        { action: 'Set up Google Search Console and Analytics', reason: 'Required for monitoring search performance', evidence: 'Industry Best Practice', effort: 'low', impact: 'Analytics, Monitoring' },
-        { action: 'Research and document target keywords', reason: 'Keyword research is foundation of SEO strategy', evidence: 'SEO Methodology', effort: 'medium', impact: 'Traffic, Rankings' },
-        { action: 'Write first 2 blog posts targeting long-tail keywords', reason: 'Blog content captures informational search traffic', evidence: 'Content Strategy', effort: 'medium', impact: 'Organic Traffic, Authority' }
-      ],
-      day60: [
-        { action: 'Publish 4-6 more SEO-optimized blog posts', reason: 'Consistent publishing builds topical authority', evidence: 'Content Strategy', effort: 'medium', impact: 'Traffic, Authority' },
-        { action: 'Create 2-3 comparison pages', reason: 'Comparison pages capture commercial intent traffic', evidence: 'Keyword Research', effort: 'medium', impact: 'Conversion Traffic' },
-        { action: 'Build internal linking structure', reason: 'Internal links distribute page authority and improve crawlability', evidence: 'SEO Best Practice', effort: 'low', impact: 'SEO Rankings, Crawlability' },
-        { action: 'Start link building campaign', reason: 'Backlinks are a top ranking factor', evidence: 'SEO Methodology', effort: 'high', impact: 'Domain Authority, Rankings' },
-        { action: 'Optimize images and page speed', reason: 'Page speed impacts user experience and rankings', evidence: 'Core Web Vitals', effort: 'medium', impact: 'User Experience, SEO' }
-      ],
-      day90: [
-        { action: 'Publish 6-8 additional blog posts', reason: 'Build content library for long-tail keyword coverage', evidence: 'Content Strategy', effort: 'medium', impact: 'Organic Traffic' },
-        { action: 'Create comprehensive guides and resources', reason: 'In-depth content earns links and authority', evidence: 'Content Marketing', effort: 'high', impact: 'Authority, Links' },
-        { action: 'Launch content promotion campaign', reason: 'Content without promotion has limited reach', evidence: 'Digital Marketing', effort: 'medium', impact: 'Traffic, Links' },
-        { action: 'Monitor rankings and adjust strategy', reason: 'SEO requires ongoing monitoring and iteration', evidence: 'SEO Methodology', effort: 'medium', impact: 'Continuous Improvement' },
-        { action: 'Analyze competitors and fill content gaps', reason: 'Competitor analysis reveals untapped opportunities', evidence: 'Competitive Analysis', effort: 'medium', impact: 'Market Position' }
-      ]
-    },
+    actionPlan: null,
     metadata: {
       analyzedAt: new Date().toISOString(),
       websiteDataCollected: !!websiteData.title,
@@ -1473,9 +1429,9 @@ function generateKeywordOpportunities(productName, researchData) {
 }
 
 function generateBlogOpportunities(productName) {
+  if (!productName || productName.length < 3) return [];
   const blogs = [
-    { title: `The Complete ${productName} Guide for Beginners`, keyword: `${productName} guide`, intent: 'informational' },
-    { title: `10 Ways to Get More Value from ${productName}`, keyword: `${productName} tips`, intent: 'informational' },
+    { title: `How to Get More Value from ${productName}`, keyword: `${productName} best practices`, intent: 'informational' },
     { title: `${productName} vs Top 5 Alternatives: Detailed Comparison`, keyword: `${productName} alternatives`, intent: 'commercial' },
     { title: `How [Company] Achieved [Result] Using ${productName}`, keyword: `${productName} case study`, intent: 'commercial' },
     { title: `${productName} Pricing Guide: Which Plan is Right for You?`, keyword: `${productName} pricing`, intent: 'commercial' },

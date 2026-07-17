@@ -1435,6 +1435,7 @@ const tabRenderers: Record<string, (d: any) => JSX.Element> = {
 /**
  * Filter tabs based on data availability and quality rules
  * Hides tabs with no data or low-quality content
+ * Uses backend tabQuality metadata when available for consistency
  */
 function filterVisibleTabs(allTabs: typeof tabs, data: any, execData: any, campaignPlan: any) {
   const tabHasData: Record<string, boolean> = {
@@ -1459,13 +1460,24 @@ function filterVisibleTabs(allTabs: typeof tabs, data: any, execData: any, campa
     Logs: !!(data?.logs?.length),
   };
   
-  // PART 16: Tab quality rule enforcement - hide low-quality tabs
+  // Use backend tabQuality metadata when available (Phase 20)
+  const backendTabQuality = execData?.tabQuality || {};
+  
+  // PART 16: Tab quality rule enforcement - use backend metadata when available
   const tabQuality: Record<string, boolean> = {
+    // Use backend quality for execution tabs if available
+    ContentStudio: backendTabQuality.contentStudio?.shouldShow ?? tabHasData.ContentStudio,
+    EmailCampaigns: backendTabQuality.emailCampaigns?.shouldShow ?? tabHasData.EmailCampaigns,
+    CreativeStudio: backendTabQuality.creativeStudio?.shouldShow ?? (tabHasData.CreativeStudio && (execData?.creativeStudio?.totalGenerated || 0) >= 2),
+    VideoStudio: backendTabQuality.videoStudio?.shouldShow ?? (tabHasData.VideoStudio && (execData?.videoStudio?.totalGenerated || 0) >= 2),
+    CampaignPlans: backendTabQuality.campaignPlans?.shouldShow ?? tabHasData.CampaignPlans,
+    SocialCalendar: backendTabQuality.socialCalendars?.shouldShow ?? (tabHasData.SocialCalendar && (execData?.socialCalendars?.totalGenerated || 0) >= 5),
+    
+    // Legacy tab quality rules for automation plan tabs
     Email: tabHasData.Email && data.emailSequence?.length > 0, // Only show if has actual sequence
     LinkedIn: tabHasData.LinkedIn && (data.linkedInPosts?.length > 2 || data.linkedInDmTemplates?.length > 0), // Only show if substantial content
     Instagram: tabHasData.Instagram && (data.instagramCaptions?.length > 2 || data.instagramReelIdeas?.length > 0), // Only show if substantial content
     GoogleAds: tabHasData.GoogleAds && data.googleAds?.length > 0, // Only show if has ads
-    SocialCalendar: tabHasData.SocialCalendar && data.contentCalendar?.length > 5, // Only show if has meaningful calendar
   };
   
   return allTabs.filter(tab => {
