@@ -370,6 +370,23 @@ export async function callAI(prompt) {
   };
 }
 
+export function getAIProviderDiagnostics() {
+  return PROVIDER_ORDER.map(provider => {
+    const config = PROVIDER_CONFIG[provider];
+    const status = getStatus(provider);
+    const cooldownUntil = getProviderCooldown(provider);
+    const cooldownRemainingMs = cooldownUntil > Date.now() ? cooldownUntil - Date.now() : 0;
+    return {
+      provider,
+      configured: !!config?.key(),
+      status,
+      model: config?.model() || null,
+      cooldownActive: cooldownRemainingMs > 0,
+      cooldownRemainingMs,
+    };
+  });
+}
+
 export async function generateProductAnalysis(productData, scrapedData) {
   const prompt = buildPrompt(productData, scrapedData);
 

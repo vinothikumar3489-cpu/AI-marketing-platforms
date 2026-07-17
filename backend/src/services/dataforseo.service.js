@@ -13,6 +13,8 @@ const DATAFORSEO_API_URL = 'https://api.dataforseo.com/v3';
 console.log("[DataForSEO] login loaded", !!DATAFORSEO_LOGIN);
 console.log("[DataForSEO] password loaded", !!DATAFORSEO_PASSWORD);
 
+let _dataforseoAuthenticated = true;
+
 // Generic junk keywords to filter out (must be multi-word real topics)
 const GENERIC_KEYWORDS = new Set([
   'business', 'custom', 'systems', 'built', 'everything', 'right', 'before',
@@ -76,8 +78,12 @@ function getAuthHeader() {
  * Make authenticated request to DataForSEO API
  */
 async function dataforseoRequest(endpoint, method = 'POST', body = null) {
+  if (!_dataforseoAuthenticated) {
+    return { success: false, error: 'DataForSEO unavailable: authentication previously failed', unavailable: true, available: false, reason: 'AUTHENTICATION_FAILED' };
+  }
   const authHeader = getAuthHeader();
   if (!authHeader) {
+    _dataforseoAuthenticated = false;
     return { success: false, error: 'DataForSEO credentials not configured', unavailable: true };
   }
 
@@ -101,10 +107,10 @@ async function dataforseoRequest(endpoint, method = 'POST', body = null) {
     console.log(`📊 [DataForSEO] Response Status: ${response.status}`);
 
     if (response.status === 401) {
+      _dataforseoAuthenticated = false;
       const errorText = await response.text();
-      console.warn('⚠️ [DataForSEO] Authentication failed - marking as unavailable');
+      console.warn('⚠️ [DataForSEO] Authentication failed - marking unavailable for remainder of analysis');
 
-      // Check for account verification failure
       if (errorText.includes('40104') || errorText.includes('verify your account')) {
         return {
           success: false,
@@ -616,6 +622,18 @@ export function separateCompetitorsByType(competitors) {
  */
 export function isDataForSEOConfigured() {
   return !!(DATAFORSEO_LOGIN && DATAFORSEO_PASSWORD);
+}
+
+export function isDataForSEOAvailable() {
+  return isDataForSEOConfigured() && _dataforseoAuthenticated;
+}
+
+export function getDataForSEOStatus() {
+  return {
+    configured: isDataForSEOConfigured(),
+    authenticated: _dataforseoAuthenticated,
+    available: isDataForSEOConfigured() && _dataforseoAuthenticated,
+  };
 }
 
 // ============================================

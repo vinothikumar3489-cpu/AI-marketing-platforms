@@ -211,7 +211,8 @@ function filterJunkKeywords(keywords, source = 'unknown') {
       'canva\'s', 'templates', 'designing', 'design',
       'undefined', 'account', 'semrush', 'general',
       'homepage', 'url', 'self link', 'page title', 'meta title',
-      'month', 'year', 'day', 'week'
+      'month', 'year', 'day', 'week',
+      'started', 'menu', 'next', 'previous', 'learn', 'submit', 'copyright'
     ];
 
     if (/^\[/.test(lowerKeyword)) return false;
@@ -234,6 +235,8 @@ function filterJunkKeywords(keywords, source = 'unknown') {
 
     return true;
   }).map(kw => {
+    const isDataForSEO = (typeof kw === 'object' ? (kw.source || source) : source) === 'DataForSEO';
+    const validationStatus = isDataForSEO ? 'VERIFIED' : 'HEURISTICALLY_VALIDATED';
     if (typeof kw === 'string') {
       return {
         keyword: kw,
@@ -242,7 +245,8 @@ function filterJunkKeywords(keywords, source = 'unknown') {
         cpc: null,
         source: source,
         confidence: null,
-        metricType: 'topic_idea_only'
+        metricType: 'topic_idea_only',
+        validationStatus
       };
     }
     return {
@@ -252,7 +256,8 @@ function filterJunkKeywords(keywords, source = 'unknown') {
       cpc: kw.cpc ?? null,
       source: kw.source || source,
       confidence: null,
-      metricType: kw.metricType || 'topic_idea_only'
+      metricType: kw.metricType || 'topic_idea_only',
+      validationStatus: validationStatus
     };
   });
 }

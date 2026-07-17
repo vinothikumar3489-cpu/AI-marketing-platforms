@@ -147,79 +147,18 @@ async function generateBlogIdeas({ keywordIntelligence, competitorIntelligence, 
 
   console.log(`✅ [Blog Ideas] Using ${allKeywords.length} keywords for blog generation`);
 
-  // Filter to only validated keywords (confidence ≥ 50 or from DataForSEO)
-  // Also allow clean category-based seed keywords with lower confidence
+  // Filter to only VERIFIED or HEURISTICALLY_VALIDATED keywords
   const validatedKeywords = allKeywords.filter(kw => {
-    const confidence = kw.confidence || 0;
-    const source = kw.source || '';
-
-    // Accept DataForSEO keywords (high confidence by default)
-    if (source === 'DataForSEO') return true;
-
-    // Accept keywords with confidence ≥ 50 (lowered from 70)
-    if (confidence >= 50) return true;
-
-    // Accept clean category-based seed keywords (source includes 'Category Seed' or similar)
-    if (source && source.includes('Category Seed')) {
-      const keyword = (kw.keyword || '').toLowerCase().trim();
-      if (!keyword) return false;
-      // Additional check: ensure keyword is not a bad phrase
-      const badPhrases = ['general', 'account', 'semrush', 'platform for', 'for building', 'the collaborative interface', 'for building meaningful'];
-      if (badPhrases.some(bp => keyword.includes(bp))) return false;
-      // Reject concatenated junk keywords
-      if (/^[a-z]{15,}$/.test(keyword) || /^[a-z]+[A-Z]/.test(keyword) || /^[a-z]{2,}[A-Z]{2,}/.test(keyword)) return false;
-      const concatenatedBrands = ['canva', 'gamma', 'figma', 'notion', 'adobe', 'google'];
-      if (concatenatedBrands.some(p => keyword.includes(p)) && !keyword.includes(' ')) return false;
-      return true;
-    }
-
-    // Reject other seed/weak keywords
+    const status = kw.validationStatus || '';
+    if (status === 'VERIFIED' || status === 'HEURISTICALLY_VALIDATED') return true;
     return false;
   });
 
   if (validatedKeywords.length === 0) {
-    console.log('⚠️ [Blog Ideas] No validated keywords (confidence ≥ 50 or DataForSEO) available');
-    // Fall back to allKeywords if they exist (category seeds, AI-extracted)
-    if (allKeywords.length > 0) {
-      console.log(`🔄 [Blog Ideas] Falling back to ${allKeywords.length} unvalidated keywords for blog ideas`);
-      const validKeywords = allKeywords.filter(kw => {
-        const keyword = (kw.keyword || kw || '').toLowerCase().trim();
-        if (!keyword || keyword.length < 4) return false;
-        const rejectTerms = ['general', 'account', 'semrush', 'whatever', 'tools', 'compare'];
-        if (rejectTerms.some(t => keyword.includes(t))) return false;
-        const words = keyword.split(' ');
-        const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-          'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had',
-          'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'must', 'can', 'this',
-          'that', 'these', 'those']);
-        if (stopWords.has(words[0]) || stopWords.has(words[words.length - 1])) return false;
-        return true;
-      });
-      
-      validKeywords.slice(0, 10).forEach(kw => {
-        const keyword = kw.keyword || kw;
-        const volume = kw.searchVolume;
-        const difficulty = kw.difficulty || kw.keywordDifficulty;
-        ideas.push({
-          title: generateBlogTitle(keyword, productName, 'informational'),
-          targetKeyword: keyword,
-          searchVolume: volume,
-          keywordDifficulty: difficulty,
-          intent: 'informational',
-          outline: generateOutline('informational', keyword),
-          estimatedTrafficPotential: null,
-          source: 'CategorySeed',
-          evidence: 'Category-based seed keyword for blog topic exploration',
-          internalLinkSuggestions: generateInternalLinks(keyword, productName)
-        });
-      });
-      
-      if (ideas.length > 0) {
-        console.log(`✅ [Blog Ideas] Generated ${ideas.length} blog ideas from fallback keywords`);
-        return ideas.sort((a, b) => (b.searchVolume || 0) - (a.searchVolume || 0));
-      }
-    }
-    return ideas;
+    console.log('⚠️ [Blog Ideas] No validated keywords (VERIFIED/HEURISTICALLY_VALIDATED) available');
+    result.status = 'PARTIAL';
+    result.warnings = [{ code: 'NO_VALIDATED_KEYWORDS', message: 'No validated keywords available for blog ideas.' }];
+    return result;
   }
   
   console.log(`✅ [Blog Ideas] Using ${validatedKeywords.length} validated keywords out of ${allKeywords.length} total`);

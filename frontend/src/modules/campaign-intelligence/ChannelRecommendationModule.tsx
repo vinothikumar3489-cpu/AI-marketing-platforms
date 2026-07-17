@@ -57,14 +57,20 @@ export function ChannelRecommendationModule() {
           return;
         }
 
-        const items: ChannelItem[] = rawList.map((c: any) => ({
-          channel: c.channel || c.name || typeof c === 'string' ? c : 'Unknown',
-          recommendation: c.recommendation || c.recommendedContent || c.desc || '',
-          reason: c.reason || c.rationale || c.evidence || '',
-          evidence: c.evidence || c.source || '',
-          confidence: typeof c.confidence === 'number' ? c.confidence : null,
-          status: c.status || (c.confidence >= 80 ? 'VERIFIED' : c.confidence >= 50 ? 'AI_INFERRED' : 'PARTIAL'),
-        }));
+        const UNAVAILABLE_SENTINELS = ['Unknown', 'Channel data unavailable', 'Insufficient Data', 'N/A'];
+        const items: ChannelItem[] = rawList
+          .filter((c: any) => {
+            const name = typeof c === 'string' ? c : (c.channel || c.name || '');
+            return !UNAVAILABLE_SENTINELS.some(s => name.startsWith(s));
+          })
+          .map((c: any) => ({
+            channel: typeof c === 'string' ? c : (c.channel || c.name || 'Unknown'),
+            recommendation: c.recommendation || c.recommendedContent || c.desc || '',
+            reason: c.reason || c.rationale || c.evidence || '',
+            evidence: c.evidence || c.source || '',
+            confidence: typeof c.confidence === 'number' ? c.confidence : null,
+            status: c.status || (c.confidence >= 80 ? 'VERIFIED' : c.confidence >= 50 ? 'AI_INFERRED' : 'PARTIAL'),
+          }));
 
         setChannels(items);
       } catch (e: any) {

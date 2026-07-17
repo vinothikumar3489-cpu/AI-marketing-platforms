@@ -312,9 +312,9 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Product Analysis failed:', error.message);
       warnings.push(`Product Analysis fallback: ${error.message}`);
-      results.product = validateProductAnalysis(null, input);
+      results.product = generateProductFallback(input, websiteData);
       steps[0].status = 'PARTIAL';
-      steps[0].provider = 'fallback';
+      steps[0].provider = results.product.provider || 'fallback_unavailable';
       steps[0].confidenceScore = results.product.confidenceScore ?? null;
     }
 
@@ -336,9 +336,9 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Market Discovery failed:', error.message);
       warnings.push(`Market Discovery fallback: ${error.message}`);
-      results.market = validateMarketDiscovery(null, input);
+      results.market = generateMarketFallback(input, results.product);
       steps[1].status = 'PARTIAL';
-      steps[1].provider = 'fallback';
+      steps[1].provider = results.market.provider || 'fallback_unavailable';
       steps[1].confidenceScore = results.market.confidenceScore ?? null;
     }
 
@@ -360,9 +360,9 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Audience Intelligence failed:', error.message);
       warnings.push(`Audience Intelligence fallback: ${error.message}`);
-      results.audience = validateAudienceIntelligence(null, input);
+      results.audience = generateAudienceFallback(input, results.product);
       steps[2].status = 'PARTIAL';
-      steps[2].provider = 'fallback';
+      steps[2].provider = results.audience.provider || 'fallback_unavailable';
       steps[2].confidenceScore = results.audience.confidenceScore ?? null;
     }
 
@@ -385,9 +385,9 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Competitor Analysis failed:', error.message);
       warnings.push(`Competitor Analysis fallback: ${error.message}`);
-      results.competitor = validateCompetitorAnalysis(null, input);
+      results.competitor = generateCompetitorFallback(input, results.product, researchData?.competitors || []);
       steps[3].status = 'PARTIAL';
-      steps[3].provider = 'fallback';
+      steps[3].provider = results.competitor.provider || 'fallback_unavailable';
       steps[3].confidenceScore = results.competitor.confidenceScore ?? null;
     }
 
@@ -409,9 +409,9 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Intent Prediction failed:', error.message);
       warnings.push(`Intent Prediction fallback: ${error.message}`);
-      results.intent = validateIntentPrediction(null, input);
+      results.intent = generateIntentFallback(input, results.audience);
       steps[4].status = 'PARTIAL';
-      steps[4].provider = 'fallback';
+      steps[4].provider = results.intent.provider || 'fallback_unavailable';
       steps[4].confidenceScore = results.intent.confidenceScore ?? null;
     }
 
@@ -433,9 +433,9 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Positioning Engine failed:', error.message);
       warnings.push(`Positioning Engine fallback: ${error.message}`);
-      results.positioning = validatePositioningEngine(null, input);
+      results.positioning = generatePositioningFallback(input, results.product, results.competitor);
       steps[5].status = 'PARTIAL';
-      steps[5].provider = 'fallback';
+      steps[5].provider = results.positioning.provider || 'fallback_unavailable';
       steps[5].confidenceScore = results.positioning.confidenceScore ?? null;
     }
 
@@ -458,9 +458,9 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Campaign Generator failed:', error.message);
       warnings.push(`Campaign Generator fallback: ${error.message}`);
-      results.campaign = validateCampaignGenerator(null, input);
+      results.campaign = generateCampaignFallback(input, websiteData, results);
       steps[6].status = 'PARTIAL';
-      steps[6].provider = 'fallback';
+      steps[6].provider = results.campaign.provider || 'fallback_unavailable';
       steps[6].confidenceScore = results.campaign.confidenceScore ?? null;
     }
 
@@ -482,9 +482,9 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     } catch (error) {
       console.log('⚠️ [Growth Workspace] Channel Recommendation failed:', error.message);
       warnings.push(`Channel Recommendation fallback: ${error.message}`);
-      results.channel = validateChannelRecommendation(null, input);
+      results.channel = generateChannelFallback(input, results.audience, results.campaign);
       steps[7].status = 'PARTIAL';
-      steps[7].provider = 'fallback';
+      steps[7].provider = results.channel.provider || 'fallback_unavailable';
       steps[7].confidenceScore = results.channel.confidenceScore ?? null;
     }
 
@@ -930,31 +930,43 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     console.log('💾 [Growth Workspace] Core intelligence saved to database');
     console.log(`✅ [Growth Workspace] hasActionPlan: ${!!normalizedResults.campaign.actionPlan}`);
 
-    // Verify database records
+    // Refetch persisted data — return DB truth, not in-memory
     try {
-      const [product, audience, competitor, campaign] = await Promise.all([
-        prisma.productIntelligence.findFirst({ where: { userId, chatId: validChatId }, select: { id: true } }),
-        prisma.competitorIntelligence.findFirst({ where: { userId, chatId: validChatId }, select: { id: true } }),
-        prisma.campaignIntelligence.findFirst({ where: { userId, chatId: validChatId }, select: { id: true } }),
+      const [dbProductIntel, dbCompetitorIntel, dbCampaignIntel] = await Promise.all([
+        prisma.productIntelligence.findFirst({ where: { userId, chatId: validChatId } }),
+        prisma.competitorIntelligence.findFirst({ where: { userId, chatId: validChatId } }),
+        prisma.campaignIntelligence.findFirst({ where: { userId, chatId: validChatId } }),
       ]);
-      console.info('[Growth Stage]', {
-        stage: 'PERSISTENCE_VERIFIED',
-        status: 'completed',
-        chatId: validChatId,
-        persistence: {
-          hasProductIntelligence: !!product,
-          hasAudienceIntelligence: !!audience,
-          hasCompetitorIntelligence: !!competitor,
-          hasCampaignIntelligence: !!campaign,
+      if (dbProductIntel || dbCompetitorIntel || dbCampaignIntel) {
+        const dbResults = {};
+        if (dbProductIntel) {
+          dbResults.product = dbProductIntel.productAnalysis;
+          dbResults.market = dbProductIntel.marketDiscovery;
+          dbResults.audience = dbProductIntel.audienceIntelligence;
         }
-      });
-    } catch (verifyError) {
+        if (dbCompetitorIntel) {
+          dbResults.competitor = dbCompetitorIntel.competitorAnalysis;
+          dbResults.intent = dbCompetitorIntel.intentPrediction;
+          dbResults.positioning = dbCompetitorIntel.positioningEngine;
+        }
+        if (dbCampaignIntel) {
+          const gen = dbCampaignIntel.campaignGenerator;
+          if (gen) {
+            dbResults.campaign = typeof gen === 'object' ? { ...gen, growthSummary: undefined, metadata: undefined } : gen;
+          }
+          dbResults.channel = dbCampaignIntel.channelRecommendation;
+        }
+        Object.assign(results, dbResults);
+        const refetchedNormalized = normalizeGrowthResults(results, input);
+        Object.assign(normalizedResults, refetchedNormalized);
+      }
+      console.info('[Growth Stage]', { stage: 'PERSISTENCE_REFETCHED', status: 'completed', chatId: validChatId });
+    } catch (refetchError) {
       console.error('[Growth Stage]', {
-        stage: 'PERSISTENCE_VERIFY_FAILED',
+        stage: 'PERSISTENCE_REFETCH_FAILED',
         status: 'warning',
         chatId: validChatId,
-        errorName: verifyError.name,
-        errorMessage: verifyError.message,
+        error: refetchError.message,
       });
     }
 
@@ -1068,12 +1080,15 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       }
     }
 
+    const completedStepCount = steps.filter(s => s.status === 'completed').length;
+    const hasPartialResults = completedStepCount > 0;
     return {
-      success: false,
-      error: error.message,
+      success: hasPartialResults,
+      error: hasPartialResults ? null : error.message,
       results: normalizeGrowthResults(results, input),
       steps,
-      overallStatus: 'failed'
+      overallStatus: hasPartialResults ? 'PARTIAL' : 'failed',
+      warnings: hasPartialResults ? [`Analysis incomplete: ${error.message}`] : []
     };
   }
 }

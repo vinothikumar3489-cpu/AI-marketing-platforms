@@ -67,6 +67,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
   let researchData = null;
   let websiteData = null;
   let seoScores = null;
+  let persistedSeoRecordId = null;
 
   try {
     // Step 1: Collect research data using orchestrator (single source of truth)
@@ -411,7 +412,6 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
 
     // Save the main SeoIntelligence record FIRST (before sub-record transaction)
     // so partial results survive even if the sub-record transaction later fails
-    let savedId;
     try {
       const seoRecord = await prisma.seoIntelligence.upsert({
         where: { chatId },
@@ -450,7 +450,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
           updatedAt: new Date()
         }
       });
-      savedId = seoRecord.id;
+      persistedSeoRecordId = seoRecord.id;
       if (process.env.NODE_ENV !== 'production') {
         console.log('✅ [SEO SAVE] Main record saved (in_progress) for chat:', chatId);
       }
@@ -522,13 +522,13 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     }
     
     console.log('[SEO] Starting transaction save for chat:', chatId, 'userId:', userId);
-    const saved = await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
       // Main SeoIntelligence record was already saved above; use its ID for sub-records
 
     // Save raw crawl data (null-safe required fields to prevent transaction rollback)
     await tx.rawCrawlData.create({
       data: {
-        seoIntelligenceId: savedId,
+        seoIntelligenceId: persistedSeoRecordId,
         url: websiteUrl || '',
         html: (websiteData?.html || '').substring(0, 100000),
         text: (websiteData?.text || '').substring(0, 50000),
@@ -543,9 +543,9 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
 
     // Save technical audit details
     await tx.technicalSeoAudit.upsert({
-      where: { seoIntelligenceId: savedId },
+      where: { seoIntelligenceId: persistedSeoRecordId },
       create: {
-        seoIntelligence: { connect: { id: savedId } },
+        seoIntelligence: { connect: { id: persistedSeoRecordId } },
         auditData: technicalAudit,
         overallScore: toNullableScore(safeTechnicalScores.overall),
         titleScore: toNullableScore(safeTechnicalScores.title),
@@ -594,9 +594,9 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
       lastCalculated: new Date()
     };
     await tx.seoScoreBreakdown.upsert({
-      where: { seoIntelligenceId: savedId },
+      where: { seoIntelligenceId: persistedSeoRecordId },
       create: {
-        seoIntelligence: { connect: { id: savedId } },
+        seoIntelligence: { connect: { id: persistedSeoRecordId } },
         ...scoreBreakdownData
       },
       update: scoreBreakdownData
@@ -604,9 +604,9 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
 
     // Save keyword intelligence
     await tx.keywordIntelligenceRecord.upsert({
-      where: { seoIntelligenceId: savedId },
+      where: { seoIntelligenceId: persistedSeoRecordId },
       create: {
-        seoIntelligence: { connect: { id: savedId } },
+        seoIntelligence: { connect: { id: persistedSeoRecordId } },
         primaryKeywords: parsedKeywordIntelligence.primaryKeywords || [],
         secondaryKeywords: parsedKeywordIntelligence.secondaryKeywords || [],
         longTailKeywords: parsedKeywordIntelligence.longTailKeywords || [],
@@ -657,9 +657,9 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
       recommendations: parsedGeoIntelligence.recommendations || {}
     };
     await tx.geoIntelligenceRecord.upsert({
-      where: { seoIntelligenceId: savedId },
+      where: { seoIntelligenceId: persistedSeoRecordId },
       create: {
-        seoIntelligence: { connect: { id: savedId } },
+        seoIntelligence: { connect: { id: persistedSeoRecordId } },
         ...geoRecordData
       },
       update: {
@@ -670,9 +670,9 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
 
     // Save Competitor SEO intelligence
     await tx.competitorSeoRecord.upsert({
-      where: { seoIntelligenceId: savedId },
+      where: { seoIntelligenceId: persistedSeoRecordId },
       create: {
-        seoIntelligence: { connect: { id: savedId } },
+        seoIntelligence: { connect: { id: persistedSeoRecordId } },
         competitors: parsedCompetitorIntelligence.competitors || [],
         competitorProfiles: parsedCompetitorIntelligence.competitorProfiles || [],
         keywordGaps: parsedCompetitorIntelligence.keywordGaps || {},
@@ -701,9 +701,9 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     console.log('🔍 [SEO Intelligence] Step 4e: Saving content gap analysis...');
 
     await tx.contentGapRecord.upsert({
-      where: { seoIntelligenceId: savedId },
+      where: { seoIntelligenceId: persistedSeoRecordId },
       create: {
-        seoIntelligence: { connect: { id: savedId } },
+        seoIntelligence: { connect: { id: persistedSeoRecordId } },
         contentGaps: parsedContentGapIntelligence.contentGaps || parsedContentGapIntelligence.missingPages || [],
         landingPageIdeas: parsedContentGapIntelligence.landingPageIdeas || [],
         comparisonPageIdeas: parsedContentGapIntelligence.comparisonPageIdeas || [],
@@ -735,9 +735,9 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     }
 
     await tx.blogIntelligenceRecord.upsert({
-      where: { seoIntelligenceId: savedId },
+      where: { seoIntelligenceId: persistedSeoRecordId },
       create: {
-        seoIntelligence: { connect: { id: savedId } },
+        seoIntelligence: { connect: { id: persistedSeoRecordId } },
         blogIdeas: parsedBlogIntelligence.blogIdeas || [],
         blogClusters: parsedBlogIntelligence.blogClusters || [],
         blogBriefs: parsedBlogIntelligence.blogBriefs || [],
@@ -763,25 +763,25 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
   });
 
   // Post-save verification: confirm SeoIntelligence was actually saved and update status
-  if (!savedId) {
+  if (!persistedSeoRecordId) {
     throw new Error('SEO analysis completed but SeoIntelligence was not saved (transaction returned no ID).');
   }
   try {
     await prisma.seoIntelligence.update({
-      where: { id: savedId },
+      where: { id: persistedSeoRecordId },
       data: { status: 'completed', updatedAt: new Date() }
     });
   } catch (statusUpdateError) {
     console.error('[SEO] Status update to completed failed:', statusUpdateError.message);
   }
   const verifyMain = await prisma.seoIntelligence.findUnique({
-    where: { id: savedId },
+    where: { id: persistedSeoRecordId },
     select: { id: true, chatId: true, userId: true, status: true }
   });
   if (!verifyMain) {
     throw new Error('SEO analysis completed but SeoIntelligence was not saved (record not found after transaction).');
   }
-  console.log('[SEO] Saved SeoIntelligence', { chatId, userId, seoIntelligenceId: savedId, status: verifyMain.status });
+  console.log('[SEO] Saved SeoIntelligence', { chatId, userId, seoIntelligenceId: persistedSeoRecordId, status: verifyMain.status });
 
   // ==== POST-SAVE VERIFICATION (runs in all environments) ====
   const verify = await prisma.seoIntelligence.findFirst({
@@ -881,7 +881,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
   let executiveDashboardError = null;
   try {
     const executiveResult = await generateExecutiveDashboard({
-      seoIntelligenceId: saved.id,
+      seoIntelligenceId: persistedSeoRecordId,
       seoData: {
         technicalAudit,
         keywordIntelligence,
@@ -920,13 +920,11 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     executiveDashboard = null;
   }
 
-  // saved is now the seoRecord returned from the transaction
-
   // Update SeoIntelligence record with landingPageSuggestions and actionPlan from generated data
-  if (executiveDashboard) {
+  if (executiveDashboard && persistedSeoRecordId) {
     try {
       await prisma.seoIntelligence.update({
-        where: { id: saved.id },
+        where: { id: persistedSeoRecordId },
         data: {
           landingPageSuggestions: contentGapIntelligence?.landingPageIdeas || executiveDashboard?.landingPageOptimization || [],
           actionPlan: executiveDashboard?.executiveActionPlan || executiveDashboard?.actionPlan || null,
@@ -967,7 +965,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     console.log('[SEO RUN COMPLETE]');
     console.log('runId:', runId);
     console.log('chatId:', chatId);
-    console.log('savedId:', saved?.id || 'N/A');
+    console.log('persistedSeoRecordId:', persistedSeoRecordId || 'N/A');
     console.log('overallScore:', safeSeoScores.overall);
     console.log('========================================');
     console.log('');
@@ -992,7 +990,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     executiveDashboardSaved: !executiveDashboardFailed,
     warnings,
     data: {
-      id: saved.id,
+      id: persistedSeoRecordId,
       status: seoResponseStatus,
       identity: {
         brandName: identity.brandName || identity.productName,
@@ -1036,10 +1034,10 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     console.error('❌ [SEO Intelligence] Error:', error);
     
     // Mark SeoIntelligence as partial if main record was already saved
-    if (savedId) {
+    if (persistedSeoRecordId) {
       try {
         await prisma.seoIntelligence.update({
-          where: { id: savedId },
+          where: { id: persistedSeoRecordId },
           data: { status: 'PARTIAL', updatedAt: new Date() }
         }).catch(() => {});
       } catch (seoUpdateError) {

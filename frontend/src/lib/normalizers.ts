@@ -372,7 +372,8 @@ export function normalizeFullResults(data: any) {
   const hasGrowth = growthStatus !== 'NOT_RUN' && growthStatus !== 'FAILED';
 
   // PRIORITY 1: Use canonical growthWorkspace from backend
-  if (root.growthWorkspace && typeof root.growthWorkspace === 'object' && root.growthWorkspace.status === 'COMPLETED') {
+  const canonicalStatuses = ['COMPLETED', 'COMPLETED_WITH_WARNINGS', 'PARTIAL'];
+  if (root.growthWorkspace && typeof root.growthWorkspace === 'object' && canonicalStatuses.includes(root.growthWorkspace.status)) {
     const workspace = root.growthWorkspace;
 
     return {
@@ -401,7 +402,7 @@ export function normalizeFullResults(data: any) {
       agents: asArray(root.agentRuns || []),
       automation: root.automationPlan || null,
       hasGrowthWorkspace: hasProduct,
-      hasSeoIntelligence: seoStatus === 'COMPLETED' || seoStatus === 'COMPLETED_WITH_WARNINGS',
+      hasSeoIntelligence: seoStatus === 'COMPLETED' || seoStatus === 'COMPLETED_WITH_WARNINGS' || seoStatus === 'PARTIAL',
       hasProductIntelligence: hasProduct,
       hasCompetitorIntelligence: root.hasCompetitorIntelligence === true,
       hasCampaignIntelligence: root.hasCampaignIntelligence === true,
@@ -437,7 +438,7 @@ export function normalizeFullResults(data: any) {
       agents: asArray(root.agentRuns || []),
       automation: root.automationPlan || null,
       hasGrowthWorkspace: hasProduct,
-      hasSeoIntelligence: seoStatus === 'COMPLETED' || seoStatus === 'COMPLETED_WITH_WARNINGS',
+      hasSeoIntelligence: seoStatus === 'COMPLETED' || seoStatus === 'COMPLETED_WITH_WARNINGS' || seoStatus === 'PARTIAL',
       hasProductIntelligence: hasProduct,
       hasCompetitorIntelligence: root.hasCompetitorIntelligence === true,
       hasCampaignIntelligence: root.hasCampaignIntelligence === true,

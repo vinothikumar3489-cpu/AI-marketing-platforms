@@ -39,22 +39,23 @@ export const runFullAnalysisHandler = async (req, res) => {
       console.info('[Growth Stage]', { stage: 'PIPELINE_FAILED', status: 'failed', error: result.error, chatId });
       return res.status(500).json({
         success: false,
-        error: result.error,
-        results: result.results,
-        steps: result.steps
+        error: result.error || 'Growth analysis failed',
+        results: result.results || null,
+        steps: result.steps || []
       });
     }
 
-    console.info('[Growth Stage]', { stage: 'PIPELINE_COMPLETE', status: 'completed', chatId });
-    console.log('✅ [Growth Workspace Controller] Analysis complete');
+    const stageLabel = result.overallStatus === 'PARTIAL' ? 'PIPELINE_PARTIAL' : 'PIPELINE_COMPLETE';
+    const stageStatus = result.overallStatus === 'PARTIAL' ? 'partial' : 'completed';
+    console.info('[Growth Stage]', { stage: stageLabel, status: stageStatus, overallStatus: result.overallStatus, chatId });
     
     return res.json({
       success: true,
-      chatId: result.chatId, // Return the actual or newly created chatId
+      chatId: result.chatId,
       results: result.results,
       steps: result.steps,
       summary: result.summary,
-      overallStatus: result.overallStatus,
+      overallStatus: result.overallStatus || 'completed',
       warnings: result.warnings || []
     });
 

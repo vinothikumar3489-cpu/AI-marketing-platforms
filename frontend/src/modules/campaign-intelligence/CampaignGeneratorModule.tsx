@@ -151,10 +151,12 @@ export function CampaignGeneratorModule() {
 
       {data && (
         <div className="space-y-6">
-          {data.fallbackUsed && (
+          {(data.status === 'PARTIALLY_GENERATED' || data.fallbackUsed) && (
             <div className="rounded-2xl bg-yellow-500/10 border border-yellow-500/20 p-4 text-sm text-yellow-200 flex items-center gap-2">
               <AlertCircle className="w-5 h-5" />
-              Generated using fallback analysis (AI providers unavailable).
+              {data.status === 'PARTIALLY_GENERATED'
+                ? 'Campaign generated with partial data (some intelligence unavailable).'
+                : 'Generated using fallback analysis (AI providers unavailable).'}
             </div>
           )}
 
