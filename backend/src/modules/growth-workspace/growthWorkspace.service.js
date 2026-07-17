@@ -313,7 +313,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       console.log('⚠️ [Growth Workspace] Product Analysis failed:', error.message);
       warnings.push(`Product Analysis fallback: ${error.message}`);
       results.product = validateProductAnalysis(null, input);
-      steps[0].status = 'completed';
+      steps[0].status = 'PARTIAL';
       steps[0].provider = 'fallback';
       steps[0].confidenceScore = results.product.confidenceScore ?? null;
     }
@@ -337,7 +337,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       console.log('⚠️ [Growth Workspace] Market Discovery failed:', error.message);
       warnings.push(`Market Discovery fallback: ${error.message}`);
       results.market = validateMarketDiscovery(null, input);
-      steps[1].status = 'completed';
+      steps[1].status = 'PARTIAL';
       steps[1].provider = 'fallback';
       steps[1].confidenceScore = results.market.confidenceScore ?? null;
     }
@@ -361,7 +361,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       console.log('⚠️ [Growth Workspace] Audience Intelligence failed:', error.message);
       warnings.push(`Audience Intelligence fallback: ${error.message}`);
       results.audience = validateAudienceIntelligence(null, input);
-      steps[2].status = 'completed';
+      steps[2].status = 'PARTIAL';
       steps[2].provider = 'fallback';
       steps[2].confidenceScore = results.audience.confidenceScore ?? null;
     }
@@ -386,7 +386,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       console.log('⚠️ [Growth Workspace] Competitor Analysis failed:', error.message);
       warnings.push(`Competitor Analysis fallback: ${error.message}`);
       results.competitor = validateCompetitorAnalysis(null, input);
-      steps[3].status = 'completed';
+      steps[3].status = 'PARTIAL';
       steps[3].provider = 'fallback';
       steps[3].confidenceScore = results.competitor.confidenceScore ?? null;
     }
@@ -410,7 +410,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       console.log('⚠️ [Growth Workspace] Intent Prediction failed:', error.message);
       warnings.push(`Intent Prediction fallback: ${error.message}`);
       results.intent = validateIntentPrediction(null, input);
-      steps[4].status = 'completed';
+      steps[4].status = 'PARTIAL';
       steps[4].provider = 'fallback';
       steps[4].confidenceScore = results.intent.confidenceScore ?? null;
     }
@@ -434,7 +434,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       console.log('⚠️ [Growth Workspace] Positioning Engine failed:', error.message);
       warnings.push(`Positioning Engine fallback: ${error.message}`);
       results.positioning = validatePositioningEngine(null, input);
-      steps[5].status = 'completed';
+      steps[5].status = 'PARTIAL';
       steps[5].provider = 'fallback';
       steps[5].confidenceScore = results.positioning.confidenceScore ?? null;
     }
@@ -459,7 +459,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       console.log('⚠️ [Growth Workspace] Campaign Generator failed:', error.message);
       warnings.push(`Campaign Generator fallback: ${error.message}`);
       results.campaign = validateCampaignGenerator(null, input);
-      steps[6].status = 'completed';
+      steps[6].status = 'PARTIAL';
       steps[6].provider = 'fallback';
       steps[6].confidenceScore = results.campaign.confidenceScore ?? null;
     }
@@ -483,12 +483,63 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       console.log('⚠️ [Growth Workspace] Channel Recommendation failed:', error.message);
       warnings.push(`Channel Recommendation fallback: ${error.message}`);
       results.channel = validateChannelRecommendation(null, input);
-      steps[7].status = 'completed';
+      steps[7].status = 'PARTIAL';
       steps[7].provider = 'fallback';
       steps[7].confidenceScore = results.channel.confidenceScore ?? null;
     }
 
-    overallStatus = 'completed';
+    const partialSteps = steps.filter(s => s.status === 'PARTIAL').length;
+    const completedSteps = steps.filter(s => s.status === 'completed').length;
+    overallStatus = partialSteps > 0 && completedSteps > 0 ? 'PARTIAL' : completedSteps === 8 ? 'completed' : 'PARTIAL';
+
+    // Persist partial results incrementally to survive later-stage failures
+    try {
+      await prisma.productIntelligence.upsert({
+        where: { chatId: validChatId },
+        create: {
+          chatId: validChatId, userId,
+          productAnalysis: results.product,
+          marketDiscovery: results.market,
+          audienceIntelligence: results.audience,
+          status: overallStatus,
+          inputJson: input
+        },
+        update: {
+          productAnalysis: results.product,
+          marketDiscovery: results.market,
+          audienceIntelligence: results.audience,
+          status: overallStatus,
+          inputJson: input,
+          updatedAt: new Date()
+        }
+      });
+    } catch (piError) {
+      console.error('[Growth Workspace] Product intelligence partial save failed:', piError.message);
+    }
+
+    try {
+      await prisma.competitorIntelligence.upsert({
+        where: { chatId: validChatId },
+        create: {
+          chatId: validChatId, userId,
+          competitorAnalysis: results.competitor,
+          intentPrediction: results.intent,
+          positioningEngine: results.positioning,
+          status: overallStatus,
+          inputJson: input
+        },
+        update: {
+          competitorAnalysis: results.competitor,
+          intentPrediction: results.intent,
+          positioningEngine: results.positioning,
+          status: overallStatus,
+          inputJson: input,
+          updatedAt: new Date()
+        }
+      });
+    } catch (ciError) {
+      console.error('[Growth Workspace] Competitor intelligence partial save failed:', ciError.message);
+    }
 
     // Apply quality filters to ensure evidence-based data
     results = enforceGrowthQualityFilters(results);
@@ -807,54 +858,12 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     console.log('[Growth Save] executiveStory exists', !!growthExecutiveStory);
     console.log('[Growth Save] actionPlan keys', Object.keys(growthActionPlan || {}));
 
-    // Save to database using validated chat.id
-    console.log('💾 [Growth Workspace] Saving core intelligence to database...');
-    console.info('[Growth Stage]', { stage: 'TRANSACTION_STARTED', status: 'running', chatId: validChatId });
+    // Save campaign intelligence (product and competitor already saved incrementally)
+    console.log('💾 [Growth Workspace] Saving campaign intelligence to database...');
+    console.info('[Growth Stage]', { stage: 'CAMPAIGN_SAVE_STARTED', status: 'running', chatId: validChatId });
     
-    await prisma.$transaction([
-      prisma.productIntelligence.upsert({
-        where: { chatId: validChatId },
-        create: {
-          chatId: validChatId,
-          userId,
-          productAnalysis: normalizedResults.product,
-          marketDiscovery: normalizedResults.market,
-          audienceIntelligence: normalizedResults.audience,
-          status: 'completed',
-          inputJson: input
-        },
-        update: {
-          productAnalysis: normalizedResults.product,
-          marketDiscovery: normalizedResults.market,
-          audienceIntelligence: normalizedResults.audience,
-          status: 'completed',
-          inputJson: input,
-          updatedAt: new Date()
-        }
-      }),
-
-      prisma.competitorIntelligence.upsert({
-        where: { chatId: validChatId },
-        create: {
-          chatId: validChatId,
-          userId,
-          competitorAnalysis: normalizedResults.competitor,
-          intentPrediction: normalizedResults.intent,
-          positioningEngine: normalizedResults.positioning,
-          status: 'completed',
-          inputJson: input
-        },
-        update: {
-          competitorAnalysis: normalizedResults.competitor,
-          intentPrediction: normalizedResults.intent,
-          positioningEngine: normalizedResults.positioning,
-          status: 'completed',
-          inputJson: input,
-          updatedAt: new Date()
-        }
-      }),
-
-      prisma.campaignIntelligence.upsert({
+    try {
+      await prisma.campaignIntelligence.upsert({
         where: { chatId: validChatId },
         create: {
           chatId: validChatId,
@@ -868,7 +877,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
             }
           },
           channelRecommendation: normalizedResults.channel,
-          status: 'completed',
+          status: overallStatus,
           inputJson: input
         },
         update: {
@@ -881,14 +890,16 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
             }
           },
           channelRecommendation: normalizedResults.channel,
-          status: 'completed',
+          status: overallStatus,
           inputJson: input,
           updatedAt: new Date()
         }
-      })
-    ]);
-
-    console.info('[Growth Stage]', { stage: 'TRANSACTION_COMMITTED', status: 'completed', chatId: validChatId });
+      });
+      console.info('[Growth Stage]', { stage: 'CAMPAIGN_SAVE_COMMITTED', status: 'completed', chatId: validChatId });
+    } catch (campaignError) {
+      console.error('[Growth Workspace] Campaign intelligence save failed (non-fatal):', campaignError.message);
+      warnings.push({ code: 'CAMPAIGN_SAVE_FAILED', message: 'Product and competitor data saved, campaign persistence failed.' });
+    }
 
     // Save optional derived data (executive story, action plan) separately
     try {
@@ -1000,6 +1011,61 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     const failedStepIndex = steps.findIndex(s => s.status === 'running');
     if (failedStepIndex !== -1) {
       steps[failedStepIndex].status = 'failed';
+    }
+
+    // Attempt to persist partial results before returning
+    const partialChatId = chat?.id || chatId;
+    if (partialChatId && results) {
+      try {
+        if (results.product || results.market || results.audience) {
+          await prisma.productIntelligence.upsert({
+            where: { chatId: partialChatId },
+            create: {
+              chatId: partialChatId, userId,
+              productAnalysis: results.product || null,
+              marketDiscovery: results.market || null,
+              audienceIntelligence: results.audience || null,
+              status: 'PARTIAL',
+              inputJson: input
+            },
+            update: {
+              productAnalysis: results.product,
+              marketDiscovery: results.market,
+              audienceIntelligence: results.audience,
+              status: 'PARTIAL',
+              inputJson: input,
+              updatedAt: new Date()
+            }
+          });
+        }
+      } catch (piError) {
+        console.error('[Growth Workspace] Partial save (product) failed in outer catch:', piError.message);
+      }
+      try {
+        if (results.competitor || results.intent || results.positioning) {
+          await prisma.competitorIntelligence.upsert({
+            where: { chatId: partialChatId },
+            create: {
+              chatId: partialChatId, userId,
+              competitorAnalysis: results.competitor || null,
+              intentPrediction: results.intent || null,
+              positioningEngine: results.positioning || null,
+              status: 'PARTIAL',
+              inputJson: input
+            },
+            update: {
+              competitorAnalysis: results.competitor,
+              intentPrediction: results.intent,
+              positioningEngine: results.positioning,
+              status: 'PARTIAL',
+              inputJson: input,
+              updatedAt: new Date()
+            }
+          });
+        }
+      } catch (ciError) {
+        console.error('[Growth Workspace] Partial save (competitor) failed in outer catch:', ciError.message);
+      }
     }
 
     return {
