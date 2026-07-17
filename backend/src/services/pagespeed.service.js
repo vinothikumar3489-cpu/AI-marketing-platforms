@@ -1,16 +1,38 @@
 import fetch from 'node-fetch';
 
-// ============================================
-// GOOGLE PAGESPEED INSIGHTS SERVICE
-// Real technical SEO audit data from Google PageSpeed API
-// ============================================
-
 const PAGESPEED_API_KEY = process.env.PAGESPEED_INSIGHTS_API_KEY || process.env.GOOGLE_PAGESPEED_INSIGHTS_API_KEY || process.env.PAGESPEED_API_KEY;
 const PAGESPEED_API_URL = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
 
-/**
- * Get PageSpeed audit for a URL
- */
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 1000;
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+const cache = new Map();
+
+function getCacheKey(url, strategy) {
+  return `${strategy}:${url}`;
+}
+
+function cacheGet(url, strategy) {
+  const key = getCacheKey(url, strategy);
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function cacheSet(url, strategy, data) {
+  const key = getCacheKey(url, strategy);
+  cache.set(key, { data, timestamp: Date.now() });
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export async function getPageSpeedAudit(url, strategy = 'mobile') {
   if (!url) {
     return { success: false, error: 'URL is required' };
@@ -21,32 +43,67 @@ export async function getPageSpeedAudit(url, strategy = 'mobile') {
     return { success: false, error: 'PageSpeed API key not configured' };
   }
 
-  try {
-    const apiUrl = `${PAGESPEED_API_URL}?url=${encodeURIComponent(url)}&strategy=${strategy}&key=${PAGESPEED_API_KEY}`;
-    console.log(`🔍 [PageSpeed] Requesting ${strategy} audit for: ${url}`);
-    
-    const response = await fetch(apiUrl);
-    
-    if (!response.ok) {
+  const cached = cacheGet(url, strategy);
+  if (cached) {
+    console.log(`🔍 [PageSpeed] Cache hit for ${strategy}: ${url}`);
+    return { success: true, data: cached, fromCache: true };
+  }
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const apiUrl = `${PAGESPEED_API_URL}?url=${encodeURIComponent(url)}&strategy=${strategy}&key=${PAGESPEED_API_KEY}`;
+      console.log(`🔍 [PageSpeed] Requesting ${strategy} audit for: ${url} (attempt ${attempt}/${MAX_RETRIES})`);
+
+      const response = await fetch(apiUrl);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`✅ [PageSpeed] ${strategy} audit successful`);
+
+        const normalized = normalizePageSpeedResult(data, strategy);
+        if (normalized) {
+          cacheSet(url, strategy, normalized);
+        }
+        return { success: true, data: normalized };
+      }
+
+      if (response.status === 429) {
+        const retryAfter = parseInt(response.headers.get('retry-after') || '0', 10) * 1000 || RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        console.warn(`⚠️ [PageSpeed] Rate limited (429) for ${strategy}:${url}, retrying in ${retryAfter}ms (attempt ${attempt}/${MAX_RETRIES})`);
+        if (attempt < MAX_RETRIES) {
+          await sleep(retryAfter);
+          continue;
+        }
+        const errorText = await response.text();
+        console.error(`❌ [PageSpeed] Rate limit exhausted after ${MAX_RETRIES} attempts: ${errorText}`);
+        return { success: false, error: `Rate limited after ${MAX_RETRIES} retries`, rateLimited: true };
+      }
+
+      if (response.status >= 500 && attempt < MAX_RETRIES) {
+        const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        console.warn(`⚠️ [PageSpeed] Server error ${response.status} for ${strategy}:${url}, retrying in ${delay}ms`);
+        await sleep(delay);
+        continue;
+      }
+
       const errorText = await response.text();
       console.error(`❌ [PageSpeed] API error: ${response.status} - ${errorText}`);
       return { success: false, error: `API error: ${response.status}` };
+    } catch (error) {
+      if (attempt < MAX_RETRIES) {
+        const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        console.warn(`⚠️ [PageSpeed] Network error: ${error.message}, retrying in ${delay}ms`);
+        await sleep(delay);
+        continue;
+      }
+      console.error(`❌ [PageSpeed] Request failed after ${MAX_RETRIES} attempts:`, error.message);
+      return { success: false, error: error.message };
     }
-
-    const data = await response.json();
-    console.log(`✅ [PageSpeed] ${strategy} audit successful`);
-    
-    const normalized = normalizePageSpeedResult(data, strategy);
-    return { success: true, data: normalized };
-  } catch (error) {
-    console.error(`❌ [PageSpeed] Request failed:`, error.message);
-    return { success: false, error: error.message };
   }
+
+  return { success: false, error: 'Max retries exceeded' };
 }
 
-/**
- * Get both desktop and mobile PageSpeed audits
- */
 export async function getDesktopAndMobilePageSpeed(url) {
   if (!url) {
     return { success: false, error: 'URL is required' };
@@ -66,9 +123,6 @@ export async function getDesktopAndMobilePageSpeed(url) {
   };
 }
 
-/**
- * Normalize PageSpeed API response
- */
 function normalizePageSpeedResult(response, strategy) {
   if (!response || !response.lighthouseResult) {
     return null;
@@ -93,9 +147,6 @@ function normalizePageSpeedResult(response, strategy) {
   };
 }
 
-/**
- * Extract Lighthouse category scores
- */
 function extractLighthouseScores(categories) {
   return {
     performance: categories.performance?.score ? Math.round(categories.performance.score * 100) : null,
@@ -106,9 +157,6 @@ function extractLighthouseScores(categories) {
   };
 }
 
-/**
- * Extract Core Web Vitals
- */
 function extractCoreWebVitals(audits) {
   return {
     fcp: getMetricValue(audits['first-contentful-paint']),
@@ -120,9 +168,6 @@ function extractCoreWebVitals(audits) {
   };
 }
 
-/**
- * Extract SEO-specific audits
- */
 function extractSeoAudits(audits) {
   return {
     hasTitleTag: audits['is-on-https']?.score === 1,
@@ -138,9 +183,6 @@ function extractSeoAudits(audits) {
   };
 }
 
-/**
- * Extract performance audits
- */
 function extractPerformanceAudits(audits) {
   return {
     totalBlockingTime: getMetricValue(audits['total-blocking-time']),
@@ -153,9 +195,6 @@ function extractPerformanceAudits(audits) {
   };
 }
 
-/**
- * Extract opportunities
- */
 function extractOpportunities(audits) {
   const opportunityKeys = [
     'unused-css-rules',
@@ -184,9 +223,6 @@ function extractOpportunities(audits) {
     }));
 }
 
-/**
- * Extract diagnostics
- */
 function extractDiagnostics(audits) {
   const diagnosticKeys = [
     'mainthread-work-breakdown',
@@ -211,9 +247,6 @@ function extractDiagnostics(audits) {
     }));
 }
 
-/**
- * Extract passed audits
- */
 function extractPassedAudits(audits) {
   return Object.values(audits)
     .filter(audit => audit.score === 1)
@@ -225,9 +258,6 @@ function extractPassedAudits(audits) {
     }));
 }
 
-/**
- * Extract failed audits
- */
 function extractFailedAudits(audits) {
   return Object.values(audits)
     .filter(audit => audit.score !== null && audit.score < 1)
@@ -242,17 +272,11 @@ function extractFailedAudits(audits) {
     }));
 }
 
-/**
- * Get metric value from audit
- */
 function getMetricValue(audit) {
   if (!audit) return null;
   return audit.numericValue !== undefined ? audit.numericValue : null;
 }
 
-/**
- * Check if PageSpeed API is configured
- */
 export function isPageSpeedConfigured() {
   return !!PAGESPEED_API_KEY;
 }

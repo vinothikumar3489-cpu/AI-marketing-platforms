@@ -1348,26 +1348,85 @@ CRITICAL INSTRUCTION: Return ONLY valid JSON using the exact schema above.`;
 
 async function runCampaignGenerator(input, allResults) {
   const duration = input.duration || '7 days';
-  
-  const prompt = `Generate a ${duration} marketing campaign:
 
-Product: ${input.productName}
-Campaign Goal: ${input.campaignGoal}
-Target: ${input.targetAudience}
-Preferred Channel: ${input.preferredChannels}
-Tone: ${input.tone}
-Budget: ${input.budgetRange}
+  const productFeatures = allResults?.product?.features || [];
+  const featuresText = productFeatures.length > 0
+    ? productFeatures.map(f => `- ${f.name || f.title || f}: ${f.description || f.benefit || ''}`).join('\n')
+    : 'No verified features available';
 
-  Positioning: ${allResults.positioning?.valueProposition || allResults.positioning?.valueProposition || ''}
+  const audiencePersonas = allResults?.audience?.buyerPersonas || [];
+  const personasText = audiencePersonas.length > 0
+    ? audiencePersonas.map(p => `- ${p.name} (${p.role || p.title || 'role unknown'}): ${(p.goals || []).join(', ')}`).join('\n')
+    : 'No verified audience personas available';
+
+  const competitorGaps = allResults?.competitor?.marketGaps || allResults?.competitor?.differentiationOpportunities || [];
+  const gapsText = competitorGaps.length > 0
+    ? competitorGaps.map(g => `- ${typeof g === 'string' ? g : g.opportunity || g.gap || g.description || ''}`).join('\n')
+    : 'No competitor gap analysis available';
+
+  const intentSignals = allResults?.intent?.buyingSignals || allResults?.intent?.highIntentSegments || [];
+  const signalsText = intentSignals.length > 0
+    ? intentSignals.map(s => `- ${typeof s === 'string' ? s : s.signal || s.name || s.segment || ''}`).join('\n')
+    : 'No intent signals available';
+
+  const usp = allResults?.product?.usp || allResults?.product?.valueProposition || '';
+  const positioning = allResults?.positioning?.valueProposition || allResults?.positioning?.positioningStatement || '';
+  const painPoints = (allResults?.product?.painPoints || []).slice(0, 5).join(', ');
+
+  const prompt = `Generate a ${duration} marketing campaign using ALL available evidence:
+
+Product: ${input.productName || 'unknown'}
+Campaign Goal: ${input.campaignGoal || 'brand awareness'}
+Target Audience: ${input.targetAudience || 'ideal customer profile'}
+Preferred Channel: ${input.preferredChannels || 'multiple channels'}
+Tone: ${input.tone || 'professional'}
+Budget: ${input.budgetRange || 'not specified'}
+Duration: ${duration}
+
+EVIDENCE — Product Features:
+${featuresText}
+
+EVIDENCE — USP / Value Proposition:
+${usp || positioning || 'Not available'}
+
+EVIDENCE — Audience Personas:
+${personasText}
+
+EVIDENCE — Competitor Gaps / Opportunities:
+${gapsText}
+
+EVIDENCE — Intent Signals:
+${signalsText}
+
+EVIDENCE — Customer Pain Points:
+${painPoints || 'Not available'}
+
+EVIDENCE — Positioning:
+${positioning || 'Not available'}
+
+Analyze the evidence above to determine:
+1. BUYING STAGE: Based on intent signals and pain points, determine whether the audience is in awareness, consideration, or decision stage. If intent signals include purchase-ready terms, use 'decision'.
+2. FUNNEL CHANNELS: Recommend top-of-funnel, middle-of-funnel, and bottom-of-funnel channels based on audience personas and product type.
+3. KPIs: Define specific, measurable KPIs tied to the campaign goal. Status must be one of: 'on_track', 'at_risk', 'needs_attention'.
 
 Provide JSON response:
 {
-  "creativeAngles": [{"value": "Angle", "confidence": null, "impact": null}],
-  "copyHooks": [{"value": "Hook", "confidence": null, "impact": null}],
-  "ctaSuggestions": [{"value": "CTA", "confidence": null, "impact": null}],
-  "emailSequence": [{"value": "Email Idea", "confidence": null, "impact": null}],
-  "socialPostIdeas": [{"value": "Post Idea", "confidence": null, "impact": null}],
-  "videoIdeas": [{"value": "Video Idea", "confidence": null, "impact": null}],
+  "campaignPhases": [
+    {"phase": "Phase name", "duration": "Timeline", "objective": "Phase goal", "channels": ["channel1"], "kpis": [{"metric": "KPI name", "target": "Target value", "status": "on_track"}]}
+  ],
+  "creativeAngles": [{"value": "Angle derived from evidence", "confidence": null, "impact": null}],
+  "copyHooks": [{"value": "Hook tied to USP or pain point", "confidence": null, "impact": null}],
+  "ctaSuggestions": [{"value": "CTA aligned with buying stage", "confidence": null, "impact": null}],
+  "emailSequence": [{"value": "Email Idea with stage context", "confidence": null, "impact": null}],
+  "socialPostIdeas": [{"value": "Post Idea targeting specific persona", "confidence": null, "impact": null}],
+  "videoIdeas": [{"value": "Video Idea for specific funnel stage", "confidence": null, "impact": null}],
+  "buyingStage": "awareness|consideration|decision",
+  "funnelChannels": {
+    "topOfFunnel": ["channel1"],
+    "middleOfFunnel": ["channel2"],
+    "bottomOfFunnel": ["channel3"]
+  },
+  "kpiSummary": [{"metric": "KPI name", "target": "Target", "status": "on_track"}],
   "actionPlan": {
     "sevenDay": [{"title": "Task", "problem": "What problem this solves", "evidence": "Data evidence", "researchSource": "Source module", "businessImpact": "Business impact", "difficulty": "Low/Medium/High", "priority": "High", "estimatedTimeline": "1 week", "owner": "Role"}],
     "thirtyDay": [{"title": "Task", "problem": "What problem this solves", "evidence": "Data evidence", "researchSource": "Source module", "businessImpact": "Business impact", "difficulty": "Low/Medium/High", "priority": "High", "estimatedTimeline": "2-4 weeks", "owner": "Role"}],
@@ -1377,10 +1436,10 @@ Provide JSON response:
   "confidenceScore": null
 }
 
-CRITICAL INSTRUCTION: Do NOT invent ROI, CTR, CPA, or conversion numbers. Action plan MUST use 'sevenDay', 'thirtyDay', 'sixtyDay', 'ninetyDay' timelines. Every task MUST explain WHY it exists using the problem, evidence, and researchSource fields. Do not use generic placeholders.`;
+CRITICAL INSTRUCTION: Base every recommendation on the evidence provided above. Do NOT invent ROI, CTR, CPA, or conversion numbers. Action plan MUST use 'sevenDay', 'thirtyDay', 'sixtyDay', 'ninetyDay' timelines. Every task MUST explain WHY it exists using the problem, evidence, and researchSource fields. If evidence is marked as "Not available", omit that dimension rather than inventing data.`;
 
   const fallbackData = generateCampaignFallback(input, allResults.product, allResults);
-  const aiResult = await callBestAI(prompt, 1200, 'Campaign Generator', fallbackData);
+  const aiResult = await callBestAI(prompt, 1600, 'Campaign Generator', fallbackData);
   
   return {
     ...aiResult,

@@ -8,8 +8,15 @@
 import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
 
 const INVALID_PRODUCT_IDENTITIES = new Set([
-  'unknown product', 'new analysis', 'new & featured', 'untitled',
-  'new project', 'growth analysis', 'featured', 'home',
+  'unknown product', 'unknown company', 'unknown',
+  'new analysis', 'new growth analysis', 'new seo analysis', 'new campaign',
+  'growth analysis', 'seo analysis', 'campaign analysis',
+  'untitled project', 'untitled', 'new project',
+  'new & featured', 'featured', 'home', 'courses',
+  'project', 'analysis', 'my', 'the', 'test', 'demo', 'sample',
+  'product', 'website', 'landing', 'page',
+  'www', 'app', 'login', 'signin', 'signup',
+  'general', 'technology', 'saas', 'none',
 ]);
 
 const QUALITY_CHECKS = {

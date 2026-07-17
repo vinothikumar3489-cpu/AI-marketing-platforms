@@ -18,17 +18,17 @@ export function deriveWebsiteIdentity(params = {}) {
     return {
       websiteUrl: '',
       domain: '',
-      brandName: 'Unknown',
-      companyName: 'Unknown Company',
-      productName: 'Unknown Product',
-      industry: 'Technology',
-      category: 'General',
-      targetAudience: 'General',
+      brandName: null,
+      companyName: null,
+      productName: null,
+      industry: null,
+      category: null,
+      targetAudience: null,
       websiteTitle: '',
       websiteDescription: '',
-      businessModel: 'B2B SaaS',
-      businessCategory: 'Technology',
-      companySize: 'Unknown',
+      businessModel: null,
+      businessCategory: null,
+      companySize: null,
       source: 'fallback'
     };
   }
@@ -120,17 +120,17 @@ export function deriveWebsiteIdentity(params = {}) {
     brandName = chat.productName;
   }
 
-  // Ensure we don't output generic fallback names
-  if (!productName || productName === 'Unknown' || productName === 'Unknown Product') {
+  // Ensure we don't output generic fallback names — use brandName instead
+  if (!productName) {
     productName = brandName;
   }
 
   // Infer business properties from scraped text
-  let businessModel = 'B2B SaaS';
-  let companySize = 'Mid-Market';
-  let businessCategory = 'Technology';
-  let category = 'General';
-  let targetAudience = 'General';
+  let businessModel = null;
+  let companySize = null;
+  let businessCategory = null;
+  let category = null;
+  let targetAudience = null;
   
   if (scrapedData?.text) {
     const text = scrapedData.text.toLowerCase();
@@ -163,7 +163,7 @@ export function deriveWebsiteIdentity(params = {}) {
     brandName: sanitizeText(brandName),
     companyName: sanitizeText(companyName),
     productName: sanitizeText(productName),
-    industry: chatDomain === domain && chat?.industry ? chat.industry : 'Technology',
+    industry: chatDomain === domain && chat?.industry ? chat.industry : null,
     category,
     targetAudience,
     websiteTitle: sanitizeText(titlePart),

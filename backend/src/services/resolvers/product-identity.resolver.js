@@ -4,8 +4,10 @@ const GENERIC_LABELS = new Set([
   'untitled project', 'untitled', 'new project',
   'new & featured', 'featured', 'home', 'courses',
   'project', 'analysis', 'my', 'the', 'test', 'demo', 'sample',
-  'unknown product', 'product', 'website', 'landing', 'page',
+  'unknown product', 'unknown company', 'unknown',
+  'product', 'website', 'landing', 'page',
   'www', 'app', 'login', 'signin', 'signup',
+  'general', 'technology', 'saas', 'none',
 ]);
 
 function isGeneric(label) {
