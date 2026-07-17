@@ -49,14 +49,14 @@ export async function buildReportData(chatId, userId) {
   const seo = seoIntel ? normalizeSeoIntelligence(seoIntel) : null;
 
   const scores = {
-    overallGrowthScore: campaign?.growthSummary?.overallGrowthScore ?? campaign?.growthSummary?.dataCompletenessScore ?? null,
+    overallGrowthScore: campaign?.growthSummary?.overallGrowthScore ?? null,
     dataCompletenessScore: campaign?.growthSummary?.dataCompletenessScore ?? null,
     evidenceBased: campaign?.growthSummary?.evidenceBased ?? false,
     evidenceSourcesCount: campaign?.growthSummary?.evidenceSourcesCount ?? 0,
-    marketOpportunityScore: campaign?.growthSummary?.evidenceBased ? campaign?.growthSummary?.overallGrowthScore : null,
-    audienceClarityScore: null,
-    competitiveDefensibilityScore: null,
-    campaignReadinessScore: null
+    marketOpportunityScore: campaign?.growthSummary?.marketOpportunityScore ?? null,
+    audienceClarityScore: campaign?.growthSummary?.audienceClarityScore ?? null,
+    competitiveDefensibilityScore: campaign?.growthSummary?.competitiveDefensibilityScore ?? null,
+    campaignReadinessScore: campaign?.growthSummary?.campaignReadinessScore ?? null,
   };
 
   const company = executiveStory?.companyOverview || {
@@ -330,7 +330,7 @@ function normalizeSeoIntelligence(seoIntel) {
   const blogRecord = seoIntel.blogIntelligenceRecord || { blogIdeas: seoIntel.blogIdeas || [] };
 
   return {
-    scores: seoIntel.technicalAuditDetail || seoIntel.technicalAudit || {},
+    scores: (seoIntel.technicalAuditDetail || seoIntel.technicalAudit || {}).auditData || seoIntel.technicalAuditDetail || seoIntel.technicalAudit || {},
     keywords: normalizeSeoKeywordArray(keywordRecord),
     competitors: extractArray(competitorRecord?.competitors || competitorRecord?.competitorProfiles || competitorRecord),
     gaps: extractArray(gapRecord?.contentGaps || seoIntel.contentGaps),

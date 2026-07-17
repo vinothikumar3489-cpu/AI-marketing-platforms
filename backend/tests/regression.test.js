@@ -215,4 +215,87 @@ describe('normalizeSeoKeywords — validationStatus', () => {
   });
 });
 
+// =====================
+// Blog Intelligence — generateBlogIntelligence contract
+// =====================
+describe('Blog Intelligence — generateBlogIntelligence', () => {
+  it('returns empty blogIdeas when no validated keywords exist', async () => {
+    const mod = await import('../src/services/seo/blog-intelligence.service.js');
+    const result = await mod.generateBlogIntelligence({
+      keywordIntelligence: {
+        primaryKeywords: [{ keyword: 'test kw', validationStatus: 'UNVALIDATED' }],
+        secondaryKeywords: [],
+        longTailKeywords: [],
+      },
+      competitorIntelligence: { competitorProfiles: [] },
+      geoIntelligence: {},
+      identity: { productName: 'Test', industry: 'Tech' },
+      orchestratorData: {},
+    });
+    assert.ok(Array.isArray(result.blogIdeas));
+    assert.equal(result.blogIdeas.length, 0);
+  });
+});
+
+// =====================
+// Claim Validator — percentage growth patterns
+// =====================
+describe('Claim Validator — percentage patterns', () => {
+  it('removes unsupported percentage follower claims', async () => {
+    const mod = await import('../src/services/execution/claim-validator.service.js');
+    const content = { body: 'Our product delivers 30% follower increase in 30 days.' };
+    const result = mod.validateContentClaims(content, 'test');
+    const removed = result.findings.filter(f => f.action === 'removed');
+    assert.ok(removed.length >= 1);
+    assert.equal(result.sanitized.body, null);
+  });
+
+  it('removes unsupported percentage engagement claims', async () => {
+    const mod = await import('../src/services/execution/claim-validator.service.js');
+    const content = { body: 'Users see 79% higher engagement with our solution.' };
+    const result = mod.validateContentClaims(content, 'test');
+    const removed = result.findings.filter(f => f.action === 'removed');
+    assert.ok(removed.length >= 1);
+    assert.equal(result.sanitized.body, null);
+  });
+
+  it('preserves valid evidence-backed claims', async () => {
+    const mod = await import('../src/services/execution/claim-validator.service.js');
+    const content = { body: 'Our platform helps marketing teams create better content.' };
+    const result = mod.validateContentClaims(content, 'test');
+    assert.equal(result.status, 'passed');
+    assert.equal(result.sanitized.body, content.body);
+  });
+});
+
+// =====================
+// Content Studio — identity resolution
+// =====================
+describe('Content Studio — identity handling', () => {
+  it('uses brief._productIdentity directly without re-resolving', async () => {
+    const mod = await import('../src/services/execution/content-studio.service.js');
+    const brief = {
+      product: { name: 'instagram' },
+      _productIdentity: { productName: 'instagram', brandName: 'instagram', resolved: true, source: 'test' },
+    };
+    const result = await mod.generateContent('blog_article', brief, {}, null, 'user1', 'chat1');
+    if (result._status === 'blocked') {
+      assert.fail(`Content blocked with reason: ${result._reason}`);
+    } else {
+      assert.ok(result.content || result.headline);
+    }
+  });
+
+  it('blocks when product name is empty', async () => {
+    const mod = await import('../src/services/execution/content-studio.service.js');
+    const brief = {
+      product: { name: '' },
+      _productIdentity: { productName: null, brandName: null, resolved: false },
+    };
+    const result = await mod.generateContent('blog_article', brief, {}, null, 'user1', 'chat1');
+    assert.equal(result._status, 'blocked');
+    assert.ok(result._reason.includes('No product name'));
+  });
+});
+
 

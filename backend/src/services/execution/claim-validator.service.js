@@ -52,6 +52,12 @@ const HALLUCINATED_PATTERNS = [
   /\btake (your|the) (content|marketing|business) to the next level\b/i,
   /\bnext level\b/i,
   /\bcontent that resonates\b/i,
+  // Unsupported percentage growth claims
+  /[0-9]+%\s*(follower|followers|engagement|traffic|revenue|sale|sales|conversion|website|visit|visits|lead|leads|download|downloads|signup|signups|retention|growth|increase|improvement|boost|uplift|gain|rate|share|roi|ctr)\b/i,
+  /[0-9]+%\s*(higher|lower|more|less|faster|better|greater)\s+(follower|followers|engagement|traffic|revenue|conversion|roi|ctr|growth|rate)/i,
+  /\bincrease\s+[a-z]+\s+by\s+[0-9]+%/i,
+  /\bboost\s+[a-z]+\s+by\s+[0-9]+%/i,
+  /\bgrow\s+[a-z]+\s+by\s+[0-9]+%/i,
   /\bmost advanced\b/i,
   /\bmost powerful\b/i,
   /\bmost comprehensive\b/i,

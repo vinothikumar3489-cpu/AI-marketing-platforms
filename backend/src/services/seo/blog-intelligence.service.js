@@ -45,7 +45,7 @@ export async function generateBlogIntelligence({
   try {
     // Step 1: Generate blog ideas from real data only (using filtered competitors and orchestrator data)
     console.log('💡 [Blog Intelligence] Step 1: Generating blog ideas from real data...');
-    const blogIdeas = await generateBlogIdeas({
+    const blogIdeasResult = await generateBlogIdeas({
       keywordIntelligence,
       competitorIntelligence: filteredCompetitorIntelligence,
       geoIntelligence,
@@ -54,6 +54,7 @@ export async function generateBlogIntelligence({
       newsSignals: orchestratorData.newsSignals || [],
       marketSignals: orchestratorData.marketSignals || []
     });
+    const blogIdeas = blogIdeasResult.ideas || [];
 
     // Step 2: Create blog clusters
     console.log('🗂️ [Blog Intelligence] Step 2: Creating blog clusters...');
@@ -142,7 +143,7 @@ async function generateBlogIdeas({ keywordIntelligence, competitorIntelligence, 
   
   if (!allKeywords || allKeywords.length === 0) {
     console.log('⚠️ [Blog Ideas] No keyword data available');
-    return ideas;
+    return { ideas: [], status: 'UNAVAILABLE', source: 'keyword_intelligence', warnings: [{ code: 'NO_KEYWORD_DATA', message: 'No keyword data available for blog ideas.' }] };
   }
 
   console.log(`✅ [Blog Ideas] Using ${allKeywords.length} keywords for blog generation`);
@@ -156,9 +157,7 @@ async function generateBlogIdeas({ keywordIntelligence, competitorIntelligence, 
 
   if (validatedKeywords.length === 0) {
     console.log('⚠️ [Blog Ideas] No validated keywords (VERIFIED/HEURISTICALLY_VALIDATED) available');
-    result.status = 'PARTIAL';
-    result.warnings = [{ code: 'NO_VALIDATED_KEYWORDS', message: 'No validated keywords available for blog ideas.' }];
-    return result;
+    return { ideas: [], status: 'UNAVAILABLE', source: 'keyword_validation', warnings: [{ code: 'NO_VALIDATED_KEYWORDS', message: 'No validated keywords available for blog ideas.' }] };
   }
   
   console.log(`✅ [Blog Ideas] Using ${validatedKeywords.length} validated keywords out of ${allKeywords.length} total`);
@@ -209,7 +208,7 @@ async function generateBlogIdeas({ keywordIntelligence, competitorIntelligence, 
 
   if (validKeywords.length === 0) {
     console.log('⚠️ [Blog Ideas] No valid keywords available after filtering');
-    return ideas;
+    return { ideas: [], status: 'UNAVAILABLE', source: 'keyword_filtering', warnings: [{ code: 'NO_VALID_KEYWORDS', message: 'All keywords filtered out before blog generation.' }] };
   }
 
   console.log(`✅ [Blog Ideas] Using ${validKeywords.length} valid keywords out of ${validatedKeywords.length} validated`);
@@ -360,10 +359,10 @@ async function generateBlogIdeas({ keywordIntelligence, competitorIntelligence, 
   }
 
   console.log(`✅ [Blog Ideas] Generated ${ideas.length} blog ideas from real data`);
-  return ideas.sort((a, b) => (b.searchVolume || 0) - (a.searchVolume || 0));
+  return { ideas: ideas.sort((a, b) => (b.searchVolume || 0) - (a.searchVolume || 0)), status: 'COMPLETED', source: 'keyword_intelligence', warnings: [] };
   } catch (blogIdeasError) {
     console.error('❌ [Blog Ideas] Error generating ideas:', blogIdeasError);
-    return [];
+    return { ideas: [], status: 'UNAVAILABLE', source: 'error', warnings: [{ code: 'GENERATION_ERROR', message: blogIdeasError.message }] };
   }
 }
 

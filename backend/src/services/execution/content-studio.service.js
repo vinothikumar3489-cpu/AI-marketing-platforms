@@ -1206,7 +1206,7 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
     };
   }
 
-  const identity = resolveProductIdentity(brief?._productIdentity || {});
+  const identity = brief?._productIdentity || {};
   const productName = (identity?.productName || '').toLowerCase().trim();
   if (INVALID_PRODUCT_LABELS.has(productName) || !productName || productName.length < 2) {
     return {

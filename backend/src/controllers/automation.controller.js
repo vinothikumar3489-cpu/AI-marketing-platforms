@@ -990,10 +990,22 @@ export const generateContentItem = async (req, res) => {
         status: contentBody?._status || 'null',
         reason: contentBody?._reason,
       });
+      if (contentBody?._status === 'blocked') {
+        return res.status(422).json({
+          success: false,
+          status: 'BLOCKED',
+          code: 'PRODUCT_IDENTITY_UNAVAILABLE',
+          message: contentBody?._reason || 'Content generation requires a verified product identity',
+          readiness: {
+            ready: false,
+            missingRequired: ['PRODUCT_IDENTITY'],
+          },
+        });
+      }
       return res.status(500).json({
         success: false,
         error: {
-          code: contentBody?._status === 'blocked' ? "BRIEF_BLOCKED" : "CONTENT_GENERATION_FAILED",
+          code: "CONTENT_GENERATION_FAILED",
           message: contentBody?._reason || "AI provider returned no content. Check that API keys are configured in .env",
           retryable: true,
           stage: "GENERATION"
