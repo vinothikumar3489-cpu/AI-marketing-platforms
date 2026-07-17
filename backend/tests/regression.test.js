@@ -298,4 +298,127 @@ describe('Content Studio — identity handling', () => {
   });
 });
 
+// =====================
+// DataForSEO location normalization
+// =====================
+describe('DataForSEO location normalization', () => {
+  it('resolveLocation maps Global to US code 2840', async () => {
+    const mod = await import('../src/services/dataforseo.service.js');
+    const loc = mod.resolveLocation('Global');
+    assert.equal(loc.location_code, 2840);
+    assert.equal(loc.language_code, 'en');
+    assert.equal(loc.fallbackApplied, true);
+    assert.equal(loc.requestedLocation, 'Global');
+  });
+
+  it('resolveLocation maps Worldwide to US code 2840', async () => {
+    const mod = await import('../src/services/dataforseo.service.js');
+    const loc = mod.resolveLocation('Worldwide');
+    assert.equal(loc.location_code, 2840);
+    assert.equal(loc.fallbackApplied, true);
+  });
+
+  it('resolveLocation handles missing location', async () => {
+    const mod = await import('../src/services/dataforseo.service.js');
+    const loc = mod.resolveLocation('');
+    assert.equal(loc.location_code, 2840);
+    assert.equal(loc.fallbackApplied, true);
+  });
+
+  it('resolveLocation maps United States correctly', async () => {
+    const mod = await import('../src/services/dataforseo.service.js');
+    const loc = mod.resolveLocation('United States');
+    assert.equal(loc.location_code, 2840);
+    assert.equal(loc.language_code, 'en');
+    assert.equal(loc.fallbackApplied, false);
+  });
+
+  it('resolveLocation maps India correctly', async () => {
+    const mod = await import('../src/services/dataforseo.service.js');
+    const loc = mod.resolveLocation('India');
+    assert.equal(loc.location_code, 2034);
+    assert.equal(loc.language_code, 'en');
+    assert.equal(loc.fallbackApplied, false);
+  });
+
+  it('resolveLocation returns metadata', async () => {
+    const mod = await import('../src/services/dataforseo.service.js');
+    const loc = mod.resolveLocation('United States');
+    assert.ok('requestedLocation' in loc);
+    assert.ok('resolvedLocationCode' in loc || 'location_code' in loc);
+    assert.ok('fallbackApplied' in loc);
+  });
+
+  it('resolveLocation leaves unknown location as unresolved', async () => {
+    const mod = await import('../src/services/dataforseo.service.js');
+    const loc = mod.resolveLocation('Some Unknown Country');
+    assert.equal(loc.unresolved, true);
+    assert.equal(loc.fallbackApplied, false);
+  });
+});
+
+// =====================
+// DataForSEO endpoint validation
+// =====================
+describe('DataForSEO endpoint validation', () => {
+  it('exported functions use only valid endpoints', async () => {
+    const mod = await import('../src/services/dataforseo.service.js');
+    assert.ok(typeof mod.getKeywordMetrics === 'function');
+    assert.ok(typeof mod.getSerpCompetitors === 'function');
+    assert.ok(typeof mod.getBacklinksSummary === 'function');
+    assert.ok(typeof mod.getDomainAnalytics === 'function');
+  });
+});
+
+// =====================
+// DataForSEO article/competitor filtering
+// =====================
+describe('DataForSEO normalizeSerpCompetitors — article filtering', () => {
+  it('rejects "What is" article titles', async () => {
+    const mod = await import('../src/services/dataforseo.service.js');
+    const serpResults = [
+      { domain: 'example.com', url: 'https://example.com/what-is-saas', title: 'What is SaaS? A Complete Guide', snippet: 'Learn what SaaS is', rank: 1 },
+    ];
+    const filtered = mod.normalizeSerpCompetitors(serpResults, {});
+    assert.equal(filtered.length, 0);
+  });
+
+  it('rejects "Top 10" listicle titles', async () => {
+    const mod = await import('../src/services/dataforseo.service.js');
+    const serpResults = [
+      { domain: 'example.com', url: 'https://example.com/top-10-saas', title: 'Top 10 SaaS Management Platforms', snippet: 'Best SaaS tools', rank: 2 },
+    ];
+    const filtered = mod.normalizeSerpCompetitors(serpResults, {});
+    assert.equal(filtered.length, 0);
+  });
+
+  it('rejects Wikipedia domains', async () => {
+    const mod = await import('../src/services/dataforseo.service.js');
+    const serpResults = [
+      { domain: 'en.wikipedia.org', url: 'https://en.wikipedia.org/wiki/SaaS', title: 'SaaS - Wikipedia', snippet: 'Software as a service', rank: 1 },
+    ];
+    const filtered = mod.normalizeSerpCompetitors(serpResults, {});
+    assert.equal(filtered.length, 0);
+  });
+
+  it('rejects career/job pages', async () => {
+    const mod = await import('../src/services/dataforseo.service.js');
+    const serpResults = [
+      { domain: 'company.com', url: 'https://company.com/careers/saas-engineer', title: 'SaaS Engineer - Company Careers', snippet: 'Join our team', rank: 3 },
+    ];
+    const filtered = mod.normalizeSerpCompetitors(serpResults, {});
+    assert.equal(filtered.length, 0);
+  });
+
+  it('preserves real competitor domains', async () => {
+    const mod = await import('../src/services/dataforseo.service.js');
+    const serpResults = [
+      { domain: 'realsassproduct.com', url: 'https://realsassproduct.com', title: 'RealSaaSProduct - Marketing Platform', snippet: 'Marketing platform for teams', rank: 1 },
+    ];
+    const filtered = mod.normalizeSerpCompetitors(serpResults, {});
+    assert.equal(filtered.length, 1);
+    assert.equal(filtered[0].domain, 'realsassproduct.com');
+  });
+});
+
 
