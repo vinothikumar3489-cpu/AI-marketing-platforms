@@ -42,7 +42,7 @@ export async function generateCompetitorSeoIntelligence({
       ? orchestratorCompetitors
       : await (async () => {
           // Fallback to Growth CompetitorIntelligence table
-          const chatId = identity.chatId || (global.currentChatId);
+          const chatId = identity.chatId;
           if (chatId) {
             try {
               const growthIntel = await prisma.competitorIntelligence.findUnique({ where: { chatId } });
@@ -51,14 +51,25 @@ export async function generateCompetitorSeoIntelligence({
                 const directCompetitors = analysis.directCompetitors || analysis.competitors || [];
                 if (directCompetitors.length > 0) {
                   console.log(`[Competitor SEO] Using ${directCompetitors.length} competitors from Growth CompetitorIntelligence`);
-                  return directCompetitors.map(c => ({
-                    name: c.name,
-                    domain: c.domain || (c.websiteUrl ? new URL(c.websiteUrl).hostname.replace(/^www\./, '') : ''),
-                    competitorType: 'direct',
-                    source: 'GROWTH_INTELLIGENCE',
-                    evidence: c.evidence || 'From Growth CompetitorIntelligence',
-                    websiteUrl: c.websiteUrl || c.domain || ''
-                  }));
+                  return directCompetitors.map(c => {
+                    let domain = c.domain || '';
+                    if (!domain && c.websiteUrl) {
+                      try { domain = new URL(c.websiteUrl).hostname.replace(/^www\./, ''); }
+                      catch { domain = c.websiteUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0].split('?')[0]; }
+                    }
+                    // Validate domain looks real (has a dot, not a tagline)
+                    if (!domain || !domain.includes('.') || domain.split('.').filter(Boolean).length < 2 || domain.length > 60) {
+                      return null;
+                    }
+                    return {
+                      name: c.name || domain,
+                      domain,
+                      competitorType: 'direct',
+                      source: 'GROWTH_INTELLIGENCE',
+                      evidence: c.evidence || 'From Growth CompetitorIntelligence',
+                      websiteUrl: domain
+                    };
+                  }).filter(Boolean);
                 }
               }
             } catch (e) {

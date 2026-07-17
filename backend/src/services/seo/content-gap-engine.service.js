@@ -618,10 +618,15 @@ function generateTitleFromKeyword(keyword, productName) {
   if (!keyword || !keyword.trim()) return `${productName} - Content Opportunity`;
   const lower = keyword.trim();
   const words = lower.split(/\s+/).filter(Boolean);
-  // Never produce single-word titles — append product context
+  // Never produce single-word titles — skip them entirely
   if (words.length < 2) {
-    const cap = words[0].charAt(0).toUpperCase() + words[0].slice(1);
-    return `${cap} - ${productName} Guide`;
+    return null;
+  }
+  // Never produce "Complete Guide" template patterns
+  const templatePrefixes = ['complete', 'ultimate', 'definitive'];
+  if (templatePrefixes.includes(words[0].toLowerCase())) {
+    const rest = words.slice(1).join(' ');
+    return rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : `${productName} Content Strategy`;
   }
   const title = words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   if (lower.startsWith('how') || lower.startsWith('what') || lower.startsWith('why') || lower.startsWith('when') || lower.startsWith('where') || lower.startsWith('which') || lower.startsWith('who') || lower.startsWith('is') || lower.startsWith('can') || lower.startsWith('does') || lower.includes('?')) {

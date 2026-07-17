@@ -145,17 +145,18 @@ class TabErrorBoundary extends Component<{ children: React.ReactNode; tabName?: 
 const tabs = ['Executive Dashboard', 'Executive Story', 'Technical Audit', 'Keyword Intelligence', 'Competitor SEO', 'Content Gaps', 'GEO / AI Visibility', 'Blog Intelligence', 'Action Plan'];
 
 export default function SEOIntelligencePage() {
-  const { selectedChatId, createChat, loadFullResults, fullResults, refreshChats } = useProject();
+  const { selectedChatId, createChat, loadFullResults, fullResults, refreshChats, restoreStatus, restoringChatId } = useProject();
   const navigate = useNavigate();
   const location = useLocation();
   const isNewAnalysis = location.state?.newAnalysis === true;
   const storedChatRef = useRef<string>('');
+  const restoreAttemptedRef = useRef(false);
   const [url, setUrl] = useState('');
   const [seo, setSeo] = useState<any>({});
   const [activeTab, setActiveTab] = useWorkspaceMemory('seo-activeTab', 'Executive Dashboard');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [mode, setMode] = useState<'form' | 'creating' | 'running' | 'results' | 'error'>(isNewAnalysis ? 'form' : 'form');
+  const [mode, setMode] = useState<'form' | 'creating' | 'restoring' | 'running' | 'results' | 'error'>(isNewAnalysis ? 'form' : (selectedChatId ? 'restoring' : 'form'));
   const [creatingChat, setCreatingChat] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentStage, setCurrentStage] = useState('Starting...');
@@ -214,36 +215,60 @@ export default function SEOIntelligencePage() {
     return false;
   }
 
-  // On mount, hydrate from fullResults if data exists for this chat
+  // Restore from fullResults when data arrives
   useEffect(() => {
     if (isNewAnalysis) return;
     if (!selectedChatId) return;
+    
     const r = fullResults.seoIntelligence || fullResults.seo || {};
     
-    // Crash detector: find risky objects that cause React error #31
-    if (import.meta.env.DEV) {
-      findRiskyObjects(fullResults, "fullResults");
+    if (restoreStatus === 'restoring') {
+      setMode('restoring');
+      return;
     }
+    
     if (hasRealSeoData(r)) {
       storedChatRef.current = selectedChatId;
       setSeo(r);
       setMode('results');
       if (!url) setUrl(r.websiteUrl || '');
+      restoreAttemptedRef.current = true;
+    } else if (restoreStatus === 'restored' && !hasRealSeoData(r)) {
+      // Data was restored but has no SEO data - still valid, show appropriate state
+      if (!restoreAttemptedRef.current) {
+        restoreAttemptedRef.current = true;
+        setMode('form');
+      }
+    } else if (restoreStatus === 'not_found' && selectedChatId) {
+      // Chat exists but no SEO data yet
+      if (!restoreAttemptedRef.current) {
+        restoreAttemptedRef.current = true;
+        setMode('form');
+      }
     }
-  }, []);
+  }, [fullResults, selectedChatId, restoreStatus, isNewAnalysis]);
 
-  // On fullResults change: update if data exists, never clear existing results
+  // On mount, trigger initial restoration check
   useEffect(() => {
     if (isNewAnalysis) return;
     if (!selectedChatId) return;
+    if (restoreAttemptedRef.current) return;
+    
     const r = fullResults.seoIntelligence || fullResults.seo || {};
     if (hasRealSeoData(r)) {
       storedChatRef.current = selectedChatId;
       setSeo(r);
       setMode('results');
       if (!url) setUrl(r.websiteUrl || '');
+      restoreAttemptedRef.current = true;
+    } else if (restoreStatus === 'idle') {
+      // Trigger load if not already restoring
+      loadFullResults(selectedChatId).catch(() => {});
+    } else if (restoreStatus === 'not_found') {
+      restoreAttemptedRef.current = true;
+      setMode('form');
     }
-  }, [fullResults]);
+  }, [selectedChatId, isNewAnalysis]);
 
   async function run() {
     if (seoInFlightRef.current) {
@@ -377,6 +402,15 @@ export default function SEOIntelligencePage() {
         </Card>
       )}
 
+      {mode === 'restoring' && (
+        <Card>
+          <div style={{ padding: '40px', textAlign: 'center' }}>
+            <Loader2 className="spin" size={24} />
+            <p style={{ color: '#9aa7bd', marginTop: '15px' }}>Restoring previous analysis...</p>
+          </div>
+        </Card>
+      )}
+
       {mode === 'creating' && (
         <Card>
           <div style={{ padding: '40px', textAlign: 'center' }}>
@@ -386,7 +420,7 @@ export default function SEOIntelligencePage() {
         </Card>
       )}
 
-      {(mode === 'form' || mode === 'running') && (
+      {mode === 'form' && (
       <Card>
         <SectionTitle title="Analyze Website" subtitle="Enter your URL to generate thousands of data points." />
         <div style={{ display: 'flex', gap: '15px' }}>

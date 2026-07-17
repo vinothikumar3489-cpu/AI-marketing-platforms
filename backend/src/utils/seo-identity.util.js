@@ -15,15 +15,37 @@ const UI_IDENTITY_PATTERNS = [
   'video conferencing for business', 'start free trial', 'book a demo',
 ];
 
+// Tagline/description patterns that are too long or descriptive to be company names
+const TAGLINE_PATTERNS = [
+  /^(social listening|social media|digital marketing|content marketing|video marketing|influencer marketing)/i,
+  /for (tiktok|instagram|reels|shorts|youtube|facebook|linkedin|twitter)/i,
+  /^(analytics|intelligence|monitoring|listening|tracking)/i,
+  /^(ai-|ai |powered by|built for)/i,
+  /^[a-z][a-z\s]{4,}\s+(for|of|that|which)/i,
+];
+
+// Patterns that indicate a product name is actually a tagline or description
+function isTagline(value) {
+  if (!value || typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (trimmed.length > 40) return true;
+  for (const pattern of TAGLINE_PATTERNS) {
+    if (pattern.test(trimmed)) return true;
+  }
+  return false;
+}
+
 export function isValidProductIdentity(value) {
   if (!value || typeof value !== 'string') return false;
   const trimmed = value.trim().toLowerCase();
   if (!trimmed) return false;
   if (trimmed.length <= 2) return false;
+  if (trimmed.length > 40) return false;
   if (UI_IDENTITY_PATTERNS.includes(trimmed)) return false;
   for (const pattern of UI_IDENTITY_PATTERNS) {
     if (trimmed === pattern) return false;
   }
+  if (isTagline(trimmed)) return false;
   return true;
 }
 
@@ -281,7 +303,7 @@ export function deriveWebsiteIdentity(params = {}) {
     }
   }
 
-  if (chatDomain === domain && chat?.productName) {
+  if (chatDomain === domain && chat?.productName && isValidProductIdentity(chat.productName) && !isTagline(chat.productName)) {
     productName = chat.productName;
     companyName = chat.companyName || chat.productName;
     brandName = chat.productName;

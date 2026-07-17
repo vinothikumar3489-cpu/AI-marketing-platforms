@@ -1493,15 +1493,20 @@ function generateMeasurementReadiness(seoData) {
       estimatedRevenueImpact: null,
       timeToResults: null,
       hasSufficientData: false,
-      message: 'Valid keyword data unavailable for ROI calculation'
+      status: 'NO_KEYWORD_DATA',
+      confidence: null,
+      message: 'Valid keyword data unavailable for ROI calculation. Connect Google Search Console or provide keyword data.'
     };
   }
 
   return {
     potentialTrafficGain: null,
     estimatedRevenueImpact: null,
-    timeToResults: null,
+    timeToResults: '3-6 months',
     hasSufficientData: true,
+    status: 'ESTIMATED',
+    confidence: 'Low',
+    message: 'Keyword data available but revenue data is not connected. Estimated based on search volume only.',
     source: 'Keyword Intelligence',
     evidence: `Based on ${keywordIntel.primaryKeywords.length} keywords with ${totalSearchVolume.toLocaleString()} total monthly searches`
   };

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 import { normalizeSeoIntelligenceForConsumers, normalizeTechnicalAuditForConsumers } from '../services/normalizers/seo-intelligence.normalizer.js';
-import { isValidProductIdentity } from '../utils/seo-identity.util.js';
+import { deriveWebsiteIdentity } from '../utils/seo-identity.util.js';
 
 export async function getChatIntelligenceReadiness({ userId, chatId }) {
   const [productIntel, competitorIntel, campaignIntel, seoIntel, automationPlan] = await Promise.all([
@@ -608,14 +608,28 @@ export const getFullResults = async (req, res) => {
   const hasGrowthWorkspace = !!(productIntelligence || competitorIntelligence || campaignIntelligence);
   const hasSeoIntelligence = !!normalizedSeoIntelligence;
 
+  // Determine status from existing data for frontend normalization
+  const growthStatus = hasGrowthWorkspace ? 'COMPLETED' : 'NOT_RUN';
+  const seoStatus = hasSeoIntelligence ? 'COMPLETED' : 'NOT_RUN';
+
+  // Resolve canonical identity using the evidence-based utility
+  const canonicalIdentity = deriveWebsiteIdentity({
+    websiteUrl: chat?.websiteUrl || productIntelligence?.inputJson?.websiteUrl || seoIntelligence?.websiteUrl || '',
+    scrapedData: (productIntelligence?.scrapedData) || (seoIntelligence?.rawCrawlData?.raw || null),
+    chat: { productName: chat?.productName, title: chat?.title },
+  }) || {};
+
   const canonicalResult = {
     success: true,
+    growthStatus,
+    seoStatus,
     chat,
+    productIdentity: canonicalIdentity,
     growth: hasGrowthWorkspace ? {
       identity: {
         websiteUrl: chat?.websiteUrl || productIntelligence?.inputJson?.websiteUrl || '',
-        productName: chat?.productName || productIntelligence?.inputJson?.productName || '',
-        companyName: chat?.title || productIntelligence?.inputJson?.companyName || '',
+        productName: canonicalIdentity?.productName || chat?.productName || productIntelligence?.inputJson?.productName || '',
+        companyName: canonicalIdentity?.companyName || canonicalIdentity?.brandName || chat?.productName || productIntelligence?.inputJson?.companyName || '',
         industry: productIntelligence?.inputJson?.industry || '',
       },
       product: productIntelligence?.productAnalysis ?? null,
@@ -634,8 +648,8 @@ export const getFullResults = async (req, res) => {
       identity: {
         websiteUrl: seoIntelligence?.websiteUrl || '',
         domain: seoIntelligence?.domain || '',
-        companyName: seoIntelligence?.companyName || '',
-        productName: seoIntelligence?.productName || '',
+        companyName: canonicalIdentity?.companyName || canonicalIdentity?.brandName || seoIntelligence?.companyName || '',
+        productName: canonicalIdentity?.productName || seoIntelligence?.productName || '',
       },
       technicalAudit: normalizedSeoIntelligence.technicalAudit || {},
       keywordIntelligence: normalizedSeoIntelligence.keywordIntelligence || {},

@@ -979,18 +979,65 @@ export const generateContentItem = async (req, res) => {
     const evidenceContext = await buildEvidenceContext(prisma, userId, chatId);
 
     // Stage 4: Generate content
+    const aiRequestStarted = Date.now();
     const result = await generateContent(contentType, brief, evidenceContext, callAI, userId, chatId);
+    const aiResponseReceived = Date.now();
     const contentBody = result?.content || result;
     const meta = result?.metadata || {};
 
+    // Instrument: post-AI response logging
+    {
+      const productIdentity = brief?.product || {};
+      const featureCount = (productIdentity?.features || []).length;
+      const benefitCount = (productIdentity?.benefits || []).length;
+      const personaCount = (brief?.targetPersonas || []).length;
+      const competitorCount = (brief?.validatedCompetitors || []).length;
+      const keywordCount = (brief?.verifiedKeywords || []).length;
+      console.info("[Content Studio Instrumentation]", {
+        event: "CONTENT_GENERATION_RESPONSE",
+        chatId,
+        userId,
+        contentType,
+        requestBodyKeys: Object.keys(req.body || {}),
+        briefBuilt: Boolean(brief),
+        productIdentity: !!(productIdentity?.name || productIdentity?.productName),
+        featureCount,
+        benefitCount,
+        personaCount,
+        competitorCount,
+        keywordCount,
+        selectedProvider: meta?.provider || 'groq',
+        selectedModel: meta?.model || 'default',
+        evidenceContextKeys: Object.keys(evidenceContext || {}),
+        aiRequestStarted,
+        aiResponseReceived,
+        aiLatencyMs: aiResponseReceived - aiRequestStarted,
+        responseType: typeof contentBody,
+        responseKeys: typeof contentBody === 'object' && contentBody ? Object.keys(contentBody) : [],
+        jsonParsed: typeof contentBody === 'object',
+        repairAttempted: meta?.repairAttempted || false,
+        schemaValidated: meta?.schemaValid || false,
+        validationIssues: meta?.schemaErrors?.length || 0,
+        claimValidationPassed: meta?.claimStatus === 'passed',
+        hasContent: Boolean(contentBody && (typeof contentBody === 'string' || (typeof contentBody === 'object' && Object.keys(contentBody).length > 0))),
+        responseStatus: contentBody?._status || meta?.status || 'success',
+        errorName: null,
+        errorMessage: null,
+      });
+    }
+
     // Check for generation failures (returned as status objects, not content)
     if (!contentBody || contentBody._status === 'generation_failed' || contentBody._status === 'blocked') {
-      console.error("[Content Studio] Generation failed", {
+      console.error("[Content Studio Instrumentation]", {
+        event: "CONTENT_GENERATION_FAILED",
         chatId, userId, contentType,
         status: contentBody?._status || 'null',
         reason: contentBody?._reason,
+        errorName: 'GenerationFailed',
+        errorMessage: contentBody?._reason || 'AI provider returned no content',
+        errorCode: contentBody?._status === 'blocked' ? 'BRIEF_BLOCKED' : 'CONTENT_GENERATION_FAILED',
       });
-      return res.status(500).json({
+      return res.status(contentBody?._status === 'blocked' ? 422 : 500).json({
         success: false,
         error: {
           code: contentBody?._status === 'blocked' ? "BRIEF_BLOCKED" : "CONTENT_GENERATION_FAILED",
@@ -1006,28 +1053,32 @@ export const generateContentItem = async (req, res) => {
       const typeLabel = CONTENT_TYPES[contentType]?.label || contentType;
       const errorDetails = (meta.schemaErrors || []).join('; ');
       const userMessage = `${typeLabel} did not match the required format. Please try again.`;
-      console.error("[Content Studio] Schema rejected", {
+      console.error("[Content Studio Instrumentation]", {
+        event: "CONTENT_SCHEMA_REJECTED",
         chatId, userId, contentType,
         errors: meta.schemaErrors,
+        errorName: 'SchemaRejected',
+        errorMessage: userMessage,
+        errorCode: 'CONTENT_SCHEMA_REJECTED',
       });
       return res.status(422).json({
         success: false,
-        error: userMessage,
-        code: "SCHEMA_REJECTED",
-        retryable: true,
-        stage: "VALIDATION",
-        details: errorDetails,
+        error: {
+          code: "CONTENT_SCHEMA_REJECTED",
+          message: "Generated content did not match the required format.",
+          validationIssues: meta.schemaErrors || [],
+          recoverable: true,
+        }
       });
     }
 
     // Stage 5: Quality scoring
     const qualityScore = scoreContentQuality(contentBody, brief, contentType);
-
-    // Ensure _type and _assetId are set on content for frontend detection
-    if (contentBody && typeof contentBody === 'object') {
-      if (!contentBody._type) contentBody._type = contentType;
-      contentBody._assetId = asset.id;
-    }
+    console.info("[Content Studio] Quality scored", {
+      chatId, userId, contentType,
+      overall: qualityScore?.overall,
+      checks: qualityScore?.checks ? Object.keys(qualityScore.checks).join(',') : [],
+    });
 
     // Stage 6: Persist asset
     const asset = await saveContentAsset(prisma, {
@@ -1036,7 +1087,7 @@ export const generateContentItem = async (req, res) => {
       contentType,
       briefSnapshot: brief,
       evidenceSnapshot: evidenceContext,
-      provider: 'groq',
+      provider: meta?.provider || 'groq',
       content: contentBody,
       metadata: meta,
       qualityScore,
@@ -1055,10 +1106,14 @@ export const generateContentItem = async (req, res) => {
       });
     }
 
+    // Ensure _type and _assetId are set on content for frontend detection
+    if (contentBody && typeof contentBody === 'object') {
+      if (!contentBody._type) contentBody._type = contentType;
+      contentBody._assetId = asset.id;
+    }
+
     console.info("[Content Studio] Asset saved", {
-      chatId,
-      userId,
-      contentType,
+      chatId, userId, contentType,
       assetId: asset?.id,
       assetSaved: Boolean(asset)
     });

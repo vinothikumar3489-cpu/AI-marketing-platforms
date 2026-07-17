@@ -12,7 +12,7 @@ import {
   generateChannelFallback 
 } from './fallback.generators.js';
 import { callAI } from '../../ai/services/aiRouter.service.js';
-import { deriveWebsiteIdentity } from '../../utils/seo-identity.util.js';
+import { deriveWebsiteIdentity, isValidProductIdentity } from '../../utils/seo-identity.util.js';
 import { collectResearchData } from '../../services/intelligence/research-orchestrator.service.js';
 import {
   validateProductAnalysis,
@@ -238,8 +238,11 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     console.log('✅ [Growth Workspace] Derived Identity:', identity);
     
     // Inject identity into input but prefer user inputs from the new multi-step form
-    input.productName = input.brandName || identity.productName;
-    input.companyName = input.companyName || identity.companyName;
+    // Validate user-provided names against tagline/UI patterns to prevent leakage
+    const validatedBrandName = input.brandName && isValidProductIdentity(input.brandName) ? input.brandName : null;
+    const validatedCompanyName = input.companyName && isValidProductIdentity(input.companyName) ? input.companyName : null;
+    input.productName = validatedBrandName || identity.productName;
+    input.companyName = validatedCompanyName || identity.companyName;
     input.industry = input.industry || identity.industry;
     input.businessModel = identity.businessModel;
     input.businessCategory = identity.businessCategory;
@@ -1625,7 +1628,18 @@ export async function getGrowthWorkspaceResults({ chatId, userId }) {
 
     const completedSteps = steps.filter(s => s.status === 'completed').length;
     const evidenceScore = results.evidence?.sourceSummary?.completenessScore || null;
-    const overallGrowthScore = evidenceScore || null;
+
+    // Compute component scores from persisted results (defensive: may be null)
+    const computeScore = (val) => (val !== null && val !== undefined && Number.isFinite(Number(val))) ? Math.round(Number(val)) : null;
+    const productFitScore = computeScore(results.product?.score || (results.product?.features?.length ? Math.min(100, results.product.features.length * 20) : null));
+    const marketOpportunityScore = computeScore(results.market?.score || (results.market?.growthSignals?.length ? Math.min(100, results.market.growthSignals.length * 15) : null));
+    const audienceClarityScore = computeScore(results.audience?.score || (() => { const rp = (results.audience?.buyerPersonas || []).filter(p => p.name && p.name !== 'Target Persona' && p.name !== 'Persona Name'); return rp.length ? Math.min(100, rp.length * 20 + (results.audience?.buyingTriggers?.length || 0) * 10) : null; })());
+    const competitiveDefensibilityScore = computeScore(results.competitor?.score || (() => { const rc = (results.competitor?.directCompetitors || []).filter(c => c.name && !c.name.includes('Competitor')); return rc.length ? Math.min(100, rc.length * 15 + (results.competitor?.marketGaps?.length || 0) * 10) : null; })());
+    const campaignReadinessScore = computeScore(results.campaign?.score || (() => { const angles = (results.campaign?.creativeAngles || []).filter(a => a.value && !a.value.includes('Angle')); const channels = (results.channel?.recommendedChannels || []).filter(c => c.channel && !c.channel.includes('Channel')); return (angles.length || channels.length) ? Math.min(100, angles.length * 15 + channels.length * 15) : null; })());
+
+    const componentScores = [productFitScore, marketOpportunityScore, audienceClarityScore, competitiveDefensibilityScore, campaignReadinessScore].filter(s => s !== null && s !== undefined);
+    const measurableComponents = componentScores.length;
+    const overallGrowthScore = measurableComponents >= 3 ? Math.round(componentScores.reduce((a, b) => a + b, 0) / measurableComponents) : null;
 
     return {
       success: true,
@@ -1641,6 +1655,11 @@ export async function getGrowthWorkspaceResults({ chatId, userId }) {
         overallGrowthScore,
         dataCompletenessScore: evidenceScore,
         evidenceBased: !!evidenceScore,
+        productFitScore,
+        marketOpportunityScore,
+        audienceClarityScore,
+        competitiveDefensibilityScore,
+        campaignReadinessScore,
         bestChannel: results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel || results.channel?.recommendedChannels?.[0]?.name || 'Unknown',
         topOpportunity: results.market?.growthOpportunities?.[0] || null,
         topRisk: results.market?.marketRisks?.[0] || null,
@@ -1691,6 +1710,54 @@ function enforceGrowthQualityFilters(results) {
       if (name === 'target persona' || name === 'target user' || name === 'persona name') return false;
       return (p.goals && p.goals.length > 0) || (p.painPoints && p.painPoints.length > 0) || (p.demographics && p.demographics.length > 10);
     });
+    // Sanitize persona goals: remove fabricated numeric targets, add inferenceStatus
+    audience.buyerPersonas.forEach(p => {
+      if (p.goals && Array.isArray(p.goals)) {
+        p.goals = p.goals.map(g => {
+          if (typeof g === 'string') {
+            // Detect fabricated numeric targets (percentages, counts)
+            const hasNumericTarget = /\b\d+%|\bincrease\s+\w+\s+by\s+\d+|\bacquire\s+[\d,]+\s+|Improve\s+\w+\s+by\s+\d+/i.test(g);
+            if (hasNumericTarget) {
+              // Remove the numeric portion but keep the qualitative direction
+              const cleaned = g.replace(/\s+by\s+\d+%?/i, '').replace(/\b\d+%/, '').trim();
+              return {
+                goal: cleaned || g,
+                timeframe: null,
+                numericTarget: null,
+                evidence: null,
+                inferenceStatus: 'AI_INFERRED'
+              };
+            }
+            return {
+              goal: g,
+              timeframe: null,
+              numericTarget: null,
+              evidence: null,
+              inferenceStatus: 'AI_INFERRED'
+            };
+          }
+          if (typeof g === 'object') {
+            if (g.numericTarget || g.timeframe) {
+              return {
+                goal: g.goal || '',
+                timeframe: null,
+                numericTarget: null,
+                evidence: g.evidence || null,
+                inferenceStatus: 'AI_INFERRED'
+              };
+            }
+            return {
+              goal: g.goal || '',
+              timeframe: g.timeframe || null,
+              numericTarget: null,
+              evidence: g.evidence || null,
+              inferenceStatus: g.inferenceStatus || 'AI_INFERRED'
+            };
+          }
+          return g;
+        });
+      }
+    });
   }
 
   ['channel', 'campaign'].forEach(area => {
@@ -1722,6 +1789,38 @@ function enforceGrowthQualityFilters(results) {
           if (item.expectedKPI && item.expectedKPI.includes('%')) delete item.expectedKPI;
           return item;
         });
+      }
+    });
+  }
+
+  // Phase 7: Remove generic/unsupported roadmap and strategy actions
+  const GENERIC_ACTIONS = [
+    'commission market sizing report',
+    'build predictive market intelligence models',
+    'launch partner ecosystem',
+    'launch demand generation campaign',
+    'optimize pricing',
+    'influencer partnerships',
+    'conduct market research',
+    'build predictive intelligence',
+    'launch partner program',
+    'develop predictive models',
+    'create market sizing',
+  ];
+  if (results.campaign?.actionPlan) {
+    Object.keys(results.campaign.actionPlan).forEach(key => {
+      const items = results.campaign.actionPlan[key];
+      if (Array.isArray(items)) {
+        results.campaign.actionPlan[key] = items.filter(item => {
+          const text = (item.action || item.title || item.task || item.recommendation || '').toLowerCase().trim();
+          return !GENERIC_ACTIONS.some(g => text.includes(g));
+        });
+      }
+    });
+    // Remove empty buckets
+    Object.keys(results.campaign.actionPlan).forEach(key => {
+      if (Array.isArray(results.campaign.actionPlan[key]) && results.campaign.actionPlan[key].length === 0) {
+        delete results.campaign.actionPlan[key];
       }
     });
   }
