@@ -409,6 +409,56 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
       console.log('');
     }
 
+    // Save the main SeoIntelligence record FIRST (before sub-record transaction)
+    // so partial results survive even if the sub-record transaction later fails
+    let savedId;
+    try {
+      const seoRecord = await prisma.seoIntelligence.upsert({
+        where: { chatId },
+        create: {
+          chatId, userId,
+          websiteUrl: identity.websiteUrl,
+          domain: identity.domain,
+          companyName: identity.companyName,
+          productName: identity.productName,
+          seoScore: safeSeoScores.overall,
+          technicalAudit: technicalAudit,
+          keywordOpportunities: keywordIntelligence,
+          competitorKeywords: competitorIntelligence,
+          contentGaps: contentGapIntelligence,
+          aiVisibility: geoIntelligence,
+          blogIdeas: blogIntelligence,
+          providers: researchData.sources,
+          warnings: researchData.warnings,
+          status: 'in_progress'
+        },
+        update: {
+          websiteUrl: identity.websiteUrl,
+          domain: identity.domain,
+          companyName: identity.companyName,
+          productName: identity.productName,
+          seoScore: safeSeoScores.overall,
+          technicalAudit: technicalAudit,
+          keywordOpportunities: keywordIntelligence,
+          competitorKeywords: competitorIntelligence,
+          contentGaps: contentGapIntelligence,
+          aiVisibility: geoIntelligence,
+          blogIdeas: blogIntelligence,
+          providers: researchData.sources,
+          warnings: researchData.warnings,
+          status: 'in_progress',
+          updatedAt: new Date()
+        }
+      });
+      savedId = seoRecord.id;
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('✅ [SEO SAVE] Main record saved (in_progress) for chat:', chatId);
+      }
+    } catch (mainSaveError) {
+      console.error('❌ [SEO SAVE] Main record save failed:', mainSaveError.message);
+      throw mainSaveError;
+    }
+
     // Delete old child records BEFORE saving new ones (avoids stale/mixed data)
     if (process.env.NODE_ENV !== 'production') {
       console.log('🧹 [SEO SAVE] Cleaning old child records for chat:', chatId);
@@ -426,10 +476,8 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
         await prisma.contentGapRecord.deleteMany({ where: { seoIntelligenceId: oldId } });
         await prisma.blogIntelligenceRecord.deleteMany({ where: { seoIntelligenceId: oldId } });
         await prisma.executiveSeoDashboard.deleteMany({ where: { seoIntelligenceId: oldId } });
-        // Delete the main seoIntelligence record (cascade should handle children but we're being explicit)
-        await prisma.seoIntelligence.deleteMany({ where: { id: oldId } });
         if (process.env.NODE_ENV !== 'production') {
-          console.log('✅ [SEO SAVE] Deleted old SEO record and all children for chat:', chatId);
+          console.log('✅ [SEO SAVE] Deleted old child records for chat:', chatId);
         }
       } else {
         if (process.env.NODE_ENV !== 'production') {
@@ -475,47 +523,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     
     console.log('[SEO] Starting transaction save for chat:', chatId, 'userId:', userId);
     const saved = await prisma.$transaction(async (tx) => {
-      // First, upsert the main SEO intelligence record
-      const seoRecord = await tx.seoIntelligence.upsert({
-        where: { chatId },
-        create: {
-          chatId,
-          userId,
-          websiteUrl: identity.websiteUrl,
-          domain: identity.domain,
-          companyName: identity.companyName,
-          productName: identity.productName,
-          seoScore: safeSeoScores.overall,
-          technicalAudit: technicalAudit,
-          keywordOpportunities: keywordIntelligence,
-          competitorKeywords: competitorIntelligence,
-          contentGaps: contentGapIntelligence,
-          aiVisibility: geoIntelligence,
-          blogIdeas: blogIntelligence,
-          providers: researchData.sources,
-          warnings: researchData.warnings,
-          status: 'completed'
-        },
-        update: {
-          websiteUrl: identity.websiteUrl,
-          domain: identity.domain,
-          companyName: identity.companyName,
-          productName: identity.productName,
-          seoScore: safeSeoScores.overall,
-          technicalAudit: technicalAudit,
-          keywordOpportunities: keywordIntelligence,
-          competitorKeywords: competitorIntelligence,
-        contentGaps: contentGapIntelligence,
-        aiVisibility: geoIntelligence,
-        blogIdeas: blogIntelligence,
-        providers: researchData.sources,
-        warnings: researchData.warnings,
-        status: 'completed',
-        updatedAt: new Date()
-      }
-    });
-
-    const savedId = seoRecord.id;
+      // Main SeoIntelligence record was already saved above; use its ID for sub-records
 
     // Save raw crawl data (null-safe required fields to prevent transaction rollback)
     await tx.rawCrawlData.create({
@@ -752,14 +760,19 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
 
       console.log('✅ [SEO Intelligence] All data saved to database');
     }
-
-    return seoRecord;
   });
 
-  // Post-save verification: confirm SeoIntelligence was actually saved
-  const savedId = saved?.id;
+  // Post-save verification: confirm SeoIntelligence was actually saved and update status
   if (!savedId) {
     throw new Error('SEO analysis completed but SeoIntelligence was not saved (transaction returned no ID).');
+  }
+  try {
+    await prisma.seoIntelligence.update({
+      where: { id: savedId },
+      data: { status: 'completed', updatedAt: new Date() }
+    });
+  } catch (statusUpdateError) {
+    console.error('[SEO] Status update to completed failed:', statusUpdateError.message);
   }
   const verifyMain = await prisma.seoIntelligence.findUnique({
     where: { id: savedId },
@@ -1021,6 +1034,18 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
 
   } catch (error) {
     console.error('❌ [SEO Intelligence] Error:', error);
+    
+    // Mark SeoIntelligence as partial if main record was already saved
+    if (savedId) {
+      try {
+        await prisma.seoIntelligence.update({
+          where: { id: savedId },
+          data: { status: 'PARTIAL', updatedAt: new Date() }
+        }).catch(() => {});
+      } catch (seoUpdateError) {
+        console.error('[SEO] Failed to mark SeoIntelligence as partial:', seoUpdateError.message);
+      }
+    }
     
     // Extract identity for fallback
     let fallbackProductName = 'Product';
