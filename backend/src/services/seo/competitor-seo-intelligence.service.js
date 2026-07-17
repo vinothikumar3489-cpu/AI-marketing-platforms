@@ -644,7 +644,6 @@ function filterSelfLinks(competitors, targetWebsiteUrl) {
       return [];
     }
   }
-}
 
 function extractDomain(url) {
   try {
