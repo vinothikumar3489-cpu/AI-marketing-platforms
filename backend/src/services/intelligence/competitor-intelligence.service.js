@@ -1,31 +1,78 @@
 import { researchCompetitors } from '../tavily.service.js';
 import { getSerpCompetitors, normalizeSerpCompetitors, getKeywordMetrics, isDataForSEOConfigured } from '../dataforseo.service.js';
 
-export async function collectCompetitorIntelligence({ websiteUrl, productName, companyName, industry, marketData }) {
+function isGenericIndustry(industry) {
+  if (!industry) return true;
+  const lower = industry.toLowerCase().trim();
+  return ['technology', 'saas', 'software', 'general', 'unknown', ''].includes(lower);
+}
+
+function buildCompetitorSearchTerms(productName, companyName, industry, category, domain) {
+  const terms = [];
+
+  if (productName && productName !== 'Unknown' && productName !== 'Unknown Product') {
+    terms.push(`${productName} competitors`);
+    terms.push(`${productName} alternatives`);
+  }
+
+  if (companyName && companyName !== productName && companyName !== 'Unknown' && companyName !== 'Unknown Company') {
+    terms.push(`${companyName} competitors`);
+  }
+
+  const lowerCategory = (category || '').toLowerCase().trim();
+  const lowerIndustry = (industry || '').toLowerCase().trim();
+
+  if (!isGenericIndustry(industry) && lowerCategory) {
+    terms.push(`${lowerCategory} competitors`);
+    terms.push(`best ${lowerCategory}`);
+    terms.push(`top ${lowerCategory}`);
+  }
+
+  if (!isGenericIndustry(industry) && lowerIndustry && lowerIndustry !== lowerCategory) {
+    terms.push(`${lowerIndustry} companies`);
+    terms.push(`top ${lowerIndustry} platforms`);
+  }
+
+  if (terms.length === 0 && domain) {
+    const domainName = domain.split('.')[0];
+    if (domainName && domainName.length > 2) {
+      terms.push(`${domainName} competitors`);
+    }
+  }
+
+  return [...new Set(terms)].filter(Boolean).slice(0, 5);
+}
+
+export async function collectCompetitorIntelligence({ websiteUrl, productName, companyName, industry, marketData, category, domain }) {
   const competitors = [];
   const sources = [];
   const warnings = [];
-  const domain = extractDomain(websiteUrl);
+  const domain_extracted = domain || extractDomain(websiteUrl);
 
-  // Phase 1: SERP-based competitors via DataForSEO
+  const searchTerms = buildCompetitorSearchTerms(productName, companyName, industry, category, domain_extracted);
+
+  if (searchTerms.length === 0) {
+    return {
+      direct: [],
+      indirect: [],
+      emerging: [],
+      serp: [],
+      all: [],
+      sources,
+      warnings: ['No competitor search terms could be generated from product identity']
+    };
+  }
+
   if (isDataForSEOConfigured()) {
     try {
-      const searchTerms = [
-        productName,
-        companyName,
-        `${industry} software`,
-        `${industry} platform`,
-        `${industry} tools`
-      ].filter(Boolean);
-
       const serpResult = await getSerpCompetitors(searchTerms);
       if (serpResult?.success && serpResult?.data?.length > 0) {
-        const identity = { domain, industry, productName };
+        const identity = { domain: domain_extracted, industry, productName };
         const serpCompetitors = normalizeSerpCompetitors(serpResult.data, identity);
         const filtered = serpCompetitors.filter(c => {
           if (!c.domain) return false;
           const compDomain = c.domain.toLowerCase();
-          const currentDomain = domain.toLowerCase();
+          const currentDomain = domain_extracted.toLowerCase();
           if (compDomain === currentDomain) return false;
           if (compDomain.endsWith('.' + currentDomain)) return false;
           if (currentDomain.endsWith('.' + compDomain)) return false;
@@ -44,6 +91,7 @@ export async function collectCompetitorIntelligence({ websiteUrl, productName, c
 
           return c.relevanceScore >= 30;
         });
+
         for (const comp of filtered) {
           competitors.push({
             name: comp.name,
@@ -87,13 +135,14 @@ export async function collectCompetitorIntelligence({ websiteUrl, productName, c
     }
   }
 
-  // Phase 2: Tavily competitor research
   try {
-    const tavilyResult = await researchCompetitors(productName || companyName || domain, industry || 'technology', 'software');
+    const tavilyQuery = productName || companyName || domain_extracted || '';
+    const tavilyIndustry = !isGenericIndustry(industry) ? industry : 'technology';
+    const tavilyResult = await researchCompetitors(tavilyQuery, tavilyIndustry, 'software');
     if (tavilyResult?.success && tavilyResult?.competitors?.length > 0) {
       for (const comp of tavilyResult.competitors) {
         const compDomain = extractDomain(comp.website || comp.url || '');
-        if (compDomain && compDomain !== domain && !competitors.find(c => c.domain === compDomain)) {
+        if (compDomain && compDomain !== domain_extracted && !competitors.find(c => c.domain === compDomain)) {
           competitors.push({
             name: comp.name || compDomain,
             domain: compDomain,
@@ -136,12 +185,10 @@ export async function collectCompetitorIntelligence({ websiteUrl, productName, c
     warnings.push(`Tavily competitor research failed: ${e.message}`);
   }
 
-  // Phase 3: Enrich known competitors with industry-based enterprise fields
   for (const comp of competitors) {
     enrichCompetitorFields(comp, industry);
   }
 
-  // Classify competitors
   for (const comp of competitors) {
     if (!comp.type || comp.type === 'serp') {
       if (comp.similarityScore >= 70) {
@@ -154,7 +201,6 @@ export async function collectCompetitorIntelligence({ websiteUrl, productName, c
     }
   }
 
-  // Categorize
   const result = {
     direct: competitors.filter(c => c.type === 'direct'),
     indirect: competitors.filter(c => c.type === 'indirect'),

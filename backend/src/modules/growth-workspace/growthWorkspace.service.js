@@ -256,7 +256,9 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
         productName: input.productName || '',
         companyName: input.companyName || '',
         industry: input.industry || '',
-        targetCountry: input.targetCountry || 'United States'
+        targetCountry: input.targetCountry || 'United States',
+        category: input.category || '',
+        domain: input.domain || (identity ? identity.domain : ''),
       });
       
       if (businessIntelligence) {
@@ -676,18 +678,57 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     const audienceClarityScore = calculateAudienceClarityScore(normalizedResults.audience);
     const competitiveDefensibilityScore = calculateCompetitiveDefensibilityScore(normalizedResults.competitor);
     const campaignReadinessScore = campaignViabilityScore;
-    const componentScores = [productFitScore, marketOpportunityScore, audienceClarityScore, competitiveDefensibilityScore, campaignReadinessScore].filter(s => s !== null && s !== undefined);
-    const measurableComponents = componentScores.length;
-    const overallGrowthScore = measurableComponents >= 3 ? Math.round(componentScores.reduce((a, b) => a + b, 0) / measurableComponents) : null;
-    const growthScoreStatus = measurableComponents >= 3 ? null : NOT_ENOUGH_EVIDENCE;
+
+    const dimensionLabels = {
+      productFitScore: 'Product Evidence',
+      marketOpportunityScore: 'Market Opportunity',
+      audienceClarityScore: 'Audience Clarity',
+      competitiveDefensibilityScore: 'Competitive Position',
+      campaignReadinessScore: 'Campaign Readiness',
+    };
+
+    const rawScores = { productFitScore, marketOpportunityScore, audienceClarityScore, competitiveDefensibilityScore, campaignReadinessScore };
+    const nonNullScores = Object.entries(rawScores).filter(([, v]) => v !== null && v !== undefined);
+    const nullScores = Object.entries(rawScores).filter(([, v]) => v === null || v === undefined);
+    const measurableComponents = nonNullScores.length;
+    const totalDimensions = Object.keys(rawScores).length;
+
+    const evidenceCompleteness = totalDimensions > 0 ? Math.round((measurableComponents / totalDimensions) * 100) : 0;
+
+    let overallGrowthScore = null;
+    let growthScoreStatus = null;
+    let scoreConfidence = null;
+
+    if (measurableComponents >= 3) {
+      const rawAverage = Math.round(nonNullScores.reduce((a, [, v]) => a + v, 0) / measurableComponents);
+      const completenessPenalty = Math.round((1 - (0.5 * (1 - measurableComponents / totalDimensions))) * 100) / 100;
+      overallGrowthScore = Math.round(rawAverage * completenessPenalty);
+      scoreConfidence = Math.round(completenessPenalty * 100);
+    } else {
+      growthScoreStatus = NOT_ENOUGH_EVIDENCE;
+      scoreConfidence = 0;
+    }
 
     console.log('[Growth Scores]', {
       overallGrowthScore,
       marketOpportunityScore,
-      campaignViabilityScore
+      campaignViabilityScore,
+      evidenceCompleteness,
+      scoreConfidence,
+      measurableComponents,
+      totalDimensions,
     });
 
-    // Generate growth summary with calculated scores and recommendations
+    const dimensionScores = {};
+    for (const [key, label] of Object.entries(dimensionLabels)) {
+      const value = rawScores[key];
+      if (value !== null && value !== undefined) {
+        dimensionScores[key] = { value, label, available: true };
+      } else {
+        dimensionScores[key] = { value: null, label, available: false };
+      }
+    }
+
     const growthSummary = {
       overallGrowthScore,
       marketOpportunityScore,
@@ -698,11 +739,15 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       competitiveDefensibilityScore,
       campaignReadinessScore,
       growthScoreStatus,
-      // Generate product-specific recommendations
+      scoreConfidence,
+      evidenceCompleteness,
+      dimensionScores,
+      availableDimensions: nonNullScores.map(([k]) => k),
+      unavailableDimensions: nullScores.map(([k]) => ({ key: k, label: dimensionLabels[k] || k, reason: 'Insufficient evidence' })),
       topRecommendation: generateTopRecommendation(normalizedResults, input),
       primaryRisk: generatePrimaryRisk(normalizedResults, input),
       immediateAction: generateImmediateAction(normalizedResults, input),
-      sourceModules: ['Product Analysis', 'Market Discovery', 'Audience Intelligence', 'Competitor Analysis', 'Intent Prediction', 'Positioning Engine', 'Campaign Generator', 'Channel Recommendation']
+      sourceModules: ['Product Analysis', 'Market Discovery', 'Audience Intelligence', 'Competitor Analysis', 'Intent Prediction', 'Positioning Engine', 'Campaign Generator', 'Channel Recommendation'],
     };
 
     console.log('[Growth Summary]', {

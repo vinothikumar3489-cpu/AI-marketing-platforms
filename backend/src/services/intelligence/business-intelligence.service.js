@@ -18,7 +18,16 @@ import {
 
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 
-export async function collectBusinessIntelligence({ websiteUrl, productName, companyName, industry, targetCountry }) {
+function extractDomainSimple(url) {
+  if (!url) return '';
+  try {
+    return new URL(url.startsWith('http') ? url : `https://${url}`).hostname.replace('www.', '');
+  } catch {
+    return url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+  }
+}
+
+export async function collectBusinessIntelligence({ websiteUrl, productName, companyName, industry, targetCountry, category, domain }) {
   console.log('[Business Intelligence] Starting enterprise-grade intelligence collection for:', websiteUrl);
 
   const evidence = {
@@ -90,7 +99,9 @@ export async function collectBusinessIntelligence({ websiteUrl, productName, com
       websiteUrl,
       productName: companyIntel.name || productName,
       industry: companyIntel.industry || industry,
-      targetCountry
+      targetCountry,
+      category: category || companyIntel.category,
+      domain: domain || extractDomainSimple(websiteUrl),
     });
     evidence.market = marketIntel;
     logMarketCollected(marketIntel);
@@ -106,7 +117,9 @@ export async function collectBusinessIntelligence({ websiteUrl, productName, com
       productName: companyIntel.name || productName,
       companyName: companyIntel.name || companyName,
       industry: companyIntel.industry || industry,
-      marketData: marketIntel
+      marketData: marketIntel,
+      category: category || companyIntel.category,
+      domain: domain || extractDomainSimple(websiteUrl),
     });
     evidence.competitors = competitorIntel;
     logCompetitorsCollected(competitorIntel);

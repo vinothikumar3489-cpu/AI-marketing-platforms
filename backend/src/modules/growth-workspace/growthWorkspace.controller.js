@@ -20,7 +20,7 @@ export const runFullAnalysisHandler = async (req, res) => {
   // Map frontend multi-step form arrays to string fields for the AI service
   const mappedInput = {
     ...input,
-    targetCountry: Array.isArray(input.targetCountries) && input.targetCountries.length > 0 ? input.targetCountries.join(', ') : 'Global',
+    targetCountry: Array.isArray(input.targetCountries) && input.targetCountries.length > 0 ? input.targetCountries[0] : 'United States',
     targetAudience: Array.isArray(input.audienceTypes) && input.audienceTypes.length > 0 ? input.audienceTypes.join(', ') : 'General Market',
     campaignGoal: Array.isArray(input.campaignGoals) && input.campaignGoals.length > 0 ? input.campaignGoals.join(', ') + (input.customGoal ? ` - ${input.customGoal}` : '') : (input.customGoal || 'Growth'),
     preferredChannel: Array.isArray(input.preferredChannels) && input.preferredChannels.length > 0 ? input.preferredChannels.join(', ') : 'Digital Channels',
