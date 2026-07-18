@@ -5,10 +5,11 @@ import { generateAllExecutionModules, generateSingleModule } from "../services/e
 import { buildEvidenceContext, buildReadinessChecklist } from "../services/execution/evidence-context-builder.service.js";
 import { buildContentBrief } from "../services/execution/content-brief.service.js";
 import { getSeoIntelligenceForChat } from "../services/loaders/seo-intelligence.loader.js";
+import { CONTENT_TYPES, CONTENT_TYPES_LIST, normalizeContentType, SUPPORTED_CONTENT_TYPES } from "../constants/content-types.js";
 
 const inProgressAutomation = new Set();
 const inProgressCampaign = new Set();
-import { generateContent, generateContentStudioPlan, CONTENT_TYPES_LIST as CONTENT_TYPES } from "../services/execution/content-studio.service.js";
+import { generateContent, generateContentStudioPlan } from "../services/execution/content-studio.service.js";
 import { scoreContentQuality } from "../services/execution/quality-scorer.service.js";
 import { saveContentAsset, getContentAssets, getAssetVersions, regenerateAsset as renewAssetInDb } from "../services/execution/content-asset.service.js";
 
@@ -926,19 +927,19 @@ export const generateContentItem = async (req, res) => {
   const userId = req.user.id;
   const { contentType } = req.body;
 
-  if (!contentType || !CONTENT_TYPES.includes(contentType)) {
+  if (!contentType || !CONTENT_TYPES_LIST.includes(contentType)) {
     return res.status(400).json({
       success: false,
       error: {
         code: "INVALID_CONTENT_TYPE",
-        message: `Invalid contentType. Must be one of: ${CONTENT_TYPES.join(', ')}`,
+        message: `Invalid contentType. Must be one of: ${CONTENT_TYPES_LIST.join(', ')}`,
         retryable: false
       }
     });
   }
 
   try {
-    const typeConfig = CONTENT_TYPES_LIST.includes(contentType) ? CONTENT_TYPES_LIST.find(t => t === contentType) : null;
+    const typeConfig = CONTENT_TYPES_LIST.includes(contentType) ? contentType : null;
     const generatorMap = { email_copy: 'generateEmailCopy', blog_article: 'generateBlogArticle' };
     console.info("[Content Studio] Content-type routing", {
       uiSelection: contentType,
@@ -1136,7 +1137,7 @@ export const generateContentItem = async (req, res) => {
 export const generateAllContent = async (req, res) => {
   const { chatId } = req.params;
   const userId = req.user.id;
-  const { types = CONTENT_TYPES } = req.body;
+  const { types = CONTENT_TYPES_LIST } = req.body;
 
   try {
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
@@ -1145,7 +1146,7 @@ export const generateAllContent = async (req, res) => {
     const brief = await buildContentBrief(prisma, userId, chatId);
     const evidenceContext = await buildEvidenceContext(prisma, userId, chatId);
 
-    const invalid = types.filter(t => !CONTENT_TYPES.includes(t));
+    const invalid = types.filter(t => !CONTENT_TYPES_LIST.includes(t));
     if (invalid.length) {
       return res.status(400).json({ success: false, error: `Invalid types: ${invalid.join(', ')}` });
     }
