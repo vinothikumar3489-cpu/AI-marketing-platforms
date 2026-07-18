@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import { normalizeFullResults } from '../lib/normalizers';
 import { useAuth } from './AuthContext';
@@ -18,19 +18,23 @@ type ProjectCtx = {
 };
 const ProjectContext = createContext<ProjectCtx | null>(null);
 
+const EMPTY_FULL_RESULTS = { growth: null, seo: null, executive: null, profile: null, chat: null };
+
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [chats, setChats] = useState<any[]>([]);
   const [selectedChatId, setSelectedChatId] = useState(localStorage.getItem('selectedChatId') || '');
-  const [fullResults, setFullResults] = useState<any>({ growth: null, seo: null, executive: null, profile: null, chat: null });
+  const [fullResults, setFullResults] = useState<any>(EMPTY_FULL_RESULTS);
   const [loading, setLoading] = useState(false);
   const mountedRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
   const createChatInFlightRef = useRef(false);
   const createChatPromiseRef = useRef<Promise<string> | null>(null);
+  const selectedChatIdRef = useRef(selectedChatId);
+  selectedChatIdRef.current = selectedChatId;
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
-  async function refreshChats() {
+  const refreshChats = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
@@ -38,49 +42,21 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       if (!mountedRef.current) return;
       const list = res.chats || res.data || res || [];
       setChats(Array.isArray(list) ? list : []);
-      const exists = list.some((c: any) => c.id === selectedChatId);
-      if (selectedChatId && !exists) {
+      const currentId = selectedChatIdRef.current;
+      const exists = list.some((c: any) => c.id === currentId);
+      if (currentId && !exists) {
         localStorage.removeItem('selectedChatId');
         setSelectedChatId('');
-        setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null });
+        setFullResults(EMPTY_FULL_RESULTS);
       }
     } finally { if (mountedRef.current) setLoading(false); }
-  }
+  }, [user]);
 
-  async function selectChat(id: string) {
-    if (!id) {
-      console.warn('selectChat called with empty ID');
-      return;
-    }
+  const loadFullResults = useCallback(async (id?: string) => {
+    const chatId = id || selectedChatIdRef.current;
+    if (!chatId) return EMPTY_FULL_RESULTS;
     
-    console.log('');
-    console.log('[ProjectContext selectChat]');
-    console.log('selectedChatId:', id);
-    console.log('previousSelectedChatId:', selectedChatId);
-    console.log('isSwitch:', id !== selectedChatId);
-    
-    // Only clear results if switching to a different chat
-    if (id !== selectedChatId) {
-      console.log('[ProjectContext] Clearing results for chat switch');
-      setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null });
-    }
-    
-    setSelectedChatId(id);
-    localStorage.setItem('selectedChatId', id);
-    
-    // Load results for the selected chat
-    await loadFullResults(id);
-    console.log('[ProjectContext selectChat complete] chatId:', id);
-  }
-
-  async function loadFullResults(id = selectedChatId) {
-    if (!id) {
-      return { growth: null, seo: null, executive: null, profile: null, chat: null };
-    }
-    
-    if (abortRef.current) {
-      abortRef.current.abort();
-    }
+    if (abortRef.current) abortRef.current.abort();
     abortRef.current = new AbortController();
     const signal = abortRef.current.signal;
     
@@ -88,136 +64,118 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     
     try {
       await new Promise(resolve => setTimeout(resolve, 100));
-      if (!mountedRef.current || signal.aborted) return { growth: null, seo: null, executive: null, profile: null, chat: null };
+      if (!mountedRef.current || signal.aborted) return EMPTY_FULL_RESULTS;
       
-      const res: any = await api.get(`/chats/${id}/full-results`, signal);
-      if (!mountedRef.current || signal.aborted) return { growth: null, seo: null, executive: null, profile: null, chat: null };
+      const res: any = await api.get(`/chats/${chatId}/full-results`, signal);
+      if (!mountedRef.current || signal.aborted) return EMPTY_FULL_RESULTS;
       
       const normalized = normalizeFullResults(res);
-
-      setFullResults(normalized);
+      if (mountedRef.current) setFullResults(normalized);
       return normalized;
     } catch (error: any) {
-      if (error.name === 'AbortError') return { growth: null, seo: null, executive: null, profile: null, chat: null };
+      if (error.name === 'AbortError') return EMPTY_FULL_RESULTS;
       console.error('Failed to load full results:', error.message || error);
       
-      const emptyResults = { growth: null, seo: null, executive: null, profile: null, chat: null };
-      
-      if (error.response?.status === 404) {
-        if (mountedRef.current) setFullResults(emptyResults);
+      if (error.response?.status === 404 && mountedRef.current) {
+        setFullResults(EMPTY_FULL_RESULTS);
       }
       
-      return emptyResults;
+      return EMPTY_FULL_RESULTS;
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }
+  }, []);
 
-  async function createChat(title: string) {
+  const selectChat = useCallback(async (id: string) => {
+    if (!id) {
+      console.warn('selectChat called with empty ID');
+      return;
+    }
+    
+    const prevId = selectedChatIdRef.current;
+    if (id !== prevId) setFullResults(EMPTY_FULL_RESULTS);
+    
+    setSelectedChatId(id);
+    localStorage.setItem('selectedChatId', id);
+    
+    await loadFullResults(id);
+  }, [loadFullResults]);
+
+  const createChat = useCallback(async (title: string) => {
     if (createChatInFlightRef.current && createChatPromiseRef.current) {
-      console.info('[ProjectContext createChat] request already in-flight, reusing existing promise', { title });
       return createChatPromiseRef.current;
     }
 
     createChatInFlightRef.current = true;
     const promise = (async () => {
-      console.info('[ProjectContext createChat requested]', { title, selectedChatId, pending: createChatInFlightRef.current });
       const res: any = await api.post('/chats', { title: title || 'New Product Analysis' });
       const chat = res.chat || res.data || res;
       const id = chat.id;
+      if (!id) throw new Error('Failed to create chat: No chat ID returned');
       
-      if (!id) {
-        throw new Error('Failed to create chat: No chat ID returned');
-      }
-      
-      console.log('');
-      console.log('[ProjectContext createChat]');
-      console.log('chatId:', id);
-      console.log('previousSelectedChatId:', selectedChatId);
-      console.log('');
-      
-      // IMMEDIATELY set the selected chat ID - don't wait for refresh
       setSelectedChatId(id);
       localStorage.setItem('selectedChatId', id);
-      
-      // Clear results while new chat is being created
-      setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null });
-      
-      // Refresh chat list in background (non-blocking)
+      setFullResults(EMPTY_FULL_RESULTS);
       refreshChats().catch(err => console.warn('Chat refresh failed:', err));
-      
       return id;
     })();
 
     createChatPromiseRef.current = promise;
-
     try {
       return await promise;
     } finally {
       createChatInFlightRef.current = false;
       createChatPromiseRef.current = null;
     }
-  }
+  }, [refreshChats]);
 
-  function clearSelection() {
+  const clearSelection = useCallback(() => {
     setSelectedChatId('');
     localStorage.removeItem('selectedChatId');
-    setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null });
-  }
+    setFullResults(EMPTY_FULL_RESULTS);
+  }, []);
 
-  async function deleteChat(id: string) {
-    if (!id) {
-      console.warn('deleteChat called with empty ID');
-      return;
-    }
-
-    console.log('🗑️ [ProjectContext] Deleting chat:', id);
-
+  const deleteChat = useCallback(async (id: string) => {
+    if (!id) return;
     try {
       await api.del(`/chats/${id}`);
-      console.log('✅ [ProjectContext] Chat deleted successfully:', id);
-
-      // If the deleted chat was selected, clear selection
-      if (selectedChatId === id) {
-        clearSelection();
-      }
-
-      // Refresh chat list
+      if (selectedChatIdRef.current === id) clearSelection();
       await refreshChats();
     } catch (error: any) {
-      console.error('❌ [ProjectContext] Failed to delete chat:', error.message || error);
+      console.error('Failed to delete chat:', error.message || error);
       throw error;
     }
-  }
+  }, [refreshChats, clearSelection]);
 
-  async function clearHistory() {
-    console.log('🗑️ [ProjectContext] Clearing all chat history');
-
+  const clearHistory = useCallback(async () => {
     try {
       await api.del('/chats/clear-history');
-      console.log('✅ [ProjectContext] All chat history cleared successfully');
-
-      // Clear selection and refresh
       clearSelection();
       await refreshChats();
     } catch (error: any) {
-      console.error('❌ [ProjectContext] Failed to clear history:', error.message || error);
+      console.error('Failed to clear history:', error.message || error);
       throw error;
     }
-  }
+  }, [refreshChats, clearSelection]);
 
   useEffect(() => {
     if (!user) {
       setChats([]);
       setSelectedChatId('');
-      setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null });
+      setFullResults(EMPTY_FULL_RESULTS);
       return;
     }
     refreshChats();
-  }, [user]);
-  useEffect(() => { if (user && selectedChatId) loadFullResults(selectedChatId).catch((e) => console.warn('Initial full results load failed:', e)); }, [user, selectedChatId]);
+  }, [user, refreshChats]);
 
-  const value = useMemo(() => ({ chats, selectedChatId, fullResults, loading, refreshChats, selectChat, clearSelection, loadFullResults, createChat, deleteChat, clearHistory }), [chats, selectedChatId, fullResults, loading]);
+  const value = useMemo(() => ({
+    chats, selectedChatId, fullResults, loading,
+    refreshChats, selectChat, clearSelection, loadFullResults,
+    createChat, deleteChat, clearHistory,
+  }), [chats, selectedChatId, fullResults, loading,
+      refreshChats, selectChat, clearSelection, loadFullResults,
+      createChat, deleteChat, clearHistory]);
+
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
 }
 

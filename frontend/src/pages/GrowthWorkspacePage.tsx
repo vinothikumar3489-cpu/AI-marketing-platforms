@@ -199,7 +199,6 @@ export default function GrowthWorkspacePage() {
     }
     setError(''); 
     setLoading(true);
-    setStatus('running');
     analysisRunningRef.current = true;
     try {
       let chatId = selectedChatId;
@@ -234,7 +233,6 @@ export default function GrowthWorkspacePage() {
       } else {
         setError(msg);
       }
-      setStatus('failed');
     } finally {
       setLoading(false);
       analysisRunningRef.current = false;
@@ -247,7 +245,7 @@ export default function GrowthWorkspacePage() {
     setForm(defaults);
     setResults({});
     setError('');
-    setStatus('input_required');
+    setRestoreStatus('empty');
     setStep(1);
     try {
       await createChat('New Growth Analysis');
