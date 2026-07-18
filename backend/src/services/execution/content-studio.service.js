@@ -2,32 +2,15 @@ import { callAI } from '../../ai/services/aiRouter.service.js';
 import { validateContentClaims, validateBriefContent } from './claim-validator.service.js';
 import { validateContentOutput, repairAIOutput, SCHEMA_REGISTRY } from './content-schemas.js';
 import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
+import { createStableHash } from '../../utils/stable-hash.js';
+import { CONTENT_TYPES, CONTENT_TYPES_LIST } from '../../constants/content-types.js';
+
+export { CONTENT_TYPES, CONTENT_TYPES_LIST } from '../../constants/content-types.js';
 
 const INVALID_PRODUCT_LABELS = new Set([
   'unknown product', 'new analysis', 'new & featured', 'untitled',
   'new project', 'growth analysis', 'featured', 'home',
 ]);
-
-const CONTENT_TYPES = {
-  blog_article: { label: 'Blog Article' },
-  faq_page: { label: 'FAQ Page' },
-  landing_page: { label: 'Landing Page' },
-  product_page: { label: 'Product Page' },
-  comparison_page: { label: 'Comparison Page' },
-  feature_announcement: { label: 'Feature Announcement' },
-  whitepaper: { label: 'Whitepaper' },
-  linkedin_post: { label: 'LinkedIn Post' },
-  instagram_post: { label: 'Instagram Post' },
-  twitter_post: { label: 'X (Twitter) Post' },
-  facebook_post: { label: 'Facebook Post' },
-  youtube_description: { label: 'YouTube Description' },
-  email_copy: { label: 'Email Copy' },
-  creative_brief: { label: 'Creative Brief' },
-  video_script: { label: 'Video Script' },
-};
-
-export const CONTENT_TYPES_LIST = Object.keys(CONTENT_TYPES);
-export { CONTENT_TYPES };
 
 function buildEvidenceSection(brief) {
   const lines = [];
@@ -999,7 +982,7 @@ export function transitionApprovalStatus(content, newStatus, { approvedBy, appro
   if (newStatus === APPROVAL_STATUSES.APPROVED) {
     updated._approvedBy = approvedBy || 'unknown';
     updated._approvedAt = approvedAt || new Date().toISOString();
-    updated._revisionHash = simpleHash(JSON.stringify({
+    updated._revisionHash = createStableHash(JSON.stringify({
       html: content._htmlTemplate || '',
       plainText: content._plainText || '',
       subject: content.subject || '',

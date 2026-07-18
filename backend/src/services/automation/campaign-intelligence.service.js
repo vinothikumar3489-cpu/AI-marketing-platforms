@@ -1,5 +1,6 @@
 import { callAI } from "../../ai/services/aiRouter.service.js";
 import { resolveProductIdentity } from "../resolvers/product-identity.resolver.js";
+import { createStableHash } from "../../utils/stable-hash.js";
 
 /**
  * Safely extract JSON from AI response with repair logic
@@ -140,12 +141,14 @@ export async function generateCampaignIntelligence({ userId, chatId, evidenceCon
     provider: "RULE_BASED_FALLBACK",
     fallbackUsed: true,
     generationStatus: "PARTIALLY_GENERATED",
+    generationMode: "FALLBACK",
     attempts: maxAttempts,
     warnings: [
       `AI provider failed after ${maxAttempts} attempts`,
       lastError || "Malformed provider output",
       "Campaign generated using evidence-based rules"
     ],
+    fallbackReason: lastError || "AI generation failed, used evidence-based fallback",
     evidenceReconciliation
   };
 
@@ -351,10 +354,14 @@ function validateCampaignOutput(data, evidenceReconciliation) {
       provider: "ai",
       fallbackUsed: false,
       generationStatus: "FULLY_GENERATED",
+      generationMode: "AI",
       versionNumber: 1,
       evidenceHash: generateEvidenceHash(evidenceReconciliation),
       contradictionsDetected: contradictions.length,
-      contradictions: contradictions
+      contradictions: contradictions,
+      attempts: 1,
+      warnings: [],
+      fallbackReason: null
     }
   };
 
@@ -506,7 +513,7 @@ function generateFingerprint(context) {
     JSON.stringify((context.channels || []).map(c => c.name || c).sort()),
     context.evidence?.hash || '',
   ];
-  return simpleHash(parts.join('::'));
+  return createStableHash(parts.join('::'));
 }
 
 function detectCampaignSimilarity(fingerprint1, fingerprint2) {
@@ -856,6 +863,11 @@ function generateEvidenceBasedCampaign(context) {
       generatedAt: new Date().toISOString(),
       provider: "evidence-based",
       fallbackUsed: true,
+      generationStatus: "PARTIALLY_GENERATED",
+      generationMode: "FALLBACK",
+      attempts: 2,
+      warnings: ["Campaign generated using evidence-based rules (no AI)"],
+      fallbackReason: "AI generation not available, used evidence-based fallback",
       evidenceQuality: {
         hasProductData,
         hasAudienceData,
@@ -1405,19 +1417,23 @@ function buildKPIs(context) {
   const hasCompetitorData = !!(competitors?.list?.value?.length);
   const hasProductData = !!(product.usp?.value || product.features?.value?.length);
 
-  function makeKPI(name, businessDefinition, formula, eventSource, analyticsTool, baselineStatus, reportingFrequency, owner, attributionWindow) {
+  function makeKPI(name, businessDefinition, formula, eventSource, analyticsTool, integrationStatus, reportingFrequency, owner, attributionWindow, objective, funnelStage, eventName) {
     return {
       name,
+      objective: objective || 'Measure campaign performance',
+      funnelStage: funnelStage || 'full_funnel',
+      definition: businessDefinition,
       businessDefinition,
       formula,
-      eventSource,
-      analyticsTool,
-      baselineStatus: baselineStatus || 'TRACKABLE_NOT_CONNECTED',
+      eventName: eventName || eventSource || 'web_session',
+      dataSource: analyticsTool || 'Not configured',
+      integrationStatus: integrationStatus || 'TRACKABLE_NOT_CONNECTED',
+      baselineStatus: integrationStatus || 'TRACKABLE_NOT_CONNECTED',
       targetStatus: 'TO_BE_DEFINED',
       reportingFrequency: reportingFrequency || 'weekly',
       owner: owner || 'Marketing Operations',
       attributionWindow: attributionWindow || '30 days',
-      status: baselineStatus === 'CONNECTED' ? 'MEASURED' : baselineStatus === 'UNAVAILABLE' ? 'UNAVAILABLE' : 'NOT_CONFIGURED'
+      status: integrationStatus === 'CONNECTED' ? 'MEASURED' : integrationStatus === 'UNAVAILABLE' ? 'UNAVAILABLE' : 'NOT_CONFIGURED'
     };
   }
 
