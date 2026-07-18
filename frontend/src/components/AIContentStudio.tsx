@@ -1078,7 +1078,7 @@ export default function AIContentStudio() {
     }
   }, [selectedChatId, addingToCampaign]);
 
-  const safeFetch = useCallback(async <T>(
+  const safeFetch = useCallback(async <T extends unknown>(
     key: string,
     fetcher: (signal: AbortSignal) => Promise<T>,
     setter: (data: T | null) => void,
