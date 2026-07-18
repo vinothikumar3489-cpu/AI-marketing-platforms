@@ -214,6 +214,7 @@ RULES (ABSOLUTE):
 4. If evidence is insufficient, use "Insufficient evidence" as the reason.
 5. Never use placeholder text, lorem ipsum, or filler content.
 6. Do NOT generate fake percentages, fake growth numbers, or fake performance metrics.
+7. For marketingFunnel, only include stages that the evidence genuinely supports. Do NOT generate all six standard stages (awareness/interest/consideration/conversion/retention/advocacy). Instead, create only 2-4 stages that match the campaign goal, audience, and product evidence. For example, a new product launch may only warrant awareness → consideration → conversion, while a mature product may add retention. Each stage must reference specific evidence for its inclusion.
 
 Return valid JSON with this exact structure (no markdown, no code fences):
 
@@ -275,12 +276,7 @@ Return valid JSON with this exact structure (no markdown, no code fences):
     "month3": [{ "title": "task", "description": "details", "dependency": "what depends on this", "ownerRole": "who", "evidence": "why" }]
   },
   "marketingFunnel": {
-    "awareness": { "objective": "goal", "channels": ["ch1"], "content": "content type", "cta": "call to action", "measurement": "how to measure" },
-    "interest": { "objective": "goal", "channels": ["ch1"], "content": "content type", "cta": "call to action", "measurement": "how to measure" },
-    "consideration": { "objective": "goal", "channels": ["ch1"], "content": "content type", "cta": "call to action", "measurement": "how to measure" },
-    "conversion": { "objective": "goal", "channels": ["ch1"], "content": "content type", "cta": "call to action", "measurement": "how to measure" },
-    "retention": { "objective": "goal", "channels": ["ch1"], "content": "content type", "cta": "call to action", "measurement": "how to measure" },
-    "advocacy": { "objective": "goal", "channels": ["ch1"], "content": "content type", "cta": "call to action", "measurement": "how to measure" }
+    "[stage_name]": { "objective": "goal", "channels": ["ch1"], "content": "content type", "cta": "call to action", "measurement": "how to measure" }
   },
   "kpiFramework": [
     { "kpi": "KPI name", "howToMeasure": "method", "tool": "tool name", "frequency": "weekly/monthly", "status": "Measured or Estimated or Not Yet Measured" }

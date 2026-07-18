@@ -6,14 +6,19 @@ const GENERIC_LABELS = new Set([
   'project', 'analysis', 'my', 'the', 'test', 'demo', 'sample',
   'unknown product', 'unknown company', 'unknown',
   'product', 'website', 'landing', 'page',
-  'www', 'app', 'login', 'signin', 'signup',
+  'www', 'app', 'login', 'signin', 'signup', 'register',
   'general', 'technology', 'saas', 'none',
+  'video conferencing for business', 'online video conferencing',
+  'click here', 'learn more', 'get started', 'sign up',
+  'documentation', 'docs', 'help center', 'support',
+  'privacy policy', 'terms of service', 'cookie policy',
 ]);
 
 function isGeneric(label) {
   if (!label || typeof label !== 'string') return true;
   const t = label.trim();
   if (t.length < 2) return true;
+  if (t.length > 100) return true;
   return GENERIC_LABELS.has(t.toLowerCase());
 }
 
@@ -31,38 +36,72 @@ function domainToBrand(domain) {
   if (parts.length < 2) return null;
   const name = parts[0];
   if (!name || name.length < 2 || GENERIC_LABELS.has(name)) return null;
-  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 function extractBrandFromTitle(title) {
   if (!title || typeof title !== 'string') return null;
-  // Try "Brand: Subtitle" or "Brand - Subtitle" or "Subtitle | Brand"
-  const pipe = title.split('|').map(s => s.trim()).filter(Boolean);
-  if (pipe.length >= 2) {
-    const candidate = pipe[pipe.length - 1];
-    if (!isGeneric(candidate)) return candidate;
-  }
-  const colon = title.split(':').map(s => s.trim()).filter(Boolean);
-  if (colon.length >= 2) {
-    const candidate = colon[0];
-    if (!isGeneric(candidate)) return candidate;
-  }
-  const dash = title.split('—').map(s => s.trim()).filter(Boolean);
-  if (dash.length >= 2) {
-    const candidate = dash[dash.length - 1];
-    if (!isGeneric(candidate)) return candidate;
-  }
-  const hyphen = title.split(' - ').map(s => s.trim()).filter(Boolean);
-  if (hyphen.length >= 2) {
-    const candidate = hyphen[hyphen.length - 1];
-    if (!isGeneric(candidate)) return candidate;
+  const separators = ['|', '–', '—', ' - ', ' : ', ': ', ' :: '];
+  for (const sep of separators) {
+    const parts = title.split(sep).map(s => s.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      const candidate = parts[parts.length - 1];
+      if (!isGeneric(candidate) && candidate.length < 60) return candidate;
+    }
   }
   return null;
 }
 
-function extractBrandFromStructuredData(data) {
-  if (!data || typeof data !== 'object') return null;
-  return data.organizationName || data.brandName || data.name || data.productName || null;
+function extractOpenGraph(website) {
+  if (!website || typeof website !== 'object') return {};
+  const og = website.openGraph || website.og || {};
+  const result = {};
+  if (og.siteName && !isGeneric(og.siteName)) result.siteName = og.siteName;
+  if (og.title && !isGeneric(og.title)) result.title = og.title;
+  if (og.description) result.description = og.description;
+  if (og.url) result.url = og.url;
+  if (og.type) result.type = og.type;
+  return result;
+}
+
+function extractJsonLd(website) {
+  if (!website || typeof website !== 'object') return null;
+  const ld = website.structuredData || website.jsonLd || website.jsonld || null;
+  if (!ld) return null;
+  const entries = Array.isArray(ld) ? ld : [ld];
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object') continue;
+    if (entry['@type'] === 'Organization' || entry['@type'] === 'Product' || entry['@type'] === 'SoftwareApplication') {
+      return {
+        name: entry.name || null,
+        brand: entry.brand?.name || entry.brand || null,
+        alternateName: entry.alternateName || null,
+        description: entry.description || null,
+        url: entry.url || null,
+        sameAs: entry.sameAs || null,
+        type: entry['@type'],
+      };
+    }
+  }
+  return null;
+}
+
+function extractMeta(website) {
+  if (!website || typeof website !== 'object') return {};
+  const meta = website.meta || website.metaTags || {};
+  return {
+    title: meta.title || website.title || null,
+    description: meta.description || website.description || null,
+    keywords: meta.keywords || null,
+  };
+}
+
+function extractH1(website) {
+  if (!website || typeof website !== 'object') return [];
+  const h1s = website.h1 || website.headings?.h1 || website.heroText || null;
+  if (!h1s) return [];
+  const arr = Array.isArray(h1s) ? h1s : [h1s];
+  return arr.filter(h => h && typeof h === 'string' && !isGeneric(h) && h.length < 100);
 }
 
 export function resolveProductIdentity({ chat, productIntelligence, evidenceSnapshot, website }) {
@@ -70,104 +109,120 @@ export function resolveProductIdentity({ chat, productIntelligence, evidenceSnap
   const websiteUrl = chat?.websiteUrl || website?.url || null;
   const domain = extractDomain(websiteUrl);
 
-  let productName = null;
-  let brandName = null;
-  let companyName = null;
-  let source = null;
-  let evidenceReference = null;
+  const candidates = [];
+  const conflicts = [];
 
-  // Priority 1: ProductIntelligence — check inputJson first (where productName is actually stored),
-  // then productAnalysis content, then top-level fields (which may not exist on the Prisma model)
+  function addCandidate(field, value, source, confidence) {
+    if (!value || isGeneric(value)) return;
+    const existing = candidates.find(c => c.field === field);
+    if (existing) {
+      if (existing.value !== value) {
+        conflicts.push({ field, sourceA: existing.source, valueA: existing.value, sourceB: source, valueB: value });
+      }
+      if (confidence > existing.confidence) {
+        existing.value = value;
+        existing.source = source;
+        existing.confidence = confidence;
+      }
+    } else {
+      candidates.push({ field, value, source, confidence });
+    }
+  }
+
+  function getBest(field) {
+    const match = candidates.filter(c => c.field === field).sort((a, b) => b.confidence - a.confidence);
+    return match.length > 0 ? match[0] : null;
+  }
+
   const pi = productIntelligence;
   const analysis = pi?.productAnalysis || {};
   const inputJson = pi?.inputJson || {};
 
-  const candidateName = inputJson.productName || inputJson.brandName || pi?.productName || null;
-  const candidateCompany = inputJson.companyName || inputJson.name || pi?.companyName || pi?.name || null;
-  const candidateBrand = inputJson.brandName || pi?.brandName || inputJson.name || null;
+  const og = extractOpenGraph(website);
+  const ld = extractJsonLd(website);
+  const meta = extractMeta(website);
+  const h1s = extractH1(website);
 
-  if (!isGeneric(candidateName)) {
-    productName = candidateName; source = 'inputJson_productName'; evidenceReference = 'ProductIntelligence.inputJson.productName';
-  } else if (!isGeneric(analysis?.productName)) {
-    productName = analysis.productName; source = 'pi_analysis_productName'; evidenceReference = 'ProductIntelligence.productAnalysis.productName';
-  } else if (!isGeneric(analysis?.name)) {
-    productName = analysis.name; source = 'pi_analysis_name'; evidenceReference = 'ProductIntelligence.productAnalysis.name';
-  } else if (!isGeneric(candidateCompany)) {
-    productName = candidateCompany; source = 'inputJson_companyName'; evidenceReference = 'ProductIntelligence.inputJson.companyName';
-  } else if (!isGeneric(candidateBrand)) {
-    productName = candidateBrand; source = 'inputJson_brandName'; evidenceReference = 'ProductIntelligence.inputJson.brandName';
-    brandName = candidateBrand;
+  addCandidate('productName', inputJson.productName, 'inputJson.productName', 100);
+  addCandidate('brandName', inputJson.brandName, 'inputJson.brandName', 100);
+  addCandidate('companyName', inputJson.companyName, 'inputJson.companyName', 100);
+
+  addCandidate('productName', analysis?.productName, 'pi_analysis.productName', 85);
+  addCandidate('productName', analysis?.name, 'pi_analysis.name', 80);
+  addCandidate('companyName', analysis?.companyName, 'pi_analysis.companyName', 80);
+
+  addCandidate('productName', pi?.productName, 'pi.productName', 75);
+  addCandidate('brandName', pi?.brandName, 'pi.brandName', 75);
+  addCandidate('companyName', pi?.companyName, 'pi.companyName', 75);
+  addCandidate('companyName', pi?.name, 'pi.name', 70);
+
+  const es = evidenceSnapshot?.evidence || {};
+  const esProduct = es?.product || es?.company || {};
+  addCandidate('productName', esProduct?.name, 'evidence.product.name', 80);
+  addCandidate('brandName', esProduct?.brandName, 'evidence.product.brandName', 80);
+  addCandidate('companyName', esProduct?.companyName, 'evidence.product.companyName', 80);
+
+  if (ld) {
+    addCandidate('productName', ld.name, `jsonLd.${ld.type}.name`, 75);
+    addCandidate('brandName', ld.brand, `jsonLd.${ld.type}.brand`, 70);
+    addCandidate('description', ld.description, `jsonLd.${ld.type}.description`, 60);
   }
 
-  if (!brandName && !isGeneric(candidateBrand)) brandName = candidateBrand;
-  if (!companyName && !isGeneric(candidateCompany)) companyName = candidateCompany;
+  if (og?.siteName) addCandidate('companyName', og.siteName, 'openGraph.siteName', 70);
 
-  // Priority 2: EvidenceSnapshot product data
-  if (!productName || isGeneric(productName)) {
-    const sd = evidenceSnapshot?.evidence?.product || evidenceSnapshot?.evidence?.company || {};
-    if (!isGeneric(sd?.name)) { productName = sd.name; source = 'evidence_product_name'; evidenceReference = 'EvidenceSnapshot.product.name'; }
-    else if (!isGeneric(sd?.brandName)) { productName = sd.brandName; source = 'evidence_brand_name'; evidenceReference = 'EvidenceSnapshot.product.brandName'; }
-    if (!brandName && !isGeneric(sd?.brandName)) brandName = sd.brandName;
+  const titleBrand = extractBrandFromTitle(og?.title || meta?.title || website?.title || null);
+  if (titleBrand) addCandidate('brandName', titleBrand, 'title_extracted_brand', 60);
+
+  if (meta?.title && !titleBrand && !isGeneric(meta.title)) {
+    addCandidate('description', meta.title, 'meta.title', 40);
   }
 
-  // Priority 3: Structured data org/product name
-  if (!productName || isGeneric(productName)) {
-    const sdName = extractBrandFromStructuredData(evidenceSnapshot?.evidence?.structuredData);
-    if (sdName && !isGeneric(sdName)) { productName = sdName; source = 'structured_data'; evidenceReference = 'structuredData.organizationName'; }
+  if (meta?.description) addCandidate('description', meta.description, 'meta.description', 30);
+
+  for (const h1 of h1s.slice(0, 3)) {
+    if (h1.length < 60) {
+      addCandidate('productName', h1, 'h1', 40);
+    }
   }
 
-  // Priority 4: Website title/H1 → extract brand
-  if (!productName || isGeneric(productName)) {
-    const title = website?.title || evidenceSnapshot?.evidence?.website?.title || null;
-    const extracted = extractBrandFromTitle(title);
-    if (extracted && !isGeneric(extracted)) { productName = extracted; source = 'website_title_brand'; evidenceReference = 'Website.title'; }
+  const domainBrand = domainToBrand(domain);
+  if (domainBrand) addCandidate('brandName', domainBrand, 'domain', 30);
+
+  const summary = analysis.summary || analysis.productSummary || '';
+  const brandMatch = summary.match(/^([A-Z][a-zA-Z0-9._-]{1,40})\s+is/i);
+  if (brandMatch && !isGeneric(brandMatch[1])) {
+    addCandidate('productName', brandMatch[1], 'summary_brand', 35);
   }
 
-  // Priority 5: Website H1
-  if (!productName || isGeneric(productName)) {
-    const h1 = website?.heroText || evidenceSnapshot?.evidence?.website?.heroText || null;
-    if (h1 && !isGeneric(h1) && h1.length < 100) { productName = h1; source = 'website_h1'; evidenceReference = 'Website.heroText'; }
+  if (chat?.productName && !isGeneric(chat.productName)) {
+    addCandidate('productName', chat.productName, 'chat.productName', 50);
   }
 
-  // Priority 6: Domain → brand
-  if (!productName || isGeneric(productName)) {
-    const db = domainToBrand(domain);
-    if (db && !isGeneric(db)) { productName = db; brandName = brandName || db; source = 'domain'; evidenceReference = 'Domain'; }
-  }
+  const productNameBest = getBest('productName');
+  const brandNameBest = getBest('brandName');
+  const companyNameBest = getBest('companyName');
+  const descriptionBest = getBest('description');
 
-  // Priority 7: Product summary brand detection
-  if (!productName || isGeneric(productName)) {
-    const summary = analysis.summary || analysis.productSummary || '';
-    const brandMatch = summary.match(/^([A-Z][a-zA-Z0-9]+)\s+is/i);
-    if (brandMatch && !isGeneric(brandMatch[1])) { productName = brandMatch[1]; brandName = brandName || productName; source = 'summary_brand'; evidenceReference = 'ProductIntelligence.productAnalysis.summary'; }
-  }
+  const productName = productNameBest?.value || null;
+  const brandName = brandNameBest?.value || productName || null;
+  const companyName = companyNameBest?.value || brandName || productName || null;
+  const description = descriptionBest?.value || null;
 
-  // Priority 8: chat.productName
-  if (!productName || isGeneric(productName)) {
-    if (chat?.productName && !isGeneric(chat.productName)) { productName = chat.productName; source = 'chat_productName'; evidenceReference = 'Chat.productName'; }
-  }
+  const aliases = [...new Set(
+    candidates
+      .filter(c => c.field === 'productName' || c.field === 'brandName')
+      .map(c => c.value)
+      .filter(Boolean)
+  )];
 
   const resolved = Boolean(productName && !isGeneric(productName));
 
-  if (!resolved) {
-    return {
-      projectTitle,
-      productName: null,
-      brandName: null,
-      companyName: null,
-      websiteUrl,
-      domain,
-      category: null,
-      industry: null,
-      businessModel: null,
-      source: 'unresolved',
-      evidenceReference: 'No valid product identity could be derived from evidence',
-      resolved: false,
-    };
-  }
-
-  if (!brandName) brandName = productName;
-  if (!companyName) companyName = brandName;
+  const fieldConfidence = {
+    productName: productNameBest?.confidence || 0,
+    brandName: brandNameBest?.confidence || 0,
+    companyName: companyNameBest?.confidence || 0,
+    description: descriptionBest?.confidence || 0,
+  };
 
   const category = analysis?.category || null;
   const industry = analysis?.industry || null;
@@ -178,14 +233,20 @@ export function resolveProductIdentity({ chat, productIntelligence, evidenceSnap
     productName,
     brandName,
     companyName,
+    displayName: productName || brandName || companyName || projectTitle,
+    aliases,
     websiteUrl,
     domain,
-    category,
     industry,
+    category,
     businessModel,
-    source,
-    evidenceReference,
-    resolved: true,
+    description,
+    evidence: candidates.map(c => ({ field: c.field, value: c.value, source: c.source, confidence: c.confidence })),
+    fieldConfidence,
+    conflicts,
+    source: resolved ? (productNameBest?.source || 'resolved') : 'unresolved',
+    evidenceReference: resolved ? (productNameBest?.source || 'Unknown') : 'No valid product identity could be derived from evidence',
+    resolved,
   };
 }
 

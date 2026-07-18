@@ -875,7 +875,20 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
   const validatedContent = {
     ...(claimValidation.sanitized || schemaValidation.data),
     _type: assetType,
+    _approvalStatus: APPROVAL_STATUSES.DRAFT,
+    _generatedAt: new Date().toISOString(),
+    _version: 1,
   };
+
+  // For email copy, render full HTML template
+  if (assetType === 'email_copy') {
+    const companyName = brief?.company?.name || brief?.product?.name || '';
+    const companyWebsite = brief?.company?.websiteUrl || '';
+    const renderedEmail = renderEmailHtmlTemplate(validatedContent, companyName, companyWebsite);
+    validatedContent._htmlTemplate = renderedEmail.html;
+    validatedContent._plainText = renderedEmail.plainText;
+    validatedContent._subject = renderedEmail.subject;
+  }
 
   return {
     content: validatedContent,
@@ -887,6 +900,7 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
       claimStatus: claimValidation.status,
       claimFindings: claimValidation.findings,
       schemaValid: true,
+      approvalStatus: APPROVAL_STATUSES.DRAFT,
     },
   };
 }
@@ -926,4 +940,193 @@ export async function generateContentStudioPlan(typesOrCtx, brief, evidenceConte
   };
 }
 
-export { generateLinkedInPost, generateInstagramPost, generateTwitterPost, generateFacebookPost, generateYouTubeDescription, generateEmailCopy, generateCreativeBrief, generateVideoScript, generateBlogArticle, generateFAQ, generateLandingPage, generateProductPage, generateComparisonPage, generateFeatureAnnouncement, generateWhitepaper };
+export { generateLinkedInPost, generateInstagramPost, generateTwitterPost, generateFacebookPost, generateYouTubeDescription, generateEmailCopy, generateCreativeBrief, generateVideoScript, generateBlogArticle, generateFAQ, generateLandingPage, generateProductPage, generateComparisonPage, generateFeatureAnnouncement, generateWhitepaper, renderEmailHtmlTemplate, APPROVAL_STATUSES };
+
+// ============================================
+// EMAIL HTML TEMPLATE GENERATOR
+// ============================================
+
+const APPROVAL_STATUSES = {
+  DRAFT: 'draft',
+  PENDING_REVIEW: 'pending_review',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  CHANGES_REQUESTED: 'changes_requested',
+  SENT: 'sent',
+};
+
+function sanitizeText(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '', unsubscribeUrl = null) {
+  const subject = sanitizeText(emailData.subject || '');
+  const previewText = sanitizeText(emailData.previewText || emailData.subject || '');
+  const greeting = sanitizeText(emailData.greeting || '');
+  const opening = sanitizeText(emailData.opening || '');
+  const bodyParagraphs = Array.isArray(emailData.bodyParagraphs) ? emailData.bodyParagraphs : [];
+  const bulletPoints = Array.isArray(emailData.bulletPoints) ? emailData.bulletPoints : [];
+  const ctaText = sanitizeText(emailData.ctaText || '');
+  const ctaUrl = emailData.ctaUrl || '#';
+  const closing = sanitizeText(emailData.closing || '');
+  const signature = sanitizeText(emailData.signature || '');
+  const complianceNote = sanitizeText(emailData.complianceNote || '');
+  const company = sanitizeText(companyName || 'Our Company');
+  const baseUrl = companyWebsite || '#';
+
+  const bodyHtml = `
+    ${greeting ? `<p style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 16px 0;">${greeting}</p>` : ''}
+    ${opening ? `<p style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 16px 0;">${opening}</p>` : ''}
+    ${bodyParagraphs.map(p => `<p style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 16px 0;">${sanitizeText(p)}</p>`).join('\n    ')}
+    ${bulletPoints.length > 0 ? `
+    <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 16px 0;">
+      ${bulletPoints.map(b => `
+      <tr>
+        <td style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; padding: 0 0 8px 0; vertical-align: top; width: 20px;">•</td>
+        <td style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; padding: 0 0 8px 0;">${sanitizeText(b)}</td>
+      </tr>`).join('\n      ')}
+    </table>` : ''}
+    ${ctaText ? `
+    <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px 0;">
+      <tr>
+        <td align="center" style="background-color: #2563eb; border-radius: 6px;">
+          <a href="${sanitizeText(ctaUrl)}" target="_blank" style="display: inline-block; font-family: Arial, sans-serif; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 6px;">${ctaText}</a>
+        </td>
+      </tr>
+    </table>` : ''}
+    ${closing ? `<p style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 16px 0;">${closing}</p>` : ''}
+    ${signature ? `<p style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 16px 0;">${signature}</p>` : ''}
+    ${complianceNote ? `<p style="font-family: Arial, sans-serif; font-size: 12px; line-height: 1.4; color: #888888; margin: 16px 0 0 0; font-style: italic;">${complianceNote}</p>` : ''}
+  `;
+
+  const unsubscribeHtml = unsubscribeUrl
+    ? `<a href="${sanitizeText(unsubscribeUrl)}" target="_blank" style="color: #888888; text-decoration: underline; font-size: 12px;">Unsubscribe</a>`
+    : `<span style="color: #888888; font-size: 12px;">To unsubscribe, reply with UNSUBSCRIBE</span>`;
+
+  return {
+    subject,
+    html: `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="x-apple-disable-message-reformatting">
+  <title>${subject}</title>
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:AllowPNG/>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+  <!--[if mso]>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+  <tr>
+  <td align="center">
+  <![endif]-->
+
+  <!-- PREHEADER -->
+  <div style="display: none; max-height: 0; overflow: hidden; mso-hide: all; line-height: 1px;">
+    ${previewText}
+  </div>
+  <div style="display: none; max-height: 0; overflow: hidden; mso-hide: all; line-height: 1px;">
+    &nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;
+  </div>
+
+  <!-- HEADER -->
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f4f4f4;">
+    <tr>
+      <td align="center" style="padding: 20px 10px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #1e293b; padding: 24px 32px; text-align: center;">
+              <a href="${sanitizeText(baseUrl)}" target="_blank" style="color: #ffffff; text-decoration: none; font-size: 20px; font-weight: 700; letter-spacing: 0.5px;">${company}</a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px 32px 24px 32px;">
+              ${bodyHtml}
+            </td>
+          </tr>
+          <!-- FOOTER -->
+          <tr>
+            <td style="background-color: #f8fafc; padding: 24px 32px; border-top: 1px solid #e2e8f0;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td style="font-family: Arial, sans-serif; font-size: 12px; line-height: 1.5; color: #888888; text-align: center;">
+                    <p style="margin: 0 0 8px 0;">© ${new Date().getFullYear()} ${company}. All rights reserved.</p>
+                    <p style="margin: 0 0 8px 0;">
+                      <a href="${sanitizeText(baseUrl)}" target="_blank" style="color: #888888; text-decoration: underline; font-size: 12px;">Visit our website</a>
+                    </p>
+                    <p style="margin: 0 0 0 0;">
+                      ${unsubscribeHtml}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <!--[if mso]>
+  </td>
+  </tr>
+  </table>
+  <![endif]-->
+</body>
+</html>`,
+    plainText: [
+      subject ? `Subject: ${subject}` : '',
+      '',
+      greeting,
+      opening,
+      ...bodyParagraphs,
+      ...bulletPoints.map(b => `- ${b}`),
+      '',
+      ctaText ? `${ctaText}: ${ctaUrl}` : '',
+      '',
+      closing,
+      signature,
+      complianceNote,
+      '',
+      `--- ${company} ---`,
+      baseUrl !== '#' ? `Website: ${baseUrl}` : '',
+      unsubscribeUrl ? `Unsubscribe: ${unsubscribeUrl}` : 'Reply UNSUBSCRIBE to opt out',
+    ].filter(Boolean).join('\n'),
+    _emailType: emailData.emailType || null,
+    _approvalStatus: APPROVAL_STATUSES.DRAFT,
+    _generatedAt: new Date().toISOString(),
+    _version: 1,
+  };
+}
+
+export function withApprovalStatus(content, status = APPROVAL_STATUSES.DRAFT) {
+  if (!content || typeof content !== 'object') return content;
+  return {
+    ...content,
+    _approvalStatus: status,
+    _approvalHistory: [
+      {
+        status,
+        timestamp: new Date().toISOString(),
+        action: status === APPROVAL_STATUSES.DRAFT ? 'created' : `status_set_to_${status}`,
+      }
+    ],
+    _version: 1,
+  };
+}

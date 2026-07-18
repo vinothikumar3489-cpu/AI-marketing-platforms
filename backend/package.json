@@ -12,7 +12,9 @@
     "seed": "node prisma/seed.js",
     "postinstall": "prisma generate",
     "build": "prisma generate",
-    "test": "node --test \"tests/*.test.js\""
+    "test": "node --test \"tests/*.test.js\"",
+    "test:jest": "npx jest --passWithNoTests",
+    "test:all": "node --test \"tests/*.test.js\" && npx jest --passWithNoTests"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
@@ -47,6 +49,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "jest": "^30.4.2",
     "nodemon": "^2.0.22",
     "prisma": "^5.10.0"
   }

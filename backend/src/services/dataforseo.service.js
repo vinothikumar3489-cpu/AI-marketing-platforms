@@ -510,10 +510,49 @@ function isJobOrCareerPage(url) {
   return /\/jobs\b|\/careers\b|\/apply\b/i.test(lower);
 }
 
+function isHelpOrSupportPage(url) {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return /\/help\b|\/support\b|\/faq\b|\/knowledge.?base|\/tutorials?\b|\/guide|\/manual|\/documentation|\/docs\b/i.test(lower);
+}
+
+function isLoginSignupPage(url) {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return /\/login|\/signin|\/sign.?up|\/register|\/auth|\/forgot|\/reset|\/logout/i.test(lower);
+}
+
+function isTargetDomainPage(url, targetDomain) {
+  if (!url || !targetDomain) return false;
+  const lower = url.toLowerCase();
+  const targetLower = targetDomain.toLowerCase();
+  return lower.includes(targetLower) && /\/support|\/help|\/docs|\/login|\/signin|\/signup|\/pricing|\/blog\/|\/news\/|\/about|\/contact/i.test(lower);
+}
+
+function isArticleOrListicle(title, url, snippet) {
+  if (!title) return true;
+  const lowerTitle = (title || '').toLowerCase();
+  const lowerUrl = (url || '').toLowerCase();
+  const lowerSnippet = (snippet || '').toLowerCase();
+  const articleIndicators = [
+    /^\d+\s+(best|top|ways|tips|reasons|steps|things|ideas)/i,
+    /(article|blog|news|press|review|vs\.|versus|guide|how\s+to|what\s+is)/i,
+    /^\d{4}\s/,
+    /\b(best|top|amazing|incredible|ultimate)\s+.+\s+(for|in|of|to)\b/i,
+  ];
+  if (articleIndicators.some(p => p.test(lowerTitle))) return true;
+  if (/\/blog\/|\/news\/|\/articles\/|\.blog\./.test(lowerUrl)) return true;
+  if (/^\d{4}\s+(best|top|trend|prediction)/i.test(lowerTitle)) return true;
+  if (lowerSnippet.includes('list of') || lowerSnippet.includes('top ') || lowerSnippet.startsWith('best ')) return true;
+  return false;
+}
+
 export function normalizeSerpCompetitors(serpResults, identity = {}) {
   if (!Array.isArray(serpResults) || serpResults.length === 0) {
     return [];
   }
+
+  const targetDomain = extractDomain(identity?.websiteUrl || identity?.domain || '');
 
   const domainMap = new Map();
 
@@ -523,6 +562,12 @@ export function normalizeSerpCompetitors(serpResults, identity = {}) {
     if (isKnowledgeDomain(domain)) return;
     if (isJobOrCareerPage(result.url)) return;
     if (isArticleTitle(result.title)) return;
+    if (isHelpOrSupportPage(result.url)) return;
+    if (isLoginSignupPage(result.url)) return;
+    if (isArticleOrListicle(result.title, result.url, result.snippet)) return;
+    if (targetDomain && isTargetDomainPage(result.url, targetDomain)) return;
+    if (targetDomain && (domain === targetDomain || domain.includes(targetDomain) || targetDomain.includes(domain))) return;
+    if (targetDomain && (domain.endsWith('.' + targetDomain) || targetDomain.endsWith('.' + domain))) return;
 
     if (!domainMap.has(domain)) {
       domainMap.set(domain, {
@@ -578,8 +623,9 @@ function classifyCompetitorType(competitor, identity = {}) {
     }
   }
 
-  if (title.includes('blog') || title.includes('news') || title.includes('guide') ||
-      snippet.includes('blog') || snippet.includes('article')) {
+  if ((title.includes('blog') || title.includes('news') || title.includes('guide') ||
+       snippet.includes('blog') || snippet.includes('article')) &&
+      !title.includes('software') && !title.includes('platform') && !title.includes('solution')) {
     return {
       type: 'serpCompetitor',
       relevanceScore: 30,
@@ -646,10 +692,18 @@ export function separateCompetitorsByType(competitors) {
   }
 
   return {
-    directBusinessCompetitors: competitors.filter(c => c.competitorType === 'directBusinessCompetitor' && c.relevanceScore >= 70),
-    serpCompetitors: competitors.filter(c => c.competitorType === 'serpCompetitor' || c.competitorType === 'directBusinessCompetitor'),
-    directoryOrResearchSites: competitors.filter(c => c.competitorType === 'directoryOrResearchSite'),
-    irrelevantFilteredSites: competitors.filter(c => c.relevanceScore < 40)
+    directBusinessCompetitors: competitors.filter(c =>
+      c.competitorType === 'directBusinessCompetitor' && c.relevanceScore >= 70
+    ),
+    serpCompetitors: competitors.filter(c =>
+      c.competitorType === 'serpCompetitor' && c.relevanceScore >= 40
+    ),
+    directoryOrResearchSites: competitors.filter(c =>
+      c.competitorType === 'directoryOrResearchSite'
+    ),
+    irrelevantFilteredSites: competitors.filter(c =>
+      c.relevanceScore < 40 || c.competitorType === 'serpCompetitor' && c.relevanceScore < 70
+    )
   };
 }
 
@@ -824,5 +878,15 @@ export async function getDomainData(domain) {
   } catch (error) {
     console.error(`❌ [DataForSEO] Domain data fetch failed:`, error.message);
     return { success: false, error: error.message };
+  }
+}
+
+function extractDomain(url) {
+  if (!url || typeof url !== 'string') return '';
+  try {
+    const cleaned = url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '');
+    return cleaned.split('/')[0].split('?')[0].toLowerCase();
+  } catch {
+    return '';
   }
 }
