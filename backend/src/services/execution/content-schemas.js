@@ -226,8 +226,13 @@ const youtubeDescriptionSchema = z.object({
 // ---------- EMAIL COPY ----------
 const emailCopySchema = z.object({
   _type: z.string().optional(),
+  assetName: z.string().optional(),
+  campaignName: z.string().optional(),
   emailType: z.enum(['outreach', 'nurture', 'product_announcement', 'newsletter', 'follow_up', 'trial_conversion']),
+  audience: z.string().optional(),
+  goal: z.string().optional(),
   subject: z.string(),
+  subjectOptions: z.array(z.string()).default([]),
   previewText: z.string().nullable(),
   greeting: z.string(),
   opening: z.string(),
@@ -238,6 +243,18 @@ const emailCopySchema = z.object({
   closing: z.string(),
   signature: z.string(),
   personalizationFields: z.array(z.string()).default([]),
+  personalizationVariables: z.array(z.object({
+    name: z.string(),
+    description: z.string(),
+    example: z.string().optional(),
+  })).default([]),
+  sections: z.object({
+    preheader: z.string().optional(),
+    header: z.string().optional(),
+    body: z.string().optional(),
+    footer: z.string().optional(),
+    unsubscribe: z.string().optional(),
+  }).optional(),
   complianceNote: z.string().nullable(),
   evidenceUsed,
   claimsRequiringReview,

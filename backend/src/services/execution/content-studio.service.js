@@ -948,12 +948,73 @@ export { generateLinkedInPost, generateInstagramPost, generateTwitterPost, gener
 
 const APPROVAL_STATUSES = {
   DRAFT: 'draft',
-  PENDING_REVIEW: 'pending_review',
+  VALIDATION_FAILED: 'validation_failed',
+  READY_FOR_REVIEW: 'ready_for_review',
   APPROVED: 'approved',
   REJECTED: 'rejected',
   CHANGES_REQUESTED: 'changes_requested',
+  SCHEDULED: 'scheduled',
+  SENDING: 'sending',
   SENT: 'sent',
+  FAILED: 'failed',
 };
+
+const VALID_TRANSITIONS = {
+  [APPROVAL_STATUSES.DRAFT]: [APPROVAL_STATUSES.VALIDATION_FAILED, APPROVAL_STATUSES.READY_FOR_REVIEW],
+  [APPROVAL_STATUSES.VALIDATION_FAILED]: [APPROVAL_STATUSES.DRAFT, APPROVAL_STATUSES.READY_FOR_REVIEW],
+  [APPROVAL_STATUSES.READY_FOR_REVIEW]: [APPROVAL_STATUSES.APPROVED, APPROVAL_STATUSES.REJECTED, APPROVAL_STATUSES.CHANGES_REQUESTED],
+  [APPROVAL_STATUSES.APPROVED]: [APPROVAL_STATUSES.SCHEDULED, APPROVAL_STATUSES.SENDING, APPROVAL_STATUSES.DRAFT],
+  [APPROVAL_STATUSES.REJECTED]: [APPROVAL_STATUSES.DRAFT],
+  [APPROVAL_STATUSES.CHANGES_REQUESTED]: [APPROVAL_STATUSES.DRAFT, APPROVAL_STATUSES.READY_FOR_REVIEW],
+  [APPROVAL_STATUSES.SCHEDULED]: [APPROVAL_STATUSES.SENDING, APPROVAL_STATUSES.FAILED, APPROVAL_STATUSES.DRAFT],
+  [APPROVAL_STATUSES.SENDING]: [APPROVAL_STATUSES.SENT, APPROVAL_STATUSES.FAILED],
+  [APPROVAL_STATUSES.SENT]: [],
+  [APPROVAL_STATUSES.FAILED]: [APPROVAL_STATUSES.DRAFT],
+};
+
+export function transitionApprovalStatus(content, newStatus, { approvedBy, approvedAt, reason } = {}) {
+  if (!content || typeof content !== 'object') return content;
+  const current = content._approvalStatus || APPROVAL_STATUSES.DRAFT;
+  const allowed = VALID_TRANSITIONS[current];
+  if (!allowed || !allowed.includes(newStatus)) {
+    console.warn('[Approval] Invalid transition', { from: current, to: newStatus, allowed });
+    return null;
+  }
+
+  const updated = {
+    ...content,
+    _approvalStatus: newStatus,
+    _approvalHistory: [
+      ...(Array.isArray(content._approvalHistory) ? content._approvalHistory : []),
+      {
+        from: current,
+        to: newStatus,
+        timestamp: new Date().toISOString(),
+        approvedBy: approvedBy || null,
+        reason: reason || null,
+      }
+    ],
+  };
+
+  if (newStatus === APPROVAL_STATUSES.APPROVED) {
+    updated._approvedBy = approvedBy || 'unknown';
+    updated._approvedAt = approvedAt || new Date().toISOString();
+    updated._revisionHash = simpleHash(JSON.stringify({
+      html: content._htmlTemplate || '',
+      plainText: content._plainText || '',
+      subject: content.subject || '',
+    }));
+    updated._version = (content._version || 1) + 1;
+  }
+
+  if (newStatus === APPROVAL_STATUSES.DRAFT && content._approvedBy) {
+    delete updated._approvedBy;
+    delete updated._approvedAt;
+    delete updated._revisionHash;
+  }
+
+  return updated;
+}
 
 function sanitizeText(text) {
   if (!text) return '';
@@ -1108,10 +1169,70 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
       baseUrl !== '#' ? `Website: ${baseUrl}` : '',
       unsubscribeUrl ? `Unsubscribe: ${unsubscribeUrl}` : 'Reply UNSUBSCRIBE to opt out',
     ].filter(Boolean).join('\n'),
+    sections: {
+      preheader: previewText,
+      header: company,
+      body: bodyHtml,
+      footer: `© ${new Date().getFullYear()} ${company}. All rights reserved.`,
+      unsubscribe: unsubscribeHtml,
+    },
+    subjectOptions: Array.isArray(emailData.subjectOptions) ? emailData.subjectOptions : [],
+    personalizationVariables: Array.isArray(emailData.personalizationVariables) ? emailData.personalizationVariables : (
+      Array.isArray(emailData.personalizationFields) ? emailData.personalizationFields.map(f => ({ name: f, description: `Personalization field: ${f}`, example: '' })) : []
+    ),
     _emailType: emailData.emailType || null,
     _approvalStatus: APPROVAL_STATUSES.DRAFT,
     _generatedAt: new Date().toISOString(),
     _version: 1,
+  };
+}
+
+export function previewEmail(htmlContent, plainText, subject, emailData) {
+  const issues = [];
+
+  const body = emailData?.bodyParagraphs?.join(' ') || '';
+  const greeting = emailData?.greeting || '';
+  const ctaText = emailData?.ctaText || '';
+  const ctaUrl = emailData?.ctaUrl || '';
+  const subjectLine = subject || emailData?.subject || '';
+  const unsubscribeHtml = htmlContent?.includes('Unsubscribe') || htmlContent?.includes('unsubscribe');
+  const hasClosing = emailData?.closing || false;
+  const hasSignature = emailData?.signature || false;
+
+  if (!subjectLine) issues.push({ severity: 'blocked', field: 'subject', message: 'Subject line is required' });
+  if (!greeting) issues.push({ severity: 'blocked', field: 'greeting', message: 'Greeting is required' });
+  if (!body || body.length < 20) issues.push({ severity: 'blocked', field: 'body', message: 'Email body is required' });
+  if (!ctaText) issues.push({ severity: 'blocked', field: 'ctaText', message: 'Call-to-action is required' });
+  if (!unsubscribeHtml) issues.push({ severity: 'blocked', field: 'unsubscribe', message: 'Unsubscribe link is required' });
+  if (!hasClosing) issues.push({ severity: 'needs_review', field: 'closing', message: 'No closing paragraph' });
+  if (!hasSignature) issues.push({ severity: 'needs_review', field: 'signature', message: 'No signature block' });
+
+  const variablePattern = /\{\{[^}]+\}\}|{{[^}]+}}/g;
+  if (htmlContent) {
+    const unresolvedVars = htmlContent.match(variablePattern);
+    if (unresolvedVars && unresolvedVars.length > 0) {
+      issues.push({ severity: 'needs_review', field: 'personalization', message: `${unresolvedVars.length} unresolved variables: ${unresolvedVars.join(', ')}` });
+    }
+  }
+
+  if (ctaUrl && !ctaUrl.startsWith('http') && !ctaUrl.startsWith('#')) {
+    issues.push({ severity: 'needs_review', field: 'ctaUrl', message: `CTA URL "${ctaUrl}" may be invalid` });
+  }
+
+  const hasBlocked = issues.some(i => i.severity === 'blocked');
+  const hasWarnings = issues.some(i => i.severity === 'needs_review');
+
+  return {
+    valid: !hasBlocked,
+    status: hasBlocked ? 'blocked' : hasWarnings ? 'needs_review' : 'passed',
+    issues,
+    views: {
+      desktop: htmlContent || '',
+      plainText: plainText || '',
+      mobile: htmlContent ? htmlContent.replace(/style="width:\s*600/g, 'style="width:100%') : '',
+    },
+    subject: subjectLine,
+    previewText: emailData?.previewText || '',
   };
 }
 

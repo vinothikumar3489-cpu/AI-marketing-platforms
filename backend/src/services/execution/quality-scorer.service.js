@@ -461,6 +461,80 @@ const QUALITY_CHECKS = {
       return { status: 'passed', detail: `Product identity verified: ${identity?.productName}` };
     },
   },
+  contentCompleteness: {
+    label: 'Content completeness',
+    check: (content, brief, assetType) => {
+      const required = COMPLETENESS_RULES[assetType];
+      if (!required) return { status: 'not_applicable', detail: 'No completeness rules for this type' };
+      const missing = required.filter(field => {
+        const val = content[field];
+        if (val === null || val === undefined) return true;
+        if (typeof val === 'string' && val.trim().length === 0) return true;
+        if (Array.isArray(val) && val.length === 0) return true;
+        return false;
+      });
+      if (missing.length === 0) return { status: 'passed', detail: `All ${required.length} required fields present` };
+      if (missing.length > required.length / 2) return { status: 'blocked', detail: `${missing.length}/${required.length} required fields missing: ${missing.join(', ')}` };
+      return { status: 'needs_review', detail: `${missing.length}/${required.length} fields missing: ${missing.join(', ')}` };
+    },
+  },
+  platformSpecificQuality: {
+    label: 'Platform-specific quality',
+    check: (content, brief, assetType) => {
+      const rule = PLATFORM_QUALITY_RULES[assetType];
+      if (!rule) return { status: 'not_applicable', detail: 'No platform-specific rules' };
+      return rule(content);
+    },
+  },
+};
+
+const COMPLETENESS_RULES = {
+  linkedin_post: ['hook', 'bodyParagraphs', 'insight', 'proof', 'cta', 'hashtags', 'visualBrief'],
+  instagram_post: ['hook', 'caption', 'visualBrief'],
+  twitter_post: ['post'],
+  facebook_post: ['headline', 'body', 'cta'],
+  youtube_description: ['openingHook', 'description'],
+  email_copy: ['subject', 'greeting', 'bodyParagraphs', 'ctaText', 'closing'],
+  blog_article: ['title', 'article'],
+  landing_page: ['headline', 'body', 'cta'],
+  creative_brief: ['objective', 'audience', 'visualDirection'],
+  video_script: ['duration', 'scenes'],
+};
+
+const PLATFORM_QUALITY_RULES = {
+  facebook_post: (content) => {
+    const body = content.body || '';
+    if (!body.includes(content.productName || '') && !body.includes('value') && !body.includes('benefit') && !body.includes('solve')) {
+      return { status: 'blocked', detail: 'Facebook posts must explain product value or benefit to the audience' };
+    }
+    if (!content.cta) return { status: 'needs_review', detail: 'Facebook post missing call-to-action' };
+    const contentStr = JSON.stringify(content).toLowerCase();
+    const audienceTerms = ['you', 'your', 'audience', 'customer', 'user', 'team', 'business'];
+    const hasAudience = audienceTerms.some(t => contentStr.includes(t));
+    if (!hasAudience) return { status: 'needs_review', detail: 'Facebook post lacks audience relevance language' };
+    return { status: 'passed', detail: 'Facebook quality checks passed' };
+  },
+  youtube_description: (content) => {
+    if (content.timestamps && Array.isArray(content.timestamps)) {
+      for (const ts of content.timestamps) {
+        if (typeof ts.time === 'string' && ts.time.length > 8) {
+          return { status: 'blocked', detail: `Suspicious timestamp format: "${ts.time}" — timestamps should be MM:SS or HH:MM:SS` };
+        }
+      }
+    }
+    return { status: 'passed', detail: 'YouTube quality checks passed' };
+  },
+  linkedin_post: (content) => {
+    if (!content.insight || content.insight.length < 20) return { status: 'needs_review', detail: 'LinkedIn post missing substantial insight' };
+    if (!content.proof) return { status: 'needs_review', detail: 'LinkedIn post missing proof or evidence' };
+    return { status: 'passed', detail: 'LinkedIn quality checks passed' };
+  },
+  email_copy: (content) => {
+    if (!content.ctaText) return { status: 'blocked', detail: 'Email missing call-to-action' };
+    if (!content.bodyParagraphs || content.bodyParagraphs.length === 0) return { status: 'blocked', detail: 'Email body paragraphs required' };
+    if (!content.subject) return { status: 'blocked', detail: 'Email subject line required' };
+    return { status: 'passed', detail: 'Email quality checks passed' };
+  },
 };
 
 export function scoreContentQuality(content, brief, assetType) {

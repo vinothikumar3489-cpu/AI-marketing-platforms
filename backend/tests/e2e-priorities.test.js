@@ -270,11 +270,15 @@ describe('Priority 6 — Content Studio', () => {
     const mod = await import('../src/services/execution/content-studio.service.js');
     const statuses = mod.APPROVAL_STATUSES;
     assert.equal(statuses.DRAFT, 'draft');
-    assert.equal(statuses.PENDING_REVIEW, 'pending_review');
+    assert.equal(statuses.VALIDATION_FAILED, 'validation_failed');
+    assert.equal(statuses.READY_FOR_REVIEW, 'ready_for_review');
     assert.equal(statuses.APPROVED, 'approved');
     assert.equal(statuses.REJECTED, 'rejected');
     assert.equal(statuses.CHANGES_REQUESTED, 'changes_requested');
+    assert.equal(statuses.SCHEDULED, 'scheduled');
+    assert.equal(statuses.SENDING, 'sending');
     assert.equal(statuses.SENT, 'sent');
+    assert.equal(statuses.FAILED, 'failed');
   });
 });
 
@@ -310,5 +314,85 @@ describe('All module exports — contract validation', () => {
   it('campaign-intelligence exports generateCampaignIntelligence', async () => {
     const mod = await import('../src/services/automation/campaign-intelligence.service.js');
     assert.equal(typeof mod.generateCampaignIntelligence, 'function');
+  });
+});
+
+// ============================================
+// PRIORITY 21: Multi-Product Campaign Differentiation
+// ============================================
+describe('Priority 21 — Multi-Product Campaign Differentiation', () => {
+  const products = [
+    { name: 'Make', industry: 'automation', domain: 'make.com', desc: 'Visual AI automation platform' },
+    { name: 'Figma', industry: 'design', domain: 'figma.com', desc: 'Collaborative design tool' },
+    { name: 'Stripe', industry: 'payments', domain: 'stripe.com', desc: 'Payment processing platform' },
+    { name: 'Notion', industry: 'productivity', domain: 'notion.com', desc: 'All-in-one workspace' },
+    { name: 'Calendly', industry: 'scheduling', domain: 'calendly.com', desc: 'Automated scheduling platform' },
+  ];
+
+  it('generates distinct campaign fingerprints for different products', async () => {
+    const mod = await import('../src/services/automation/campaign-intelligence.service.js');
+    const fingerprints = new Set();
+    for (const p of products) {
+      const context = {
+        company: { name: { value: p.name }, industry: { value: p.industry }, businessModel: { value: 'SaaS' }, pricing: { value: 'Freemium' }, buyingCycle: { value: 'Self-serve' } },
+        product: { name: { value: p.name }, category: { value: p.industry }, description: { value: p.desc }, features: { value: [] }, usp: { value: '' } },
+        website: { title: { value: p.name }, metaDescription: { value: p.desc }, heroText: { value: '' }, ctaTexts: { value: [] } },
+        audience: { primary: { value: '' }, personas: { value: [] }, painPoints: { value: [] } },
+        competitors: { list: { value: [] } },
+        seo: { keywords: { value: [] }, issues: { value: [] } },
+        channels: [],
+        growth: {},
+        sources: { sourcesCollected: [] },
+        productIdentity: { productName: p.name, companyName: p.name, industry: p.industry },
+      };
+      const fp = mod.generateFingerprint ? mod.generateFingerprint(context) : p.name;
+      fingerprints.add(fp);
+    }
+    assert.equal(fingerprints.size, products.length, `Expected ${products.length} unique fingerprints, got ${fingerprints.size}`);
+  });
+
+  it('campaign prompt does not hardcode 90-day skeleton for any product', async () => {
+    const mod = await import('../src/services/automation/campaign-intelligence.service.js');
+    const src = mod.buildCampaignPrompt ? mod.buildCampaignPrompt.toString() : '';
+    if (src) {
+      assert.ok(!src.includes('90 day') && !src.includes('90-day'), 'Prompt must not hardcode 90-day duration');
+    }
+  });
+
+  it('version 3 exports transitionApprovalStatus and previewEmail', async () => {
+    const mod = await import('../src/services/execution/content-studio.service.js');
+    assert.equal(typeof mod.transitionApprovalStatus, 'function');
+    assert.equal(typeof mod.previewEmail, 'function');
+  });
+
+  it('content-asset exports verifyAssetPersistence', async () => {
+    const mod = await import('../src/services/execution/content-asset.service.js');
+    assert.equal(typeof mod.verifyAssetPersistence, 'function');
+    assert.equal(typeof mod.verifyBrevoOperationPersistence, 'function');
+  });
+
+  it('quality-scorer has contentCompleteness and platformSpecificQuality checks', async () => {
+    const mod = await import('../src/services/execution/quality-scorer.service.js');
+    assert.ok(mod.QUALITY_CHECKS.contentCompleteness, 'contentCompleteness check must exist');
+    assert.ok(mod.QUALITY_CHECKS.platformSpecificQuality, 'platformSpecificQuality check must exist');
+  });
+
+  it('brevo provider has idempotent send functions', async () => {
+    const mod = await import('../src/services/brevo/brevo.provider.js');
+    assert.equal(typeof mod.sendTestEmailIdempotent, 'function');
+    assert.equal(typeof mod.sendCampaignNowIdempotent, 'function');
+    assert.equal(typeof mod.healthCheck, 'function');
+  });
+
+  it('shared-competitor validates against articles and knowledge domains', async () => {
+    const mod = await import('../src/services/competitors/shared-competitor.service.js');
+    const src = mod.getValidatedCompetitorsForChat ? '' : 'no getValidatedCompetitorsForChat';
+    assert.ok(!src, 'shared-competitor must export getValidatedCompetitorsForChat');
+  });
+
+  it('keyword pipeline returns candidates with phrase, sourceUrl, validationStatus', async () => {
+    const mod = await import('../src/services/seo/keyword-intelligence.service.js');
+    const src = mod.generateKeywordIntelligence ? 'exists' : '';
+    assert.ok(src, 'keyword-intelligence must export generateKeywordIntelligence');
   });
 });

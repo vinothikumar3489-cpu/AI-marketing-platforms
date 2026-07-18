@@ -213,4 +213,71 @@ export async function regenerateAsset(prisma, assetId, newResult) {
   return newAsset;
 }
 
-export default { saveContentAsset, getContentAssets, getAssetVersions, regenerateAsset };
+export async function verifyAssetPersistence(prisma, assetId) {
+  const asset = await prisma.automationAsset.findUnique({ where: { id: assetId } });
+  if (!asset) return { verified: false, error: 'Asset not found' };
+
+  const content = asset.assetContent?.content;
+  const checks = {
+    id: !!asset.id,
+    assetType: !!asset.assetType,
+    assetTitle: !!asset.assetTitle,
+    contentPresent: !!content,
+    htmlPresent: !!(content?._htmlTemplate || content?.html),
+    plainTextPresent: !!(content?._plainText || content?.plainText),
+    subjectPresent: !!(content?.subject || content?.subjectLine),
+    approvalStatus: !!(content?._approvalStatus || asset.status),
+    versionPresent: !!(content?._version || asset.assetContent?.version),
+    identityPresent: !!(content?.productName || content?.brandName || asset.assetTitle),
+    generationMetadata: !!asset.assetContent?.generationMetadata,
+    briefSnapshot: !!asset.assetContent?.briefSnapshot,
+    evidenceSnapshot: !!asset.assetContent?.evidenceSnapshot,
+  };
+
+  const missing = Object.entries(checks).filter(([, v]) => !v).map(([k]) => k);
+  const verified = missing.length === 0;
+
+  if (asset.assetContent?.generationMetadata?.provider === 'brevo') {
+    checks.brevoCampaignId = !!(content?._brevoCampaignId || content?.providerCampaignId);
+  }
+
+  return {
+    verified,
+    assetId: asset.id,
+    assetType: asset.assetType,
+    version: asset.assetContent?.version || 1,
+    checks,
+    missingFields: missing,
+    errors: verified ? [] : [`Missing fields: ${missing.join(', ')}`],
+  };
+}
+
+export async function verifyBrevoOperationPersistence(prisma, assetId, operation) {
+  const asset = await prisma.automationAsset.findUnique({ where: { id: assetId } });
+  if (!asset) return { verified: false, error: 'Asset not found' };
+
+  const content = asset.assetContent?.content || {};
+  const campaignId = content._brevoCampaignId || content.providerCampaignId;
+  const requestStatus = content._brevoRequestStatus || content.providerStatus;
+
+  const checks = {
+    providerCampaignId: !!campaignId,
+    requestStatus: !!requestStatus,
+    operation,
+    timestamp: !!(content._brevoTimestamp || content.providerTimestamp),
+    userSafe: !requestStatus?.includes('error') && !requestStatus?.includes('fail'),
+  };
+
+  const missing = Object.entries(checks).filter(([, v]) => !v).map(([k]) => k);
+  return {
+    verified: missing.length === 0,
+    assetId: asset.id,
+    operation,
+    campaignId,
+    requestStatus,
+    checks,
+    missingFields: missing,
+  };
+}
+
+export default { saveContentAsset, getContentAssets, getAssetVersions, regenerateAsset, verifyAssetPersistence, verifyBrevoOperationPersistence };

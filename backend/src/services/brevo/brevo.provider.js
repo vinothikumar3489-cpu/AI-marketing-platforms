@@ -151,6 +151,41 @@ export async function sendTestEmail(campaignId, emailTo) {
   return brevoRequest('POST', `/emailCampaigns/${campaignId}/sendTest`, { emailTo: emails });
 }
 
+const _idempotencyStore = new Map();
+const IDEMPOTENCY_TTL = 300000;
+
+function makeIdempotencyKey(assetId, action) {
+  return `${assetId}::${action}`;
+}
+
+export async function sendTestEmailIdempotent(assetId, campaignId, emailTo, { onDuplicate } = {}) {
+  const key = makeIdempotencyKey(assetId, 'sendTest');
+  const existing = _idempotencyStore.get(key);
+  if (existing && Date.now() - existing.timestamp < IDEMPOTENCY_TTL) {
+    if (onDuplicate) onDuplicate(existing);
+    return { ...existing, idempotent: true, previousAttempt: existing.timestamp };
+  }
+  const result = await sendTestEmail(campaignId, emailTo);
+  const entry = { ...result, timestamp: Date.now(), assetId, campaignId };
+  _idempotencyStore.set(key, entry);
+  setTimeout(() => _idempotencyStore.delete(key), IDEMPOTENCY_TTL);
+  return { ...entry, idempotent: false };
+}
+
+export async function sendCampaignNowIdempotent(assetId, campaignId, { onDuplicate } = {}) {
+  const key = makeIdempotencyKey(assetId, 'sendNow');
+  const existing = _idempotencyStore.get(key);
+  if (existing && Date.now() - existing.timestamp < IDEMPOTENCY_TTL) {
+    if (onDuplicate) onDuplicate(existing);
+    return { ...existing, idempotent: true, previousAttempt: existing.timestamp };
+  }
+  const result = await sendCampaignNow(campaignId);
+  const entry = { ...result, timestamp: Date.now(), assetId, campaignId };
+  _idempotencyStore.set(key, entry);
+  setTimeout(() => _idempotencyStore.delete(key), IDEMPOTENCY_TTL);
+  return { ...entry, idempotent: false };
+}
+
 export async function getCampaignStatus(campaignId) {
   return brevoRequest('GET', `/emailCampaigns/${campaignId}`);
 }
