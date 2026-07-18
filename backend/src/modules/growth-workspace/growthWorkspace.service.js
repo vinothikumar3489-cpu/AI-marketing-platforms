@@ -79,8 +79,10 @@ function asArray(value) {
 // MAIN UNIFIED ANALYSIS FUNCTION
 // ============================================
 
-const EVIDENCE_BASED = 'EVIDENCE_BASED';
+const VERIFIED = 'VERIFIED';
+const SUPPORTED_INFERENCE = 'SUPPORTED_INFERENCE';
 const HYPOTHESIS = 'HYPOTHESIS';
+const EVIDENCE_BASED = 'EVIDENCE_BASED';
 
 export async function runFullGrowthAnalysis({ chatId, userId, input }) {
   console.log('🚀 [Growth Workspace] Starting full analysis:', { chatId, userId, productName: input.productName });
@@ -557,19 +559,13 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     console.log('🔄 [Growth Workspace] Results normalized');
     console.log('[Growth Normalize] normalizedResults keys', Object.keys(normalizedResults || {}));
 
-    // Calculate growth scores from evidence completeness, not AI guesses
-    function calculateEvidenceBasedScore(evidenceGrowthData) {
-      if (!evidenceGrowthData?.sourceSummary) return null;
-      return evidenceGrowthData.sourceSummary.completenessScore || null;
-    }
-
     function calculateSubScore(moduleKey, moduleData, evidenceGrowthData) {
       if (!moduleData) return null;
 
       const isHypothesis = moduleData._dataSource === HYPOTHESIS;
       const provider = moduleData.provider || '';
+      const isPureFallback = provider === 'fallback';
 
-      // Base score from evidence completeness
       let baseScore = 0;
       let detailBreakdown = [];
 
@@ -604,67 +600,111 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
         }
       }
 
-      // Apply evidence penalty: HYPOTHESIS gets max 50% of base, or 0 if pure fallback
-      if (isHypothesis) {
-        const isPureFallback = provider === 'fallback';
+      if (isPureFallback) {
         return {
-          value: isPureFallback ? null : Math.min(50, Math.round(baseScore * 0.5)),
+          value: null,
           evidenceSource: HYPOTHESIS,
+          status: HYPOTHESIS,
           breakdown: detailBreakdown,
-          penalty: isPureFallback ? 'pure_fallback' : 'ai_inferred_no_evidence'
+          penalty: 'pure_fallback'
+        };
+      }
+
+      if (isHypothesis) {
+        return {
+          value: baseScore > 0 ? Math.min(50, Math.round(baseScore * 0.5)) : null,
+          evidenceSource: HYPOTHESIS,
+          status: SUPPORTED_INFERENCE,
+          breakdown: detailBreakdown,
+          penalty: 'ai_inferred_no_evidence'
+        };
+      }
+
+      const realEvidenceCount = moduleData._evidenceCount ||
+        (moduleKey === 'product' ? evidenceGrowthData?.productIntelligence?.features?.length || 0 : 0);
+
+      if (realEvidenceCount > 0 || baseScore > 0) {
+        return {
+          value: baseScore > 0 ? baseScore : null,
+          evidenceSource: EVIDENCE_BASED,
+          status: realEvidenceCount > 0 ? VERIFIED : SUPPORTED_INFERENCE,
+          breakdown: detailBreakdown,
+          penalty: null
         };
       }
 
       return {
-        value: baseScore > 0 ? baseScore : null,
-        evidenceSource: baseScore > 0 ? EVIDENCE_BASED : HYPOTHESIS,
+        value: null,
+        evidenceSource: HYPOTHESIS,
+        status: HYPOTHESIS,
         breakdown: detailBreakdown,
-        penalty: null
+        penalty: 'no_data'
       };
     }
 
-    // Generate product-specific top recommendation from evidence
+    function recommendationStatus(signalCount, featureCount, competitorCount, personaCount) {
+      if (signalCount > 0 || featureCount > 0 || competitorCount > 0 || personaCount > 0) return VERIFIED;
+      if (signalCount > 0 || featureCount > 0) return SUPPORTED_INFERENCE;
+      return HYPOTHESIS;
+    }
+
     function generateTopRecommendation(results, input) {
       const productName = input.companyName || input.productName || 'the product';
       const signals = evidenceGrowthData?.growthSignals || [];
       const features = (evidenceGrowthData?.productIntelligence?.features || []).map(f => f.value);
-      
+      const topPersona = results.audience?.buyerPersonas?.[0]?.name || '';
+      const realPersonas = (results.audience?.buyerPersonas || []).filter(p => p.name && p.name !== 'Target Persona' && p.name !== 'Persona Name');
+
+      let text;
       if (signals.length > 0) {
-        return `Based on evidence: ${signals[0]?.signal || ''}. Leverage this opportunity for ${productName}.`;
+        text = `Based on evidence: ${signals[0]?.signal || ''}. Leverage this opportunity for ${productName}.`;
+      } else if (features.length > 0) {
+        text = `Prioritize marketing the key features found: ${features.slice(0, 3).join(', ')} for ${productName}.`;
+      } else {
+        const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel || 'digital channels';
+        text = `Focus on ${primaryChannel} to reach ${topPersona || 'target audience'} for ${productName}.`;
       }
-      if (features.length > 0) {
-        return `Prioritize marketing the key features found: ${features.slice(0, 3).join(', ')} for ${productName}.`;
-      }
-      
-      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel || 'digital channels';
-      const topPersona = results.audience?.buyerPersonas?.[0]?.name || 'target audience';
-      return `Focus on ${primaryChannel} to reach ${topPersona} for ${productName}.`;
+      return {
+        text,
+        status: recommendationStatus(signals.length, features.length, 0, realPersonas.length)
+      };
     }
 
     function generatePrimaryRisk(results, input) {
       const topCompetitor = results.competitor?.directCompetitors?.[0]?.name;
+      const realCompetitors = (results.competitor?.directCompetitors || []).filter(c => c.name && !c.name.includes('Competitor') && !c.name.includes('competitor'));
       const productName = input.companyName || input.productName || 'the product';
-      
+
+      let text;
       if (topCompetitor) {
-        return `Competitive pressure from ${topCompetitor} in the market.`;
+        text = `Competitive pressure from ${topCompetitor} in the market.`;
+      } else {
+        text = `Data insufficient to identify primary risk for ${productName}.`;
       }
-      return `Data insufficient to identify primary risk for ${productName}.`;
+      return {
+        text,
+        status: realCompetitors.length > 0 ? VERIFIED : HYPOTHESIS
+      };
     }
 
     function generateImmediateAction(results, input) {
       const features = (evidenceGrowthData?.productIntelligence?.features || []).map(f => f.value);
       const ctas = evidenceGrowthData?.productIntelligence?.ctaTexts || [];
       const productName = input.companyName || input.productName || 'the product';
-      
+
+      let text;
       if (ctas.length > 0) {
-        return `Test and optimize existing CTAs from website: "${ctas[0]}" to improve conversion for ${productName}.`;
+        text = `Test and optimize existing CTAs from website: "${ctas[0]}" to improve conversion for ${productName}.`;
+      } else if (features.length > 0) {
+        text = `Build landing pages highlighting top features: ${features.slice(0, 2).join(', ')} for ${productName}.`;
+      } else {
+        const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel || 'marketing';
+        text = `Launch ${primaryChannel} campaign to validate ${productName} positioning.`;
       }
-      if (features.length > 0) {
-        return `Build landing pages highlighting top features: ${features.slice(0, 2).join(', ')} for ${productName}.`;
-      }
-      
-      const primaryChannel = results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel || 'marketing';
-      return `Launch ${primaryChannel} campaign to validate ${productName} positioning.`;
+      return {
+        text,
+        status: ctas.length > 0 || features.length > 0 ? VERIFIED : HYPOTHESIS
+      };
     }
 
     const dimensionConfig = {
@@ -684,6 +724,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
         value: sub.value,
         label: cfg.label,
         evidenceSource: sub.evidenceSource,
+        status: sub.status,
         breakdown: sub.breakdown,
         penalty: sub.penalty
       };
@@ -694,9 +735,13 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     const measurableComponents = nonNullScores.length;
     const totalDimensions = Object.keys(rawScores).length;
 
-    const evidenceCompleteness = totalDimensions > 0 ? Math.round((measurableComponents / totalDimensions) * 100) : 0;
+    const dataAvailability = totalDimensions > 0 ? Math.round((measurableComponents / totalDimensions) * 100) : 0;
 
-    // Count evidence-based vs hypothesis-based dimensions
+    const statuses = Object.values(dimensionScoreDetails).map(d => d.status);
+    const verifiedEvidenceCoverage = statuses.filter(s => s === VERIFIED).length;
+    const inferredEvidenceCoverage = statuses.filter(s => s === SUPPORTED_INFERENCE).length;
+    const hypothesisCoverage = statuses.filter(s => s === HYPOTHESIS).length;
+
     const evidenceBasedCount = Object.values(dimensionScoreDetails).filter(d => d.evidenceSource === EVIDENCE_BASED).length;
     const hypothesisCount = Object.values(dimensionScoreDetails).filter(d => d.evidenceSource === HYPOTHESIS).length;
 
@@ -706,10 +751,11 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     if (measurableComponents >= 3) {
       const rawAverage = Math.round(nonNullScores.reduce((a, [, v]) => a + v, 0) / measurableComponents);
-      // Penalty based on how many dimensions are hypothesis vs evidence
       const evidenceRatio = measurableComponents > 0 ? evidenceBasedCount / measurableComponents : 0;
       const completenessRatio = measurableComponents / totalDimensions;
-      const penalty = Math.round((completenessRatio * 0.6 + evidenceRatio * 0.4) * 100) / 100;
+      // When evidenceBasedCount is 0, confidence stays below 40%
+      const verifiedBoost = verifiedEvidenceCoverage / totalDimensions;
+      const penalty = Math.round((completenessRatio * 0.5 + evidenceRatio * 0.3 + verifiedBoost * 0.2) * 100) / 100;
       overallGrowthScore = Math.round(rawAverage * penalty);
       scoreConfidence = Math.round(penalty * 100);
     } else {
@@ -719,12 +765,15 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     console.log('[Growth Scores]', {
       overallGrowthScore,
-      evidenceCompleteness,
+      dataAvailability,
       scoreConfidence,
       measurableComponents,
       totalDimensions,
       evidenceBasedCount,
       hypothesisCount,
+      verifiedEvidenceCoverage,
+      inferredEvidenceCoverage,
+      hypothesisCoverage,
     });
 
     const dimensionScores = {};
@@ -734,10 +783,15 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
         label: detail.label,
         available: detail.value !== null && detail.value !== undefined,
         evidenceSource: detail.evidenceSource,
+        status: detail.status,
         breakdown: detail.breakdown,
         penalty: detail.penalty
       };
     }
+
+    const topRec = generateTopRecommendation(normalizedResults, input);
+    const risk = generatePrimaryRisk(normalizedResults, input);
+    const action = generateImmediateAction(normalizedResults, input);
 
     const growthSummary = {
       overallGrowthScore,
@@ -748,15 +802,21 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       campaignReadinessScore: rawScores.campaignReadinessScore,
       growthScoreStatus,
       scoreConfidence,
-      evidenceCompleteness,
+      dataAvailability,
+      verifiedEvidenceCoverage,
+      inferredEvidenceCoverage,
+      hypothesisCoverage,
       dimensionScores,
       evidenceBasedCount,
       hypothesisCount,
       availableDimensions: nonNullScores.map(([k]) => k),
       unavailableDimensions: nullScores.map(([k]) => ({ key: k, label: dimensionConfig[k]?.label || k, reason: 'Insufficient evidence' })),
-      topRecommendation: generateTopRecommendation(normalizedResults, input),
-      primaryRisk: generatePrimaryRisk(normalizedResults, input),
-      immediateAction: generateImmediateAction(normalizedResults, input),
+      topRecommendation: topRec.text,
+      topRecommendationStatus: topRec.status,
+      primaryRisk: risk.text,
+      primaryRiskStatus: risk.status,
+      immediateAction: action.text,
+      immediateActionStatus: action.status,
       sourceModules: ['Product Analysis', 'Market Discovery', 'Audience Intelligence', 'Competitor Analysis', 'Intent Prediction', 'Positioning Engine', 'Campaign Generator', 'Channel Recommendation'],
     };
 

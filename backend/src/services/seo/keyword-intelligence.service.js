@@ -324,26 +324,36 @@ async function extractKeywordsFromWebsite({
   ];
 
   function normalizeText(t) {
-    return t.toLowerCase().replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim();
+    return t.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()"]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function isMostlyStopWords(words) {
+    if (words.length === 0) return true;
+    const stopCount = words.filter(w => STOPWORDS.has(w)).length;
+    return stopCount / words.length > 0.6;
   }
 
   function extractPhrases(text, maxWords = 5, minWords = 2) {
     const normalized = normalizeText(text);
-    const words = normalized.split(' ').filter(w => w.length > 0 && !STOPWORDS.has(w) && w.length > 1);
-    const phrases = [];
+    const rawWords = normalized.split(' ').filter(w => w.length > 0);
+    const phrases = new Set();
 
-    for (let len = Math.min(maxWords, words.length); len >= minWords; len--) {
-      for (let i = 0; i <= words.length - len; i++) {
-        const phrase = words.slice(i, i + len).join(' ');
-        if (phrase.length >= 5 && phrase.split(' ').every(w => w.length > 1)) {
-          const isBoilerplate = BOILERPLATE_PHRASES.some(bp => phrase.includes(bp));
-          if (!isBoilerplate) {
-            phrases.push(phrase);
-          }
+    for (let len = Math.min(maxWords, rawWords.length); len >= minWords; len--) {
+      for (let i = 0; i <= rawWords.length - len; i++) {
+        const window = rawWords.slice(i, i + len);
+        if (isMostlyStopWords(window)) continue;
+        const contentWords = window.filter(w => !STOPWORDS.has(w) && w.length > 1);
+        if (contentWords.length < minWords) continue;
+        if (contentWords.some(w => w.length > 20)) continue;
+        const phrase = window.join(' ');
+        if (phrase.length < 5) continue;
+        const isBoilerplate = BOILERPLATE_PHRASES.some(bp => phrase.includes(bp));
+        if (!isBoilerplate) {
+          phrases.add(phrase);
         }
       }
     }
-    return [...new Set(phrases)];
+    return [...phrases];
   }
 
   function scoreRelevance(phrase, productName, companyName, industry) {
@@ -461,15 +471,24 @@ Rules:
           }).filter(p => p.score >= 50);
 
           if (scored.length > 0) {
-            const primaryKeywords = scored.slice(0, 8).map(p => ({
-              keyword: p.phrase, source: 'ai_extracted', confidence: null, metricType: 'topic_idea_only', label: 'topic idea only', intent: null, relevanceScore: p.score
-            }));
-            const secondaryKeywords = scored.slice(8, 20).map(p => ({
-              keyword: p.phrase, source: 'ai_extracted', confidence: null, metricType: 'topic_idea_only', label: 'topic idea only', intent: null, relevanceScore: p.score
-            }));
-            const longTailKeywords = scored.slice(20, 30).map(p => ({
-              keyword: p.phrase, source: 'ai_extracted', confidence: null, metricType: 'topic_idea_only', label: 'topic idea only', intent: null, relevanceScore: p.score
-            }));
+            const mapAiCandidate = (p) => ({
+              phrase: p.phrase,
+              keyword: p.phrase,
+              source: 'ai_extracted',
+              sourceUrl: websiteData.url || '',
+              intent: null,
+              productRelevance: p.score || 50,
+              searchRelevance: null,
+              validationStatus: 'PENDING',
+              metricsStatus: 'NO_METRICS',
+              confidence: null,
+              metricType: 'topic_idea_only',
+              label: 'topic idea only',
+              relevanceScore: p.score || 50
+            });
+            const primaryKeywords = scored.slice(0, 8).map(mapAiCandidate);
+            const secondaryKeywords = scored.slice(8, 20).map(mapAiCandidate);
+            const longTailKeywords = scored.slice(20, 30).map(mapAiCandidate);
             console.log(`[Keyword Extraction] AI extracted ${scored.length} keyword candidates`);
             return {
               primary: primaryKeywords, secondary: secondaryKeywords, longTail: longTailKeywords, questions: parsed.questions || [],
@@ -507,47 +526,29 @@ Rules:
     .filter(p => p.score >= 50)
     .slice(0, 30);
 
-  const primary = relevant.slice(0, 8).map(p => ({
+  const mapCandidate = (p) => ({
+    phrase: p.phrase,
     keyword: p.phrase,
+    source: p.source || 'website_content',
+    sourceUrl: websiteData.url || '',
+    intent: null,
+    productRelevance: p.score || 50,
+    searchRelevance: null,
+    validationStatus: 'PENDING',
+    metricsStatus: 'NO_METRICS',
     searchVolume: null,
     keywordDifficulty: null,
     cpc: null,
     competition: null,
-    source: 'topic_candidate',
     confidence: null,
     metricType: 'topic_idea_only',
     label: 'topic idea only',
-    intent: null,
-    relevanceScore: p.score
-  }));
+    relevanceScore: p.score || 50
+  });
 
-  const secondary = relevant.slice(8, 20).map(p => ({
-    keyword: p.phrase,
-    searchVolume: null,
-    keywordDifficulty: null,
-    cpc: null,
-    competition: null,
-    source: 'topic_candidate',
-    confidence: null,
-    metricType: 'topic_idea_only',
-    label: 'topic idea only',
-    intent: null,
-    relevanceScore: p.score
-  }));
-
-  const longTail = relevant.slice(20, 30).map(p => ({
-    keyword: p.phrase,
-    searchVolume: null,
-    keywordDifficulty: null,
-    cpc: null,
-    competition: null,
-    source: 'topic_candidate',
-    confidence: null,
-    metricType: 'topic_idea_only',
-    label: 'topic idea only',
-    intent: null,
-    relevanceScore: p.score
-  }));
+  const primary = relevant.slice(0, 8).map(mapCandidate);
+  const secondary = relevant.slice(8, 20).map(mapCandidate);
+  const longTail = relevant.slice(20, 30).map(mapCandidate);
 
   console.log(`[Keyword Extraction] Generated ${relevant.length} keyword candidates: ${primary.length} primary, ${secondary.length} secondary, ${longTail.length} long-tail`);
 

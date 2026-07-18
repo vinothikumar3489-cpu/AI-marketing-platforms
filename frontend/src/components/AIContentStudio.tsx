@@ -1057,6 +1057,8 @@ export default function AIContentStudio() {
   const [readinessLoading, setReadinessLoading] = useState(false);
   const [addingToCampaign, setAddingToCampaign] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const requestVersionRef = useRef(0);
+  const pendingRequestsRef = useRef<Set<string>>(new Set());
 
   const handleAddToEmailCampaign = useCallback(async (assetId: string) => {
     if (!selectedChatId || addingToCampaign) return;
@@ -1076,6 +1078,34 @@ export default function AIContentStudio() {
     }
   }, [selectedChatId, addingToCampaign]);
 
+  const safeFetch = useCallback(async <T>(
+    key: string,
+    fetcher: (signal: AbortSignal) => Promise<T>,
+    setter: (data: T | null) => void,
+    onFinally?: () => void
+  ) => {
+    const version = requestVersionRef.current;
+    const requestId = `${selectedChatId}:${key}`;
+
+    if (!selectedChatId) return;
+    if (pendingRequestsRef.current.has(requestId)) return;
+
+    pendingRequestsRef.current.add(requestId);
+    if (abortRef.current?.signal.aborted) return;
+
+    try {
+      const data = await fetcher(abortRef.current.signal);
+      if (!abortRef.current.signal.aborted && requestVersionRef.current === version) {
+        setter(data ?? null);
+      }
+    } catch {
+      if (!abortRef.current?.signal.aborted) setter(null);
+    } finally {
+      pendingRequestsRef.current.delete(requestId);
+      onFinally?.();
+    }
+  }, [selectedChatId]);
+
   useEffect(() => {
     setBrief(null);
     setGeneratedContent(null);
@@ -1090,58 +1120,40 @@ export default function AIContentStudio() {
       return;
     }
 
+    requestVersionRef.current++;
     if (abortRef.current) abortRef.current.abort();
     abortRef.current = new AbortController();
+    pendingRequestsRef.current.clear();
 
     setContextLoading(true);
     setBriefLoading(true);
     setReadinessLoading(true);
 
-    getEvidenceContext(selectedChatId)
-      .then(ctx => {
-        if (ctx && typeof ctx === 'object') setEvidenceContext(ctx);
-        else setEvidenceContext(null);
-      })
-      .catch(() => setEvidenceContext(null))
-      .finally(() => setContextLoading(false));
+    safeFetch('evidenceContext',
+      () => getEvidenceContext(selectedChatId),
+      (d) => setEvidenceContext(d),
+      () => setContextLoading(false)
+    );
 
-    getContentBrief(selectedChatId)
-      .then(res => {
-        if (res && typeof res === 'object') setBrief(res);
-        else setBrief(null);
-      })
-      .catch(() => setBrief(null))
-      .finally(() => setBriefLoading(false));
+    safeFetch('contentBrief',
+      () => getContentBrief(selectedChatId) as Promise<any>,
+      (d) => setBrief(d),
+      () => setBriefLoading(false)
+    );
 
-    // Source of truth for content readiness is the backend evidence-readiness endpoint.
-    // PART 10: Preserve previous readiness during refetch to prevent flicker
-    setReadinessLoading(true);
-    api.get(`/chats/${selectedChatId}/evidence-readiness`)
-      .then((res: any) => {
-        console.info("[Content Studio] Evidence-readiness response", {
-          chatId: selectedChatId,
-          responseType: typeof res,
-          responseKeys: res ? Object.keys(res) : null,
-          contentGenerationReady: res?.contentGenerationReady,
-          hasProductIntelligence: res?.hasProductIntelligence,
-          fullResponse: res
-        });
-        // Handle both wrapped and unwrapped response shapes
-        const readinessData = res?.data || res;
-        if (readinessData && typeof readinessData === 'object') {
-          setReadiness(readinessData);
-        }
-      })
-      .catch((err) => {
-        console.error("[Content Studio] Evidence-readiness fetch failed", err);
-        // Don't setReadiness(null) on error - preserve previous value
-      })
-      .finally(() => setReadinessLoading(false));
+    safeFetch('evidenceReadiness',
+      (signal) => api.get(`/chats/${selectedChatId}/evidence-readiness`, { signal }) as Promise<any>,
+      (d) => {
+        const readinessData = d?.data || d;
+        if (readinessData && typeof readinessData === 'object') setReadiness(readinessData);
+      },
+      () => setReadinessLoading(false)
+    );
 
     return () => {
       if (abortRef.current) abortRef.current.abort();
     };
-  }, [selectedChatId]);
+  }, [selectedChatId, safeFetch]);
 
   const handleGenerated = useCallback((result: any) => {
     if (!result) {
@@ -1194,13 +1206,19 @@ export default function AIContentStudio() {
     brief?.product?.name ||
     fullResults?.hasProductIntelligence === true
   );
-  console.info("[Content Studio Readiness]", {
-    chatId: selectedChatId,
-    hasProductIntelligence: fullResults?.hasProductIntelligence,
-    contentGenerationReady: backendReady,
-    readiness,
-    hasEvidence,
-    sourceComponent: "AIContentStudio.tsx"
+  const readinessLogChatRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (readinessLogChatRef.current !== selectedChatId || backendReady !== readiness?.contentGenerationReady) {
+      readinessLogChatRef.current = selectedChatId;
+      console.info("[Content Studio Readiness]", {
+        chatId: selectedChatId,
+        hasProductIntelligence: fullResults?.hasProductIntelligence,
+        contentGenerationReady: backendReady,
+        readiness,
+        hasEvidence,
+        sourceComponent: "AIContentStudio.tsx"
+      });
+    }
   });
 
   const tabs = [

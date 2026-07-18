@@ -202,7 +202,11 @@ function buildCampaignPrompt(context) {
 
   evidenceLines.push(`Evidence Sources: ${sources.sourcesCollected?.join(", ") || "none"}`);
 
+  const fingerprint = generateFingerprint(context);
+
   return `You are the Campaign Intelligence Engine for an AI Marketing Platform. Your role is to plan evidence-based marketing campaigns.
+
+CAMPAIGN FINGERPRINT: ${fingerprint}
 
 EVIDENCE FROM ANALYSIS:
 ${evidenceLines.join("\n")}
@@ -214,7 +218,11 @@ RULES (ABSOLUTE):
 4. If evidence is insufficient, use "Insufficient evidence" as the reason.
 5. Never use placeholder text, lorem ipsum, or filler content.
 6. Do NOT generate fake percentages, fake growth numbers, or fake performance metrics.
-7. For marketingFunnel, only include stages that the evidence genuinely supports. Do NOT generate all six standard stages (awareness/interest/consideration/conversion/retention/advocacy). Instead, create only 2-4 stages that match the campaign goal, audience, and product evidence. For example, a new product launch may only warrant awareness → consideration → conversion, while a mature product may add retention. Each stage must reference specific evidence for its inclusion.
+7. CRITICAL: This campaign is for a SPECIFIC product with a unique identity. DO NOT generate a generic 90-day skeleton. Derive the actual strategy from the evidence provided. The campaign name, theme, channels, funnel, and KPIs must be uniquely derived from THIS product's evidence.
+8. For marketingFunnel, only include stages that the evidence genuinely supports. Do NOT generate all six standard stages (awareness/interest/consideration/conversion/retention/advocacy). Instead, create only 2-4 stages that match the campaign goal, audience, and product evidence. Each stage must reference specific evidence for its inclusion. If the funnel would be empty, set it to an empty object.
+9. For kpiFramework, each KPI must include: name, businessDefinition, formula, eventSource, analyticsTool, baselineStatus (one of BASELINE_REQUIRED/TRACKABLE_NOT_CONNECTED/CONNECTED/UNAVAILABLE), targetStatus, reportingFrequency, owner, attributionWindow. Do NOT invent baseline or target values.
+10. For channelRecommendations, each channel must include: channel, role, targetSegment, buyingStage, objective, targeting, message, contentFormats, landingDestination, cta, budgetLogic, kpis, testIdeas, evidence, confidence. Do NOT default to Google Ads + LinkedIn.
+11. The campaign may be for an early-stage product with limited evidence. In that case, focus on validation and learning, not a full-funnel rollout.
 
 Return valid JSON with this exact structure (no markdown, no code fences):
 
@@ -477,14 +485,39 @@ function generateEvidenceHash(evidenceReconciliation) {
     hasGrowthData: evidenceReconciliation.evidenceStatus?.hasGrowthData,
   });
   
-  // Simple hash function
   let hash = 0;
   for (let i = 0; i < evidenceString.length; i++) {
     const char = evidenceString.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
+    hash = hash & hash;
   }
   return Math.abs(hash).toString(36);
+}
+
+function generateFingerprint(context) {
+  const parts = [
+    context.company?.name?.value || '',
+    context.product?.category?.value || context.product?.industry?.value || '',
+    context.company?.businessModel?.value || '',
+    JSON.stringify(context.audience?.segments?.value || context.audience?.primary?.value || ''),
+    context.product?.conversionEvent?.value || '',
+    context.company?.pricing?.value || '',
+    context.company?.buyingCycle?.value || '',
+    JSON.stringify((context.channels || []).map(c => c.name || c).sort()),
+    context.evidence?.hash || '',
+  ];
+  return simpleHash(parts.join('::'));
+}
+
+function detectCampaignSimilarity(fingerprint1, fingerprint2) {
+  if (!fingerprint1 || !fingerprint2) return { similar: false, similarityScore: 0 };
+  let matches = 0;
+  const minLen = Math.min(fingerprint1.length, fingerprint2.length);
+  for (let i = 0; i < minLen; i++) {
+    if (fingerprint1[i] === fingerprint2[i]) matches++;
+  }
+  const score = Math.round((matches / Math.max(fingerprint1.length, fingerprint2.length)) * 100);
+  return { similar: score >= 70, similarityScore: score };
 }
 
 /**
@@ -1037,6 +1070,32 @@ function buildAudienceSelection(context) {
   };
 }
 
+function makeChannelPlan(channel, role, fit, priority, reason, evidence, targetSegment, buyingStage, primaryAudience) {
+  return {
+    channel,
+    role,
+    targetSegment: targetSegment || primaryAudience || 'target audience',
+    buyingStage: buyingStage || 'awareness',
+    objective: '',
+    targeting: '',
+    message: '',
+    contentFormats: [],
+    landingDestination: '',
+    cta: '',
+    budgetLogic: '',
+    kpis: [],
+    testIdeas: [],
+    fit,
+    priority,
+    reason,
+    evidence,
+    confidence: evidence !== 'best_practice' ? 'high' : 'medium',
+    recommendedContent: '',
+    recommendedCTA: '',
+    organicOrPaid: 'organic'
+  };
+}
+
 function determineChannels(context) {
   const { product, company, website, audience, competitors, seo, channels, growth } = context;
   const recs = [];
@@ -1050,89 +1109,170 @@ function determineChannels(context) {
   const hasProductData = !!(product.usp?.value || product.features?.value?.length);
   const hasSeoKeywords = !!(seo?.keywords?.value?.length);
   const hasCompetitorData = !!(competitors?.list?.value?.length);
+  const hasAudienceData = !!(audience?.personas?.value?.length || audience?.primary?.value);
+  const primaryAudience = audience?.primary?.value || 'target audience';
+  const productName = product.name?.value || company.name?.value || 'product';
 
   if (hasSeoKeywords || seo?.issues?.value?.length) {
-    recs.push({
-      channel: "Organic SEO",
-      fit: "high",
-      priority: "high",
-      reason: "SEO opportunities and/or issues detected in analysis",
-      evidence: "seo_intelligence",
-      recommendedContent: "SEO-optimized blog posts and landing pages addressing identified keyword gaps",
-      recommendedCTA: "Learn More / Read More",
-      organicOrPaid: "organic"
-    });
+    const plan = makeChannelPlan(
+      'Organic SEO', 'Drive organic discovery', 'high', 'high',
+      'SEO opportunities detected in analysis', 'seo_intelligence',
+      'search audience', 'awareness', primaryAudience
+    );
+    plan.objective = 'Increase organic visibility for target keywords';
+    plan.targeting = 'Search intent based on keyword clusters';
+    plan.message = 'Educational and solution-oriented content';
+    plan.contentFormats = ['Blog posts', 'Landing pages', 'How-to guides'];
+    plan.landingDestination = '/blog/ /resources/';
+    plan.cta = 'Learn More';
+    plan.budgetLogic = 'Content production hours + SEO tool costs';
+    plan.kpis = ['Organic traffic', 'Keyword rankings', 'Organic CTR'];
+    plan.testIdeas = ['Content format A/B testing', 'Long-tail vs short-tail targeting'];
+    plan.organicOrPaid = 'organic';
+    recs.push(plan);
   }
 
   if (hasProductData) {
-    recs.push({
-      channel: "Content Marketing",
-      fit: "high",
-      priority: "high",
-      reason: "Product features and USPs identified — content marketing can showcase them effectively",
-      evidence: "product_intelligence",
-      recommendedContent: "Product-focused content, comparison guides, feature highlights",
-      recommendedCTA: "Get Started / Learn More",
-      organicOrPaid: "organic"
-    });
-  }
+    const plan = makeChannelPlan(
+      'Content Marketing', 'Educate and build authority', 'high', 'high',
+      'Product features and USPs identified', 'product_intelligence',
+      'in-market buyers', 'consideration', primaryAudience
+    );
+    plan.objective = 'Showcase product value through educational content';
+    plan.targeting = 'Topic clusters around product use cases';
+    plan.message = 'Product benefits, comparisons, and thought leadership';
+    plan.contentFormats = ['Case studies', 'Comparison guides', 'Feature highlights', 'Whitepapers'];
+    plan.landingDestination = '/resources/ /product/';
+    plan.cta = 'Get Started / Learn More';
+    plan.budgetLogic = 'Content calendar-driven production';
+    plan.kpis = ['Content engagement', 'Lead generation from content', 'Time on page'];
+    plan.testIdeas = ['Content types (video vs text vs infographic)', 'CTA placement testing'];
+    plan.organicOrPaid = 'organic';
+    recs.push(plan);
 
-  recs.push({
-    channel: "LinkedIn",
-    fit: "medium",
-    priority: "high",
-    reason: "B2B lead generation and professional networking",
-    evidence: "channel_best_practices",
-    recommendedContent: "Thought leadership, industry insights, product updates",
-    recommendedCTA: "Follow Page / Visit Website",
-    organicOrPaid: "organic"
-  });
+    const emailPlan = makeChannelPlan(
+      'Email Marketing', 'Nurture leads through lifecycle', 'medium', 'medium',
+      'Product data available for nurture sequences', 'product_intelligence',
+      'known leads and prospects', 'consideration', primaryAudience
+    );
+    emailPlan.objective = 'Move prospects through consideration to conversion';
+    emailPlan.targeting = 'Segmented by behavior and lead source';
+    emailPlan.message = 'Relevant product education and social proof';
+    emailPlan.contentFormats = ['Drip sequences', 'Newsletter', 'Product updates'];
+    emailPlan.landingDestination = '/product/ /demo/';
+    emailPlan.cta = 'Try Now / Schedule Demo';
+    emailPlan.budgetLogic = 'Email platform subscription + content production';
+    emailPlan.kpis = ['Open rate', 'CTR', 'Conversion from email'];
+    emailPlan.testIdeas = ['Subject line A/B testing', 'Send time optimization', 'Segmentation strategy'];
+    emailPlan.organicOrPaid = 'organic';
+    recs.push(emailPlan);
+  }
 
   if (hasCompetitorData) {
-    recs.push({
-      channel: "Google Search",
-      fit: "high",
-      priority: "medium",
-      reason: "Competitors present — paid search can capture competitor audience",
-      evidence: "competitor_intelligence",
-      recommendedContent: "Competitor comparison landing pages, branded search ads",
-      recommendedCTA: "Learn More / Compare",
-      organicOrPaid: "both"
-    });
+    const plan = makeChannelPlan(
+      'Paid Search', 'Capture competitor audience', 'high', 'high',
+      'Competitor presence indicates paid search opportunity', 'competitor_intelligence',
+      'competitor searchers', 'consideration', primaryAudience
+    );
+    plan.objective = 'Capture in-market audience searching for alternatives';
+    plan.targeting = 'Competitor brand terms + category keywords';
+    plan.message = 'Comparison messaging and unique value proposition';
+    plan.contentFormats = ['Search ads', 'Comparison landing pages'];
+    plan.landingDestination = '/vs-competitor/ /product/';
+    plan.cta = 'Compare / See Why Better';
+    plan.budgetLogic = 'Cost-per-click based; start with competitor conquest budget';
+    plan.kpis = ['Click-through rate', 'CPA', 'Conversion rate'];
+    plan.testIdeas = ['Ad copy variants (feature vs benefit)', 'Landing page messaging'];
+    plan.organicOrPaid = 'paid';
+    recs.push(plan);
   }
 
-  recs.push({
-    channel: "Email",
-    fit: "medium",
-    priority: "medium",
-    reason: "Direct communication channel for lead nurturing",
-    evidence: "channel_best_practices",
-    recommendedContent: "Newsletter, product updates, educational content",
-    recommendedCTA: "Read More / Get Started",
-    organicOrPaid: "organic"
-  });
+  if (hasAudienceData) {
+    const linkedinPlan = makeChannelPlan(
+      'LinkedIn', 'B2B audience targeting', 'high', 'high',
+      'Audience data enables precise LinkedIn targeting', 'audience_intelligence',
+      'professional segments', 'awareness', primaryAudience
+    );
+    linkedinPlan.objective = 'Build brand awareness among target professional segments';
+    linkedinPlan.targeting = 'Job titles, industries, company size, seniority';
+    linkedinPlan.message = 'Thought leadership and industry insights';
+    linkedinPlan.contentFormats = ['Sponsored content', 'InMail', 'Thought leadership posts'];
+    linkedinPlan.landingDestination = '/product/ /resources/';
+    linkedinPlan.cta = 'Learn More / Connect';
+    linkedinPlan.budgetLogic = 'CPC or CPM based; LinkedIn premium pricing';
+    linkedinPlan.kpis = ['Impressions', 'Engagement rate', 'Lead form submissions'];
+    linkedinPlan.testIdeas = ['Audience narrowing vs broad', 'Message type (educational vs promotional)'];
+    linkedinPlan.organicOrPaid = 'both';
+    recs.push(linkedinPlan);
+  }
 
-  recs.push({
-    channel: "Communities",
-    fit: "medium",
-    priority: "low",
-    reason: "Community engagement for brand building and feedback",
-    evidence: "channel_best_practices",
-      recommendedContent: "Discussion participation, community support, industry topics",
-    recommendedCTA: "Join Community",
-    organicOrPaid: "organic"
-  });
+  if (hasAudienceData) {
+    const xPlan = makeChannelPlan(
+      'X (Twitter)', 'Community engagement and trends', 'medium', 'medium',
+      'Audience insights available for community conversations', 'audience_intelligence',
+      'industry followers and influencers', 'awareness', primaryAudience
+    );
+    xPlan.objective = 'Participate in industry conversations and build following';
+    xPlan.targeting = 'Industry hashtags and relevant conversations';
+    xPlan.message = 'Quick insights, industry news, community engagement';
+    xPlan.contentFormats = ['Short posts', 'Threads', 'Visual content'];
+    xPlan.landingDestination = '/product/ /blog/';
+    xPlan.cta = 'Follow / Share / Learn More';
+    xPlan.budgetLogic = 'Minimal organic; paid promotions optional';
+    xPlan.kpis = ['Follower growth', 'Engagement rate', 'Share of voice'];
+    xPlan.testIdeas = ['Post frequency testing', 'Content mix (educational vs promotional)'];
+    xPlan.organicOrPaid = 'organic';
+    recs.push(xPlan);
+  }
 
-  if (lower.includes("youtube") || lower.includes("video")) {
-    recs.push({
-      channel: "YouTube",
-      fit: "high",
-      priority: "medium",
-      reason: "Video content referenced on website",
-      evidence: "website_content_analysis",
-      recommendedContent: "Product demos, tutorials, thought leadership videos",
-      recommendedCTA: "Subscribe / Watch More",
-      organicOrPaid: "organic"
+  if (lower.includes("enterprise") || lower.includes("business") || lower.includes("team")) {
+    const plan = makeChannelPlan(
+      'Webinars / Events', 'Deep engagement with qualified prospects', 'high', 'medium',
+      'Enterprise positioning detected — webinars effective for B2B', 'content_language_analysis',
+      'enterprise decision-makers', 'consideration', primaryAudience
+    );
+    plan.objective = 'Generate qualified leads through educational events';
+    plan.targeting = 'Decision-makers in target industries';
+    plan.message = 'Solve specific industry challenges with product';
+    plan.contentFormats = ['Live demos', 'Industry panels', 'Educational sessions'];
+    plan.landingDestination = '/webinars/ /events/';
+    plan.cta = 'Register / Watch On-Demand';
+    plan.budgetLogic = 'Event platform costs + promotion budget';
+    plan.kpis = ['Registrations', 'Attendance rate', 'Post-event conversion'];
+    plan.testIdeas = ['Format (live vs on-demand)', 'Topic selection A/B'];
+    plan.organicOrPaid = 'both';
+    recs.push(plan);
+  }
+
+  if (lower.includes("youtube") || lower.includes("video") || lower.includes("demo") || lower.includes("visual")) {
+    const plan = makeChannelPlan(
+      'YouTube', 'Visual product demonstration', 'high', 'medium',
+      'Video content referenced on website — YouTube showcases product visually', 'website_content_analysis',
+      'visual learners and researchers', 'awareness', primaryAudience
+    );
+    plan.objective = 'Build product understanding through visual content';
+    plan.targeting = 'Search intent around product category';
+    plan.message = 'Visual demonstration of value and ease of use';
+    plan.contentFormats = ['Product demos', 'Tutorials', 'Customer testimonials'];
+    plan.landingDestination = '/product/ /demo/';
+    plan.cta = 'Subscribe / Watch Full Demo';
+    plan.budgetLogic = 'Production costs + YouTube Ads (optional)';
+    plan.kpis = ['Views', 'Watch time', 'Subscription conversions'];
+    plan.testIdeas = ['Video length optimization', 'Thumbnail A/B testing'];
+    plan.organicOrPaid = 'both';
+    recs.push(plan);
+  }
+
+  if (channels?.length) {
+    channels.forEach(suggested => {
+      const channelName = suggested.channel || suggested.name;
+      if (channelName && !recs.some(r => r.channel.toLowerCase() === channelName.toLowerCase())) {
+        recs.push(makeChannelPlan(
+          channelName, 'Evidence-suggested channel', 'medium', 'medium',
+          'Suggested by channel analysis module', 'channel_analysis',
+          primaryAudience, 'awareness', primaryAudience
+        ));
+      }
     });
   }
 
@@ -1179,53 +1319,81 @@ function buildTimeline(context, channels) {
 }
 
 function buildFunnel(context, channels) {
+  const { product, company, audience } = context;
   const channelNames = channels.map(c => c.channel);
-  const topChannels = channelNames.slice(0, 3).length > 0 ? channelNames.slice(0, 3) : ["Content Marketing", "Organic SEO", "LinkedIn"];
+  const hasProductData = !!(product.usp?.value || product.features?.value?.length);
+  const hasAudienceData = !!(audience?.primary?.value || audience?.personas?.value?.length);
+  const hasCompetitorData = !!(context.competitors?.list?.value?.length);
+  const goal = determineBusinessGoal(context).goal || '';
+  const isLaunch = goal.toLowerCase().includes('launch');
 
-  return {
-    awareness: {
-      objective: "Build brand visibility and reach new audience segments",
-      channels: topChannels,
+  const funnel = {};
+
+  if (hasAudienceData || hasCompetitorData || isLaunch) {
+    funnel.awareness = {
+      objective: isLaunch ? "Introduce the product to the market and build initial awareness" : "Build brand visibility and reach new audience segments",
+      audience: audience?.primary?.value || 'target audience',
+      barrier: isLaunch ? "Unknown brand, no market presence" : "Low brand recall",
+      message: isLaunch ? "New solution for known problem" : "Thought leadership and industry insights",
+      channel: channelNames.filter(c => ['LinkedIn', 'X (Twitter)', 'Organic SEO', 'YouTube'].includes(c)),
       content: "Educational content, thought leadership, SEO-optimized articles",
-      cta: "Learn More / Read Article",
-      measurement: "Traffic, impressions, reach, new visitors"
-    },
-    interest: {
-      objective: "Engage audience with relevant content and establish authority",
-      channels: topChannels,
-      content: "In-depth guides, comparison content, how-to articles",
-      cta: "Download Guide / Watch Webinar",
-      measurement: "Time on page, content downloads, email signups, social engagement"
-    },
-    consideration: {
-      objective: "Nurture prospects toward solution awareness and evaluation",
-      channels: ["Email", "Content Marketing", "LinkedIn"],
-      content: "Product comparisons, feature highlights, demo content",
-      cta: "Schedule Demo / Request Quote",
-      measurement: "Demo requests, content engagement score, email CTR"
-    },
-    conversion: {
+      cta: "Learn More",
+      event: 'first_visit',
+      kpi: 'Impressions, reach, new visitors',
+      evidence: hasAudienceData ? 'audience_intelligence' : 'campaign_goal'
+    };
+  }
+
+  if (hasProductData || hasAudienceData) {
+    funnel.consideration = {
+      objective: "Educate prospects on product value and differentiation",
+      audience: audience?.personas?.value?.[0]?.name || 'evaluating prospects',
+      barrier: "Lack of product understanding vs competitors",
+      message: "Product benefits, comparisons, and proof points",
+      channel: channelNames.filter(c => ['Content Marketing', 'Email Marketing', 'Paid Search', 'Webinars / Events'].includes(c)),
+      content: "Case studies, comparison guides, feature highlights, demo content",
+      cta: "Schedule Demo",
+      event: 'demo_request',
+      kpi: 'Demo requests, content engagement score',
+      evidence: hasProductData ? 'product_intelligence' : 'audience_intelligence'
+    };
+  }
+
+  if (hasProductData) {
+    funnel.conversion = {
       objective: "Convert qualified prospects into customers",
-      channels: ["Email", "Google Search", "Direct"],
-      content: "Testimonials, free trial offers, limited-time incentives",
+      audience: 'high-intent prospects',
+      barrier: "Price objection, implementation concerns",
+      message: "Social proof, risk reduction, time-limited offers",
+      channel: channelNames.filter(c => ['Email Marketing', 'Paid Search'].includes(c)),
+      content: "Testimonials, free trial offers, case studies",
       cta: "Start Free Trial / Get Started",
-      measurement: "Conversion rate, signup rate, revenue (when measurable)"
-    },
-    retention: {
-      objective: "Retain customers and drive product adoption",
-      channels: ["Email", "Communities"],
-      content: "Onboarding sequences, product tips, feature updates, success stories",
-      cta: "Explore Feature / Join Community",
-      measurement: "Activation rate, retention rate, feature adoption, NPS"
-    },
-    advocacy: {
-      objective: "Convert customers into brand advocates and referral sources",
-      channels: ["Email", "Communities"],
-      content: "Customer spotlight, review requests, success stories",
-      cta: "Leave a Review / Share Feedback",
-      measurement: "Referral count, reviews, testimonials, organic mentions"
-    }
-  };
+      event: 'signup',
+      kpi: 'Conversion rate, signup rate',
+      evidence: 'product_intelligence'
+    };
+  }
+
+  if (!isLaunch) {
+    funnel.retention = {
+      objective: "Drive product adoption and reduce churn",
+      audience: 'existing customers',
+      barrier: "Low feature adoption, lack of ongoing engagement",
+      message: "Value realization and continuous improvement",
+      channel: channelNames.filter(c => ['Email Marketing', 'X (Twitter)', 'Webinars / Events'].includes(c)),
+      content: "Onboarding sequences, product tips, success stories",
+      cta: "Explore Feature",
+      event: 'feature_adoption',
+      kpi: 'Activation rate, retention rate',
+      evidence: 'best_practice'
+    };
+  }
+
+  if (Object.keys(funnel).length === 0) {
+    return {};
+  }
+
+  return funnel;
 }
 
 function buildKPIs(context) {
@@ -1237,28 +1405,44 @@ function buildKPIs(context) {
   const hasCompetitorData = !!(competitors?.list?.value?.length);
   const hasProductData = !!(product.usp?.value || product.features?.value?.length);
 
+  function makeKPI(name, businessDefinition, formula, eventSource, analyticsTool, baselineStatus, reportingFrequency, owner, attributionWindow) {
+    return {
+      name,
+      businessDefinition,
+      formula,
+      eventSource,
+      analyticsTool,
+      baselineStatus: baselineStatus || 'TRACKABLE_NOT_CONNECTED',
+      targetStatus: 'TO_BE_DEFINED',
+      reportingFrequency: reportingFrequency || 'weekly',
+      owner: owner || 'Marketing Operations',
+      attributionWindow: attributionWindow || '30 days',
+      status: baselineStatus === 'CONNECTED' ? 'MEASURED' : baselineStatus === 'UNAVAILABLE' ? 'UNAVAILABLE' : 'NOT_CONFIGURED'
+    };
+  }
+
   if (hasSeoData) {
-    kpis.push({ kpi: "Organic Traffic", howToMeasure: "Google Search Console + Google Analytics", tool: "Google Search Console", frequency: "weekly", status: "NOT_CONFIGURED" });
-    kpis.push({ kpi: "Organic CTR", howToMeasure: "Google Search Console average CTR", tool: "Google Search Console", frequency: "weekly", status: "NOT_CONFIGURED" });
-    kpis.push({ kpi: "Organic Keyword Rankings", howToMeasure: "Track target keyword positions in SERP", tool: "Google Search Console / DataForSEO", frequency: "weekly", status: "NOT_CONFIGURED" });
+    kpis.push(makeKPI('Organic Traffic', 'Number of visitors arriving via organic search', 'Sessions from organic search / Time period', 'Google Search Console + GA4', 'Google Search Console / Google Analytics', 'TRACKABLE_NOT_CONNECTED', 'weekly', 'SEO Specialist', '30 days'));
+    kpis.push(makeKPI('Organic CTR', 'Click-through rate from search engine results', 'Clicks / Impressions * 100', 'Google Search Console', 'Google Search Console', 'TRACKABLE_NOT_CONNECTED', 'weekly', 'SEO Specialist', '30 days'));
+    kpis.push(makeKPI('Organic Keyword Rankings', 'Average position of target keywords in SERP', 'Sum of positions / Number of tracked keywords', 'Google Search Console / DataForSEO', 'Google Search Console / DataForSEO', 'TRACKABLE_NOT_CONNECTED', 'weekly', 'SEO Specialist', '30 days'));
   }
 
   if (hasAudienceData) {
-    kpis.push({ kpi: "Email Open Rate", howToMeasure: "Email platform open rate tracking", tool: "Email Marketing Platform", frequency: "weekly", status: "Not Yet Measured" });
-    kpis.push({ kpi: "Email CTR", howToMeasure: "Email platform click-through rate tracking", tool: "Email Marketing Platform", frequency: "weekly", status: "Not Yet Measured" });
+    kpis.push(makeKPI('Email Open Rate', 'Percentage of delivered emails that were opened', 'Unique opens / Delivered * 100', 'Email marketing platform', 'Brevo / Email Platform', 'TRACKABLE_NOT_CONNECTED', 'weekly', 'Email Marketer', '7 days'));
+    kpis.push(makeKPI('Email CTR', 'Percentage of email recipients who clicked a link', 'Unique clicks / Delivered * 100', 'Email marketing platform', 'Brevo / Email Platform', 'TRACKABLE_NOT_CONNECTED', 'weekly', 'Email Marketer', '7 days'));
   }
 
   if (hasProductData) {
-    kpis.push({ kpi: "Lead Count", howToMeasure: "Track form submissions and content downloads", tool: "CRM / Analytics", frequency: "weekly", status: "Not Yet Measured" });
-    kpis.push({ kpi: "Demo Requests", howToMeasure: "Count demo booking form submissions", tool: "CRM / Booking System", frequency: "weekly", status: "Not Yet Measured" });
-    kpis.push({ kpi: "Signup Rate", howToMeasure: "Free trial or account signups", tool: "Product Analytics", frequency: "weekly", status: "Not Yet Measured" });
-    kpis.push({ kpi: "Activation Rate", howToMeasure: "Users who completed key activation milestone", tool: "Product Analytics", frequency: "monthly", status: "Not Yet Measured" });
+    kpis.push(makeKPI('Lead Count', 'Number of new leads generated from campaign', 'Count of form submissions + content downloads', 'CRM / Form submissions', 'CRM', 'TRACKABLE_NOT_CONNECTED', 'weekly', 'Marketing Operations', '30 days'));
+    kpis.push(makeKPI('Demo Requests', 'Number of demo booking form submissions', 'Count of demo requests / Time period', 'CRM / Booking System', 'CRM', 'TRACKABLE_NOT_CONNECTED', 'weekly', 'Sales Development', '30 days'));
+    kpis.push(makeKPI('Signup Rate', 'Percentage of visitors who create an account', 'Signups / Unique visitors * 100', 'Product Analytics', 'Product Analytics', 'TRACKABLE_NOT_CONNECTED', 'weekly', 'Product Marketing', '30 days'));
+    kpis.push(makeKPI('Activation Rate', 'Percentage of signups reaching key activation milestone', 'Activated users / Signups * 100', 'Product Analytics', 'Product Analytics', 'TRACKABLE_NOT_CONNECTED', 'monthly', 'Product Marketing', '90 days'));
   }
 
-  kpis.push({ kpi: "Website Traffic", howToMeasure: "Google Analytics sessions and users", tool: "Google Analytics", frequency: "weekly", status: "Not Yet Measured" });
+  kpis.push(makeKPI('Website Traffic', 'Total website sessions', 'Sessions / Time period', 'Google Analytics 4', 'Google Analytics', 'TRACKABLE_NOT_CONNECTED', 'weekly', 'Marketing Operations', '30 days'));
 
   if (kpis.length === 0) {
-    kpis.push({ kpi: "Website Traffic", howToMeasure: "Google Analytics sessions", tool: "Google Analytics", frequency: "weekly", status: "Not Yet Measured" });
+    kpis.push(makeKPI('Website Traffic', 'Total website sessions', 'Sessions / Time period', 'Google Analytics 4', 'Google Analytics', 'TRACKABLE_NOT_CONNECTED', 'weekly', 'Marketing Operations', '30 days'));
   }
 
   return kpis;

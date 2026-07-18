@@ -1,5 +1,6 @@
 import fetch from 'node-fetch';
 import { getSerpCompetitors, normalizeSerpCompetitors, separateCompetitorsByType, isDataForSEOConfigured, getDomainData } from '../dataforseo.service.js';
+import { getValidatedCompetitorsForChat } from '../competitors/shared-competitor.service.js';
 import { researchCompetitors } from '../tavily.service.js';
 import { asArray } from '../../utils/text.util.js';
 

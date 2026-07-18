@@ -938,7 +938,15 @@ export const generateContentItem = async (req, res) => {
   }
 
   try {
-    console.info("[Content Studio] Generating content", { chatId, userId, contentType });
+    const typeConfig = CONTENT_TYPES_LIST.includes(contentType) ? CONTENT_TYPES_LIST.find(t => t === contentType) : null;
+    const generatorMap = { email_copy: 'generateEmailCopy', blog_article: 'generateBlogArticle' };
+    console.info("[Content Studio] Content-type routing", {
+      uiSelection: contentType,
+      requestContentType: contentType,
+      normalizedContentType: contentType,
+      generatorSelected: generatorMap[contentType] || 'unknown',
+      chatId, userId
+    });
     
     // Stage 1: Validate authentication and chat ownership
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });

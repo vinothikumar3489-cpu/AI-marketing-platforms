@@ -37,15 +37,23 @@ export async function collectCompanyIntelligence({ websiteUrl, productName, comp
   const text = (scrapedData?.text || '') + ' ' + (legacyExtract?.rawMarkdown || '') + ' ' + (legacyExtract?.cleanedText || '');
   const lower = text.toLowerCase();
 
-  // Name from multiple sources
-  company.name = extract.name || meta?.ogSiteName || meta?.['og:site_name'] ||
-    scrapedData?.title || legacyExtract?.title ||
-    companyName || productName ||
-    domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1) ||
-    'Unknown';
+  // Name from multiple sources — prefer user-provided companyName over AI-extracted tagline
+  const exactMatch = companyName && companyName !== 'Unknown' && companyName !== productName;
+  const ogName = meta?.ogSiteName || meta?.['og:site_name'] || '';
+  const pageTitle = scrapedData?.title || legacyExtract?.title || '';
+  const extractedName = extract.name || '';
+  const domainName = domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1);
+
+  company.name = exactMatch ? companyName
+    : ogName ? ogName
+    : pageTitle ? extractCleanCompanyFromTitle(pageTitle)
+    : companyName || domainName || 'Unknown';
+
+  // Store the raw extracted name / tagline separately — never overwrite companyName
+  company.tagline = extractedName || '';
 
   if (company.name && company.name !== 'Unknown') {
-    company.sources.push({ type: 'company_name', source: 'website_scrape', value: company.name });
+    company.sources.push({ type: 'company_name', source: exactMatch ? 'user_input' : 'website_scrape', value: company.name });
   }
 
   // Industry detection
@@ -166,6 +174,19 @@ export async function collectCompanyIntelligence({ websiteUrl, productName, comp
   }
 
   return company;
+}
+
+function extractCleanCompanyFromTitle(title) {
+  if (!title) return '';
+  let cleaned = title
+    .replace(/\s*[|–—-]\s*.*$/, '')               // remove after separator
+    .replace(/\s*:.*$/, '')                           // remove after colon (tagline)
+    .replace(/ – .*$/, '')                            // remove after em-dash
+    .replace(/\s*&#\d+;.*$/, '')                      // remove HTML entities and after
+    .replace(/^(Meet|Introducing|About|Welcome to)\s+/i, '') // remove intro words
+    .trim();
+  if (cleaned.length > 60) cleaned = cleaned.substring(0, 60).trim();
+  return cleaned;
 }
 
 function extractDomain(url) {

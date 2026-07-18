@@ -21,7 +21,6 @@ const GENERIC_KEYWORDS = new Set([
 
 const VALID_ENDPOINTS = new Set([
   '/keywords_data/google_ads/search_volume/live',
-  '/keywords_data/google_ads/keyword_suggestions/live',
   '/keywords_data/google_ads/keywords_for_keywords/live',
   '/serp/google/organic/live/regular',
   '/backlinks/summary/live',
@@ -330,7 +329,7 @@ export async function getKeywordSuggestions(seedKeywords, location = 'United Sta
     limit: 10
   }];
 
-  const response = await dataforseoRequest('/keywords_data/google_ads/keyword_suggestions/live', 'POST', body);
+  const response = await dataforseoRequest('/keywords_data/google_ads/keywords_for_keywords/live', 'POST', body);
 
   if (!response.success) {
     return response;
@@ -349,7 +348,7 @@ export async function getKeywordSuggestions(seedKeywords, location = 'United Sta
         competition: item.competition || null,
         source: 'DataForSEO',
         confidence: 100,
-        evidence: 'Retrieved from DataForSEO Keyword Suggestions API'
+        evidence: 'Retrieved from DataForSEO Keywords for Keywords API'
       }));
     })
     .filter(item => {

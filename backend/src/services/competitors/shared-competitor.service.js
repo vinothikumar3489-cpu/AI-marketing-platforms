@@ -121,7 +121,40 @@ export async function getValidatedCompetitorsForChat({ userId, chatId, productId
   } catch (error) {
     console.log('[Shared Competitor Engine] Failed to load Growth Workspace competitors:', error.message);
   }
-  
+
+  // Source 4: SEO Intelligence competitors
+  try {
+    const seoIntel = await prisma.seoIntelligence.findUnique({
+      where: { chatId }
+    });
+
+    if (seoIntel?.seoAnalysis?.competitors) {
+      const seoCompetitors = Array.isArray(seoIntel.seoAnalysis.competitors)
+        ? seoIntel.seoAnalysis.competitors
+        : [];
+
+      seoCompetitors.forEach(c => {
+        if (!competitors.some(comp => comp.name === c.name || comp.domain === c.domain)) {
+          competitors.push({
+            name: c.name,
+            domain: c.domain || extractDomainFromUrl(c.url),
+            competitorType: c.competitorType || 'direct',
+            sharedCategory: category,
+            sharedUseCase: useCases?.[0],
+            sourceUrl: c.url || c.domain,
+            validationStatus: 'validated',
+            evidence: c.evidence || 'SEO Intelligence analysis',
+            source: 'seo_intelligence'
+          });
+        }
+      });
+
+      sources.push({ source: 'seo_intelligence', count: seoCompetitors.length });
+    }
+  } catch (error) {
+    console.log('[Shared Competitor Engine] Failed to load SEO Intelligence competitors:', error.message);
+  }
+
   // Filter and validate competitors
   const validatedCompetitors = competitors.filter(comp => validateCompetitor(comp, productIdentity));
   
@@ -147,71 +180,132 @@ export async function getValidatedCompetitorsForChat({ userId, chatId, productId
  * Validate a competitor entry
  * Rejects invalid entries
  */
+const ARTICLE_INDICATORS = [
+  'what is', 'how to', 'guide to', 'ultimate guide', 'best ', 'top ',
+  'vs ', ' versus ', 'review', 'tutorial', 'example', 'list of',
+  'tips for', 'ways to', 'reasons to', 'things to', 'ideas for',
+  'introducing', 'announcing', 'blog', 'article', 'news', 'press',
+];
+
+const KNOWLEDGE_DOMAINS = [
+  'wikipedia.org', 'reddit.com', 'quora.com', 'medium.com',
+  'hubspot.com', 'blog.', 'news.', 'docs.', 'learn.',
+  'support.', 'help.', 'status.', 'community.',
+];
+
+const NON_COMMERCIAL_TLDS = new Set([
+  'gov', 'edu', 'mil',
+]);
+
+function isArticleOrTutorial(name, title, sourceUrl) {
+  const lowerName = (name || '').toLowerCase();
+  const lowerTitle = (title || '').toLowerCase();
+  const lowerUrl = (sourceUrl || '').toLowerCase();
+  if (ARTICLE_INDICATORS.some(i => lowerName.includes(i) || lowerTitle.includes(i))) return true;
+  if (/(\/blog\/|\/article\/|\/news\/|\/tutorial\/|\/guide\/)/.test(lowerUrl)) return true;
+  return false;
+}
+
+function isKnowledgeOrSupportDomain(domain) {
+  if (!domain) return false;
+  const lower = domain.toLowerCase();
+  return KNOWLEDGE_DOMAINS.some(d => lower.includes(d));
+}
+
 function validateCompetitor(competitor, productIdentity) {
   const ownDomain = extractDomainFromUrl(productIdentity?.websiteUrl);
   const competitorDomain = competitor.domain;
-  
+  const competitorName = (competitor.name || '').trim();
+  const competitorTitle = (competitor.title || competitor.name || '').trim();
+  const competitorSourceUrl = competitor.sourceUrl || competitor.url || '';
+
+  // Reject if no name
+  if (!competitorName) {
+    return false;
+  }
+
   // Reject own domain
   if (competitorDomain && ownDomain && competitorDomain === ownDomain) {
-    console.log('[Shared Competitor Engine] Rejected: own domain', competitorDomain);
     return false;
   }
-  
-  // Reject if no name
-  if (!competitor.name || competitor.name.trim() === '') {
-    console.log('[Shared Competitor Engine] Rejected: no name');
-    return false;
+
+  // Reject subdomain variants of own domain
+  if (competitorDomain && ownDomain) {
+    const cd = competitorDomain.toLowerCase().replace(/^www\./, '');
+    const od = ownDomain.toLowerCase().replace(/^www\./, '');
+    if (cd === od || cd.endsWith('.' + od) || od.endsWith('.' + cd)) {
+      return false;
+    }
   }
-  
+
   // Reject generic names
-  const genericNames = ['Competitor', 'Unknown', 'Not specified', 'N/A'];
-  if (genericNames.includes(competitor.name)) {
-    console.log('[Shared Competitor Engine] Rejected: generic name', competitor.name);
+  const genericNames = ['Competitor', 'Unknown', 'Not specified', 'N/A', 'Target', 'Brand', 'Company'];
+  if (genericNames.some(g => competitorName === g || competitorName.includes(g + ' ') || competitorName.includes(' ' + g))) {
     return false;
   }
-  
+
   // Reject app stores
-  if (competitor.domain && (
-    competitor.domain.includes('appstore') ||
-    competitor.domain.includes('play.google') ||
-    competitor.domain.includes('apps.apple')
+  if (competitorDomain && (
+    competitorDomain.includes('appstore') ||
+    competitorDomain.includes('play.google') ||
+    competitorDomain.includes('apps.apple')
   )) {
-    console.log('[Shared Competitor Engine] Rejected: app store', competitor.domain);
     return false;
   }
-  
-  // Reject review sites
-  if (competitor.domain && (
-    competitor.domain.includes('g2.com') ||
-    competitor.domain.includes('capterra') ||
-    competitor.domain.includes('trustpilot') ||
-    competitor.domain.includes('reviews')
+
+  // Reject review/directory sites
+  if (competitorDomain && (
+    competitorDomain.includes('g2.com') ||
+    competitorDomain.includes('capterra') ||
+    competitorDomain.includes('trustpilot') ||
+    competitorDomain.includes('reviews') ||
+    competitorDomain.includes('getapp.com') ||
+    competitorDomain.includes('softwareadvice.com') ||
+    competitorDomain.includes('clutch.co') ||
+    competitorDomain.includes('gartner.com') ||
+    competitorDomain.includes('forrester.com')
   )) {
-    console.log('[Shared Competitor Engine] Rejected: review site', competitor.domain);
     return false;
   }
-  
+
   // Reject social profiles
-  if (competitor.domain && (
-    competitor.domain.includes('facebook.com') ||
-    competitor.domain.includes('twitter.com') ||
-    competitor.domain.includes('linkedin.com') ||
-    competitor.domain.includes('instagram.com')
+  if (competitorDomain && (
+    competitorDomain.includes('facebook.com') ||
+    competitorDomain.includes('twitter.com') ||
+    competitorDomain.includes('linkedin.com') ||
+    competitorDomain.includes('instagram.com') ||
+    competitorDomain.includes('youtube.com') ||
+    competitorDomain.includes('tiktok.com') ||
+    competitorDomain.includes('pinterest.com') ||
+    competitorDomain.includes('snapchat.com') ||
+    competitorDomain.includes('reddit.com')
   )) {
-    console.log('[Shared Competitor Engine] Rejected: social profile', competitor.domain);
     return false;
   }
-  
-  // Reject articles/directories
-  if (competitor.sourceUrl && (
-    competitor.sourceUrl.includes('/blog/') ||
-    competitor.sourceUrl.includes('/article/') ||
-    competitor.sourceUrl.includes('/news/')
-  )) {
-    console.log('[Shared Competitor Engine] Rejected: article/directory', competitor.sourceUrl);
+
+  // Reject knowledge / support / documentation sites
+  if (isKnowledgeOrSupportDomain(competitorDomain)) {
     return false;
   }
-  
+
+  // Reject articles, tutorials, blogs, listicles
+  if (isArticleOrTutorial(competitorName, competitorTitle, competitorSourceUrl)) {
+    return false;
+  }
+
+  // Reject login / signup / pricing / careers pages
+  if (/(\/login|\/signin|\/sign.?up|\/register|\/auth|\/forgot|\/reset|\/logout|\/pricing|\/plans|\/careers|\/jobs|\/apply)/i.test(competitorSourceUrl)) {
+    return false;
+  }
+
+  // Reject non-commercial TLDs
+  if (competitorDomain) {
+    const tld = competitorDomain.split('.').pop();
+    if (NON_COMMERCIAL_TLDS.has(tld)) {
+      return false;
+    }
+  }
+
   return true;
 }
 
