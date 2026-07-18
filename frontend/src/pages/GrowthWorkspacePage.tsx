@@ -158,7 +158,27 @@ export default function GrowthWorkspacePage() {
       
       const res: any = await api.post(`/chats/${chatId}/growth-workspace/run-full-analysis`, form);
       
-      await restoreForChat(chatId);
+      console.info('[Growth UI] Run completed, refreshing results', { chatId, selectedChatId: selectedChatIdRef.current });
+      
+      const refreshed = await loadFullResults(chatId, true);
+      
+      if (selectedChatIdRef.current !== chatId) {
+        console.info('[Growth UI] Chat switched during refresh, aborting view update');
+        return;
+      }
+      
+      if (checkGrowthData(refreshed)) {
+        console.info('[Growth UI] Growth data found after run, setting results', {
+          hasProduct: !!refreshed?.productIntelligence,
+          hasCompetitor: !!refreshed?.competitorIntelligence,
+          hasCampaign: !!refreshed?.campaignIntelligence,
+        });
+        setResults(refreshed?.growth || {});
+      } else {
+        console.info('[Growth UI] No growth data in refreshed results');
+        setResults({});
+      }
+      setRestoreError(null);
     } catch (e: any) {
       const status = e?.status || e?.response?.status || 0;
       const msg = e.message || 'Analysis failed';
