@@ -34,129 +34,103 @@ const tabs = ['Executive Snapshot', 'Executive Story', 'Product DNA', 'Market In
 type RestoreStatus = 'idle' | 'loading' | 'found' | 'empty' | 'error';
 
 export default function GrowthWorkspacePage() {
-  const { selectedChatId, createChat, loadFullResults, fullResults } = useProject();
+  const { selectedChatId, createChat, loadFullResults, fullResultsByChat } = useProject();
   const [form, setForm] = useState(defaults);
   const [activeTab, setActiveTab] = useWorkspaceMemory('gw-activeTab', 'Executive Snapshot');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [results, setResults] = useState<any>({});
   const [creatingChat, setCreatingChat] = useState(false);
-  const [restoreStatus, setRestoreStatus] = useState<RestoreStatus>('idle');
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const analysisRunningRef = useRef(false);
   const selectedChatIdRef = useRef(selectedChatId);
-  const restoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initialisedRef = useRef(false);
 
   function hasRealContent(obj: any): boolean {
     return obj && typeof obj === 'object' && Object.keys(obj).length > 0;
   }
 
-  const hasSelectedChat = Boolean(selectedChatId);
+  function checkGrowthData(data: any): boolean {
+    if (!data) return false;
+    const g = data?.growth || {};
+    return Boolean(
+      data?.productIntelligence ||
+      data?.competitorIntelligence ||
+      data?.campaignIntelligence ||
+      data?.growthWorkspace ||
+      data?.growthResults ||
+      data?.hasGrowthWorkspace === true ||
+      hasRealContent(g.product) ||
+      hasRealContent(g.market) ||
+      hasRealContent(g.audience) ||
+      hasRealContent(g.competitor) ||
+      hasRealContent(g.intent) ||
+      hasRealContent(g.positioning) ||
+      hasRealContent(g.campaign) ||
+      hasRealContent(g.channel) ||
+      hasRealContent(g.executiveStory) ||
+      hasRealContent(g.actionPlan) ||
+      hasRealContent(g.evidence)
+    );
+  }
 
-  const hasGrowthAnalysis = hasSelectedChat && Boolean(
-    fullResults?.productIntelligence ||
-    fullResults?.competitorIntelligence ||
-    fullResults?.campaignIntelligence ||
-    fullResults?.growthWorkspace
-  );
+  const cacheEntry = selectedChatId ? fullResultsByChat[selectedChatId] : null;
+  const cachedData = cacheEntry?.status === 'success' ? cacheEntry.data : null;
+  const hasCachedGrowthData = cachedData ? checkGrowthData(cachedData) : false;
 
-  const restoreForChat = useCallback(async (chatId: string) => {
-    if (!chatId) {
-      setRestoreStatus('idle');
-      return;
-    }
-
-    selectedChatIdRef.current = chatId;
-    setRestoreStatus('loading');
-    setRestoreError(null);
-    setResults({});
-
-    restoreTimeoutRef.current = setTimeout(() => {
-      if (selectedChatIdRef.current === chatId) {
-        setRestoreStatus('error');
-        setRestoreError('Request timed out. The backend may be unavailable.');
-      }
-    }, 15000);
-
-    try {
-      const result = await loadFullResults(chatId);
-
-      if (restoreTimeoutRef.current) {
-        clearTimeout(restoreTimeoutRef.current);
-        restoreTimeoutRef.current = null;
-      }
-
-      if (selectedChatIdRef.current !== chatId) {
-        return;
-      }
-
-      const growth = result?.growth || {};
-      const hasGrowthData =
-        Boolean(result?.productIntelligence) ||
-        Boolean(result?.competitorIntelligence) ||
-        Boolean(result?.campaignIntelligence) ||
-        Boolean(result?.growthWorkspace) ||
-        Boolean(result?.growthResults) ||
-        result?.hasGrowthWorkspace === true ||
-        hasRealContent(growth.product) ||
-        hasRealContent(growth.market) ||
-        hasRealContent(growth.audience) ||
-        hasRealContent(growth.competitor) ||
-        hasRealContent(growth.intent) ||
-        hasRealContent(growth.positioning) ||
-        hasRealContent(growth.campaign) ||
-        hasRealContent(growth.channel) ||
-        hasRealContent(growth.executiveStory) ||
-        hasRealContent(growth.actionPlan) ||
-        hasRealContent(growth.evidence);
-
-      if (hasGrowthData) {
-        setResults(growth);
-        setRestoreStatus('found');
-      } else {
-        setResults({});
-        setRestoreStatus('empty');
-      }
-      setError('');
-    } catch (e: any) {
-      if (restoreTimeoutRef.current) {
-        clearTimeout(restoreTimeoutRef.current);
-        restoreTimeoutRef.current = null;
-      }
-
-      if (selectedChatIdRef.current !== chatId) {
-        return;
-      }
-
-      setRestoreStatus('error');
-      setRestoreError(e.message || 'Failed to restore analysis');
-      setResults({});
-    }
-    }, [loadFullResults]);
+  const viewStatus: RestoreStatus = (() => {
+    if (!selectedChatId) return 'idle';
+    if (hasCachedGrowthData) return 'found';
+    if (cacheEntry?.status === 'success') return 'empty';
+    if (cacheEntry?.status === 'loading' || cacheEntry?.status === 'idle') return 'loading';
+    if (cacheEntry?.status === 'error') return 'error';
+    return 'loading';
+  })();
 
   useEffect(() => {
-    if (analysisRunningRef.current) return;
-
     if (!selectedChatId) {
-      setRestoreStatus('idle');
       setResults({});
       setRestoreError(null);
-      if (restoreTimeoutRef.current) {
-        clearTimeout(restoreTimeoutRef.current);
-        restoreTimeoutRef.current = null;
+      return;
+    }
+
+    selectedChatIdRef.current = selectedChatId;
+
+    const entry = fullResultsByChat[selectedChatId];
+
+    if (entry?.status === 'success') {
+      if (checkGrowthData(entry.data)) {
+        setResults(entry.data?.growth || {});
+      } else {
+        setResults({});
+      }
+      setRestoreError(null);
+      if (!initialisedRef.current) {
+        initialisedRef.current = true;
+        loadFullResults(selectedChatId, false).catch(() => {});
       }
       return;
     }
 
-    restoreForChat(selectedChatId);
+    if (entry?.status === 'error') {
+      setRestoreError(entry.error || 'Failed to restore analysis');
+      return;
+    }
 
-    return () => {
-      if (restoreTimeoutRef.current) {
-        clearTimeout(restoreTimeoutRef.current);
-        restoreTimeoutRef.current = null;
+    loadFullResults(selectedChatId).then(result => {
+      if (selectedChatIdRef.current !== selectedChatId) return;
+      if (!result) return;
+      if (checkGrowthData(result)) {
+        setResults(result?.growth || {});
+      } else {
+        setResults({});
       }
-    };
-  }, [selectedChatId, restoreForChat]);
+      setRestoreError(null);
+    }).catch(() => {
+      if (selectedChatIdRef.current !== selectedChatId) return;
+      setRestoreError('Failed to restore analysis');
+    });
+  }, [selectedChatId]);
 
   async function run() {
     if (!form.websiteUrl) {
@@ -211,7 +185,7 @@ export default function GrowthWorkspacePage() {
     setForm(defaults);
     setResults({});
     setError('');
-    setRestoreStatus('empty');
+    setRestoreError(null);
     setStep(1);
     try {
       await createChat('New Growth Analysis', 'USER_CLICK_NEW_ANALYSIS');
@@ -270,7 +244,7 @@ export default function GrowthWorkspacePage() {
       </Card>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '20px' }}>
         <PageHeader eyebrow="All-in-one Analysis Command Center" title="Growth Workspace" subtitle="Generate a multi-stage, validated business intelligence report." />
-        {(restoreStatus === 'found' || error) && (
+        {(viewStatus === 'found' || error) && (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <div className="dropdown" style={{ position: 'relative' }}>
               <button className="secondary-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -290,7 +264,7 @@ export default function GrowthWorkspacePage() {
         <style>{`.dropdown:hover .dropdown-menu { display: block !important; }`}</style>
       </div>
       
-      {restoreStatus === 'loading' && (
+      {viewStatus === 'loading' && (
         <div style={{ display: 'grid', gap: '20px' }}>
           <LoadingSkeleton type="table" count={3} />
           <LoadingSkeleton type="card" count={3} />
@@ -298,7 +272,7 @@ export default function GrowthWorkspacePage() {
         </div>
       )}
 
-      {restoreStatus === 'error' && restoreError && (
+      {viewStatus === 'error' && restoreError && (
         <Card style={{ background: 'rgba(255, 71, 87, 0.1)', borderColor: '#ff4757', marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
@@ -328,7 +302,7 @@ export default function GrowthWorkspacePage() {
         </Card>
       )}
 
-      {(restoreStatus === 'empty' || restoreStatus === 'idle') && !creatingChat && (
+      {(viewStatus === 'empty' || viewStatus === 'idle') && !creatingChat && (
         <Card style={{ padding: '30px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #293245', paddingBottom: '15px' }}>
             <h2 style={{ margin: 0, color: '#fff', fontSize: '20px' }}>Project Configuration (Step {step} of 7)</h2>
@@ -445,7 +419,7 @@ export default function GrowthWorkspacePage() {
         </div>
       )}
       
-      {restoreStatus === 'found' && hasData && (
+      {viewStatus === 'found' && hasData && (
         <Card>
           <SmartNavigation items={tabs.map(t => ({ id: t, label: t }))} activeId={activeTab} onNavigate={setActiveTab} />
           <div style={{ marginBottom: '16px' }}>
@@ -490,7 +464,7 @@ export default function GrowthWorkspacePage() {
         </Card>
       )}
 
-      {restoreStatus === 'found' && !hasData && (
+      {viewStatus === 'found' && !hasData && (
         <Card>
           <EmptyState 
             title="No Verified Growth Data Available" 
