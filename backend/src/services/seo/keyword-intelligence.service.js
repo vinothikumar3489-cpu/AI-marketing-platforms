@@ -201,6 +201,30 @@ const JUNK_KEYWORDS = new Set([
   'custom', 'business', 'systems', 'built', 'everything', 'design', 'services', 'right', 'before', 'whatever', 'take', 'used', 'use', 'using', 'make', 'made', 'get', 'got', 'see', 'seen', 'look', 'looking', 'find', 'found', 'need', 'needs', 'want', 'wants', 'like', 'likes', 'love', 'loves', 'best', 'better', 'good', 'great', 'top', 'high', 'low', 'free', 'premium', 'plan', 'plans', 'month', 'monthly', 'year', 'yearly', 'day', 'daily', 'week', 'weekly', 'price', 'pricing', 'cost', 'costs', 'cheap', 'expensive', 'affordable', 'quality', 'professional', 'expert', 'experts', 'team', 'teams', 'company', 'companies', 'world', 'global', 'international', 'local', 'online', 'web', 'website', 'websites', 'site', 'sites', 'page', 'pages', 'home', 'about', 'contact', 'info', 'information', 'help', 'support', 'service', 'services', 'product', 'products', 'solution', 'solutions', 'tool', 'tools', 'software', 'softwares', 'app', 'apps', 'application', 'applications', 'system', 'systems', 'platform', 'platforms', 'technology', 'technologies', 'tech', 'digital', 'data', 'management', 'manager', 'managers', 'development', 'developer', 'developers', 'create', 'creating', 'created', 'build', 'building', 'built', 'provide', 'providing', 'provided', 'offer', 'offering', 'offered', 'feature', 'features', 'benefit', 'benefits', 'advantage', 'advantages', 'value', 'values', 'result', 'results', 'success', 'successful', 'work', 'working', 'worked', 'time', 'times', 'way', 'ways', 'thing', 'things', 'something', 'nothing', 'anything', 'everything', 'someone', 'anyone', 'everyone', 'any', 'all', 'some', 'most', 'many', 'much', 'more', 'less', 'few', 'little', 'big', 'small', 'large', 'huge', 'tiny', 'new', 'old', 'latest', 'recent', 'current', 'modern', 'simple', 'easy', 'hard', 'difficult', 'complex', 'fast', 'quick', 'slow', 'secure', 'safe', 'reliable', 'trusted', 'leading', 'major', 'main', 'primary', 'secondary', 'important', 'essential', 'key', 'core', 'basic', 'advanced', 'complete', 'full', 'partial', 'total', 'absolute', 'relative', 'specific', 'general', 'common', 'typical', 'standard', 'normal', 'regular', 'popular', 'famous', 'known', 'unknown', 'various', 'multiple', 'several', 'different', 'unique', 'special', 'particular', 'individual', 'separate', 'single', 'double', 'triple', 'multiple', 'average', 'standard', 'typical', 'usual', 'regular'
 ]);
 
+const CORRUPTION_PATTERNS = [
+  /^undefined$/i,
+  /^null$/i,
+  /^\[object object\]$/i,
+  /^\[.*image.*\]/i,
+  /!\[.*\]/,
+  /^\[.*\]$/,
+  /^[.!?,\-:;]+$/,
+  /^[0-9+\-.,%]+$/,
+  /^[a-z]$/i,
+];
+
+function isCorruptedKeyword(keyword) {
+  if (!keyword || typeof keyword !== 'string') return true;
+  if (keyword.length < 2) return true;
+  const trimmed = keyword.trim();
+  if (trimmed.length < 2) return true;
+  if (CORRUPTION_PATTERNS.some(p => p.test(trimmed))) return true;
+  if (trimmed.includes('undefined') || trimmed.includes('null')) return true;
+  const nonAlpha = trimmed.replace(/[a-zA-Z0-9\s\-&'.,#+]/g, '');
+  if (nonAlpha.length > trimmed.length * 0.3) return true;
+  return false;
+}
+
 function filterJunkKeywords(keywords, source = 'unknown') {
   return keywords.filter(kw => {
     const keyword = typeof kw === 'string' ? kw : kw.keyword;
@@ -215,6 +239,7 @@ function filterJunkKeywords(keywords, source = 'unknown') {
       'started', 'menu', 'next', 'previous', 'learn', 'submit', 'copyright'
     ];
 
+    if (isCorruptedKeyword(lowerKeyword)) return false;
     if (/^\[/.test(lowerKeyword)) return false;
     if (junkPatterns.includes(lowerKeyword)) return false;
     if (lowerKeyword.includes(':') && lowerKeyword.split(':')[0].trim().length > 0) return false;
@@ -622,12 +647,20 @@ Return ONLY valid JSON:
 // BUCKET NORMALIZATION
 // ============================================
 
+function removeCorruptedKeywords(keywords) {
+  return keywords.filter(kw => {
+    const phrase = kw.keyword || kw.phrase || kw;
+    if (!phrase || typeof phrase !== 'string') return false;
+    return !isCorruptedKeyword(phrase);
+  });
+}
+
 function normalizeKeywordBuckets(result, identity) {
   const safe = { ...result };
-  safe.primaryKeywords = asArray(safe.primaryKeywords);
-  safe.secondaryKeywords = asArray(safe.secondaryKeywords);
-  safe.longTailKeywords = asArray(safe.longTailKeywords);
-  safe.questionKeywords = asArray(safe.questionKeywords);
+  safe.primaryKeywords = removeCorruptedKeywords(asArray(safe.primaryKeywords));
+  safe.secondaryKeywords = removeCorruptedKeywords(asArray(safe.secondaryKeywords));
+  safe.longTailKeywords = removeCorruptedKeywords(asArray(safe.longTailKeywords));
+  safe.questionKeywords = removeCorruptedKeywords(asArray(safe.questionKeywords));
 
   if (safe.primaryKeywords.length === 0 && safe.secondaryKeywords.length > 0) {
     safe.primaryKeywords = safe.secondaryKeywords.slice(0, 5);
