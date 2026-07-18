@@ -21,7 +21,15 @@ const KNOWN_PLACEHOLDER_PATTERNS = [
   /estimated \/ needs validation/i,
   /premium solution built for scale/i,
   /market expanding rapidly/i,
-  /growing competition/i
+  /growing competition/i,
+  /^N\/A$/i,
+  /^n\/a$/i,
+  /^null$/i,
+  /^undefined$/i,
+  /\[object Object\]/,
+  /^N\/A\/100$/i,
+  /^null\/100$/i,
+  /^Unknown\/100$/i,
 ];
 
 const FAKE_COMPETITOR_PATTERNS = [

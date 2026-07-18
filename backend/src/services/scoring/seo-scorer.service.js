@@ -459,6 +459,62 @@ export function generatePriorityRecommendations(scores, technicalAudit) {
     });
   }
 
+  // Keyword-specific recommendations
+  if (scores.content < 70 || scores.onPage < 70) {
+    recommendations.push({
+      area: 'Keyword Optimization',
+      score: Math.min(scores.content || 100, scores.onPage || 100),
+      priority: 'high',
+      action: 'Integrate high-opportunity keywords into title tags, headings, and body content with natural placement',
+      impact: 'high',
+      effort: 'low'
+    });
+  }
+
+  if (scores.authority < 60) {
+    recommendations.push({
+      area: 'Competitor Authority Gap',
+      score: scores.authority,
+      priority: 'medium',
+      action: 'Analyze competitor backlink profiles and identify linkable assets (original research, tools, data visualizations) to close the authority gap',
+      impact: 'high',
+      effort: 'high'
+    });
+  }
+
+  if (scores.aiVisibility < 60) {
+    recommendations.push({
+      area: 'AI/GEO Readiness',
+      score: scores.aiVisibility,
+      priority: 'high',
+      action: 'Add FAQPage and HowTo structured data, create definition-style content for entity recognition, and optimize for AI-generated answers',
+      impact: 'medium',
+      effort: 'medium'
+    });
+  }
+
+  // Content gap recommendation
+  recommendations.push({
+    area: 'Content Gap Analysis',
+    score: scores.content || 50,
+    priority: 'medium',
+    action: 'Identify untapped keyword clusters where competitors rank but your site has no content; prioritize topics with high volume and low difficulty',
+    impact: 'high',
+    effort: 'medium'
+  });
+
+  // Traffic estimation recommendation
+  if (scores.authority < 50 || scores.technical < 50) {
+    recommendations.push({
+      area: 'Organic Traffic Growth',
+      score: Math.min(scores.authority || 100, scores.technical || 100),
+      priority: 'high',
+      action: 'Fix technical barriers to indexing, then build topical authority through clustered content to drive sustainable organic traffic',
+      impact: 'high',
+      effort: 'medium'
+    });
+  }
+
   // Sort by priority
   const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
   recommendations.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);

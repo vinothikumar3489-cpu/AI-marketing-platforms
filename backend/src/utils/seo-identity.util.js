@@ -4,47 +4,7 @@
  */
 import { sanitizeText, extractText } from './text.util.js';
 
-const KNOWN_DOMAIN_INDUSTRIES = {
-  'instagram.com': { industry: 'Social Media', category: 'Social Networking Platform', businessModel: 'Advertising-supported consumer platform', businessCategory: 'Social Media' },
-  'facebook.com': { industry: 'Social Media', category: 'Social Networking Platform', businessModel: 'Advertising-supported consumer platform', businessCategory: 'Social Media' },
-  'youtube.com': { industry: 'Video Streaming', category: 'Video Sharing Platform', businessModel: 'Advertising-supported consumer platform', businessCategory: 'Digital Media' },
-  'tiktok.com': { industry: 'Social Media', category: 'Short-form Video Platform', businessModel: 'Advertising-supported consumer platform', businessCategory: 'Social Media' },
-  'twitter.com': { industry: 'Social Media', category: 'Microblogging Platform', businessModel: 'Advertising-supported platform', businessCategory: 'Social Media' },
-  'linkedin.com': { industry: 'Professional Networking', category: 'Professional Social Network', businessModel: 'Subscription and advertising platform', businessCategory: 'Professional Services' },
-  'pinterest.com': { industry: 'Social Media', category: 'Visual Discovery Platform', businessModel: 'Advertising-supported platform', businessCategory: 'Social Media' },
-  'snapchat.com': { industry: 'Social Media', category: 'Multimedia Messaging Platform', businessModel: 'Advertising-supported consumer platform', businessCategory: 'Social Media' },
-  'reddit.com': { industry: 'Social Media', category: 'Social News Platform', businessModel: 'Advertising-supported platform', businessCategory: 'Social Media' },
-  'whatsapp.com': { industry: 'Communication', category: 'Messaging Platform', businessModel: 'Free communication platform', businessCategory: 'Communication' },
-  'telegram.org': { industry: 'Communication', category: 'Messaging Platform', businessModel: 'Free communication platform', businessCategory: 'Communication' },
-  'discord.com': { industry: 'Communication', category: 'Community Messaging Platform', businessModel: 'Freemium subscription platform', businessCategory: 'Communication' },
-  'slack.com': { industry: 'Business Communication', category: 'Team Collaboration Platform', businessModel: 'B2B SaaS', businessCategory: 'Enterprise Software' },
-  'zoom.us': { industry: 'Video Conferencing', category: 'Video Communication Platform', businessModel: 'B2B SaaS', businessCategory: 'Enterprise Software' },
-  'google.com': { industry: 'Internet Services', category: 'Search and Cloud Platform', businessModel: 'Advertising and cloud services', businessCategory: 'Technology' },
-  'netflix.com': { industry: 'Entertainment', category: 'Streaming Platform', businessModel: 'Subscription-based streaming', businessCategory: 'Digital Media' },
-  'spotify.com': { industry: 'Music Streaming', category: 'Audio Streaming Platform', businessModel: 'Freemium subscription platform', businessCategory: 'Digital Media' },
-  'amazon.com': { industry: 'E-commerce', category: 'Online Retail and Cloud Platform', businessModel: 'E-commerce and cloud services', businessCategory: 'Retail & E-commerce' },
-  'apple.com': { industry: 'Consumer Technology', category: 'Consumer Electronics and Services', businessModel: 'Hardware and services', businessCategory: 'Technology' },
-  'microsoft.com': { industry: 'Enterprise Software', category: 'Software and Cloud Platform', businessModel: 'B2B and B2C SaaS', businessCategory: 'Enterprise Software' },
-  'notion.com': { industry: 'Productivity Software', category: 'All-in-one Workspace', businessModel: 'B2B SaaS', businessCategory: 'Enterprise Software' },
-  'notion.so': { industry: 'Productivity Software', category: 'All-in-one Workspace', businessModel: 'B2B SaaS', businessCategory: 'Enterprise Software' },
-  'figma.com': { industry: 'Design Software', category: 'Collaborative Design Platform', businessModel: 'B2B SaaS', businessCategory: 'Enterprise Software' },
-  'canva.com': { industry: 'Design Software', category: 'Graphic Design Platform', businessModel: 'Freemium SaaS', businessCategory: 'Enterprise Software' },
-  'miro.com': { industry: 'Productivity Software', category: 'Collaborative Whiteboard Platform', businessModel: 'B2B SaaS', businessCategory: 'Enterprise Software' },
-  'asana.com': { industry: 'Productivity Software', category: 'Project Management Platform', businessModel: 'B2B SaaS', businessCategory: 'Enterprise Software' },
-  'trello.com': { industry: 'Productivity Software', category: 'Project Management Platform', businessModel: 'B2B SaaS', businessCategory: 'Enterprise Software' },
-  'notion.com': { industry: 'Productivity Software', category: 'All-in-one Workspace', businessModel: 'B2B SaaS', businessCategory: 'Enterprise Software' },
-  'hubspot.com': { industry: 'Marketing Software', category: 'CRM and Marketing Platform', businessModel: 'B2B SaaS', businessCategory: 'Enterprise Software' },
-  'salesforce.com': { industry: 'Enterprise Software', category: 'CRM Platform', businessModel: 'B2B SaaS', businessCategory: 'Enterprise Software' },
-  'shopify.com': { industry: 'E-commerce', category: 'E-commerce Platform', businessModel: 'B2B SaaS', businessCategory: 'Retail & E-commerce' },
-  'stripe.com': { industry: 'Fintech', category: 'Payment Processing Platform', businessModel: 'B2B SaaS', businessCategory: 'Financial Services' },
-  'airbnb.com': { industry: 'Travel', category: 'Hospitality Marketplace', businessModel: 'Peer-to-peer marketplace', businessCategory: 'Travel & Hospitality' },
-  'uber.com': { industry: 'Transportation', category: 'Ride-hailing Platform', businessModel: 'Peer-to-peer marketplace', businessCategory: 'Transportation' },
-  'squareup.com': { industry: 'Fintech', category: 'Payment Processing Platform', businessModel: 'B2B SaaS', businessCategory: 'Financial Services' },
-  'godaddy.com': { industry: 'Web Services', category: 'Domain and Hosting Platform', businessModel: 'B2B SaaS', businessCategory: 'Technology' },
-  'wix.com': { industry: 'Web Services', category: 'Website Building Platform', businessModel: 'B2B SaaS', businessCategory: 'Technology' },
-  'wordpress.com': { industry: 'Web Services', category: 'Website Building Platform', businessModel: 'B2B SaaS', businessCategory: 'Technology' },
-  'wordpress.org': { industry: 'Web Services', category: 'Open-source CMS', businessModel: 'Open-source software', businessCategory: 'Technology' },
-};
+
 
 export function deriveWebsiteIdentity(params = {}) {
   // Safe extraction with defaults
@@ -167,22 +127,12 @@ export function deriveWebsiteIdentity(params = {}) {
     productName = brandName;
   }
 
-  // Check known domains for precise industry/category classification
-  const knownDomain = KNOWN_DOMAIN_INDUSTRIES[domain.toLowerCase()];
   let businessModel = null;
   let companySize = null;
   let businessCategory = null;
   let category = null;
   let targetAudience = null;
 
-  if (knownDomain) {
-    businessModel = knownDomain.businessModel;
-    businessCategory = knownDomain.businessCategory;
-    category = knownDomain.category;
-    // Override industry with known data
-    // (industry field is set in the return block below)
-  }
-  
   if (scrapedData?.text) {
     const text = scrapedData.text.toLowerCase();
     if (text.includes('add to cart') || text.includes('checkout') || text.includes('shipping')) {

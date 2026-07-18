@@ -702,8 +702,10 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     if (measurableComponents >= 3) {
       const rawAverage = Math.round(nonNullScores.reduce((a, [, v]) => a + v, 0) / measurableComponents);
       const completenessPenalty = Math.round((1 - (0.5 * (1 - measurableComponents / totalDimensions))) * 100) / 100;
-      overallGrowthScore = Math.round(rawAverage * completenessPenalty);
-      scoreConfidence = Math.round(completenessPenalty * 100);
+      const keyDimensionPenalty = (marketOpportunityScore == null) ? 0.15 : (audienceClarityScore == null) ? 0.10 : 0;
+      const adjustedPenalty = Math.max(0, completenessPenalty - keyDimensionPenalty);
+      overallGrowthScore = Math.round(rawAverage * adjustedPenalty);
+      scoreConfidence = Math.round(adjustedPenalty * 100);
     } else {
       growthScoreStatus = NOT_ENOUGH_EVIDENCE;
       scoreConfidence = 0;

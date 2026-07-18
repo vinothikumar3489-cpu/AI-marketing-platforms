@@ -37,25 +37,6 @@ Ensure all arrays have at least 3 items. Return ONLY valid JSON.
 `;
 }
 
-function getRuleBasedFallback(inputData) {
-  const { productName, industry } = inputData;
-  return {
-    customerPersonas: [
-      { name: "The Budget-Conscious Student", description: "Looking for affordable tools to help with their studies" },
-      { name: "The Recent Graduate", description: "New to the job market, seeking tools to boost their career" },
-      { name: "The Career Changer", description: "Switching fields, needing help to build new skills and resume" }
-    ],
-    demographics: ["Ages 18-25", "Students and recent graduates", "Located in urban and suburban areas"],
-    psychographics: ["Tech-savvy", "Value-conscious", "Career-focused"],
-    buyingMotivations: ["Save time", "Improve chances of getting hired", "Affordable pricing"],
-    painPoints: ["Complex resume builders", "High subscription costs", "Lack of personalization"],
-    preferredChannels: ["Instagram", "TikTok", "LinkedIn", "University career centers"],
-    messagingStrategy: "Focus on simplicity, affordability, and real results from similar users",
-    contentIdeas: ["Resume templates for students", "Interview tips for freshers", "Success stories from recent graduates"],
-    finalRecommendation: "Start with a freemium model, partner with universities, and leverage user-generated content"
-  };
-}
-
 export async function generateAudienceIntelligence(inputData) {
   let researchData = null;
   try {
@@ -74,8 +55,8 @@ export async function generateAudienceIntelligence(inputData) {
 
   let result = await callAI(prompt);
   if (!result.success) {
-    console.log("⚠️ Using rule-based fallback for Audience Intelligence...");
-    result = { success: true, data: getRuleBasedFallback(inputData), provider: "rule-based", fallbackUsed: true };
+    console.warn("⚠️ Audience Intelligence AI failed, returning partial results");
+    return { success: false, error: "Audience intelligence generation failed", provider: "ai", fallbackUsed: false };
   } else {
     result.fallbackUsed = false;
   }

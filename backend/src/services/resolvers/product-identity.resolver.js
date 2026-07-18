@@ -158,8 +158,10 @@ export function resolveProductIdentity({ chat, productIntelligence, evidenceSnap
       websiteUrl,
       domain,
       category: null,
+      industry: null,
+      businessModel: null,
       source: 'unresolved',
-      evidenceReference: 'No valid product identity found',
+      evidenceReference: 'No valid product identity could be derived from evidence',
       resolved: false,
     };
   }
@@ -167,7 +169,9 @@ export function resolveProductIdentity({ chat, productIntelligence, evidenceSnap
   if (!brandName) brandName = productName;
   if (!companyName) companyName = brandName;
 
-  const category = analysis?.category || analysis?.industry || null;
+  const category = analysis?.category || null;
+  const industry = analysis?.industry || null;
+  const businessModel = analysis?.businessModel || null;
 
   return {
     projectTitle,
@@ -177,6 +181,8 @@ export function resolveProductIdentity({ chat, productIntelligence, evidenceSnap
     websiteUrl,
     domain,
     category,
+    industry,
+    businessModel,
     source,
     evidenceReference,
     resolved: true,

@@ -46,18 +46,6 @@ function safeExtractJSON(data) {
   return null;
 }
 
-const POSSIBLE_CHANNELS = [
-  "Google Search", "LinkedIn", "Meta", "Instagram", "Facebook",
-  "YouTube", "Reddit", "Email", "Content Marketing",
-  "Product Hunt", "Communities", "Partnerships", "Organic SEO"
-];
-
-const POSSIBLE_GOALS = [
-  "Launch Product", "Increase Leads", "Increase Sales", "Brand Awareness",
-  "SEO Growth", "Product Adoption", "Retention", "Upsell",
-  "Community Growth", "Enterprise Sales", "Hiring", "Funding"
-];
-
 export async function generateCampaignIntelligence({ userId, chatId, evidenceContext }) {
   const ec = evidenceContext || {};
 

@@ -124,396 +124,8 @@ Tone: ${brief.tone || 'professional'}
 Missing evidence: ${(brief.limitations || []).join('; ') || 'None identified'}`;
 }
 
-const RULE_BASED_FALLBACKS = {
-  linkedin_post(brief) {
-    const name = getProductName(brief);
-    const persona = getPersonaName(brief);
-    const pain = getFirstPainPoint(brief);
-    const feature = getFirstFeature(brief);
-    return {
-      hook: `Stop struggling with ${pain}.`,
-      body: `Many ${persona} face this challenge daily — but ${name} makes it simpler.\n\nWith ${feature}, you can move faster and achieve better results.\n\nBuilt for ${persona} who want to stop wasting time and start seeing real outcomes.`,
-      cta: `Try ${name} today`,
-      hashtags: ['#Productivity', '#Innovation', '#Marketing'],
-      audience: persona,
-      angle: 'content research',
-      evidenceUsed: ['product_features', 'audience_pain_points'],
-      claimsRequiringReview: []
-    };
-  },
-  instagram_post(brief) {
-    const name = getProductName(brief);
-    const persona = getPersonaName(brief);
-    const pain = getFirstPainPoint(brief);
-    const benefit = getFirstBenefit(brief);
-    return {
-      _type: 'instagram_post',
-      hook: `Your ${persona} deserve better than ${pain}.`,
-      caption: `${name} helps ${persona} unlock ${benefit}.\n\nStop settling for outdated approaches. Start with a tool built for real results.\n\nTap the link to learn more.`,
-      cta: 'Link in bio',
-      hashtags: ['#WorkSmarter', '#MarketingTips', '#Growth'],
-      visualConcept: `${persona} using ${name} on a laptop showing ${benefit}`,
-      audience: persona,
-      angle: 'visual storytelling',
-      evidenceUsed: ['audience_pain_points', 'product_benefits'],
-      claimsRequiringReview: []
-    };
-  },
-  twitter_post(brief) {
-    const name = getProductName(brief);
-    const pain = getFirstPainPoint(brief);
-    const persona = getPersonaName(brief);
-    const keyword = getKeyword(brief, 0) || pain.toLowerCase().replace(/\s+/g, '');
-    const post = `${pain} slowing you down?\n\n${name} helps you ${getFirstBenefit(brief)} — so you can focus on what matters.\n\n${keyword}`;
-    return {
-      _type: 'twitter_post',
-      post: post.length > 280 ? post.substring(0, 277) + '...' : post,
-      cta: null,
-      hashtags: ['#Productivity', '#Marketing'],
-      angle: 'quick insight',
-      audience: persona,
-      evidenceUsed: ['audience_pain_points'],
-      claimsRequiringReview: []
-    };
-  },
-  facebook_post(brief) {
-    const name = getProductName(brief);
-    const persona = getPersonaName(brief);
-    const pain = getFirstPainPoint(brief);
-    const feature = getFirstFeature(brief);
-    return {
-      _type: 'facebook_post',
-      headline: `Say goodbye to ${pain}`,
-      body: `${name} gives ${persona} the ${feature} they need to achieve ${getFirstBenefit(brief)}.\n\nBuilt by professionals, for professionals.`,
-      cta: 'Learn More',
-      audience: persona,
-      angle: 'solution highlighting',
-      evidenceUsed: ['product_features', 'audience_pain_points'],
-      claimsRequiringReview: []
-    };
-  },
-  youtube_description(brief) {
-    const name = getProductName(brief);
-    const persona = getPersonaName(brief);
-    const keyword1 = getKeyword(brief, 0) || 'marketing';
-    const keyword2 = getKeyword(brief, 1) || 'productivity';
-    return {
-      _type: 'youtube_description',
-      title: `How ${name} Helps ${persona} ${getFirstBenefit(brief)}`,
-      description: `In this video, we explore how ${name} solves ${getFirstPainPoint(brief)} for ${persona}.\n\nKey topics covered:\n- Understanding the ${keyword1} landscape\n- How ${name} fits into your ${keyword2} strategy\n- Practical tips to get started today`,
-      openingHook: `${getFirstPainPoint(brief)} slowing down your team? Here's how ${name} can help.`,
-      chapters: [
-        { timestamp: '0:00', title: 'Introduction' },
-        { timestamp: '1:30', title: 'The Problem' },
-        { timestamp: '3:00', title: 'How It Works' },
-        { timestamp: '5:00', title: 'Getting Started' }
-      ],
-      links: [],
-      cta: 'Visit our website to learn more',
-      hashtags: ['#' + keyword1.replace(/\s+/g, ''), '#' + keyword2.replace(/\s+/g, ''), '#' + name.replace(/\s+/g, '')],
-      keywords: [keyword1, keyword2, name],
-      evidenceUsed: ['product_features', 'audience_pain_points'],
-      claimsRequiringReview: []
-    };
-  },
-  email_copy(brief) {
-    const name = getProductName(brief);
-    const persona = getPersonaName(brief);
-    const pain = getFirstPainPoint(brief);
-    const benefit = getFirstBenefit(brief);
-    return {
-      _type: 'email_copy',
-      emailType: 'outreach',
-      subject: `How ${name} helps ${persona} overcome ${pain}`,
-      previewText: `Discover what ${name} can do for you.`,
-      greeting: `Hi there,`,
-      opening: `We know ${pain} is a real challenge for ${persona}. That's why we built ${name}.`,
-      bodyParagraphs: [
-        `${name} delivers ${benefit} through a simple, intuitive approach.`,
-        `Our users consistently report saving time and achieving better outcomes.`,
-        `See for yourself how ${name} can transform your workflow.`
-      ],
-      bulletPoints: [
-        `${getFirstFeature(brief)} to drive results`,
-        `Designed specifically for ${persona}`,
-        `Proven approach backed by real evidence`
-      ],
-      ctaText: `Try ${name}`,
-      ctaUrl: null,
-      closing: `Ready to get started?`,
-      signature: `The ${name} Team`,
-      personalizationFields: [],
-      complianceNote: null,
-      evidenceUsed: ['product_features', 'audience_pain_points', 'product_benefits'],
-      claimsRequiringReview: []
-    };
-  },
-  creative_brief(brief) {
-    const name = getProductName(brief);
-    const persona = getPersonaName(brief);
-    const pain = getFirstPainPoint(brief);
-    const feature = getFirstFeature(brief);
-    return {
-      _type: 'creative_brief',
-      objective: `Show how ${name} solves ${pain} for ${persona}`,
-      audience: persona,
-      message: `${name} helps ${persona} achieve ${getFirstBenefit(brief)}`,
-      visualDirection: `Professional product-focused imagery showing ${feature}`,
-      brandSignals: [name, brief.product?.brandName || name, brief.company?.industry || 'technology'].filter(Boolean),
-      requiredText: `${name}: ${getFirstBenefit(brief)} for ${persona}`,
-      cta: `Try ${name} today`,
-      format: 'Multi-channel campaign',
-      evidenceLimitations: [],
-      evidenceUsed: ['product_features', 'audience_pain_points', 'product_benefits'],
-      claimsRequiringReview: []
-    };
-  },
-  video_script(brief) {
-    const name = getProductName(brief);
-    const persona = getPersonaName(brief);
-    const pain = getFirstPainPoint(brief);
-    const feature = getFirstFeature(brief);
-    return {
-      _type: 'video_script',
-      title: `Introducing ${name} for ${persona}`,
-      format: 'Explainer',
-      duration: '60-90 seconds',
-      scenes: [
-        {
-          scene: 1,
-          narration: `Many ${persona} struggle with ${pain}. It's time-consuming, frustrating, and holds you back.`,
-          onScreenText: `The ${pain} problem`,
-          visual: `${persona} looking frustrated at a cluttered screen`,
-          evidencePoint: brief.painPoints?.[0] || 'audience pain points',
-          cta: null
-        },
-        {
-          scene: 2,
-          narration: `That's where ${name} comes in. We built ${feature} to help you ${getFirstBenefit(brief)}.`,
-          onScreenText: `${name}: ${getFirstBenefit(brief)}`,
-          visual: `Clean interface showing ${name} ${feature}`,
-          evidencePoint: brief.product?.features?.[0] ? 'product feature: ' + (typeof brief.product.features[0] === 'object' ? brief.product.features[0].name || brief.product.features[0].feature : brief.product.features[0]) : 'product evidence',
-          cta: null
-        },
-        {
-          scene: 3,
-          narration: `Ready to get started? Visit our website and see the difference ${name} can make.`,
-          onScreenText: `Start with ${name} today`,
-          visual: `${name} logo and website URL`,
-          evidencePoint: null,
-          cta: `Visit ${name} website`
-        }
-      ],
-      evidenceUsed: ['product_features', 'audience_pain_points'],
-      limitations: []
-    };
-  },
-  blog_article(brief) {
-    const name = getProductName(brief);
-    const persona = getPersonaName(brief);
-    const pain = getFirstPainPoint(brief);
-    const feature = getFirstFeature(brief);
-    const kw = getKeyword(brief, 0) || pain.toLowerCase().replace(/\s+/g, '-');
-    return {
-      _type: 'blog_article',
-      headline: `How ${name} Helps ${persona} Overcome ${pain}`,
-      metaDescription: `Learn how ${name} helps ${persona} solve ${pain} with ${feature}.`,
-      introduction: `${pain} is a common challenge for ${persona}. In this article, we explore how ${name} provides a practical solution.`,
-      sections: [
-        {
-          heading: 'Understanding the Challenge',
-          body: `Many ${persona} face ${pain} on a daily basis. This affects productivity, outcomes, and overall satisfaction.`,
-          keyTakeaways: [`${pain} is more common than you think`, `Traditional approaches fall short`, `A better solution exists`]
-        },
-        {
-          heading: `How ${name} Solves This`,
-          body: `${name} addresses ${pain} through ${feature}, enabling ${persona} to achieve ${getFirstBenefit(brief)}.`,
-          keyTakeaways: [`${feature} directly targets the root cause`, 'Proven methodology', 'Easy to implement']
-        },
-        {
-          heading: 'Getting Started',
-          body: `Ready to see ${name} in action? Start your journey today.`,
-          keyTakeaways: [`Quick setup process`, `No complex configuration needed`, `Immediate results`]
-        }
-      ],
-      conclusion: `${name} provides a powerful solution for ${persona} dealing with ${pain}. With ${feature}, you can finally achieve ${getFirstBenefit(brief)}.`,
-      cta: `Learn more about ${name}`,
-      targetKeywords: [kw, name]
-    };
-  },
-  faq_page(brief) {
-    const name = getProductName(brief);
-    const persona = getPersonaName(brief);
-    const feature = getFirstFeature(brief);
-    const benefit = getFirstBenefit(brief);
-    return {
-      headline: `Frequently Asked Questions About ${name}`,
-      metaDescription: `Find answers to common questions about ${name} and how it helps ${persona}.`,
-      introduction: `Here are answers to the most common questions about ${name}.`,
-      faqs: [
-        {
-          question: `What is ${name}?`,
-          answer: `${name} is a solution designed to help ${persona} achieve ${benefit}. It provides ${feature} in a simple, effective package.`
-        },
-        {
-          question: `Who is ${name} for?`,
-          answer: `${name} is built for ${persona} who need ${benefit}. If you're dealing with ${getFirstPainPoint(brief)}, ${name} can help.`
-        },
-        {
-          question: `How does ${name} work?`,
-          answer: `${name} uses ${feature} to deliver ${benefit}. It's designed to be intuitive and requires no special training.`
-        },
-        {
-          question: `How do I get started with ${name}?`,
-          answer: `Getting started is simple. Visit our website, sign up, and start seeing results immediately.`
-        }
-      ],
-      cta: `Try ${name} today`
-    };
-  },
-  landing_page(brief) {
-    const name = getProductName(brief);
-    const persona = getPersonaName(brief);
-    const pain = getFirstPainPoint(brief);
-    const benefit = getFirstBenefit(brief);
-    const feature = getFirstFeature(brief);
-    const kw = getKeyword(brief, 0) || name;
-    return {
-      headline: `${name}: ${benefit} for ${persona}`,
-      subheadline: `Stop struggling with ${pain}. Start seeing results.`,
-      heroCTA: `Get Started with ${name}`,
-      painPoints: [
-        `${pain} slowing you down`,
-        `Traditional tools don't deliver`,
-        `Wasted time on ${pain.toLowerCase()}`
-      ],
-      solution: `${name} provides ${feature} that helps ${persona} achieve ${benefit}.`,
-      features: [
-        { icon: '🎯', title: feature, description: `Targeted ${feature} designed for ${persona}` },
-        { icon: '⚡', title: 'Fast Results', description: `See ${benefit} from day one` },
-        { icon: '🔒', title: 'Reliable', description: `Built on proven ${getKeyword(brief, 1) || 'methodology'}` }
-      ],
-      socialProof: [],
-      finalCTA: `Start with ${name}`,
-      seoKeywords: [kw, `${name} for ${persona}`, `${kw} tool`]
-    };
-  },
-  product_page(brief) {
-    const name = getProductName(brief);
-    const persona = getPersonaName(brief);
-    const benefit = getFirstBenefit(brief);
-    const feature = getFirstFeature(brief);
-    const pain = getFirstPainPoint(brief);
-    return {
-      productName: name,
-      tagline: `${benefit} for ${persona}`,
-      overview: `${name} helps ${persona} achieve ${benefit} by addressing ${pain}.`,
-      keyFeatures: [
-        {
-          name: feature,
-          description: `Core ${feature} that drives ${benefit}`,
-          benefit: `Enables ${persona} to overcome ${pain}`
-        },
-        {
-          name: 'Easy Integration',
-          description: 'Works with your existing workflow',
-          benefit: 'No disruption to your current process'
-        },
-        {
-          name: 'Real Results',
-          description: `Proven approach to ${benefit.toLowerCase()}`,
-          benefit: `See ${benefit} quickly`
-        }
-      ],
-      useCases: [
-        {
-          scenario: `For ${persona} dealing with ${pain}`,
-          solution: `${name} provides ${feature} to directly address this challenge`,
-          outcome: `Achieve ${benefit} without the usual friction`
-        }
-      ],
-      cta: `Get ${name}`,
-      pricing: null,
-      faqs: [
-        { question: `What makes ${name} different?`, answer: `${name} focuses on ${benefit} through ${feature}.` },
-        { question: `Is ${name} right for me?`, answer: `If you're a ${persona} dealing with ${pain}, yes.` }
-      ]
-    };
-  },
-  comparison_page(brief) {
-    const name = getProductName(brief);
-    const persona = getPersonaName(brief);
-    const benefit = getFirstBenefit(brief);
-    const feature = getFirstFeature(brief);
-    const competitors = brief.validatedCompetitors?.slice(0, 2).map(c => c.name) || ['Alternative solutions'];
-    return {
-      headline: `${name} vs Alternatives`,
-      introduction: `Compare ${name} with other solutions for ${persona}.`,
-      comparisonTable: {
-        headers: ['Feature', name, ...competitors],
-        rows: [
-          { feature: benefit, [name]: '✓', [competitors[0] || 'Alternative']: 'Limited', [competitors[1] || 'Other']: '✗' },
-          { feature: feature, [name]: '✓ Native', [competitors[0] || 'Alternative']: '✓ Basic', [competitors[1] || 'Other']: '✗' },
-          { feature: 'Ease of Use', [name]: 'High', [competitors[0] || 'Alternative']: 'Medium', [competitors[1] || 'Other']: 'Low' }
-        ]
-      },
-      whyChooseUs: `${name} is purpose-built for ${persona} who need ${benefit}. Unlike alternatives, ${name} delivers ${feature} without complexity.`,
-      cta: `Try ${name}`,
-      competitorWeaknesses: competitors.map(c => ({ competitor: c, weakness: `Limited ${benefit.toLowerCase()} capabilities` }))
-    };
-  },
-  feature_announcement(brief) {
-    const name = getProductName(brief);
-    const persona = getPersonaName(brief);
-    const feature = getFirstFeature(brief);
-    const benefit = getFirstBenefit(brief);
-    return {
-      headline: `Introducing ${feature} on ${name}`,
-      subheadline: `A new way for ${persona} to achieve ${benefit}`,
-      body: `We're excited to announce a powerful new ${feature} capability in ${name}. Designed for ${persona}, this feature helps you ${benefit} faster than ever before.`,
-      benefits: [
-        `${benefit} with less effort`,
-        `Purpose-built for ${persona}`,
-        `Seamless integration with your workflow`
-      ],
-      cta: `Explore ${feature}`,
-      availability: 'Available now',
-      technicalDetails: null
-    };
-  },
-  whitepaper(brief) {
-    const name = getProductName(brief);
-    const persona = getPersonaName(brief);
-    const pain = getFirstPainPoint(brief);
-    const benefit = getFirstBenefit(brief);
-    const feature = getFirstFeature(brief);
-    return {
-      title: `${benefit}: A Guide for ${persona}`,
-      subtitle: `How ${name} Addresses ${pain} With ${feature}`,
-      executiveSummary: `This whitepaper explores how ${name} helps ${persona} overcome ${pain} and achieve ${benefit}. Based on real evidence and proven methodologies.`,
-      sections: [
-        {
-          heading: 'The Challenge',
-          body: `${persona} face ${pain} daily, impacting their ability to achieve ${benefit.toLowerCase()}. Traditional approaches are failing.`,
-          keyFindings: [`${pain} affects productivity`, 'Current tools are inadequate', 'A new approach is needed']
-        },
-        {
-          heading: `The ${name} Solution`,
-          body: `${name} addresses these challenges through ${feature}, delivering ${benefit} to ${persona}.`,
-          keyFindings: [`${feature} directly solves the core issue`, `Designed specifically for ${persona}`, 'Proven methodology']
-        },
-        {
-          heading: 'Implementation Guide',
-          body: `Getting started with ${name} is straightforward. This section covers the implementation approach.`,
-          keyFindings: ['Quick setup', 'Minimal learning curve', 'Immediate value']
-        }
-      ],
-      conclusion: `${name} provides a proven solution for ${persona} dealing with ${pain}. With ${feature}, achieving ${benefit} is now possible.`,
-      references: [],
-      cta: `Download the full ${name} whitepaper`
-    };
-  }
-};
+const FALLBACK_FAILURE = { _status: 'generation_failed', _reason: 'AI generation failed, no rule-based templates available', _provider: 'ai' };
+
 
 function getEvidenceForTrend(brief) {
   const hasTrendKeywords = brief.verifiedKeywords?.some(k => k.keyword && (k.volume || k.difficulty)) || false;
@@ -565,7 +177,7 @@ Return valid JSON:
     const result = await callAI(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { /* fall through to rule-based */ }
-  return { ...RULE_BASED_FALLBACKS.linkedin_post(brief), _provider: 'rule-based' };
+  return FALLBACK_FAILURE;
 }
 
 async function generateInstagramPost(brief) {
@@ -610,7 +222,7 @@ Return valid JSON:
     const result = await callAI(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { /* fall through to rule-based */ }
-  return { ...RULE_BASED_FALLBACKS.instagram_post(brief), _provider: 'rule-based' };
+  return FALLBACK_FAILURE;
 }
 
 async function generateTwitterPost(brief) {
@@ -649,7 +261,7 @@ Return valid JSON:
     const result = await callAI(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { /* fall through to rule-based */ }
-  return { ...RULE_BASED_FALLBACKS.twitter_post(brief), _provider: 'rule-based' };
+  return FALLBACK_FAILURE;
 }
 
 async function generateFacebookPost(brief) {
@@ -689,7 +301,7 @@ Return valid JSON:
     const result = await callAI(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { /* fall through to rule-based */ }
-  return { ...RULE_BASED_FALLBACKS.facebook_post(brief), _provider: 'rule-based' };
+  return FALLBACK_FAILURE;
 }
 
 async function generateYouTubeDescription(brief) {
@@ -732,7 +344,7 @@ Return valid JSON:
     const result = await callAI(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { /* fall through to rule-based */ }
-  return { ...RULE_BASED_FALLBACKS.youtube_description(brief), _provider: 'rule-based' };
+  return FALLBACK_FAILURE;
 }
 
 async function generateEmailCopy(brief) {
@@ -787,7 +399,7 @@ Return valid JSON:
     const result = await callAI(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { /* fall through to rule-based */ }
-  return { ...RULE_BASED_FALLBACKS.email_copy(brief), _provider: 'rule-based' };
+  return FALLBACK_FAILURE;
 }
 
 async function generateBlogArticle(brief) {
@@ -831,7 +443,7 @@ Return valid JSON:
     const result = await callAI(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { /* fall through to rule-based */ }
-  return { ...RULE_BASED_FALLBACKS.blog_article(brief), _provider: 'rule-based' };
+  return FALLBACK_FAILURE;
 }
 
 async function generateFAQ(brief) {
@@ -867,7 +479,7 @@ Return valid JSON:
     const result = await callAI(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { /* fall through to rule-based */ }
-  return { ...RULE_BASED_FALLBACKS.faq_page(brief), _provider: 'rule-based' };
+  return FALLBACK_FAILURE;
 }
 
 async function generateLandingPage(brief) {
@@ -912,7 +524,7 @@ Return valid JSON:
     const result = await callAI(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { /* fall through to rule-based */ }
-  return { ...RULE_BASED_FALLBACKS.landing_page(brief), _provider: 'rule-based' };
+  return FALLBACK_FAILURE;
 }
 
 async function generateProductPage(brief) {
@@ -955,7 +567,7 @@ Return valid JSON:
     const result = await callAI(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { /* fall through to rule-based */ }
-  return { ...RULE_BASED_FALLBACKS.product_page(brief), _provider: 'rule-based' };
+  return FALLBACK_FAILURE;
 }
 
 async function generateComparisonPage(brief) {
@@ -995,7 +607,7 @@ Return valid JSON:
     const result = await callAI(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { /* fall through to rule-based */ }
-  return { ...RULE_BASED_FALLBACKS.comparison_page(brief), _provider: 'rule-based' };
+  return FALLBACK_FAILURE;
 }
 
 async function generateFeatureAnnouncement(brief) {
@@ -1036,7 +648,7 @@ Return valid JSON:
     const result = await callAI(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { /* fall through to rule-based */ }
-  return { ...RULE_BASED_FALLBACKS.feature_announcement(brief), _provider: 'rule-based' };
+  return FALLBACK_FAILURE;
 }
 
 async function generateWhitepaper(brief) {
@@ -1077,7 +689,7 @@ Return valid JSON:
     const result = await callAI(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { /* fall through to rule-based */ }
-  return { ...RULE_BASED_FALLBACKS.whitepaper(brief), _provider: 'rule-based' };
+  return FALLBACK_FAILURE;
 }
 
 async function generateCreativeBrief(brief) {
@@ -1122,7 +734,7 @@ Return valid JSON:
     const result = await callAI(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { /* fall through to rule-based */ }
-  return { ...RULE_BASED_FALLBACKS.creative_brief(brief), _provider: 'rule-based' };
+  return FALLBACK_FAILURE;
 }
 
 async function generateVideoScript(brief) {
@@ -1164,7 +776,7 @@ Return valid JSON:
     const result = await callAI(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { /* fall through to rule-based */ }
-  return { ...RULE_BASED_FALLBACKS.video_script(brief), _provider: 'rule-based' };
+  return FALLBACK_FAILURE;
 }
 
 const GENERATORS = {

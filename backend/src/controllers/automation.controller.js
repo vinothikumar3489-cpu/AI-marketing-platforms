@@ -1035,12 +1035,6 @@ export const generateContentItem = async (req, res) => {
     // Stage 5: Quality scoring
     const qualityScore = scoreContentQuality(contentBody, brief, contentType);
 
-    // Ensure _type and _assetId are set on content for frontend detection
-    if (contentBody && typeof contentBody === 'object') {
-      if (!contentBody._type) contentBody._type = contentType;
-      contentBody._assetId = asset.id;
-    }
-
     // Stage 6: Persist asset
     const asset = await saveContentAsset(prisma, {
       userId,
@@ -1065,6 +1059,12 @@ export const generateContentItem = async (req, res) => {
           stage: "PERSISTENCE"
         }
       });
+    }
+
+    // Ensure _type and _assetId are set on content for frontend detection
+    if (contentBody && typeof contentBody === 'object') {
+      if (!contentBody._type) contentBody._type = contentType;
+      contentBody._assetId = asset.id;
     }
 
     console.info("[Content Studio] Asset saved", {
