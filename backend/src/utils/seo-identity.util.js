@@ -2,129 +2,91 @@
  * Derive correct website identity without blindly trusting previous project names.
  * Fully safe - handles null/undefined inputs gracefully.
  */
-import { sanitizeText, extractText } from './text.util.js';
+import { sanitizeText } from './text.util.js';
 
+function extractHostname(url) {
+  if (!url || typeof url !== 'string') return '';
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+  }
+}
 
+function cleanTitle(raw) {
+  if (!raw) return '';
+  const parts = raw.split(/\||-|–/);
+  if (parts.length > 1) {
+    return parts.reduce((a, b) => a.trim().length <= b.trim().length && a.trim().length > 0 ? a : b).trim();
+  }
+  return raw.trim();
+}
+
+function capitalizeDomain(domain) {
+  if (!domain) return '';
+  const parts = domain.split('.');
+  if (parts.length > 1) {
+    return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+  }
+  return domain.charAt(0).toUpperCase() + domain.slice(1);
+}
 
 export function deriveWebsiteIdentity(params = {}) {
-  // Safe extraction with defaults
-  const {
-    websiteUrl = '',
-    scrapedData = {},
-    researchData = {},
-    chat = {}
-  } = params || {};
+  const { websiteUrl = '', scrapedData = {}, chat = {} } = params || {};
 
-  // Return safe defaults if no websiteUrl
   if (!websiteUrl || typeof websiteUrl !== 'string') {
     return {
-      websiteUrl: '',
-      domain: '',
-      brandName: null,
-      companyName: null,
-      productName: null,
-      industry: null,
-      category: null,
-      targetAudience: null,
-      websiteTitle: '',
-      websiteDescription: '',
-      businessModel: null,
-      businessCategory: null,
-      companySize: null,
-      source: 'fallback'
+      websiteUrl: '', domain: '', brandName: null, companyName: null,
+      productName: null, industry: null, category: null, targetAudience: null,
+      websiteTitle: '', websiteDescription: '', businessModel: null,
+      businessCategory: null, companySize: null, source: 'fallback'
     };
   }
 
-  let domain = '';
-  try {
-    const urlObj = new URL(websiteUrl);
-    domain = urlObj.hostname.replace(/^www\./, '');
-  } catch (e) {
-    domain = websiteUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
-  }
-
-  // Helper to safely split titles
-  const cleanTitle = (raw) => {
-    if (!raw) return '';
-    let parts = raw.split(/\||-|–/);
-    if (parts.length > 1) {
-      return parts.reduce((a, b) => a.trim().length <= b.trim().length && a.trim().length > 0 ? a : b).trim();
-    }
-    return raw.trim();
+  const identityContext = {
+    originalUrl: websiteUrl,
+    hostname: extractHostname(websiteUrl),
+    normalizedDomain: null,
+    companyHint: null,
+    productHint: null,
+    evidence: [],
+    confidence: null
   };
 
   const meta = scrapedData?.meta || {};
   const ogSiteName = meta?.ogSiteName || meta?.['og:site_name'];
-  
-  // Extract title from multiple sources in priority order
+
   const titleSources = [
-    scrapedData?.title,
-    meta?.title,
-    meta?.ogTitle,
-    meta?.['og:title'],
-    scrapedData?.h1?.[0],
-    ogSiteName
+    scrapedData?.title, meta?.title, meta?.ogTitle,
+    meta?.['og:title'], scrapedData?.h1?.[0], ogSiteName
   ];
   const titlePart = cleanTitle(titleSources.find(t => t) || '');
-  
-  // Extract description from multiple sources in priority order
+
   const descriptionSources = [
-    meta?.description,
-    meta?.ogDescription,
-    meta?.['og:description'],
-    scrapedData?.metaDescription,
-    scrapedData?.description
+    meta?.description, meta?.ogDescription, meta?.['og:description'],
+    scrapedData?.metaDescription, scrapedData?.description
   ];
   const descriptionPart = descriptionSources.find(d => d) || '';
 
-  // Safely extract h1 from multiple sources
   const h1 =
-    scrapedData?.h1?.[0] ||
-    scrapedData?.metadata?.h1?.[0] ||
-    scrapedData?.headings?.h1?.[0] ||
-    scrapedData?.headings?.h1 ||
+    scrapedData?.h1?.[0] || scrapedData?.metadata?.h1?.[0] ||
+    scrapedData?.headings?.h1?.[0] || scrapedData?.headings?.h1 ||
     (scrapedData?.content?.match?.(/<h1[^>]*>(.*?)<\/h1>/i)?.[1] || '');
 
-  // Format domain to proper case - NEVER append TLD words
-  const formatDomain = (d) => {
-    if (!d) return '';
-    const parts = d.split('.');
-    if (parts.length > 1) {
-      const name = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-      
-      // Never append TLD as separate word - always return just the name capitalized
-      // This prevents "Notion com", "Figma com", "Orkyn ai" etc.
-      return name;
-    }
-    return d.charAt(0).toUpperCase() + d.slice(1);
-  };
+  identityContext.normalizedDomain = identityContext.hostname;
+  const domainDerivedName = capitalizeDomain(identityContext.normalizedDomain);
 
-  const domainDerivedName = formatDomain(domain);
+  identityContext.productHint = ogSiteName || titlePart || h1 || domainDerivedName || identityContext.normalizedDomain;
+  identityContext.companyHint = identityContext.productHint;
 
-  // Pick the best company/product/brand name - prioritize scraped title/meta over domain
-  let brandName = ogSiteName || titlePart || h1 || domainDerivedName || domain;
-  let companyName = brandName;
-  let productName = brandName;
-
-  // Check if we should inherit from chat (only if domain matches exactly)
-  let chatDomain = '';
+  let chatHostname = '';
   if (chat?.websiteUrl) {
-    try {
-      chatDomain = new URL(chat.websiteUrl).hostname.replace(/^www\./, '');
-    } catch (e) {
-      chatDomain = chat.websiteUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
-    }
+    chatHostname = extractHostname(chat.websiteUrl);
   }
 
-  if (chatDomain === domain && chat?.productName) {
-    productName = chat.productName;
-    companyName = chat.companyName || chat.productName;
-    brandName = chat.productName;
-  }
-
-  // Ensure we don't output generic fallback names — use brandName instead
-  if (!productName) {
-    productName = brandName;
+  if (chatHostname === identityContext.normalizedDomain && chat?.productName) {
+    identityContext.productHint = chat.productName;
+    identityContext.companyHint = chat.companyName || chat.productName;
   }
 
   let businessModel = null;
@@ -158,14 +120,14 @@ export function deriveWebsiteIdentity(params = {}) {
     }
   }
 
-  const resolvedIndustry = knownDomain?.industry || (chatDomain === domain && chat?.industry ? chat.industry : null);
+  const resolvedIndustry = category || (chatHostname === identityContext.normalizedDomain && chat?.industry ? chat.industry : null);
 
   return {
-    websiteUrl,
-    domain,
-    brandName: sanitizeText(brandName),
-    companyName: sanitizeText(companyName),
-    productName: sanitizeText(productName),
+    websiteUrl: identityContext.originalUrl,
+    domain: identityContext.normalizedDomain,
+    brandName: sanitizeText(identityContext.productHint),
+    companyName: sanitizeText(identityContext.companyHint),
+    productName: sanitizeText(identityContext.productHint),
     industry: resolvedIndustry,
     category,
     targetAudience,
@@ -174,6 +136,6 @@ export function deriveWebsiteIdentity(params = {}) {
     businessModel,
     businessCategory,
     companySize,
-    source: knownDomain ? 'known_domain_classification' : ((chatDomain === domain && chat?.productName) ? 'chat_match' : 'scraped_derived')
+    source: (chatHostname === identityContext.normalizedDomain && chat?.productName) ? 'chat_match' : 'scraped_derived'
   };
 }
