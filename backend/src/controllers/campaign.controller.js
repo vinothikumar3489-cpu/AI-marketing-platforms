@@ -206,11 +206,18 @@ export const generateCampaignPlan = async (req, res) => {
       });
     }
     const campaignGenerator = extractCampaignGenerator(savedPlan);
+    const metadata = typeof savedPlan.inputJson === 'object' ? (savedPlan.inputJson?._metadata || {}) : {};
+    const generationMode = metadata.generationMode || (savedPlan.fallbackUsed ? 'FALLBACK' : 'AI');
 
     return res.status(201).json({
       success: true,
       campaignPlan: savedPlan,
       campaignGenerator,
+      generationMode,
+      fallbackUsed: savedPlan.fallbackUsed,
+      provider: savedPlan.provider,
+      warnings: metadata.warnings || [],
+      fallbackReason: metadata.fallbackReason || null,
     });
   } catch (error) {
     console.error("[Campaign] Error generating intelligence:", error);
