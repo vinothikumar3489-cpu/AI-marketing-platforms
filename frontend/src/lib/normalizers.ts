@@ -376,12 +376,20 @@ export function normalizeFullResults(data: any) {
   if (root.growthWorkspace && typeof root.growthWorkspace === 'object' && canonicalStatuses.includes(root.growthWorkspace.status)) {
     const workspace = root.growthWorkspace;
 
+    const productIdentity = root.productIdentity || workspace.productIdentity || null;
+    const identity = productIdentity || {};
     return {
       chat: root.chat || {},
       chatId: root.chatId || root.chat?.id || '',
       growthStatus,
       seoStatus,
-      productIdentity: root.productIdentity || workspace.productIdentity || null,
+      productIdentity: identity,
+      profile: {
+        productName: identity.productName || identity.brandName || workspace.productDNA?.name?.value || '',
+        brandName: identity.brandName || identity.productName || '',
+        companyName: identity.companyName || workspace.productDNA?.company?.name?.value || root.chat?.companyName || '',
+        websiteUrl: identity.domain || root.chat?.websiteUrl || '',
+      },
       growthWorkspace: workspace, // Canonical payload - use as-is
       // Legacy growth shape for backward compatibility (derived from canonical)
       growth: {
@@ -413,12 +421,19 @@ export function normalizeFullResults(data: any) {
   if (hasGrowth && root.growth && typeof root.growth === 'object') {
     const growth = root.growth;
 
+    const productIdentity2 = root.productIdentity || {};
     return {
       chat: root.chat || {},
       chatId: root.chatId || root.chat?.id || '',
       growthStatus,
       seoStatus,
-      productIdentity: root.productIdentity || null,
+      productIdentity: productIdentity2,
+      profile: {
+        productName: productIdentity2.productName || productIdentity2.brandName || growth.product?.name?.value || '',
+        brandName: productIdentity2.brandName || productIdentity2.productName || '',
+        companyName: productIdentity2.companyName || growth.product?.company?.name?.value || root.chat?.companyName || '',
+        websiteUrl: productIdentity2.domain || root.chat?.websiteUrl || '',
+      },
       growthWorkspace: null, // No canonical workspace available
       growth: {
         product: safeParse(growth.product, growth.product),
@@ -456,12 +471,19 @@ export function normalizeFullResults(data: any) {
   const execStory = campaignIntel.executiveStory || campaignIntel.campaignGenerator?.executiveStory || channelIntel.executiveStory || channelIntel.channelRecommendation?.executiveStory || growth.executiveStory;
   const actPlan = campaignIntel.actionPlan || campaignIntel.campaignGenerator?.actionPlan || channelIntel.actionPlan || channelIntel.channelRecommendation?.actionPlan || growth.actionPlan;
 
+  const productIdentity3 = root.productIdentity || {};
   return {
     chat: root.chat || {},
     chatId: root.chatId || root.chat?.id || '',
     growthStatus,
     seoStatus,
-    productIdentity: root.productIdentity || null,
+    productIdentity: productIdentity3,
+    profile: {
+      productName: productIdentity3.productName || productIdentity3.brandName || productIntel.productAnalysis?.name?.value || '',
+      brandName: productIdentity3.brandName || productIdentity3.productName || '',
+      companyName: productIdentity3.companyName || productIntel.productAnalysis?.company?.name?.value || root.chat?.companyName || '',
+      websiteUrl: productIdentity3.domain || root.chat?.websiteUrl || '',
+    },
     growthWorkspace: null,
     growth: {
       product: safeParse(productIntel.productAnalysis, productIntel.productAnalysis),
