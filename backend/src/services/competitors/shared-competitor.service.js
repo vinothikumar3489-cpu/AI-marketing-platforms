@@ -157,21 +157,27 @@ export async function getValidatedCompetitorsForChat({ userId, chatId, productId
 
   // Filter and validate competitors
   const validatedCompetitors = competitors.filter(comp => validateCompetitor(comp, productIdentity));
+  const classifiedCompetitors = classifyCompetitors(validatedCompetitors, productIdentity);
+  
+  const productCompetitors = classifiedCompetitors.filter(c => c.competitorClass === 'DIRECT_PRODUCT' || c.competitorClass === 'INDIRECT_PRODUCT');
   
   console.log('[Shared Competitor Engine] Validation results:', {
     totalFound: competitors.length,
-    validated: validatedCompetitors.length,
-    rejected: competitors.length - validatedCompetitors.length,
+    validated: classifiedCompetitors.length,
+    productLevel: productCompetitors.length,
+    rejected: competitors.length - classifiedCompetitors.length,
     sources
   });
   
   return {
-    competitors: validatedCompetitors,
+    competitors: productCompetitors,
+    allValidated: classifiedCompetitors,
     sources,
     validationSummary: {
       total: competitors.length,
-      validated: validatedCompetitors.length,
-      rejected: competitors.length - validatedCompetitors.length
+      validated: classifiedCompetitors.length,
+      productLevel: productCompetitors.length,
+      rejected: competitors.length - classifiedCompetitors.length
     }
   };
 }
@@ -307,6 +313,81 @@ function validateCompetitor(competitor, productIdentity) {
   }
 
   return true;
+}
+
+const COMPETITOR_CLASSIFICATION = {
+  DIRECT_PRODUCT: 'DIRECT_PRODUCT',
+  INDIRECT_PRODUCT: 'INDIRECT_PRODUCT',
+  ALTERNATIVE_METHOD: 'ALTERNATIVE_METHOD',
+  ARTICLE: 'ARTICLE',
+  DIRECTORY: 'DIRECTORY',
+  SUPPORT_PAGE: 'SUPPORT_PAGE',
+  SAME_BRAND: 'SAME_BRAND',
+  IRRELEVANT: 'IRRELEVANT',
+};
+
+function classifyCompetitor(competitor, productIdentity) {
+  const name = (competitor.name || '').toLowerCase();
+  const domain = (competitor.domain || '').toLowerCase();
+  const sourceUrl = (competitor.sourceUrl || competitor.url || '').toLowerCase();
+  const ownDomain = (extractDomainFromUrl(productIdentity?.websiteUrl) || '').toLowerCase();
+  const ownName = ((productIdentity?.productName || productIdentity?.companyName || '') + '').toLowerCase();
+
+  if (!name && !domain) return COMPETITOR_CLASSIFICATION.IRRELEVANT;
+
+  if (domain && ownDomain) {
+    const cd = domain.replace(/^www\./, '');
+    const od = ownDomain.replace(/^www\./, '');
+    if (cd === od) return COMPETITOR_CLASSIFICATION.SAME_BRAND;
+    if (cd.endsWith('.' + od) || od.endsWith('.' + cd)) return COMPETITOR_CLASSIFICATION.SAME_BRAND;
+  }
+
+  const lowerTitle = ((competitor.title || competitor.name || '') + '').toLowerCase();
+  if (isArticleOrTutorial(name, lowerTitle, sourceUrl)) return COMPETITOR_CLASSIFICATION.ARTICLE;
+
+  if (/(\/blog\/|\/article\/|\/news\/|\/tutorial\/|\/guide\/)/.test(sourceUrl)) return COMPETITOR_CLASSIFICATION.ARTICLE;
+  if (ARTICLE_INDICATORS.some(i => name.includes(i) || lowerTitle.includes(i))) return COMPETITOR_CLASSIFICATION.ARTICLE;
+
+  if (isKnowledgeOrSupportDomain(domain)) return COMPETITOR_CLASSIFICATION.SUPPORT_PAGE;
+
+  if (/(\/login|\/signin|\/sign.?up|\/register|\/auth|\/forgot|\/reset|\/logout|\/pricing|\/plans|\/careers|\/jobs|\/apply)/i.test(sourceUrl)) return COMPETITOR_CLASSIFICATION.SUPPORT_PAGE;
+
+  if (domain && (
+    domain.includes('g2.com') || domain.includes('capterra') ||
+    domain.includes('trustpilot') || domain.includes('reviews') ||
+    domain.includes('getapp.com') || domain.includes('softwareadvice.com') ||
+    domain.includes('clutch.co') || domain.includes('gartner.com') ||
+    domain.includes('forrester.com')
+  )) return COMPETITOR_CLASSIFICATION.DIRECTORY;
+
+  if (domain && (
+    domain.includes('facebook.com') || domain.includes('twitter.com') ||
+    domain.includes('linkedin.com') || domain.includes('instagram.com') ||
+    domain.includes('youtube.com') || domain.includes('tiktok.com') ||
+    domain.includes('pinterest.com') || domain.includes('reddit.com')
+  )) return COMPETITOR_CLASSIFICATION.IRRELEVANT;
+
+  if (domain) {
+    const tld = domain.split('.').pop();
+    if (NON_COMMERCIAL_TLDS.has(tld)) return COMPETITOR_CLASSIFICATION.IRRELEVANT;
+  }
+
+  const productTerms = ['saas', 'software', 'platform', 'app', 'tool', 'solution', 'cloud'];
+  const hasProductTerm = productTerms.some(t => name.includes(t) || domain.includes(t));
+  const hasOwnName = ownName && (name.includes(ownName) || domain.includes(ownName));
+
+  if (hasOwnName && hasProductTerm) return COMPETITOR_CLASSIFICATION.DIRECT_PRODUCT;
+  if (hasOwnName) return COMPETITOR_CLASSIFICATION.SAME_BRAND;
+  if (hasProductTerm) return COMPETITOR_CLASSIFICATION.INDIRECT_PRODUCT;
+
+  return COMPETITOR_CLASSIFICATION.ALTERNATIVE_METHOD;
+}
+
+export function classifyCompetitors(competitors, productIdentity) {
+  return competitors.map(c => ({
+    ...c,
+    competitorClass: classifyCompetitor(c, productIdentity),
+  }));
 }
 
 /**
