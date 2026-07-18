@@ -35,7 +35,7 @@ export function AppSidebar() {
           <Brain className="w-5 h-5 text-white" />
         </div>
         <div>
-          <div className="font-display font-bold text-sm leading-tight">AI Marketform Platform</div>
+          <div className="font-display font-bold text-sm leading-tight">AI Marketing Platform</div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Market Intelligence</div>
         </div>
       </div>

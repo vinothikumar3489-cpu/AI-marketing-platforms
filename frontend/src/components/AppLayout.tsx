@@ -23,7 +23,7 @@ export default function AppLayout() {
       <aside className="sidebar">
         <div className="brand" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button className="ghost-btn small" onClick={() => setDrawerOpen(true)} style={{ padding: '6px', border: 'none', background: 'transparent' }}><Menu size={24} color="#fff" /></button>
-          <span className="brand-icon"><WandSparkles size={18} /></span><span>AI Marketform</span>
+          <span className="brand-icon"><WandSparkles size={18} /></span><span>AI Marketing Platform</span>
         </div>
         <nav>
           {links.map(link => {
