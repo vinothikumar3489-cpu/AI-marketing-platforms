@@ -3,16 +3,20 @@ import { api } from '../lib/api';
 import { normalizeFullResults } from '../lib/normalizers';
 import { useAuth } from './AuthContext';
 
+type CreateChatReason = 'USER_CLICK_NEW_ANALYSIS' | 'USER_CLICK_PROJECT_DROPDOWN' | 'FIRST_ACCOUNT_BOOTSTRAP' | 'ANALYSIS_RUN_NO_CHAT';
+const VALID_CREATE_REASONS: readonly CreateChatReason[] = ['USER_CLICK_NEW_ANALYSIS', 'USER_CLICK_PROJECT_DROPDOWN', 'FIRST_ACCOUNT_BOOTSTRAP', 'ANALYSIS_RUN_NO_CHAT'];
+
 type ProjectCtx = {
   chats: any[];
   selectedChatId: string;
   fullResults: any;
   loading: boolean;
+  chatsLoaded: boolean;
   refreshChats: () => Promise<void>;
   selectChat: (id: string) => Promise<void>;
   clearSelection: () => void;
   loadFullResults: (id?: string) => Promise<any>;
-  createChat: (title: string) => Promise<string>;
+  createChat: (title: string, reason: CreateChatReason) => Promise<string>;
   deleteChat: (id: string) => Promise<void>;
   clearHistory: () => Promise<void>;
 };
@@ -26,10 +30,12 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [selectedChatId, setSelectedChatId] = useState(localStorage.getItem('selectedChatId') || '');
   const [fullResults, setFullResults] = useState<any>(EMPTY_FULL_RESULTS);
   const [loading, setLoading] = useState(false);
+  const [chatsLoaded, setChatsLoaded] = useState(false);
   const mountedRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
   const createChatInFlightRef = useRef(false);
   const createChatPromiseRef = useRef<Promise<string> | null>(null);
+  const bootstrapAttemptedRef = useRef(false);
   const selectedChatIdRef = useRef(selectedChatId);
   selectedChatIdRef.current = selectedChatId;
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
@@ -41,9 +47,11 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       const res: any = await api.get('/chats');
       if (!mountedRef.current) return;
       const list = res.chats || res.data || res || [];
-      setChats(Array.isArray(list) ? list : []);
+      const chatArray = Array.isArray(list) ? list : [];
+      setChats(chatArray);
+      setChatsLoaded(true);
       const currentId = selectedChatIdRef.current;
-      const exists = list.some((c: any) => c.id === currentId);
+      const exists = chatArray.some((c: any) => c.id === currentId);
       if (currentId && !exists) {
         localStorage.removeItem('selectedChatId');
         setSelectedChatId('');
@@ -101,7 +109,12 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     await loadFullResults(id);
   }, [loadFullResults]);
 
-  const createChat = useCallback(async (title: string) => {
+  const createChat = useCallback(async (title: string, reason: CreateChatReason) => {
+    if (!VALID_CREATE_REASONS.includes(reason)) {
+      console.error('[ProjectContext] createChat called with invalid reason:', reason, { title, selectedChatId: selectedChatIdRef.current, chats });
+      throw new Error(`Invalid createChat reason: ${reason}. Allowed: ${VALID_CREATE_REASONS.join(', ')}`);
+    }
+
     if (createChatInFlightRef.current && createChatPromiseRef.current) {
       return createChatPromiseRef.current;
     }
@@ -161,6 +174,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user) {
       setChats([]);
+      setChatsLoaded(false);
       setSelectedChatId('');
       setFullResults(EMPTY_FULL_RESULTS);
       return;
@@ -168,11 +182,29 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     refreshChats();
   }, [user, refreshChats]);
 
+  const hasSelectedChat = Boolean(selectedChatId);
+  const hasZeroChats = chatsLoaded && chats.length === 0;
+
+  useEffect(() => {
+    if (!user) return;
+    if (!chatsLoaded) return;
+    if (bootstrapAttemptedRef.current) return;
+    if (!hasZeroChats) return;
+    if (hasSelectedChat) return;
+    if (createChatInFlightRef.current) return;
+
+    bootstrapAttemptedRef.current = true;
+    createChat('New Analysis', 'FIRST_ACCOUNT_BOOTSTRAP').catch(err => {
+      console.warn('[ProjectContext] first-account bootstrap chat creation failed:', err);
+      bootstrapAttemptedRef.current = false;
+    });
+  }, [user, chatsLoaded, hasZeroChats, hasSelectedChat, createChat]);
+
   const value = useMemo(() => ({
-    chats, selectedChatId, fullResults, loading,
+    chats, selectedChatId, fullResults, loading, chatsLoaded,
     refreshChats, selectChat, clearSelection, loadFullResults,
     createChat, deleteChat, clearHistory,
-  }), [chats, selectedChatId, fullResults, loading,
+  }), [chats, selectedChatId, fullResults, loading, chatsLoaded,
       refreshChats, selectChat, clearSelection, loadFullResults,
       createChat, deleteChat, clearHistory]);
 

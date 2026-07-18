@@ -47,26 +47,18 @@ export default function GrowthWorkspacePage() {
   const selectedChatIdRef = useRef(selectedChatId);
   const restoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    console.info("[Growth Route Component]", {
-      component: "GrowthWorkspacePage",
-      sourceFile: "src/pages/GrowthWorkspacePage.tsx",
-      buildSha: import.meta.env.VITE_COMMIT_SHA
-    });
-  }, []);
-
   function hasRealContent(obj: any): boolean {
     return obj && typeof obj === 'object' && Object.keys(obj).length > 0;
   }
 
-  const EMPTY_FULL_RESULTS = {
-    productIntelligence: null,
-    competitorIntelligence: null,
-    campaignIntelligence: null,
-    seoIntelligence: null,
-    growthWorkspace: null,
-    automationPlan: null,
-  };
+  const hasSelectedChat = Boolean(selectedChatId);
+
+  const hasGrowthAnalysis = hasSelectedChat && Boolean(
+    fullResults?.productIntelligence ||
+    fullResults?.competitorIntelligence ||
+    fullResults?.campaignIntelligence ||
+    fullResults?.growthWorkspace
+  );
 
   const restoreForChat = useCallback(async (chatId: string) => {
     if (!chatId) {
@@ -74,22 +66,12 @@ export default function GrowthWorkspacePage() {
       return;
     }
 
-    console.log('[Growth Restore]', {
-      selectedChatId: chatId,
-      requestedChatId: chatId,
-      restoreStatus: 'loading',
-    });
-
     selectedChatIdRef.current = chatId;
     setRestoreStatus('loading');
     setRestoreError(null);
     setResults({});
 
     restoreTimeoutRef.current = setTimeout(() => {
-      console.warn('[Growth Restore] timeout after 15s for chatId:', chatId, {
-        selectedChatIdRef: selectedChatIdRef.current,
-        restoreStatus,
-      });
       if (selectedChatIdRef.current === chatId) {
         setRestoreStatus('error');
         setRestoreError('Request timed out. The backend may be unavailable.');
@@ -105,12 +87,11 @@ export default function GrowthWorkspacePage() {
       }
 
       if (selectedChatIdRef.current !== chatId) {
-        console.log('[Growth Restore] stale response ignored for chatId:', chatId, 'current:', selectedChatIdRef.current);
         return;
       }
 
       const growth = result?.growth || {};
-      const hasGrowthAnalysis =
+      const hasGrowthData =
         Boolean(result?.productIntelligence) ||
         Boolean(result?.competitorIntelligence) ||
         Boolean(result?.campaignIntelligence) ||
@@ -129,18 +110,7 @@ export default function GrowthWorkspacePage() {
         hasRealContent(growth.actionPlan) ||
         hasRealContent(growth.evidence);
 
-      console.log('[Growth Restore]', {
-        selectedChatId: chatId,
-        requestedChatId: chatId,
-        restoreStatus: hasGrowthAnalysis ? 'found' : 'empty',
-        hasGrowthAnalysis,
-        hasFullResults: Boolean(result),
-        product: Boolean(result?.productIntelligence),
-        competitor: Boolean(result?.competitorIntelligence),
-        campaign: Boolean(result?.campaignIntelligence),
-      });
-
-      if (hasGrowthAnalysis) {
+      if (hasGrowthData) {
         setResults(growth);
         setRestoreStatus('found');
       } else {
@@ -155,11 +125,9 @@ export default function GrowthWorkspacePage() {
       }
 
       if (selectedChatIdRef.current !== chatId) {
-        console.log('[Growth Restore] stale error ignored for chatId:', chatId);
         return;
       }
 
-      console.error('[Growth Restore] error:', e.message || e);
       setRestoreStatus('error');
       setRestoreError(e.message || 'Failed to restore analysis');
       setResults({});
@@ -180,8 +148,6 @@ export default function GrowthWorkspacePage() {
       return;
     }
 
-    console.log('[Growth Restore] state transition: restoring for chat', selectedChatId);
-    console.log('[Growth Restore] state transition: previous -> loading');
     restoreForChat(selectedChatId);
 
     return () => {
@@ -204,7 +170,7 @@ export default function GrowthWorkspacePage() {
       let chatId = selectedChatId;
       if (!chatId) {
         setCreatingChat(true);
-        chatId = await createChat('New Growth Analysis');
+        chatId = await createChat('New Growth Analysis', 'ANALYSIS_RUN_NO_CHAT');
         setCreatingChat(false);
       }
       
@@ -248,7 +214,7 @@ export default function GrowthWorkspacePage() {
     setRestoreStatus('empty');
     setStep(1);
     try {
-      await createChat('New Growth Analysis');
+      await createChat('New Growth Analysis', 'USER_CLICK_NEW_ANALYSIS');
     } catch {
     } finally {
       setCreatingChat(false);

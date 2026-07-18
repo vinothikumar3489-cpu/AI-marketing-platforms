@@ -22,7 +22,7 @@ export default function DashboardPage() {
 
   const handleNewAnalysis = async (type: 'growth' | 'seo' | 'full') => {
     setShowModal(false);
-    const newChatId = await createChat('New Analysis');
+    const newChatId = await createChat('New Analysis', 'USER_CLICK_NEW_ANALYSIS');
     if (type === 'growth') {
       navigate('/app/growth-workspace');
     } else if (type === 'seo') {

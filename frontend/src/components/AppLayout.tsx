@@ -83,7 +83,7 @@ function ProjectDropdown() {
 
   const handleCreate = async () => {
     setOpen(false);
-    await createChat('New Project');
+    await createChat('New Project', 'USER_CLICK_PROJECT_DROPDOWN');
   };
 
   return (

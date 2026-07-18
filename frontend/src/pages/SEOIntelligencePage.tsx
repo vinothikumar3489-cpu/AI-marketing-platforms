@@ -263,7 +263,7 @@ export default function SEOIntelligencePage() {
       setMode('creating');
       setCreatingChat(true);
       try {
-        chatId = await createChat('New SEO Analysis');
+        chatId = await createChat('New SEO Analysis', 'ANALYSIS_RUN_NO_CHAT');
         navigate('/app/seo', { replace: true });
       } catch (e: any) {
         setError('Failed to create project: ' + (e.message || 'Unknown error'));
