@@ -27,6 +27,7 @@ export const CONTENT_TYPES = {
 };
 
 export const CONTENT_TYPES_LIST = Object.keys(CONTENT_TYPES);
+export const SUPPORTED_CONTENT_TYPES = CONTENT_TYPES_LIST;
 
 export const CONTENT_TYPE_ALIASES = {
   email: 'email_campaign',

@@ -5,7 +5,7 @@ import { generateAllExecutionModules, generateSingleModule } from "../services/e
 import { buildEvidenceContext, buildReadinessChecklist } from "../services/execution/evidence-context-builder.service.js";
 import { buildContentBrief } from "../services/execution/content-brief.service.js";
 import { getSeoIntelligenceForChat } from "../services/loaders/seo-intelligence.loader.js";
-import { CONTENT_TYPES, CONTENT_TYPES_LIST, normalizeContentType, SUPPORTED_CONTENT_TYPES } from "../constants/content-types.js";
+import { CONTENT_TYPES, CONTENT_TYPES_LIST, SUPPORTED_CONTENT_TYPES } from "../constants/content-types.js";
 
 const inProgressAutomation = new Set();
 const inProgressCampaign = new Set();
