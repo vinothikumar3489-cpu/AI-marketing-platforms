@@ -57,6 +57,159 @@ export const CONTENT_TYPE_GROUPS = {
   brief: ['creative_brief', 'video_script'],
 };
 
+export const CONTENT_TYPE_REGISTRY = {
+  email_copy: {
+    canonicalType: 'email_campaign',
+    generator: 'emailCampaignGenerator',
+    validator: 'emailCampaignValidator',
+    renderer: 'EmailAssetPreview',
+  },
+  email_campaign: {
+    canonicalType: 'email_campaign',
+    generator: 'emailCampaignGenerator',
+    validator: 'emailCampaignValidator',
+    renderer: 'EmailAssetPreview',
+  },
+  email_nurture: {
+    canonicalType: 'email_campaign',
+    generator: 'emailCampaignGenerator',
+    validator: 'emailCampaignValidator',
+    renderer: 'EmailAssetPreview',
+  },
+  email_newsletter: {
+    canonicalType: 'email_campaign',
+    generator: 'emailCampaignGenerator',
+    validator: 'emailCampaignValidator',
+    renderer: 'EmailAssetPreview',
+  },
+  linkedin_post: {
+    canonicalType: 'linkedin_post',
+    generator: 'linkedInPostGenerator',
+    validator: 'linkedInPostValidator',
+    renderer: 'LinkedInPostPreview',
+  },
+  instagram_post: {
+    canonicalType: 'instagram_post',
+    generator: 'instagramPostGenerator',
+    validator: 'instagramPostValidator',
+    renderer: 'InstagramPostPreview',
+  },
+  instagram_carousel: {
+    canonicalType: 'instagram_carousel',
+    generator: 'instagramCarouselGenerator',
+    validator: 'instagramPostValidator',
+    renderer: 'InstagramCarouselPreview',
+  },
+  instagram_reel_script: {
+    canonicalType: 'instagram_reel_script',
+    generator: 'instagramReelGenerator',
+    validator: 'instagramPostValidator',
+    renderer: 'InstagramReelPreview',
+  },
+  facebook_post: {
+    canonicalType: 'facebook_post',
+    generator: 'facebookPostGenerator',
+    validator: 'facebookPostValidator',
+    renderer: 'FacebookPostPreview',
+  },
+  facebook_ad: {
+    canonicalType: 'facebook_ad',
+    generator: 'facebookAdGenerator',
+    validator: 'facebookAdValidator',
+    renderer: 'FacebookAdPreview',
+  },
+  x_post: {
+    canonicalType: 'x_post',
+    generator: 'twitterPostGenerator',
+    validator: 'twitterPostValidator',
+    renderer: 'XPostPreview',
+  },
+  x_thread: {
+    canonicalType: 'x_thread',
+    generator: 'twitterThreadGenerator',
+    validator: 'twitterPostValidator',
+    renderer: 'XThreadPreview',
+  },
+  youtube_description: {
+    canonicalType: 'youtube_description',
+    generator: 'youtubeDescriptionGenerator',
+    validator: 'youtubeDescriptionValidator',
+    renderer: 'YouTubeDescriptionPreview',
+  },
+  youtube_script: {
+    canonicalType: 'youtube_script',
+    generator: 'youtubeScriptGenerator',
+    validator: 'youtubeScriptValidator',
+    renderer: 'YouTubeScriptPreview',
+  },
+  blog_article: {
+    canonicalType: 'blog_article',
+    generator: 'blogArticleGenerator',
+    validator: 'blogArticleValidator',
+    renderer: 'BlogArticlePreview',
+  },
+  landing_page: {
+    canonicalType: 'landing_page',
+    generator: 'landingPageGenerator',
+    validator: 'landingPageValidator',
+    renderer: 'LandingPagePreview',
+  },
+  case_study: {
+    canonicalType: 'case_study',
+    generator: 'caseStudyGenerator',
+    validator: 'caseStudyValidator',
+    renderer: 'CaseStudyPreview',
+  },
+  product_announcement: {
+    canonicalType: 'product_announcement',
+    generator: 'productAnnouncementGenerator',
+    validator: 'blogArticleValidator',
+    renderer: 'BlogArticlePreview',
+  },
+  faq_page: {
+    canonicalType: 'faq_page',
+    generator: 'faqPageGenerator',
+    validator: 'faqPageValidator',
+    renderer: 'BlogArticlePreview',
+  },
+  product_page: {
+    canonicalType: 'product_page',
+    generator: 'productPageGenerator',
+    validator: 'blogArticleValidator',
+    renderer: 'BlogArticlePreview',
+  },
+  comparison_page: {
+    canonicalType: 'comparison_page',
+    generator: 'comparisonPageGenerator',
+    validator: 'comparisonPageValidator',
+    renderer: 'BlogArticlePreview',
+  },
+  feature_announcement: {
+    canonicalType: 'feature_announcement',
+    generator: 'featureAnnouncementGenerator',
+    validator: 'featureAnnouncementValidator',
+    renderer: 'BlogArticlePreview',
+  },
+  whitepaper: {
+    canonicalType: 'whitepaper',
+    generator: 'whitepaperGenerator',
+    validator: 'blogArticleValidator',
+    renderer: 'BlogArticlePreview',
+  },
+  creative_brief: {
+    canonicalType: 'creative_brief',
+    generator: 'creativeBriefGenerator',
+    validator: 'creativeBriefValidator',
+    renderer: 'CreativeBriefPreview',
+  },
+  video_script: {
+    canonicalType: 'video_script',
+    generator: 'videoScriptGenerator',
+    validator: 'videoScriptValidator',
+    renderer: 'VideoScriptPreview',
+  },
+};
+
 export function normalizeContentType(type) {
   if (!type) return null;
   const lower = String(type).toLowerCase().replace(/^content_/, '');
@@ -67,4 +220,25 @@ export function normalizeContentType(type) {
 
 export function isSupportedContentType(type) {
   return CONTENT_TYPES_LIST.includes(normalizeContentType(type));
+}
+
+export function getContentTypeRegistryEntry(type) {
+  const normalized = normalizeContentType(type);
+  if (!normalized) return null;
+  return CONTENT_TYPE_REGISTRY[normalized] || null;
+}
+
+export function getGeneratorNameForType(type) {
+  const entry = getContentTypeRegistryEntry(type);
+  return entry?.generator || null;
+}
+
+export function getValidatorNameForType(type) {
+  const entry = getContentTypeRegistryEntry(type);
+  return entry?.validator || null;
+}
+
+export function getCanonicalContentType(type) {
+  const entry = getContentTypeRegistryEntry(type);
+  return entry?.canonicalType || normalizeContentType(type) || null;
 }

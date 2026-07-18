@@ -224,6 +224,30 @@ const youtubeDescriptionSchema = z.object({
 });
 
 // ---------- EMAIL COPY ----------
+const subjectOptionSchema = z.object({
+  subject: z.string(),
+  angle: z.string().optional(),
+  evidence: z.string().optional(),
+  confidence: z.string().optional(),
+  aScore: z.number().optional(),
+  bScore: z.number().optional(),
+});
+
+const ctaObjectSchema = z.object({
+  label: z.string(),
+  destination: z.string().nullable().optional(),
+  offerType: z.string().optional(),
+  evidenceSource: z.string().optional(),
+  verified: z.boolean().optional(),
+  url: z.string().nullable().optional(),
+});
+
+const linkSchema = z.object({
+  label: z.string(),
+  url: z.string().nullable().optional(),
+  verified: z.boolean().optional(),
+});
+
 const emailCopySchema = z.object({
   _type: z.string().optional(),
   assetName: z.string().optional(),
@@ -232,14 +256,25 @@ const emailCopySchema = z.object({
   audience: z.string().optional(),
   goal: z.string().optional(),
   subject: z.string(),
-  subjectOptions: z.array(z.string()).default([]),
+  selectedSubject: z.string().optional(),
+  subjectOptions: z.array(subjectOptionSchema).default([]),
   previewText: z.string().nullable(),
+  senderName: z.string().optional(),
+  replyTo: z.string().optional(),
   greeting: z.string(),
   opening: z.string(),
+  openingHook: z.string().optional(),
+  audienceProblem: z.string().optional(),
+  valueProposition: z.string().optional(),
+  benefits: z.array(z.string()).default([]),
+  featureHighlights: z.array(z.string()).default([]),
+  proof: z.string().nullable().optional(),
   bodyParagraphs: z.array(z.string()).min(1),
   bulletPoints: z.array(z.string()).default([]),
   ctaText: z.string(),
   ctaUrl: z.string().nullable(),
+  primaryCta: ctaObjectSchema.optional(),
+  secondaryCta: ctaObjectSchema.nullable().optional(),
   closing: z.string(),
   signature: z.string(),
   personalizationFields: z.array(z.string()).default([]),
@@ -248,14 +283,25 @@ const emailCopySchema = z.object({
     description: z.string(),
     example: z.string().optional(),
   })).default([]),
+  links: z.array(linkSchema).default([]),
   sections: z.object({
     preheader: z.string().optional(),
     header: z.string().optional(),
     body: z.string().optional(),
     footer: z.string().optional(),
     unsubscribe: z.string().optional(),
+    greeting: z.string().optional(),
+    openingHook: z.string().optional(),
+    audienceProblem: z.string().optional(),
+    valueProposition: z.string().optional(),
+    closing: z.string().optional(),
+    signature: z.string().optional(),
   }).optional(),
   complianceNote: z.string().nullable(),
+  qualityReport: z.object({
+    checks: z.record(z.any()).optional(),
+    overallStatus: z.string().optional(),
+  }).optional(),
   evidenceUsed,
   claimsRequiringReview,
 });
@@ -317,6 +363,9 @@ export const SCHEMAS = {
   facebook_post: facebookPostSchema,
   youtube_description: youtubeDescriptionSchema,
   email_copy: emailCopySchema,
+  email_campaign: emailCopySchema,
+  email_nurture: emailCopySchema,
+  email_newsletter: emailCopySchema,
   creative_brief: creativeBriefSchema,
   video_script: videoScriptSchema,
 };
@@ -335,6 +384,9 @@ export const SCHEMA_REGISTRY = {
   facebook_post: { schema: facebookPostSchema, normalizer: 'facebookPost' },
   youtube_description: { schema: youtubeDescriptionSchema, normalizer: 'youtubeDescription' },
   email_copy: { schema: emailCopySchema, normalizer: 'emailCopy' },
+  email_campaign: { schema: emailCopySchema, normalizer: 'emailCopy' },
+  email_nurture: { schema: emailCopySchema, normalizer: 'emailCopy' },
+  email_newsletter: { schema: emailCopySchema, normalizer: 'emailCopy' },
   creative_brief: { schema: creativeBriefSchema, normalizer: 'creativeBrief' },
   video_script: { schema: videoScriptSchema, normalizer: 'videoScript' },
 };

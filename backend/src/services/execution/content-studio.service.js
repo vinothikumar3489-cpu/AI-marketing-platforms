@@ -336,8 +336,13 @@ async function generateEmailCopy(brief) {
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
+  const companyName = brief?.company?.name || brief?.product?.brandName || productName;
 
-  const prompt = `You are writing a professional email for ${productName}.
+  const hasFreeTrial = brief?.pricing?.hasFreeTrial || brief?.product?.pricing?.hasFreeTrial;
+  const hasFreePlan = brief?.pricing?.hasFree || brief?.product?.pricing?.hasFree;
+  const ctaIsFree = hasFreeTrial ? 'Start Free Trial' : hasFreePlan ? 'Get Started Free' : 'Learn More';
+
+  const prompt = `You are writing a professional email for ${productName} (${companyName}).
 
 Write a send-ready email targeting ${persona} who face "${painPoint}".
 
@@ -345,42 +350,97 @@ ${productContext}
 
 REQUIREMENTS:
 - emailType: One of "outreach", "nurture", "product_announcement", "newsletter", "follow_up", "trial_conversion".
-- subject: Compelling subject line. Max 70 chars.
+- subjectOptions: Array of 3 subject line options each with subject, angle, evidence, confidence.
+- selectedSubject: The best subject line from subjectOptions.
 - previewText: Preview/snippet text. Max 150 chars.
+- senderName: "${companyName} Team" or similar.
+- replyTo: "noreply@company.com" placeholder.
+- campaignName: Short campaign name derived from the email goal.
+- goal: Primary goal of this email.
+- audience: Target audience segment description.
+- sections: Object with preheader (string), header (string), greeting (string), openingHook (strong opening), audienceProblem (problem statement), valueProposition (key value), benefits (list), featureHighlights (list), proof (evidence or null), primaryCta (object with label and destination), secondaryCta (object with label and destination or null), closing (string), signature (string), footer (string), unsubscribe (string placeholder).
+- subject: Compelling subject line. Max 70 chars.
 - greeting: Professional greeting (e.g., "Hi {{firstName}},").
-- opening: Strong opening paragraph addressing the pain point.
 - bodyParagraphs: 2-3 short paragraphs about ${productName}.
 - bulletPoints: 3 key benefits or features as bullet points.
-- ctaText: Clear CTA text.
+- ctaText: "${ctaIsFree}" — must be based on verified offer.
 - ctaUrl: null — do not invent URLs.
 - closing: Closing paragraph.
 - signature: Sender signature.
-- personalizationFields: Array of personalization field names (e.g., ["firstName", "companyName"]).
-- complianceNote: For cold outreach, include "This email is a business development inquiry. If you'd prefer not to receive further communications, please reply UNSUBSCRIBE."
-- Do NOT use: fake stats, testimonials, ROI claims, pricing, fake urgency.
+- personalizationVariables: Array of { name, description, example }.
+- links: Array of link objects with { label, url, verified }.
+- evidenceUsed: ["list evidence fields referenced"].
+- claimsRequiringReview: []
+- qualityReport: Object with checks object.
+
+Do NOT use: fake stats, testimonials, ROI claims, fake pricing, fake urgency.
+Do NOT invent discount percentages or customer numbers.
 
 Return valid JSON:
 {
-  "emailType": "string — one of the allowed types",
-  "subject": "string — max 70 chars",
-  "previewText": "string — max 150 chars",
+  "emailType": "string",
+  "campaignName": "string",
+  "goal": "string",
+  "audience": "string",
+  "subjectOptions": [{"subject": "string", "angle": "string", "evidence": "string", "confidence": "medium"}],
+  "selectedSubject": "string",
+  "previewText": "string",
+  "senderName": "string",
+  "replyTo": "string",
+  "subject": "string",
   "greeting": "string",
-  "opening": "string",
-  "bodyParagraphs": ["string"],
-  "bulletPoints": ["string"],
-  "ctaText": "string",
-  "ctaUrl": null,
+  "openingHook": "string",
+  "audienceProblem": "string",
+  "valueProposition": "string",
+  "benefits": ["string"],
+  "featureHighlights": ["string"],
+  "proof": null,
+  "primaryCta": {"label": "string", "destination": null, "offerType": "${hasFreeTrial ? 'free_trial' : hasFreePlan ? 'free_plan' : 'info'}", "evidenceSource": "pricing", "verified": ${!!(hasFreeTrial || hasFreePlan)}},
+  "secondaryCta": null,
   "closing": "string",
   "signature": "string",
-  "personalizationFields": ["string"],
-  "complianceNote": "string or null",
-  "evidenceUsed": ["list evidence fields referenced"],
-  "claimsRequiringReview": []
+  "sections": {"preheader": "string", "header": "string", "body": "string", "footer": "string", "unsubscribe": "string"},
+  "personalizationVariables": [{"name": "string", "description": "string", "example": "string"}],
+  "links": [{"label": "string", "url": null, "verified": false}],
+  "evidenceUsed": [],
+  "claimsRequiringReview": [],
+  "qualityReport": {"checks": {}, "overallStatus": "NEEDS_REVIEW"}
 }`;
 
   try {
     const result = await callAI(prompt);
-    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+    if (result.success && result.data) {
+      const data = result.data;
+      const sections = data.sections || {};
+      data.greeting = data.greeting || sections.greeting || '';
+      data.opening = data.opening || sections.openingHook || data.audienceProblem || '';
+      data.bodyParagraphs = data.bodyParagraphs && data.bodyParagraphs.length > 0 ? data.bodyParagraphs : [
+        sections.audienceProblem || data.audienceProblem || '',
+        sections.valueProposition || data.valueProposition || '',
+        ...(Array.isArray(data.benefits) ? data.benefits : []),
+        ...(Array.isArray(data.featureHighlights) ? data.featureHighlights : []),
+      ].filter(Boolean);
+      data.bulletPoints = data.bulletPoints && data.bulletPoints.length > 0 ? data.bulletPoints : [
+        ...(Array.isArray(data.benefits) ? data.benefits : []),
+        ...(Array.isArray(data.featureHighlights) ? data.featureHighlights : []),
+      ].filter(Boolean);
+      data.ctaText = data.ctaText || (data.primaryCta && data.primaryCta.label) || '';
+      data.ctaUrl = data.ctaUrl || (data.primaryCta && data.primaryCta.destination) || null;
+      data.closing = data.closing || sections.closing || '';
+      data.signature = data.signature || sections.signature || '';
+      data.personalizationVariables = data.personalizationVariables || [];
+      if (!data.sections || Object.keys(data.sections).length === 0) {
+        data.sections = {
+          preheader: data.previewText || '',
+          header: data.senderName || '',
+          greeting: data.greeting,
+          body: [data.opening, ...data.bodyParagraphs, ...data.bulletPoints].filter(Boolean).join('\n\n'),
+          footer: `${new Date().getFullYear()} ${brief?.company?.name || companyName}`,
+          unsubscribe: 'To unsubscribe, reply with UNSUBSCRIBE',
+        };
+      }
+      return { ...data, _provider: result.provider };
+    }
   } catch (e) { /* fall through to rule-based */ }
   return FALLBACK_FAILURE;
 }
@@ -769,6 +829,9 @@ const GENERATORS = {
   facebook_post: generateFacebookPost,
   youtube_description: generateYouTubeDescription,
   email_copy: generateEmailCopy,
+  email_campaign: generateEmailCopy,
+  email_nurture: generateEmailCopy,
+  email_newsletter: generateEmailCopy,
   blog_article: generateBlogArticle,
   faq_page: generateFAQ,
   landing_page: generateLandingPage,
@@ -864,7 +927,7 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
   };
 
   // For email copy, render full HTML template
-  if (assetType === 'email_copy') {
+  if (assetType === 'email_copy' || assetType === 'email_campaign') {
     const companyName = brief?.company?.name || brief?.product?.name || '';
     const companyWebsite = brief?.company?.websiteUrl || '';
     const renderedEmail = renderEmailHtmlTemplate(validatedContent, companyName, companyWebsite);
@@ -1012,12 +1075,12 @@ function sanitizeText(text) {
 function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '', unsubscribeUrl = null) {
   const subject = sanitizeText(emailData.subject || '');
   const previewText = sanitizeText(emailData.previewText || emailData.subject || '');
-  const greeting = sanitizeText(emailData.greeting || '');
-  const opening = sanitizeText(emailData.opening || '');
+  const greeting = sanitizeText(emailData.greeting || (emailData.sections && emailData.sections.greeting) || '');
+  const opening = sanitizeText(emailData.opening || (emailData.sections && emailData.sections.openingHook) || '');
   const bodyParagraphs = Array.isArray(emailData.bodyParagraphs) ? emailData.bodyParagraphs : [];
   const bulletPoints = Array.isArray(emailData.bulletPoints) ? emailData.bulletPoints : [];
-  const ctaText = sanitizeText(emailData.ctaText || '');
-  const ctaUrl = emailData.ctaUrl || '#';
+  const ctaText = sanitizeText(emailData.ctaText || (emailData.primaryCta && emailData.primaryCta.label) || '');
+  const ctaUrl = emailData.ctaUrl || (emailData.primaryCta && emailData.primaryCta.destination) || '#';
   const closing = sanitizeText(emailData.closing || '');
   const signature = sanitizeText(emailData.signature || '');
   const complianceNote = sanitizeText(emailData.complianceNote || '');
@@ -1155,11 +1218,13 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
     sections: {
       preheader: previewText,
       header: company,
+      greeting,
+      opening,
       body: bodyHtml,
       footer: `© ${new Date().getFullYear()} ${company}. All rights reserved.`,
       unsubscribe: unsubscribeHtml,
     },
-    subjectOptions: Array.isArray(emailData.subjectOptions) ? emailData.subjectOptions : [],
+    subjectOptions: Array.isArray(emailData.subjectOptions) ? emailData.subjectOptions : (emailData._rawSubjectOptions ? JSON.parse(emailData._rawSubjectOptions) : []),
     personalizationVariables: Array.isArray(emailData.personalizationVariables) ? emailData.personalizationVariables : (
       Array.isArray(emailData.personalizationFields) ? emailData.personalizationFields.map(f => ({ name: f, description: `Personalization field: ${f}`, example: '' })) : []
     ),
@@ -1174,13 +1239,13 @@ export function previewEmail(htmlContent, plainText, subject, emailData) {
   const issues = [];
 
   const body = emailData?.bodyParagraphs?.join(' ') || '';
-  const greeting = emailData?.greeting || '';
-  const ctaText = emailData?.ctaText || '';
-  const ctaUrl = emailData?.ctaUrl || '';
+  const greeting = emailData?.greeting || emailData?.sections?.greeting || '';
+  const ctaText = emailData?.ctaText || (emailData?.primaryCta && emailData?.primaryCta.label) || '';
+  const ctaUrl = emailData?.ctaUrl || (emailData?.primaryCta && emailData?.primaryCta.destination) || '';
   const subjectLine = subject || emailData?.subject || '';
   const unsubscribeHtml = htmlContent?.includes('Unsubscribe') || htmlContent?.includes('unsubscribe');
-  const hasClosing = emailData?.closing || false;
-  const hasSignature = emailData?.signature || false;
+  const hasClosing = emailData?.closing || emailData?.sections?.closing || false;
+  const hasSignature = emailData?.signature || emailData?.sections?.signature || false;
 
   if (!subjectLine) issues.push({ severity: 'blocked', field: 'subject', message: 'Subject line is required' });
   if (!greeting) issues.push({ severity: 'blocked', field: 'greeting', message: 'Greeting is required' });

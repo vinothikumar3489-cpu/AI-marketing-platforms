@@ -5,7 +5,7 @@ import { generateAllExecutionModules, generateSingleModule } from "../services/e
 import { buildEvidenceContext, buildReadinessChecklist } from "../services/execution/evidence-context-builder.service.js";
 import { buildContentBrief } from "../services/execution/content-brief.service.js";
 import { getSeoIntelligenceForChat } from "../services/loaders/seo-intelligence.loader.js";
-import { CONTENT_TYPES, CONTENT_TYPES_LIST, SUPPORTED_CONTENT_TYPES } from "../constants/content-types.js";
+import { CONTENT_TYPES, CONTENT_TYPES_LIST, SUPPORTED_CONTENT_TYPES, getContentTypeRegistryEntry, getCanonicalContentType, getGeneratorNameForType } from "../constants/content-types.js";
 
 const inProgressAutomation = new Set();
 const inProgressCampaign = new Set();
@@ -939,13 +939,30 @@ export const generateContentItem = async (req, res) => {
   }
 
   try {
-    const typeConfig = CONTENT_TYPES_LIST.includes(contentType) ? contentType : null;
-    const generatorMap = { email_copy: 'generateEmailCopy', blog_article: 'generateBlogArticle' };
+    const registryEntry = getContentTypeRegistryEntry(contentType);
+    const normalizedType = getCanonicalContentType(contentType);
+    const generatorName = getGeneratorNameForType(contentType);
+
+    if (!registryEntry || !generatorName) {
+      console.error("[Content Studio] No generator registered for content type", { contentType, normalizedType });
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "UNSUPPORTED_CONTENT_TYPE",
+          message: `No generator registered for content type: ${contentType}`,
+          retryable: false
+        }
+      });
+    }
+
     console.info("[Content Studio] Content-type routing", {
+      uiTab: req.body._uiTab || 'unknown',
       uiSelection: contentType,
       requestContentType: contentType,
-      normalizedContentType: contentType,
-      generatorSelected: generatorMap[contentType] || 'unknown',
+      normalizedContentType: normalizedType,
+      generatorSelected: generatorName,
+      validatorSelected: registryEntry.validator || 'unknown',
+      persistedContentType: normalizedType,
       chatId, userId
     });
     
@@ -987,68 +1004,62 @@ export const generateContentItem = async (req, res) => {
     // Stage 3: Build evidence context
     const evidenceContext = await buildEvidenceContext(prisma, userId, chatId);
 
-    // Stage 4: Generate content
-    const result = await generateContent(contentType, brief, evidenceContext, callAI, userId, chatId);
+    // Stage 4: Generate content using canonical type
+    const effectiveType = getCanonicalContentType(contentType) || contentType;
+    const result = await generateContent(effectiveType, brief, evidenceContext, callAI, userId, chatId);
     const contentBody = result?.content || result;
     const meta = result?.metadata || {};
 
-    // Check for generation failures (returned as status objects, not content)
-    if (!contentBody || contentBody._status === 'generation_failed' || contentBody._status === 'blocked') {
-      console.error("[Content Studio] Generation failed", {
-        chatId, userId, contentType,
-        status: contentBody?._status || 'null',
-        reason: contentBody?._reason,
+    if (!contentBody) {
+      return res.status(500).json({
+        success: false,
+        error: { code: "CONTENT_GENERATION_FAILED", message: "Content generation returned no data", retryable: true, stage: "GENERATION" }
       });
-      if (contentBody?._status === 'blocked') {
+    }
+
+    if (!contentBody._type) contentBody._type = effectiveType;
+
+    if (contentBody._status === 'generation_failed' || contentBody._status === 'blocked') {
+      console.error("[Content Studio] Generation failed", {
+        chatId, userId, contentType, effectiveType,
+        status: contentBody._status,
+        reason: contentBody._reason,
+      });
+      if (contentBody._status === 'blocked') {
         return res.status(422).json({
-          success: false,
-          status: 'BLOCKED',
-          code: 'PRODUCT_IDENTITY_UNAVAILABLE',
-          message: contentBody?._reason || 'Content generation requires a verified product identity',
-          readiness: {
-            ready: false,
-            missingRequired: ['PRODUCT_IDENTITY'],
-          },
+          success: false, status: 'BLOCKED', code: 'PRODUCT_IDENTITY_UNAVAILABLE',
+          message: contentBody._reason || 'Content generation requires a verified product identity',
+          readiness: { ready: false, missingRequired: ['PRODUCT_IDENTITY'] },
         });
       }
       return res.status(500).json({
         success: false,
-        error: {
-          code: "CONTENT_GENERATION_FAILED",
-          message: contentBody?._reason || "AI provider returned no content. Check that API keys are configured in .env",
-          retryable: true,
-          stage: "GENERATION"
-        }
+        error: { code: "CONTENT_GENERATION_FAILED", message: contentBody._reason || "AI provider returned no content", retryable: true, stage: "GENERATION" }
       });
     }
 
-    // Check for schema rejection
     if (meta?.status === 'schema_rejected') {
-      const typeLabel = CONTENT_TYPES[contentType]?.label || contentType;
+      const typeLabel = CONTENT_TYPES[effectiveType]?.label || contentType;
       const errorDetails = (meta.schemaErrors || []).join('; ');
       const userMessage = `${typeLabel} did not match the required format. Please try again.`;
       console.error("[Content Studio] Schema rejected", {
-        chatId, userId, contentType,
+        chatId, userId, effectiveType,
         errors: meta.schemaErrors,
       });
       return res.status(422).json({
-        success: false,
-        error: userMessage,
-        code: "SCHEMA_REJECTED",
-        retryable: true,
-        stage: "VALIDATION",
-        details: errorDetails,
+        success: false, error: userMessage, code: "SCHEMA_REJECTED",
+        retryable: true, stage: "VALIDATION", details: errorDetails,
       });
     }
 
     // Stage 5: Quality scoring
-    const qualityScore = scoreContentQuality(contentBody, brief, contentType);
+    const qualityScore = scoreContentQuality(contentBody, brief, effectiveType);
 
     // Stage 6: Persist asset
     const asset = await saveContentAsset(prisma, {
       userId,
       chatId,
-      contentType,
+      contentType: effectiveType,
       briefSnapshot: brief,
       evidenceSnapshot: evidenceContext,
       provider: 'groq',
@@ -1058,7 +1069,7 @@ export const generateContentItem = async (req, res) => {
     });
 
     if (!asset || !asset.id) {
-      console.error("[Content Studio] Asset persistence failed", { chatId, userId, contentType });
+      console.error("[Content Studio] Asset persistence failed", { chatId, userId, contentType, effectiveType });
       return res.status(500).json({
         success: false,
         error: {
@@ -1070,18 +1081,14 @@ export const generateContentItem = async (req, res) => {
       });
     }
 
-    // Ensure _type and _assetId are set on content for frontend detection
     if (contentBody && typeof contentBody === 'object') {
-      if (!contentBody._type) contentBody._type = contentType;
+      contentBody._type = effectiveType;
       contentBody._assetId = asset.id;
     }
 
     console.info("[Content Studio] Asset saved", {
-      chatId,
-      userId,
-      contentType,
-      assetId: asset?.id,
-      assetSaved: Boolean(asset)
+      chatId, userId, contentType: effectiveType,
+      assetId: asset?.id, assetSaved: Boolean(asset)
     });
 
     // Stage 7: Verify asset persistence
@@ -1108,6 +1115,15 @@ export const generateContentItem = async (req, res) => {
 
     return res.status(201).json({
       success: true,
+      routing: {
+        uiTab: req.body._uiTab || 'content-studio',
+        uiSelection: contentType,
+        requestContentType: contentType,
+        normalizedContentType: effectiveType,
+        generatorSelected: generatorName,
+        validatorSelected: registryEntry?.validator || 'unknown',
+        persistedContentType: effectiveType,
+      },
       data: {
         content: contentBody,
         metadata: meta,
