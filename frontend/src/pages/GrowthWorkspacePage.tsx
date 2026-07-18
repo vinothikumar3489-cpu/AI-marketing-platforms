@@ -31,6 +31,8 @@ const defaults: any = {
 
 const tabs = ['Executive Snapshot', 'Executive Story', 'Product DNA', 'Market Intelligence', 'Audience Intelligence', 'Competitor Intelligence', 'Intent Prediction', 'Positioning Strategy', 'Campaign Strategy', 'Channel Strategy', 'Action Plan', 'Report Preview'];
 
+type RestoreStatus = 'idle' | 'loading' | 'found' | 'empty' | 'error';
+
 export default function GrowthWorkspacePage() {
   const { selectedChatId, createChat, loadFullResults, fullResults } = useProject();
   const [form, setForm] = useState(defaults);
@@ -39,9 +41,11 @@ export default function GrowthWorkspacePage() {
   const [error, setError] = useState('');
   const [results, setResults] = useState<any>({});
   const [creatingChat, setCreatingChat] = useState(false);
-  type Status = 'idle' | 'input_required' | 'running' | 'completed' | 'failed';
-  const [status, setStatus] = useState<Status>('idle');
+  const [restoreStatus, setRestoreStatus] = useState<RestoreStatus>('idle');
+  const [restoreError, setRestoreError] = useState<string | null>(null);
   const analysisRunningRef = useRef(false);
+  const selectedChatIdRef = useRef(selectedChatId);
+  const restoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     console.info("[Growth Route Component]", {
@@ -55,32 +59,138 @@ export default function GrowthWorkspacePage() {
     return obj && typeof obj === 'object' && Object.keys(obj).length > 0;
   }
 
-  useEffect(() => {
-    if (analysisRunningRef.current) return;
-    let cancelled = false;
-    const r = fullResults.growth || {};
-    const hasGrowthData = fullResults.hasGrowthWorkspace === true ||
-      hasRealContent(r.product) || hasRealContent(r.market) || hasRealContent(r.audience) ||
-      hasRealContent(r.competitor) || hasRealContent(r.intent) || hasRealContent(r.positioning) ||
-  hasRealContent(r.campaign) || hasRealContent(r.channel) || hasRealContent(r.executiveStory) ||
-  hasRealContent(r.actionPlan) || hasRealContent(r.evidence);
+  const EMPTY_FULL_RESULTS = {
+    productIntelligence: null,
+    competitorIntelligence: null,
+    campaignIntelligence: null,
+    seoIntelligence: null,
+    growthWorkspace: null,
+    automationPlan: null,
+  };
 
-    if (!cancelled) {
-      if (hasGrowthData) {
-        setResults(r);
-        setStatus('completed');
+  const restoreForChat = useCallback(async (chatId: string) => {
+    if (!chatId) {
+      setRestoreStatus('idle');
+      return;
+    }
+
+    console.log('[Growth Restore]', {
+      selectedChatId: chatId,
+      requestedChatId: chatId,
+      restoreStatus: 'loading',
+    });
+
+    selectedChatIdRef.current = chatId;
+    setRestoreStatus('loading');
+    setRestoreError(null);
+    setResults({});
+
+    restoreTimeoutRef.current = setTimeout(() => {
+      console.warn('[Growth Restore] timeout after 15s for chatId:', chatId, {
+        selectedChatIdRef: selectedChatIdRef.current,
+        restoreStatus,
+      });
+      if (selectedChatIdRef.current === chatId) {
+        setRestoreStatus('error');
+        setRestoreError('Request timed out. The backend may be unavailable.');
+      }
+    }, 15000);
+
+    try {
+      const result = await loadFullResults(chatId);
+
+      if (restoreTimeoutRef.current) {
+        clearTimeout(restoreTimeoutRef.current);
+        restoreTimeoutRef.current = null;
+      }
+
+      if (selectedChatIdRef.current !== chatId) {
+        console.log('[Growth Restore] stale response ignored for chatId:', chatId, 'current:', selectedChatIdRef.current);
+        return;
+      }
+
+      const growth = result?.growth || {};
+      const hasGrowthAnalysis =
+        Boolean(result?.productIntelligence) ||
+        Boolean(result?.competitorIntelligence) ||
+        Boolean(result?.campaignIntelligence) ||
+        Boolean(result?.growthWorkspace) ||
+        Boolean(result?.growthResults) ||
+        result?.hasGrowthWorkspace === true ||
+        hasRealContent(growth.product) ||
+        hasRealContent(growth.market) ||
+        hasRealContent(growth.audience) ||
+        hasRealContent(growth.competitor) ||
+        hasRealContent(growth.intent) ||
+        hasRealContent(growth.positioning) ||
+        hasRealContent(growth.campaign) ||
+        hasRealContent(growth.channel) ||
+        hasRealContent(growth.executiveStory) ||
+        hasRealContent(growth.actionPlan) ||
+        hasRealContent(growth.evidence);
+
+      console.log('[Growth Restore]', {
+        selectedChatId: chatId,
+        requestedChatId: chatId,
+        restoreStatus: hasGrowthAnalysis ? 'found' : 'empty',
+        hasGrowthAnalysis,
+        hasFullResults: Boolean(result),
+        product: Boolean(result?.productIntelligence),
+        competitor: Boolean(result?.competitorIntelligence),
+        campaign: Boolean(result?.campaignIntelligence),
+      });
+
+      if (hasGrowthAnalysis) {
+        setResults(growth);
+        setRestoreStatus('found');
       } else {
         setResults({});
-        if (selectedChatId) {
-          setStatus('input_required');
-        } else {
-          setStatus('idle');
-        }
-        setStep(1);
+        setRestoreStatus('empty');
       }
+      setError('');
+    } catch (e: any) {
+      if (restoreTimeoutRef.current) {
+        clearTimeout(restoreTimeoutRef.current);
+        restoreTimeoutRef.current = null;
+      }
+
+      if (selectedChatIdRef.current !== chatId) {
+        console.log('[Growth Restore] stale error ignored for chatId:', chatId);
+        return;
+      }
+
+      console.error('[Growth Restore] error:', e.message || e);
+      setRestoreStatus('error');
+      setRestoreError(e.message || 'Failed to restore analysis');
+      setResults({});
     }
-    return () => { cancelled = true; };
-  }, [fullResults, selectedChatId]);
+    }, [loadFullResults]);
+
+  useEffect(() => {
+    if (analysisRunningRef.current) return;
+
+    if (!selectedChatId) {
+      setRestoreStatus('idle');
+      setResults({});
+      setRestoreError(null);
+      if (restoreTimeoutRef.current) {
+        clearTimeout(restoreTimeoutRef.current);
+        restoreTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    console.log('[Growth Restore] state transition: restoring for chat', selectedChatId);
+    console.log('[Growth Restore] state transition: previous -> loading');
+    restoreForChat(selectedChatId);
+
+    return () => {
+      if (restoreTimeoutRef.current) {
+        clearTimeout(restoreTimeoutRef.current);
+        restoreTimeoutRef.current = null;
+      }
+    };
+  }, [selectedChatId, restoreForChat]);
 
   async function run() {
     if (!form.websiteUrl) {
@@ -109,9 +219,7 @@ export default function GrowthWorkspacePage() {
       
       const res: any = await api.post(`/chats/${chatId}/growth-workspace/run-full-analysis`, form);
       
-      await loadFullResults(chatId);
-      
-      setStatus('completed');
+      await restoreForChat(chatId);
     } catch (e: any) {
       const status = e?.status || e?.response?.status || 0;
       const msg = e.message || 'Analysis failed';
@@ -198,7 +306,7 @@ export default function GrowthWorkspacePage() {
       </Card>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '20px' }}>
         <PageHeader eyebrow="All-in-one Analysis Command Center" title="Growth Workspace" subtitle="Generate a multi-stage, validated business intelligence report." />
-        {(status === 'completed' || status === 'failed') && (
+        {(restoreStatus === 'found' || error) && (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <div className="dropdown" style={{ position: 'relative' }}>
               <button className="secondary-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -218,6 +326,29 @@ export default function GrowthWorkspacePage() {
         <style>{`.dropdown:hover .dropdown-menu { display: block !important; }`}</style>
       </div>
       
+      {restoreStatus === 'loading' && (
+        <div style={{ display: 'grid', gap: '20px' }}>
+          <LoadingSkeleton type="table" count={3} />
+          <LoadingSkeleton type="card" count={3} />
+          <LoadingSkeleton type="list" count={4} />
+        </div>
+      )}
+
+      {restoreStatus === 'error' && restoreError && (
+        <Card style={{ background: 'rgba(255, 71, 87, 0.1)', borderColor: '#ff4757', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h4 style={{ margin: '0 0 8px 0', color: '#ff4757' }}>Restore Failed</h4>
+              <p style={{ margin: 0, color: '#ff8a8a' }}>{restoreError}</p>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => { if (selectedChatId) restoreForChat(selectedChatId); }} className="secondary-btn">Retry</button>
+              <button onClick={handleNewAnalysis} className="ghost-btn">New Analysis</button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {error && (
         <Card style={{ background: 'rgba(255, 71, 87, 0.1)', borderColor: '#ff4757', marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -232,8 +363,8 @@ export default function GrowthWorkspacePage() {
           </div>
         </Card>
       )}
-      
-      {(status === 'input_required' || status === 'idle') && !loading && !creatingChat && (
+
+      {(restoreStatus === 'empty' || restoreStatus === 'idle') && !creatingChat && (
         <Card style={{ padding: '30px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #293245', paddingBottom: '15px' }}>
             <h2 style={{ margin: 0, color: '#fff', fontSize: '20px' }}>Project Configuration (Step {step} of 7)</h2>
@@ -341,8 +472,8 @@ export default function GrowthWorkspacePage() {
           </div>
         </Card>
       )}
-      
-      {status === 'running' && (
+
+      {loading && (
         <div style={{ display: 'grid', gap: '20px' }}>
           <LoadingSkeleton type="table" count={3} />
           <LoadingSkeleton type="card" count={3} />
@@ -350,7 +481,7 @@ export default function GrowthWorkspacePage() {
         </div>
       )}
       
-      {status === 'completed' && hasData && (
+      {restoreStatus === 'found' && hasData && (
         <Card>
           <SmartNavigation items={tabs.map(t => ({ id: t, label: t }))} activeId={activeTab} onNavigate={setActiveTab} />
           <div style={{ marginBottom: '16px' }}>
@@ -395,7 +526,7 @@ export default function GrowthWorkspacePage() {
         </Card>
       )}
 
-      {status === 'completed' && !hasData && (
+      {restoreStatus === 'found' && !hasData && (
         <Card>
           <EmptyState 
             title="No Verified Growth Data Available" 
