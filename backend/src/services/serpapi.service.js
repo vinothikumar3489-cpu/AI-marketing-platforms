@@ -17,18 +17,6 @@ function isPlaceholderKey(key) {
 const rawKey = process.env.SERPAPI_API_KEY;
 const SERPAPI_API_KEY = rawKey?.trim();
 
-if (SERPAPI_API_KEY) {
-  console.log('[SERPAPI DIAG]', {
-    keyPresent: true,
-    keyLength: SERPAPI_API_KEY.length,
-    keySuffix: SERPAPI_API_KEY.slice(-4),
-    isPlaceholder: isPlaceholderKey(SERPAPI_API_KEY),
-    configured: _keyConfigured
-  });
-} else {
-  console.log('[SERPAPI DIAG]', { keyPresent: false, rawEnv: typeof process.env.SERPAPI_API_KEY, rawLength: process.env.SERPAPI_API_KEY?.length || 0 });
-}
-
 const GOOGLE_ENGINES = {
   search: 'google',
   shopping: 'google_shopping',
@@ -48,6 +36,15 @@ const _keyConfigured = (() => {
   if (isPlaceholderKey(SERPAPI_API_KEY)) return false;
   return true;
 })();
+
+if (SERPAPI_API_KEY) {
+  console.log('[SERPAPI DIAG]', {
+    keyPresent: true, keyLength: SERPAPI_API_KEY.length, keySuffix: SERPAPI_API_KEY.slice(-4),
+    isPlaceholder: isPlaceholderKey(SERPAPI_API_KEY), configured: _keyConfigured
+  });
+} else {
+  console.log('[SERPAPI DIAG]', { keyPresent: false, rawEnv: typeof process.env.SERPAPI_API_KEY, rawLength: process.env.SERPAPI_API_KEY?.length || 0 });
+}
 
 function _keyDiagnostic() {
   if (!SERPAPI_API_KEY || !_keyConfigured) return { configured: false };
