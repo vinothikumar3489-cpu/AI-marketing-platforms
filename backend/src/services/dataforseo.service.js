@@ -180,6 +180,23 @@ async function dataforseoRequest(endpoint, method = 'POST', body = null) {
       };
     }
 
+    if (response.status === 402) {
+      const errorText = await response.text();
+      console.warn(`⚠️ [DataForSEO] Payment Required (402): ${endpoint}`);
+      _dataforseoAuthenticated = false;
+      return {
+        success: false,
+        error: 'DataForSEO credits exhausted (HTTP 402)',
+        unavailable: true,
+        available: false,
+        reason: 'DataForSEO account has no credits',
+        source: 'DataForSEO',
+        statusCode: 40200,
+        httpStatus: 402,
+        status: 'PAYMENT_REQUIRED'
+      };
+    }
+
     if (response.status === 404) {
       const errorText = await response.text();
       console.error(`❌ [DataForSEO] 404 Not Found: ${endpoint} - ${errorText}`);
@@ -715,10 +732,20 @@ export function isDataForSEOAvailable() {
 }
 
 export function getDataForSEOStatus() {
+  const configured = isDataForSEOConfigured();
   return {
-    configured: isDataForSEOConfigured(),
-    authenticated: _dataforseoAuthenticated,
-    available: isDataForSEOConfigured() && _dataforseoAuthenticated,
+    provider: 'DataForSEO',
+    enabled: true,
+    configured,
+    available: configured && _dataforseoAuthenticated,
+    status: !configured ? 'NOT_CONFIGURED'
+      : _dataforseoAuthenticated ? 'AVAILABLE'
+      : 'AUTHENTICATION_FAILED',
+    reason: !configured ? 'DATAFORSEO_LOGIN or DATAFORSEO_PASSWORD not set'
+      : _dataforseoAuthenticated ? null
+      : 'DataForSEO authentication failed or credits exhausted',
+    searchedRemaining: null,
+    checkedAt: new Date().toISOString()
   };
 }
 

@@ -7,11 +7,15 @@ export function buildSEOReport({
   contentGapIntelligence,
   blogIntelligence,
   searchConsoleData,
+  searchConsole,
   serpFeatures,
   peopleAlsoAsk,
   trendAnalysis,
-  providers
+  providers,
+  pageSpeed,
+  crux
 }) {
+  const scData = searchConsoleData || searchConsole;
   const overallScore = calculateOverallScore({
     technicalAudit,
     keywordIntelligence,
@@ -67,17 +71,20 @@ export function buildSEOReport({
       geoIntelligence,
       contentGapIntelligence
     }),
-    searchConsole: searchConsoleData ? {
-      clicks: searchConsoleData.clicks ?? null,
-      impressions: searchConsoleData.impressions ?? null,
-      ctr: searchConsoleData.ctr ?? null,
-      avgPosition: searchConsoleData.avgPosition ?? null,
-      topQueries: (searchConsoleData.topQueries || []).slice(0, 10),
-      topPages: (searchConsoleData.topPages || []).slice(0, 10),
-      countries: searchConsoleData.countries || [],
-      devices: searchConsoleData.devices || [],
+    searchConsole: scData ? {
+      clicks: scData.clicks ?? null,
+      impressions: scData.impressions ?? null,
+      ctr: scData.ctr ?? null,
+      avgPosition: scData.avgPosition ?? null,
+      topQueries: (scData.topQueries || []).slice(0, 10),
+      topPages: (scData.topPages || []).slice(0, 10),
+      countries: scData.countries || [],
+      devices: scData.devices || [],
       source: 'Google Search Console',
       status: 'measured'
+    } : searchConsole?.status === 'NOT_APPLICABLE' ? {
+      status: 'NOT_APPLICABLE',
+      reason: 'No connected Search Console property matches this website'
     } : null,
     peopleAlsoAsk: paak.slice(0, 10),
     trendAnalysis: {

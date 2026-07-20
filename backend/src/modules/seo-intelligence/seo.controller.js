@@ -44,7 +44,32 @@ export const runSeoHandler = async (req, res) => {
       });
     }
 
-    return res.json({ success: true, chatId, seoIntelligence: result.data });
+    const isPartial = result.status === 'PARTIAL';
+
+    if (isPartial && result.warnings?.length > 0) {
+      const hasFatalWarnings = result.warnings.some(w =>
+        typeof w === 'object' && w.code === 'PERSIST_FAILED' && !result.data?.id
+      );
+      if (hasFatalWarnings) {
+        return res.status(500).json({
+          success: false, error: 'SEO analysis could not be persisted',
+          warnings: result.warnings, partial: result.data || null
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      status: result.status || 'completed',
+      chatId,
+      seoIntelligence: {
+        ...result.data,
+        topicCandidates: result.data?.topicCandidates || [],
+        measuredModules: result.data?.measuredModules || [],
+        unavailableModules: result.data?.unavailableModules || []
+      },
+      warnings: result.warnings || []
+    });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message || 'Failed to run SEO analysis' });
   }
@@ -100,6 +125,9 @@ export const getSeoHandler = async (req, res) => {
     let metadataProviders;
     try { metadataProviders = await getSEOProviderStatus(); } catch (e) { metadataProviders = getCachedSEOProviderStatus(); }
 
+    const topicCandidates = seo.inputJson?.topicCandidates || [];
+    const inputMeta = seo.inputJson || {};
+
     return res.json({
       success: true,
       seoIntelligence: {
@@ -117,11 +145,16 @@ export const getSeoHandler = async (req, res) => {
         contentGapRecord: contentGapData,
         blogIntelligenceRecord: blogData,
         executiveDashboard: seo.executiveDashboard || null,
+        topicCandidates,
+        measuredModules: inputMeta.measuredModules || [],
+        unavailableModules: inputMeta.unavailableModules || [],
         metadata: {
           analyzedAt: seo.updatedAt,
           providers: seo.providers || metadataProviders,
           warnings: seo.warnings,
-          status: seo.status
+          status: seo.status,
+          scoreConfidence: report?.confidenceLabel || null,
+          coverage: (inputMeta.measuredModules?.length || 0) / ((inputMeta.measuredModules?.length || 0) + (inputMeta.unavailableModules?.length || 1))
         }
       }
     });

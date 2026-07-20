@@ -840,6 +840,11 @@ export function normalizeSeo(data: any) {
     contentOpportunities: tabKeywords?.contentOpportunities || [],
     // Evidence source summary
     sourceSummary: seo.sourceSummary || seo.identity?.sourceSummary || {},
+    // Website-derived topic candidates (always available even without search providers)
+    topicCandidates: seo.topicCandidates || [],
+    // Module availability tracking
+    measuredModules: seo.measuredModules || [],
+    unavailableModules: seo.unavailableModules || [],
   };
 
   if (import.meta.env.DEV) {

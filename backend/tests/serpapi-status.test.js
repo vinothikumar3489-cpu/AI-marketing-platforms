@@ -27,7 +27,7 @@ describe('getSerpAPIStatus — no network', () => {
     assert.equal(status.status, 'NOT_CONFIGURED');
     assert.equal(status.configured, false);
     assert.equal(status.available, false);
-    assert.equal(status.provider, 'SerpAPI');
+    assert.equal(status.provider, 'SERPAPI');
     assert.ok(status.reason.includes('not set'));
     assert.ok(status.checkedAt);
     assert.equal(status.enabled, true);
@@ -65,7 +65,7 @@ describe('getCachedSerpAPIStatus', () => {
     const mod = await getSerpapiModule();
     const status = mod.getCachedSerpAPIStatus();
     assert.equal(typeof status, 'object');
-    assert.equal(status.provider, 'SerpAPI');
+    assert.equal(status.provider, 'SERPAPI');
     assert.equal(status.enabled, true);
     assert.ok('configured' in status);
     assert.ok('available' in status);
@@ -85,7 +85,7 @@ describe('Provider router import integration', () => {
     // Ensure no ReferenceError from missing getSerpAPIStatus import
     const cached = router.getCachedSEOProviderStatus();
     assert.ok('serpapi' in cached);
-    assert.equal(cached.serpapi.provider, 'SerpAPI');
+    assert.equal(cached.serpapi.provider, 'SERPAPI');
   });
 
   it('getCachedSEOProviderStatus returns correct shape', async () => {
@@ -94,7 +94,7 @@ describe('Provider router import integration', () => {
     assert.ok('serpapi' in status, 'missing serpapi key');
     assert.ok('dataforseo' in status, 'missing dataforseo key');
     assert.ok('cacheAvailable' in status, 'missing cacheAvailable key');
-    assert.equal(status.serpapi.provider, 'SerpAPI');
+    assert.equal(status.serpapi.provider, 'SERPAPI');
     assert.ok('configured' in status.dataforseo);
     assert.ok('available' in status.dataforseo);
     assert.ok('enabled' in status.dataforseo);

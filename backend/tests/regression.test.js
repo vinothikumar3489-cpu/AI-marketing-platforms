@@ -30,7 +30,7 @@ describe('DataForSEO service', () => {
     const status = mod.getDataForSEOStatus();
     assert.ok(typeof status === 'object');
     assert.ok('configured' in status);
-    assert.ok('authenticated' in status);
+    assert.ok('provider' in status);
     assert.ok('available' in status);
     assert.equal(status.configured, true);
   });

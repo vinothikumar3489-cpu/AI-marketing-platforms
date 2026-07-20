@@ -184,28 +184,31 @@ async function performSerpSearch(url, productName) {
   const serpResults = [];
   let source = 'unknown';
 
-  try {
-    // Try DataForSEO first using product name as keyword
-    const keywords = [productName || extractDomain(url)];
-    const serpResult = await getSerpCompetitors(keywords);
-    if (serpResult && serpResult.success && serpResult.data && serpResult.data.length > 0) {
-      source = 'dataforseo';
-      serpResult.data.forEach(item => {
-        const domain = extractDomain(item.url);
-        if (domain && !domain.includes(extractDomain(url))) {
-          competitors.push({
-            name: item.title || domain,
-            domain,
-            url: item.url,
-            snippet: item.description || '',
-            source: 'dataforseo_serp'
-          });
-          serpResults.push(item);
-        }
-      });
+  const dataForSEOEnabled = process.env.SEO_PROVIDER_DATAFORSEO_ENABLED !== 'false';
+
+  if (dataForSEOEnabled) {
+    try {
+      const keywords = [productName || extractDomain(url)];
+      const serpResult = await getSerpCompetitors(keywords);
+      if (serpResult && serpResult.success && serpResult.data && serpResult.data.length > 0) {
+        source = 'dataforseo';
+        serpResult.data.forEach(item => {
+          const domain = extractDomain(item.url);
+          if (domain && !domain.includes(extractDomain(url))) {
+            competitors.push({
+              name: item.title || domain,
+              domain,
+              url: item.url,
+              snippet: item.description || '',
+              source: 'dataforseo_serp'
+            });
+            serpResults.push(item);
+          }
+        });
+      }
+    } catch (error) {
+      console.warn('[Research Orchestrator] DataForSEO SERP failed:', error.message);
     }
-  } catch (error) {
-    console.warn('[Research Orchestrator] DataForSEO SERP failed:', error.message);
   }
 
   // Fallback to Tavily if no competitors found

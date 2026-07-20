@@ -1,6 +1,33 @@
 import fetch from 'node-fetch';
 
-const SERPAPI_API_KEY = process.env.SERPAPI_API_KEY;
+const PLACEHOLDER_PATTERNS = [
+  'your_serpapi_key', 'replace_me', 'changeme', 'change_me',
+  'undefined', 'null', 'none', 'your-api-key', 'api_key_here',
+  'sk-', '<your_api_key>', '${serpapi_api_key}', 'PUT_YOUR_KEY_HERE'
+];
+
+function isPlaceholderKey(key) {
+  if (!key) return false;
+  const lower = key.toLowerCase().trim();
+  if (PLACEHOLDER_PATTERNS.some(p => lower === p || lower.startsWith(p))) return true;
+  if (key.length < 20) return true;
+  return false;
+}
+
+const rawKey = process.env.SERPAPI_API_KEY;
+const SERPAPI_API_KEY = rawKey?.trim();
+
+if (SERPAPI_API_KEY) {
+  console.log('[SERPAPI DIAG]', {
+    keyPresent: true,
+    keyLength: SERPAPI_API_KEY.length,
+    keySuffix: SERPAPI_API_KEY.slice(-4),
+    isPlaceholder: isPlaceholderKey(SERPAPI_API_KEY),
+    configured: _keyConfigured
+  });
+} else {
+  console.log('[SERPAPI DIAG]', { keyPresent: false, rawEnv: typeof process.env.SERPAPI_API_KEY, rawLength: process.env.SERPAPI_API_KEY?.length || 0 });
+}
 
 const GOOGLE_ENGINES = {
   search: 'google',
@@ -13,159 +40,197 @@ const GOOGLE_ENGINES = {
 
 let _lastCheck = 0;
 let _serpapiAvailable = true;
+let _lastStatus = null;
 const STATUS_CHECK_TTL = 60_000;
+
+const _keyConfigured = (() => {
+  if (!SERPAPI_API_KEY) return false;
+  if (isPlaceholderKey(SERPAPI_API_KEY)) return false;
+  return true;
+})();
+
+function _keyDiagnostic() {
+  if (!SERPAPI_API_KEY || !_keyConfigured) return { configured: false };
+  return {
+    configured: true,
+    keyLength: SERPAPI_API_KEY.length,
+    suffix: SERPAPI_API_KEY.slice(-4)
+  };
+}
 
 export async function getSerpAPIStatus() {
   const now = Date.now();
-  if (now - _lastCheck < STATUS_CHECK_TTL && _lastCheck !== 0) {
-    return {
-      provider: 'SerpAPI',
-      enabled: true,
-      configured: !!SERPAPI_API_KEY,
-      available: !!SERPAPI_API_KEY && _serpapiAvailable,
-      status: !SERPAPI_API_KEY ? 'NOT_CONFIGURED' : _serpapiAvailable ? 'AVAILABLE' : 'FAILED',
-      reason: !SERPAPI_API_KEY ? 'SERPAPI_API_KEY not set' : _serpapiAvailable ? null : 'Previous failure recorded',
-      searchesRemaining: null,
-      checkedAt: new Date(_lastCheck).toISOString()
-    };
+
+  if (now - _lastCheck < STATUS_CHECK_TTL && _lastCheck !== 0 && _lastStatus) {
+    return { ..._lastStatus, checkedAt: new Date(_lastCheck).toISOString() };
   }
 
-  if (!SERPAPI_API_KEY) {
+  if (!_keyConfigured) {
     _lastCheck = now;
     _serpapiAvailable = false;
-    console.log('[SEO SERPAPI STATUS]', { status: 'NOT_CONFIGURED' });
-    return {
-      provider: 'SerpAPI',
+    _lastStatus = {
+      provider: 'SERPAPI',
       enabled: true,
       configured: false,
       available: false,
       status: 'NOT_CONFIGURED',
-      reason: 'SERPAPI_API_KEY environment variable is not set',
+      reason: !SERPAPI_API_KEY ? 'SERPAPI_API_KEY environment variable is not set' : 'SerpAPI key is a placeholder value',
       searchesRemaining: null,
       checkedAt: new Date(now).toISOString()
     };
+    console.log('[SEO SERPAPI STATUS]', { ..._lastStatus, keyDiagnostic: _keyDiagnostic() });
+    return { ..._lastStatus };
   }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
 
   try {
-    const response = await fetch(`https://serpapi.com/account?api_key=${SERPAPI_API_KEY}&source=backend`, {
+    const response = await fetch(`https://serpapi.com/account.json?api_key=${SERPAPI_API_KEY}&source=backend`, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
       signal: controller.signal
     });
     clearTimeout(timeout);
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
       _lastCheck = now;
       _serpapiAvailable = false;
-      const result = {
-        provider: 'SerpAPI',
-        enabled: true,
-        configured: true,
-        available: false,
+      _lastStatus = {
+        provider: 'SERPAPI', enabled: true, configured: true, available: false,
         status: 'AUTHENTICATION_FAILED',
-        reason: 'SerpAPI rejected the API key (401/403)',
-        searchesRemaining: null,
-        checkedAt: new Date(now).toISOString()
+        reason: 'SerpAPI rejected the API key (HTTP 401)',
+        searchesRemaining: null, checkedAt: new Date(now).toISOString()
       };
-      console.log('[SEO SERPAPI STATUS]', result);
-      return result;
+      console.log('[SEO SERPAPI STATUS]', _lastStatus);
+      return { ..._lastStatus };
+    }
+
+    if (response.status === 403) {
+      _lastCheck = now;
+      _serpapiAvailable = false;
+      _lastStatus = {
+        provider: 'SERPAPI', enabled: true, configured: true, available: false,
+        status: 'PERMISSION_DENIED',
+        reason: 'SerpAPI account does not have permission (HTTP 403)',
+        searchesRemaining: null, checkedAt: new Date(now).toISOString()
+      };
+      console.log('[SEO SERPAPI STATUS]', _lastStatus);
+      return { ..._lastStatus };
+    }
+
+    if (response.status === 429) {
+      _lastCheck = now;
+      _serpapiAvailable = false;
+      _lastStatus = {
+        provider: 'SERPAPI', enabled: true, configured: true, available: false,
+        status: 'RATE_LIMITED',
+        reason: 'SerpAPI rate limit exceeded (HTTP 429)',
+        searchesRemaining: null, checkedAt: new Date(now).toISOString()
+      };
+      console.log('[SEO SERPAPI STATUS]', _lastStatus);
+      return { ..._lastStatus };
+    }
+
+    if (response.status >= 500) {
+      _lastCheck = now;
+      _lastStatus = {
+        provider: 'SERPAPI', enabled: true, configured: true, available: false,
+        status: 'PROVIDER_ERROR',
+        reason: `SerpAPI server error (HTTP ${response.status})`,
+        searchesRemaining: null, checkedAt: new Date(now).toISOString()
+      };
+      console.log('[SEO SERPAPI STATUS]', _lastStatus);
+      return { ..._lastStatus };
     }
 
     if (!response.ok) {
       _lastCheck = now;
       _serpapiAvailable = false;
-      const result = {
-        provider: 'SerpAPI',
-        enabled: true,
-        configured: true,
-        available: false,
+      _lastStatus = {
+        provider: 'SERPAPI', enabled: true, configured: true, available: false,
         status: 'FAILED',
         reason: `SerpAPI responded with status ${response.status}`,
-        searchesRemaining: null,
-        checkedAt: new Date(now).toISOString()
+        searchesRemaining: null, checkedAt: new Date(now).toISOString()
       };
-      console.log('[SEO SERPAPI STATUS]', result);
-      return result;
+      console.log('[SEO SERPAPI STATUS]', _lastStatus);
+      return { ..._lastStatus };
     }
 
     const body = await response.json();
     const searchesRemaining = body?.account?.searches_remaining ?? null;
 
     _lastCheck = now;
-    _serpapiAvailable = true;
 
     if (searchesRemaining !== null && searchesRemaining <= 0) {
       _serpapiAvailable = false;
-      const result = {
-        provider: 'SerpAPI',
-        enabled: true,
-        configured: true,
-        available: false,
+      _lastStatus = {
+        provider: 'SERPAPI', enabled: true, configured: true, available: false,
         status: 'QUOTA_EXHAUSTED',
         reason: 'SerpAPI search quota is exhausted',
-        searchesRemaining: 0,
-        checkedAt: new Date(now).toISOString()
+        searchesRemaining: 0, checkedAt: new Date(now).toISOString()
       };
-      console.log('[SEO SERPAPI STATUS]', result);
-      return result;
+      console.log('[SEO SERPAPI STATUS]', _lastStatus);
+      return { ..._lastStatus };
     }
 
-    const result = {
-      provider: 'SerpAPI',
-      enabled: true,
-      configured: true,
-      available: true,
-      status: 'AVAILABLE',
-      reason: null,
-      searchesRemaining,
-      checkedAt: new Date(now).toISOString()
+    _serpapiAvailable = true;
+    _lastStatus = {
+      provider: 'SERPAPI', enabled: true, configured: true, available: true,
+      status: 'AVAILABLE', reason: null,
+      searchesRemaining, checkedAt: new Date(now).toISOString()
     };
-    console.log('[SEO SERPAPI STATUS]', result);
-    return result;
+    console.log('[SEO SERPAPI STATUS]', _lastStatus);
+    return { ..._lastStatus };
 
   } catch (error) {
     clearTimeout(timeout);
     _lastCheck = now;
     _serpapiAvailable = false;
 
-    const status = error.name === 'AbortError' ? 'TIMEOUT' : 'FAILED';
-    const result = {
-      provider: 'SerpAPI',
-      enabled: true,
-      configured: true,
-      available: false,
-      status,
-      reason: status === 'TIMEOUT' ? 'SerpAPI account endpoint timed out after 10s' : `SerpAPI request failed: ${error.message}`,
-      searchesRemaining: null,
-      checkedAt: new Date(now).toISOString()
+    let status;
+    if (error.name === 'AbortError') status = 'TIMEOUT';
+    else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET') status = 'NETWORK_ERROR';
+    else status = 'FAILED';
+
+    _lastStatus = {
+      provider: 'SERPAPI', enabled: true, configured: true, available: false, status,
+      reason: status === 'TIMEOUT' ? 'SerpAPI account endpoint timed out after 10s'
+        : status === 'NETWORK_ERROR' ? `SerpAPI network error: ${error.message}`
+        : `SerpAPI request failed: ${error.message}`,
+      searchesRemaining: null, checkedAt: new Date(now).toISOString()
     };
-    console.log('[SEO SERPAPI STATUS]', result);
-    return result;
+    console.log('[SEO SERPAPI STATUS]', _lastStatus);
+    return { ..._lastStatus };
   }
 }
 
 export function getCachedSerpAPIStatus() {
+  if (_lastStatus) return { ..._lastStatus, checkedAt: new Date(_lastCheck).toISOString() };
   return {
-    provider: 'SerpAPI',
-    enabled: true,
-    configured: !!SERPAPI_API_KEY,
-    available: !!SERPAPI_API_KEY && _serpapiAvailable,
-    status: !SERPAPI_API_KEY ? 'NOT_CONFIGURED' : _serpapiAvailable ? 'AVAILABLE' : 'FAILED',
-    reason: null,
-    searchesRemaining: null,
+    provider: 'SERPAPI', enabled: true,
+    configured: _keyConfigured,
+    available: _keyConfigured && _serpapiAvailable,
+    status: !_keyConfigured ? 'NOT_CONFIGURED' : _serpapiAvailable ? 'AVAILABLE' : 'FAILED',
+    reason: null, searchesRemaining: null,
     checkedAt: _lastCheck ? new Date(_lastCheck).toISOString() : null
   };
 }
 
 export function isSerpAPIConfigured() {
-  return !!SERPAPI_API_KEY;
+  return _keyConfigured;
 }
 
 export function isSerpAPIAvailable() {
-  return !!SERPAPI_API_KEY && _serpapiAvailable;
+  return _keyConfigured && _serpapiAvailable;
+}
+
+export function getSerpAPIDiagnostic() {
+  const diag = _keyDiagnostic();
+  if (diag.configured) {
+    return { configured: true, keyLength: diag.keyLength };
+  }
+  return { configured: false };
 }
 
 async function serpapiRequest(endpoint, params = {}) {
