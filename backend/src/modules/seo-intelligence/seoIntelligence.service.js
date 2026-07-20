@@ -35,19 +35,45 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
   let seoReport = null, providers = null;
   let persistedSeoRecordId = null;
 
+  const warnings = [];
+
   try {
-    providers = getSEOProviderStatus();
-
-    researchData = await collectResearchData({ websiteUrl, productName: chat?.productName || '', companyName: chat?.title || '' });
-    websiteData = researchData.websiteContent;
-
-    if (!websiteData) {
-      const scrapeResult = await scrapeWebsite(websiteUrl, { timeout: 30000, extractSchema: true, extractImages: false, extractLinks: true, extractMeta: true });
-      if (!scrapeResult.success) throw new Error('Failed to scrape website: ' + scrapeResult.error);
-      websiteData = scrapeResult.data;
+    try {
+      providers = await getSEOProviderStatus();
+    } catch (e) {
+      console.warn('[SEO PROVIDER FALLBACK] getSEOProviderStatus failed:', e.message);
+      providers = { serpapi: { status: 'FAILED' }, dataforseo: { enabled: false }, cacheAvailable: false };
     }
 
-    identity = deriveWebsiteIdentity({ websiteUrl, scrapedData: websiteData, chat });
+    try {
+      researchData = await collectResearchData({ websiteUrl, productName: chat?.productName || '', companyName: chat?.title || '' });
+      websiteData = researchData.websiteContent;
+    } catch (e) {
+      warnings.push(`Research data collection failed: ${e.message}`);
+      console.warn('[SEO PROVIDER FALLBACK] collectResearchData failed:', e.message);
+    }
+
+    if (!websiteData) {
+      try {
+        const scrapeResult = await scrapeWebsite(websiteUrl, { timeout: 30000, extractSchema: true, extractImages: false, extractLinks: true, extractMeta: true });
+        if (scrapeResult.success) {
+          websiteData = scrapeResult.data;
+        } else {
+          warnings.push(`Website scrape returned: ${scrapeResult.error}`);
+          console.warn('[SEO PROVIDER FALLBACK] scrapeWebsite returned unsuccessful:', scrapeResult.error);
+        }
+      } catch (e) {
+        warnings.push(`Website scrape failed: ${e.message}`);
+        console.warn('[SEO PROVIDER FALLBACK] scrapeWebsite threw:', e.message);
+      }
+    }
+
+    try {
+      identity = deriveWebsiteIdentity({ websiteUrl, scrapedData: websiteData, chat });
+    } catch (e) {
+      warnings.push(`Identity derivation failed: ${e.message}`);
+      identity = { websiteUrl, productName: chat?.productName || '', companyName: chat?.title || '' };
+    }
 
     const [techResult, cruxResult] = await Promise.allSettled([
       generateMergedTechnicalSEO(websiteUrl),
@@ -57,29 +83,34 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     if (techResult.status === 'fulfilled') technicalAudit = techResult.value;
     if (cruxResult.status === 'fulfilled' && cruxResult.value?.success) chromeUXData = cruxResult.value.data;
 
-    const keywordBuildStart = Date.now();
-    const keywordSources = buildKeywordSources(websiteData);
-    let rawCandidates = extractCandidatePhrases(keywordSources);
+    let validatedKeywords = [];
+    try {
+      const keywordSources = buildKeywordSources(websiteData || {});
+      let rawCandidates = extractCandidatePhrases(keywordSources);
+      rawCandidates = deduplicateKeywords(rawCandidates);
 
-    rawCandidates = deduplicateKeywords(rawCandidates);
+      validatedKeywords = rawCandidates
+        .filter(c => validateKeyword(c.phrase, identity?.productName, identity?.companyName))
+        .map(c => ({
+          keyword: c.phrase,
+          priority: c.priority,
+          frequency: c.frequency,
+          sources: Array.from(c.sources),
+          relevanceScore: scoreKeywordRelevance(c.phrase, identity?.productName, identity?.companyName, identity?.industry),
+          intent: classifyKeyword(c.phrase)
+        }))
+        .sort((a, b) => b.relevanceScore - a.relevanceScore);
 
-    const validatedKeywords = rawCandidates
-      .filter(c => validateKeyword(c.phrase, identity?.productName, identity?.companyName))
-      .map(c => ({
-        keyword: c.phrase,
-        priority: c.priority,
-        frequency: c.frequency,
-        sources: Array.from(c.sources),
-        relevanceScore: scoreKeywordRelevance(c.phrase, identity?.productName, identity?.companyName, identity?.industry),
-        intent: classifyKeyword(c.phrase)
-      }))
-      .sort((a, b) => b.relevanceScore - a.relevanceScore);
+      const keywordMetrics = await resolveKeywordMetrics(
+        validatedKeywords.slice(0, 20).map(k => k.keyword)
+      );
 
-    const keywordMetrics = await resolveKeywordMetrics(
-      validatedKeywords.slice(0, 20).map(k => k.keyword)
-    );
-
-    keywordIntelligence = buildKeywordIntelligence(validatedKeywords, keywordMetrics, identity);
+      keywordIntelligence = buildKeywordIntelligence(validatedKeywords, keywordMetrics, identity);
+    } catch (e) {
+      warnings.push(`Keyword pipeline failed: ${e.message}`);
+      console.warn('[SEO PROVIDER FALLBACK] Keyword pipeline failed:', e.message);
+      keywordIntelligence = buildKeywordIntelligence([], { data: [] }, identity);
+    }
 
     const [competitorResult, serpResult, autoResult, trendResult] = await Promise.allSettled([
       discoverCompetitorsViaSerpAPI(identity?.productName || '', identity?.industry || '', websiteUrl),
@@ -105,35 +136,62 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
       trendAnalysis = trendResult.value.data;
     }
 
-    geoIntelligence = buildGeoIntelligence(technicalAudit, chromeUXData);
-    contentGapIntelligence = buildContentGapIntelligence(keywordIntelligence, competitorIntelligence, websiteData);
-    blogIntelligence = buildBlogIntelligence(keywordIntelligence, competitorIntelligence, trendAnalysis);
-    seoReport = buildSEOReport({
-      identity, technicalAudit, keywordIntelligence,
-      competitorIntelligence, geoIntelligence, contentGapIntelligence,
-      blogIntelligence, serpFeatures, peopleAlsoAsk, trendAnalysis, providers
-    });
+    try {
+      geoIntelligence = buildGeoIntelligence(technicalAudit, chromeUXData);
+    } catch (e) {
+      warnings.push(`GEO intelligence build failed: ${e.message}`);
+    }
 
-    persistedSeoRecordId = await saveSEOData({
-      chatId, userId, identity, websiteUrl,
-      technicalAudit, chromeUXData, keywordIntelligence,
-      competitorIntelligence, geoIntelligence, contentGapIntelligence,
-      blogIntelligence, seoReport, researchData, runId
-    });
+    try {
+      contentGapIntelligence = buildContentGapIntelligence(keywordIntelligence, competitorIntelligence, websiteData);
+    } catch (e) {
+      warnings.push(`Content gap analysis failed: ${e.message}`);
+    }
 
-    await prisma.message.create({
-      data: {
-        chatId, role: 'assistant',
-        content: `SEO Intelligence analysis complete for ${websiteUrl}. Overall Score: ${seoReport?.overallScore != null ? `${seoReport.overallScore}/100` : 'Pending evidence collection'}`,
-        analysisData: {
-          summary: seoReport ? `Overall SEO Score: ${seoReport.overallScore}/100, Technical: ${seoReport.technicalScore}/100, Content: ${seoReport.contentScore}/100` : `SEO analysis for ${websiteUrl}`,
-          scores: seoReport ? { overall: seoReport.overallScore, technical: seoReport.technicalScore, content: seoReport.contentScore, performance: seoReport.performanceScore } : null,
-          provider: 'orchestrator'
+    try {
+      blogIntelligence = buildBlogIntelligence(keywordIntelligence, competitorIntelligence, trendAnalysis);
+    } catch (e) {
+      warnings.push(`Blog intelligence failed: ${e.message}`);
+    }
+
+    try {
+      seoReport = buildSEOReport({
+        identity, technicalAudit, keywordIntelligence,
+        competitorIntelligence, geoIntelligence, contentGapIntelligence,
+        blogIntelligence, serpFeatures, peopleAlsoAsk, trendAnalysis, providers
+      });
+    } catch (e) {
+      warnings.push(`SEO report build failed: ${e.message}`);
+    }
+
+    try {
+      persistedSeoRecordId = await saveSEOData({
+        chatId, userId, identity, websiteUrl,
+        technicalAudit, chromeUXData, keywordIntelligence,
+        competitorIntelligence, geoIntelligence, contentGapIntelligence,
+        blogIntelligence, seoReport, researchData, runId
+      });
+    } catch (e) {
+      warnings.push(`Failed to persist SEO data: ${e.message}`);
+    }
+
+    try {
+      await prisma.message.create({
+        data: {
+          chatId, role: 'assistant',
+          content: `SEO Intelligence analysis complete for ${websiteUrl}. Overall Score: ${seoReport?.overallScore != null ? `${seoReport.overallScore}/100` : 'Pending evidence collection'}`,
+          analysisData: {
+            summary: seoReport ? `Overall SEO Score: ${seoReport.overallScore}/100, Technical: ${seoReport.technicalScore}/100, Content: ${seoReport.contentScore}/100` : `SEO analysis for ${websiteUrl}`,
+            scores: seoReport ? { overall: seoReport.overallScore, technical: seoReport.technicalScore, content: seoReport.contentScore, performance: seoReport.performanceScore } : null,
+            provider: 'orchestrator'
+          }
         }
-      }
-    }).catch(() => {});
+      }).catch(() => {});
+    } catch (e) {
+      warnings.push(`Failed to create message: ${e.message}`);
+    }
 
-    console.log('[SEO RUN COMPLETE]', { runId, chatId, overallScore: seoReport?.overallScore });
+    console.log('[SEO RUN COMPLETE]', { runId, chatId, overallScore: seoReport?.overallScore, warningCount: warnings.length });
 
     return {
       success: true,
@@ -141,6 +199,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
       data: {
         id: persistedSeoRecordId,
         status: 'completed',
+        warnings: [...warnings, ...(researchData?.warnings || [])],
         identity,
         technicalAudit,
         keywordIntelligence,
@@ -149,8 +208,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
         contentGapAnalysis: contentGapIntelligence,
         blogIntelligence,
         seoReport,
-        providers,
-        warnings: researchData?.warnings || []
+        providers
       }
     };
 

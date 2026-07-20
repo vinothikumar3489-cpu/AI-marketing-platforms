@@ -1,7 +1,7 @@
 import { prisma } from '../../config/prisma.js';
 import { generateCompleteSeoIntelligence } from './seoIntelligence.service.js';
 import { buildSEOReport } from '../../services/seo/seo-report-builder.service.js';
-import { getSEOProviderStatus, clearSEOCache, getCacheStats } from '../../services/seo/seo-provider-router.service.js';
+import { getSEOProviderStatus, getCachedSEOProviderStatus, clearSEOCache, getCacheStats } from '../../services/seo/seo-provider-router.service.js';
 import { getSearchConsoleStatus } from '../../services/googleSearchConsole.service.js';
 
 export const runSeoHandler = async (req, res) => {
@@ -83,6 +83,9 @@ export const getSeoHandler = async (req, res) => {
     const blogData = seo.blogIntelligenceRecord || seo.blogIdeas || {};
     const geoData = seo.geoIntelligence || seo.aiVisibility || {};
 
+    let reportProviders;
+    try { reportProviders = await getSEOProviderStatus(); } catch (e) { reportProviders = getCachedSEOProviderStatus(); }
+
     const report = buildSEOReport({
       identity: { websiteUrl: seo.websiteUrl, domain: seo.domain, companyName: seo.companyName, productName: seo.productName },
       technicalAudit: seo.technicalAuditDetail?.auditData || seo.technicalAudit || {},
@@ -91,8 +94,11 @@ export const getSeoHandler = async (req, res) => {
       geoIntelligence: geoData,
       contentGapIntelligence: contentGapData,
       blogIntelligence: blogData,
-      providers: getSEOProviderStatus()
+      providers: reportProviders
     });
+
+    let metadataProviders;
+    try { metadataProviders = await getSEOProviderStatus(); } catch (e) { metadataProviders = getCachedSEOProviderStatus(); }
 
     return res.json({
       success: true,
@@ -113,7 +119,7 @@ export const getSeoHandler = async (req, res) => {
         executiveDashboard: seo.executiveDashboard || null,
         metadata: {
           analyzedAt: seo.updatedAt,
-          providers: seo.providers || getSEOProviderStatus(),
+          providers: seo.providers || metadataProviders,
           warnings: seo.warnings,
           status: seo.status
         }
@@ -234,6 +240,9 @@ export const getDashboardHandler = async (req, res) => {
 
     if (!seo) return res.status(404).json({ success: false, error: 'SEO Intelligence not found' });
 
+    let dashboardProviders;
+    try { dashboardProviders = await getSEOProviderStatus(); } catch (e) { dashboardProviders = getCachedSEOProviderStatus(); }
+
     const report = buildSEOReport({
       identity: { websiteUrl: seo.websiteUrl, domain: seo.domain, companyName: seo.companyName, productName: seo.productName },
       technicalAudit: seo.technicalAuditDetail?.auditData || seo.technicalAudit || {},
@@ -242,7 +251,7 @@ export const getDashboardHandler = async (req, res) => {
       geoIntelligence: seo.geoIntelligence || seo.aiVisibility || {},
       contentGapIntelligence: seo.contentGapRecord || seo.contentGaps || {},
       blogIntelligence: seo.blogIntelligenceRecord || seo.blogIdeas || {},
-      providers: getSEOProviderStatus()
+      providers: dashboardProviders
     });
 
     return res.json({ success: true, data: { report, executiveDashboard: seo.executiveDashboard || null } });
@@ -252,10 +261,16 @@ export const getDashboardHandler = async (req, res) => {
 };
 
 export const getSEOProviderStatusHandler = async (req, res) => {
+  let providers;
+  try {
+    providers = await getSEOProviderStatus();
+  } catch (e) {
+    providers = getCachedSEOProviderStatus();
+  }
   return res.json({
     success: true,
     data: {
-      providers: getSEOProviderStatus(),
+      providers,
       cache: getCacheStats(),
       searchConsole: getSearchConsoleStatus()
     }

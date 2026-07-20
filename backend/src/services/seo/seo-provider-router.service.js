@@ -1,4 +1,4 @@
-import { isSerpAPIConfigured, isSerpAPIAvailable, googleSearch, googleAutocomplete, googleTrends, getSerpCompetitors, searchOpportunityScore, comprehensiveSearch } from '../serpapi.service.js';
+import { isSerpAPIConfigured, isSerpAPIAvailable, getSerpAPIStatus, getCachedSerpAPIStatus, googleSearch, googleAutocomplete, googleTrends, getSerpCompetitors, searchOpportunityScore, comprehensiveSearch } from '../serpapi.service.js';
 import {
   isDataForSEOConfigured, isDataForSEOAvailable, getKeywordMetrics, getKeywordSuggestions,
   getSerpResults, getSerpCompetitors as dfsGetSerpCompetitors, getDomainData, getBacklinksSummary
@@ -27,9 +27,36 @@ function cacheKey(prefix, ...args) {
   return `${prefix}:${args.filter(Boolean).join(':').toLowerCase().replace(/\s+/g, '_')}`;
 }
 
-export function getSEOProviderStatus() {
+export async function getSEOProviderStatus() {
+  let serpapi;
+  try {
+    serpapi = await getSerpAPIStatus();
+  } catch (e) {
+    console.warn('[SEO PROVIDER SELECTED] SerpAPI status check failed:', e.message);
+    serpapi = getCachedSerpAPIStatus();
+  }
+
+  const status = {
+    serpapi,
+    dataforseo: {
+      configured: isDataForSEOConfigured(),
+      available: isDataForSEOAvailable() && SEO_PROVIDER_DATAFORSEO_ENABLED,
+      enabled: SEO_PROVIDER_DATAFORSEO_ENABLED
+    },
+    cacheAvailable: memoryCache.size > 0
+  };
+
+  const selected = serpapi.status === 'AVAILABLE' ? 'SerpAPI'
+    : (isDataForSEOAvailable() && SEO_PROVIDER_DATAFORSEO_ENABLED) ? 'DataForSEO'
+    : 'cache_or_heuristic';
+  console.log('[SEO PROVIDER SELECTED]', { selected, serpapiStatus: serpapi.status, dataforseoEnabled: SEO_PROVIDER_DATAFORSEO_ENABLED });
+
+  return status;
+}
+
+export function getCachedSEOProviderStatus() {
   return {
-    serpapi: getSerpAPIStatus(),
+    serpapi: getCachedSerpAPIStatus(),
     dataforseo: {
       configured: isDataForSEOConfigured(),
       available: isDataForSEOAvailable() && SEO_PROVIDER_DATAFORSEO_ENABLED,
@@ -56,10 +83,12 @@ export async function withProviderFallback(operation, options = {}) {
       if (result && result.success !== false) {
         const enriched = { ...result, provider: 'SerpAPI', confidence: result.confidence || 100, retrievedAt: new Date().toISOString(), status: 'measured' };
         if (useCache && cacheKeyStr) setCache(cacheKeyStr, enriched);
+        console.log('[SEO PROVIDER SELECTED]', { provider: 'SerpAPI', operation: cachePrefix });
         return enriched;
       }
+      console.log('[SEO PROVIDER FALLBACK]', { from: 'SerpAPI', reason: 'operation returned unsuccessful', operation: cachePrefix });
     } catch (e) {
-      console.warn(`[ProviderRouter] SerpAPI failed for ${cachePrefix}:`, e.message);
+      console.warn('[SEO PROVIDER FALLBACK]', { from: 'SerpAPI', reason: e.message, operation: cachePrefix });
     }
   }
 
@@ -69,20 +98,24 @@ export async function withProviderFallback(operation, options = {}) {
       if (result && result.success !== false) {
         const enriched = { ...result, provider: 'DataForSEO', confidence: result.confidence || 100, retrievedAt: new Date().toISOString(), status: 'measured' };
         if (useCache && cacheKeyStr) setCache(cacheKeyStr, enriched);
+        console.log('[SEO PROVIDER SELECTED]', { provider: 'DataForSEO', operation: cachePrefix });
         return enriched;
       }
+      console.log('[SEO PROVIDER FALLBACK]', { from: 'DataForSEO', reason: 'operation returned unsuccessful', operation: cachePrefix });
     } catch (e) {
-      console.warn(`[ProviderRouter] DataForSEO failed for ${cachePrefix}:`, e.message);
+      console.warn('[SEO PROVIDER FALLBACK]', { from: 'DataForSEO', reason: e.message, operation: cachePrefix });
     }
   }
 
   if (useCache && cacheKeyStr) {
     const cached = getCached(cacheKeyStr);
     if (cached) {
+      console.log('[SEO PROVIDER SELECTED]', { provider: 'cache', operation: cachePrefix });
       return { ...cached, provider: 'cache', confidence: Math.min(cached.confidence || 70, 80), retrievedAt: new Date().toISOString(), status: 'cached' };
     }
   }
 
+  console.warn('[SEO PROVIDER FALLBACK]', { from: 'all', reason: 'all providers unavailable, no cache', operation: cachePrefix });
   return {
     success: false,
     error: 'All providers unavailable',
