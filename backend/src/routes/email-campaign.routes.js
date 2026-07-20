@@ -1,45 +1,202 @@
-import { Router } from "express";
-import { requireAuth } from "../middleware/auth.middleware.js";
-import {
-  handleGenerateEmailCampaign,
-  handleGetEmailCampaign,
-  handleListEmailCampaigns,
-  handleUpdateEmailItem,
-  handleRegenerateEmailItem,
-  handleSubmitForReview,
-  handleApproveCampaign,
-  handleRequestChanges,
-  handleCreateVersion,
-  handleRestoreVersion,
-  handleProviderHealthCheck,
-  handleSendTestCampaignEmail,
-  handleSendCampaign,
-  handleBrevoWebhookEndpoint,
-  handleGetDeliveryLogs,
-  handleFromAsset,
-} from "../controllers/email-campaign.controller.js";
+import express from 'express';
+import { requireAuth } from '../middleware/auth.middleware.js';
+import { generateEmailCampaign, sendCampaignEmail, scheduleCampaign, approveCampaign } from '../services/automation/email-campaign.service.js';
+import { prisma } from '../config/prisma.js';
 
-export const emailCampaignRouter = Router();
-export const brevoWebhookRouter = Router();
-
+export const emailCampaignRouter = express.Router();
 emailCampaignRouter.use(requireAuth);
 
-emailCampaignRouter.post("/:chatId/email-campaign/from-asset", handleFromAsset);
-emailCampaignRouter.post("/:chatId/email-campaign/generate", handleGenerateEmailCampaign);
-emailCampaignRouter.get("/:chatId/email-campaign", handleListEmailCampaigns);
-emailCampaignRouter.get("/:chatId/email-campaign/:campaignId", handleGetEmailCampaign);
-emailCampaignRouter.get("/:chatId/email-campaign/:campaignId/provider-health", handleProviderHealthCheck);
-emailCampaignRouter.get("/:chatId/email-campaign/:campaignId/logs", handleGetDeliveryLogs);
-emailCampaignRouter.patch("/:chatId/email-campaign/:campaignId/items/:itemId", handleUpdateEmailItem);
-emailCampaignRouter.post("/:chatId/email-campaign/:campaignId/items/:itemId/regenerate", handleRegenerateEmailItem);
-emailCampaignRouter.post("/:chatId/email-campaign/:campaignId/submit-review", handleSubmitForReview);
-emailCampaignRouter.post("/:chatId/email-campaign/:campaignId/approve", handleApproveCampaign);
-emailCampaignRouter.post("/:chatId/email-campaign/:campaignId/request-changes", handleRequestChanges);
-emailCampaignRouter.post("/:chatId/email-campaign/:campaignId/send", handleSendCampaign);
-emailCampaignRouter.post("/:chatId/email-campaign/:campaignId/test-send", handleSendTestCampaignEmail);
-emailCampaignRouter.post("/:chatId/email-campaign/:campaignId/versions", handleCreateVersion);
-emailCampaignRouter.post("/:chatId/email-campaign/:campaignId/versions/:versionId/restore", handleRestoreVersion);
+emailCampaignRouter.post('/:chatId/email-campaign/generate', async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user?.id;
+  const { planId, campaignPlanId, emailType } = req.body || {};
 
-// Brevo webhook (no auth — Brevo signs requests via IP allowlist)
-// This is mounted directly in server.js without requireAuth
-brevoWebhookRouter.post("/brevo", handleBrevoWebhookEndpoint);
+  if (!chatId || !userId) return res.status(400).json({ success: false, error: 'Missing chatId or user' });
+
+  try {
+    const result = await generateEmailCampaign({ chatId, userId, planId, campaignPlanId, emailType });
+    if (!result.success) return res.status(500).json({ success: false, error: result.error });
+    return res.json({ success: true, data: result.data });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.get('/:chatId/email-campaign', async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user?.id;
+
+  if (!chatId || !userId) return res.status(400).json({ success: false, error: 'Missing chatId or user' });
+
+  try {
+    const campaigns = await prisma.emailCampaign.findMany({
+      where: { chatId, userId },
+      orderBy: { createdAt: 'desc' },
+      include: { sequenceItems: { orderBy: { sequenceOrder: 'asc' } }, logs: { take: 5, orderBy: { createdAt: 'desc' } } }
+    });
+    return res.json({ success: true, data: campaigns });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.get('/:chatId/email-campaign/:campaignId', async (req, res) => {
+  const { chatId, campaignId } = req.params;
+  const userId = req.user?.id;
+
+  try {
+    const campaign = await prisma.emailCampaign.findFirst({
+      where: { id: campaignId, chatId, userId },
+      include: {
+        sequenceItems: { orderBy: { sequenceOrder: 'asc' } },
+        versions: { orderBy: { versionNumber: 'desc' } },
+        logs: { orderBy: { createdAt: 'desc' }, take: 20 }
+      }
+    });
+    if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+    return res.json({ success: true, data: campaign });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/approve', async (req, res) => {
+  const { campaignId } = req.params;
+
+  try {
+    const result = await approveCampaign(campaignId);
+    if (!result.success) return res.status(500).json({ success: false, error: result.error });
+    return res.json({ success: true, data: result.data });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/schedule', async (req, res) => {
+  const { campaignId } = req.params;
+  const { scheduledDate } = req.body || {};
+
+  if (!scheduledDate) return res.status(400).json({ success: false, error: 'scheduledDate required' });
+
+  try {
+    const result = await scheduleCampaign({ campaignId, scheduledDate });
+    if (!result.success) return res.status(500).json({ success: false, error: result.error });
+    return res.json({ success: true, data: result.data });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/send-test', async (req, res) => {
+  const { campaignId } = req.params;
+  const { recipientEmail, recipientName, companyName } = req.body || {};
+
+  if (!recipientEmail) return res.status(400).json({ success: false, error: 'recipientEmail required' });
+
+  try {
+    const campaign = await prisma.emailCampaign.findUnique({
+      where: { id: campaignId },
+      include: { sequenceItems: { take: 1, orderBy: { sequenceOrder: 'asc' } } }
+    });
+    if (!campaign || !campaign.sequenceItems[0]) return res.status(404).json({ success: false, error: 'Campaign or email item not found' });
+
+    const result = await sendCampaignEmail({
+      campaignId,
+      itemId: campaign.sequenceItems[0].id,
+      recipientEmail,
+      recipientName: recipientName || 'Test User',
+      companyName: companyName || campaign.name
+    });
+
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/items/:itemId/send', async (req, res) => {
+  const { campaignId, itemId } = req.params;
+  const { recipientEmail, recipientName, companyName } = req.body || {};
+
+  if (!recipientEmail) return res.status(400).json({ success: false, error: 'recipientEmail required' });
+
+  try {
+    const result = await sendCampaignEmail({ campaignId, itemId, recipientEmail, recipientName, companyName });
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/items/:itemId/regenerate', async (req, res) => {
+  const { chatId, campaignId, itemId } = req.params;
+  const userId = req.user?.id;
+
+  try {
+    const campaign = await prisma.emailCampaign.findUnique({ where: { id: campaignId } });
+    if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+
+    const result = await generateEmailCampaign({ chatId, userId, planId: campaign.campaignPlanId, emailType: 'regenerate' });
+    if (!result.success) return res.status(500).json({ success: false, error: result.error });
+    return res.json({ success: true, data: result.data });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.put('/:chatId/email-campaign/:campaignId/items/:itemId', async (req, res) => {
+  const { campaignId, itemId } = req.params;
+  const updates = req.body || {};
+
+  try {
+    const item = await prisma.emailSequenceItem.update({
+      where: { id: itemId },
+      data: {
+        subjectLine: updates.subjectLine,
+        previewText: updates.previewText,
+        emailBodyText: updates.emailBodyText,
+        emailBodyHtml: updates.emailBodyHtml,
+        primaryCta: updates.primaryCta,
+        status: updates.status || 'draft',
+        updatedAt: new Date()
+      }
+    });
+    return res.json({ success: true, data: item });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+export const brevoWebhookRouter = express.Router();
+
+brevoWebhookRouter.post('/brevo', async (req, res) => {
+  try {
+    const event = req.body;
+    if (!event?.event) return res.status(400).json({ success: false, error: 'Invalid webhook payload' });
+
+    const logEntry = await prisma.emailCampaignLog.create({
+      data: {
+        id: undefined,
+        action: `webhook_${event.event}`,
+        status: event.event === 'delivered' ? 'delivered' : event.event === 'open' ? 'opened' : event.event === 'click' ? 'clicked' : event.event === 'hard_bounce' ? 'bounced' : event.event === 'unsubscribe' ? 'unsubscribed' : event.event === 'complaint' ? 'complained' : 'unknown',
+        message: event.message || event.event,
+        metadata: event
+      }
+    }).catch(() => null);
+
+    await prisma.emailDeliveryLog.updateMany({
+      where: { providerMessageId: event.messageId || event.smtpId || '' },
+      data: {
+        status: event.event === 'delivered' ? 'delivered' : event.event === 'open' ? 'opened' : event.event === 'click' ? 'clicked' : event.event === 'hard_bounce' ? 'bounced' : event.event === 'soft_bounce' ? 'bounced' : event.event === 'unsubscribe' ? 'unsubscribed' : event.event === 'complaint' ? 'spam' : 'unknown',
+        ...(event.event === 'delivered' ? { deliveredAt: new Date() } : {}),
+        ...(event.event === 'open' ? { openedAt: new Date() } : {}),
+        ...(event.event === 'click' ? { clickedAt: new Date() } : {})
+      }
+    }).catch(() => {});
+
+    return res.status(200).json({ received: true });
+  } catch (error) {
+    console.error('[BrevoWebhook] Error:', error);
+    return res.status(200).json({ received: true });
+  }
+});

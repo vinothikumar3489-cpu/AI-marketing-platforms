@@ -1,1263 +1,495 @@
 import { prisma } from "../../config/prisma.js";
 import { callAI } from "../../ai/services/aiRouter.service.js";
-import { validateContentClaims } from "../execution/claim-validator.service.js";
 import { sendEmail, getEmailProviderHealth } from "../integrations/email/email-provider-registry.js";
 import { renderEmailHtml, renderPlainText } from "../email/email-template-renderer.service.js";
 
-const EMAIL_SEQUENCE_TEMPLATES = [
-  { purpose: "Introduction & Value Proposition", daysDelay: 0 },
-  { purpose: "Social Proof & Credibility", daysDelay: 2 },
-  { purpose: "Detailed Solution / Product Deep Dive", daysDelay: 4 },
-  { purpose: "Case Study or Use Case", daysDelay: 7 },
-  { purpose: "Objection Handling", daysDelay: 10 },
-  { purpose: "Final CTA / Urgency", daysDelay: 14 },
-];
+function buildRichContext(plan, evidence, productIntelligence, seoData, campaignData, audienceData, competitorData) {
+  const website = evidence?.website || {};
+  const product = evidence?.product || productIntelligence?.productAnalysis || {};
+  const company = evidence?.company || {};
+  const audience = audienceData || plan?.audienceSelection || {};
+  const seo = seoData?.keywordOpportunities || seoData?.keywordIntelligence || {};
 
-function buildContextFromPlan(plan, evidence) {
-  const audience = plan.audienceSelection || {};
-  const channelRecs = plan.channelRecommendations || [];
-  const funnelData = plan.marketingFunnel || {};
-  const goals = plan.businessGoal || {};
-  const kpiData = plan.kpiFramework || [];
-  const kpiList = Array.isArray(kpiData) ? kpiData : [];
-
-  const websiteData = evidence?.website || {};
-  const competitorData = evidence?.competitors || {};
-  const audienceData = evidence?.audience || {};
-  const seoData = evidence?.seo || {};
+  const features = [
+    ...(Array.isArray(product.features) ? product.features : []),
+    ...(Array.isArray(product.usps) ? product.usps : []),
+    ...(Array.isArray(product.benefits) ? product.benefits : []),
+    ...(Array.isArray(website.featuresText) ? website.featuresText : []),
+    ...(Array.isArray(website.usps) ? website.usps : [])
+  ].filter(Boolean);
 
   const painPoints = [
-    ...(audienceData?.painPoints?.value || audience.painPoints || []),
-  ].slice(0, 5);
+    ...(Array.isArray(audience.painPoints) ? audience.painPoints : []),
+    ...(Array.isArray(product.painPoints) ? product.painPoints : []),
+    ...(Array.isArray(evidence?.audience?.painPoints?.value) ? evidence.audience.painPoints.value : [])
+  ].filter(Boolean);
 
-  const ctaTexts = websiteData?.ctaTexts?.value || [];
+  const competitors = [
+    ...(Array.isArray(competitorData?.list?.value) ? competitorData.list.value : []),
+    ...(Array.isArray(competitorData?.competitors) ? competitorData.competitors : []),
+    ...(Array.isArray(plan?.competitors) ? plan.competitors : [])
+  ].filter(Boolean);
 
-  return {
-    productName: evidence?.product?.name || plan?.inputJson?.productName || "",
-    companyName: evidence?.company?.name || plan?.inputJson?.companyName || "",
-    industry: evidence?.industry?.name || plan?.inputJson?.industry || "",
-    targetAudience: audienceData?.description?.value || audience.primary || plan?.inputJson?.targetAudience || "",
-    painPoints,
-    ctaTexts,
-    competitorNames: (competitorData?.list?.value || []).slice(0, 3).map(c => c.name || c.url).filter(Boolean),
-    heroText: websiteData?.heroText?.value || "",
-    usps: websiteData?.usps?.value || [],
-    seoKeywords: seoData?.keywords?.value || [],
-    campaignObjective: plan.campaignObjective?.primary || plan.campaignObjective?.goal || goals.goal || "",
-    kpis: kpiList.map(k => k.kpi || k.name || "").filter(Boolean),
-    funnelStages: Object.keys(funnelData).filter(k => funnelData[k]),
-    channelFitEmail: channelRecs.find(c => (c.channel || "").toLowerCase().includes("email")),
-    evidenceSources: evidence?.sourceSummary?.sourcesCollected || [],
-  };
-}
-
-function determineChannelFit(plan) {
-  const channelRecs = plan.channelRecommendations || [];
-  const emailChannel = channelRecs.find(c =>
-    (c.channel || "").toLowerCase().includes("email")
-  );
-  if (!emailChannel) {
-    return {
-      isRecommended: false,
-      reason: "Not available",
-      evidence: "No email channel found in campaign plan channel recommendations",
-      inferenceStatus: "NOT_MEASURED",
-    };
-  }
-  return {
-    isRecommended: true,
-    fit: emailChannel.fit || "medium",
-    priority: emailChannel.priority || "medium",
-    reason: emailChannel.reason || "Email channel recommended by campaign intelligence",
-    evidence: emailChannel.evidence || "Campaign channel recommendation",
-    inferenceStatus: "EVIDENCE_BACKED",
-  };
-}
-
-function buildAIPrompt(context) {
-  return `You are a Senior Email Marketing Strategist. Generate a complete email sequence using ONLY the verified evidence below.
-
-CONTEXT:
-Product: ${context.productName || "Not available"}
-Company: ${context.companyName || "Not available"}
-Industry: ${context.industry || "Not available"}
-Target Audience: ${context.targetAudience || "Not available"}
-Campaign Objective: ${context.campaignObjective || "Not available"}
-Pain Points: ${context.painPoints.join("; ") || "Not available"}
-Website CTAs: ${context.ctaTexts.join("; ") || "Not available"}
-Competitors: ${context.competitorNames.join(", ") || "Not available"}
-USPs: ${context.usps.join("; ") || "Not available"}
-Evidence Sources: ${context.evidenceSources.join(", ") || "Not available"}
-
-Generate 6 emails following these purposes:
-1. Introduction & Value Proposition (Day 0)
-2. Social Proof & Credibility (Day 2)
-3. Detailed Solution / Product Deep Dive (Day 4)
-4. Case Study or Use Case (Day 7)
-5. Objection Handling (Day 10)
-6. Final CTA / Urgency (Day 14)
-
-Return ONLY valid JSON with this exact structure (no markdown, no extra text):
-{
-  "emails": [
-    {
-      "sequenceOrder": 1,
-      "emailName": "Brief descriptive name",
-      "purpose": "Introduction & Value Proposition",
-      "funnelStage": "awareness",
-      "subjectLine": "Subject line max 60 chars, specific to product",
-      "alternativeSubjectLines": ["alt1", "alt2"],
-      "previewText": "Preview text max 100 chars",
-      "greetingStrategy": "Personalized with {{firstName}}",
-      "emailBodyText": "Full plain-text email body. Use evidence-backed pain points and product value.",
-      "primaryCta": "Single clear call to action",
-      "secondaryCta": null,
-      "personalizationFields": ["{{firstName}}", "{{companyName}}"],
-      "evidenceUsed": [
-        {
-          "claim": "Specific claim made in this email",
-          "source": "Evidence source from provided context",
-          "inferenceStatus": "EVIDENCE_BACKED"
-        }
-      ],
-      "inferenceStatus": "EVIDENCE_BACKED",
-      "complianceNotes": "All claims are evidence-backed from provided data"
-    }
-  ]
-}
-
-CRITICAL RULES:
-1. Use ONLY the evidence provided in CONTEXT above. Do NOT invent statistics.
-2. Do NOT generate: ROI percentages, conversion rates, open rates, click-through rates, revenue figures, customer counts, or any numerical metrics.
-3. Do NOT use phrases like: "studies show", "research indicates", "according to our research", "industry experts say", "join X+ customers".
-4. Do NOT fabricate testimonials, case studies, or quotes from real people.
-5. If evidence is missing for a claim, set inferenceStatus to "AI_INFERRED" or "NOT_MEASURED".
-6. Use {{firstName}} and {{companyName}} for personalization only.
-7. Subject lines must be specific to the product, not generic.
-8. Each email body must reference at least one pain point or value from the evidence.
-9. Array must have exactly 6 emails.
-10. Return ONLY valid JSON. No markdown formatting.`;
-}
-
-function validateEmailContent(emails) {
-  const results = { valid: true, issues: [] };
-  for (const email of emails) {
-    const checks = [];
-    if (!email.subjectLine || email.subjectLine.length > 60) {
-      checks.push({ field: "subjectLine", issue: "Missing or exceeds 60 chars" });
-    }
-    if (!email.emailBodyText) {
-      checks.push({ field: "emailBodyText", issue: "Missing email body" });
-    }
-    if (!email.primaryCta) {
-      checks.push({ field: "primaryCta", issue: "Missing primary CTA" });
-    }
-    if (email.personalizationFields && email.personalizationFields.length > 5) {
-      checks.push({ field: "personalizationFields", issue: "Too many personalization fields" });
-    }
-    if (email.evidenceUsed) {
-      for (const ev of email.evidenceUsed) {
-        if (!ev.source && ev.inferenceStatus === "EVIDENCE_BACKED") {
-          checks.push({ field: "evidenceUsed", issue: `Claim "${ev.claim?.substring(0, 40)}" missing source for EVIDENCE_BACKED status` });
-        }
-      }
-    }
-    const claimResult = validateContentClaims(email, `email_${email.sequenceOrder}`);
-    if (claimResult.sanitized) {
-      Object.assign(email, claimResult.sanitized);
-    }
-    if (!claimResult.valid) {
-      for (const finding of claimResult.findings) {
-        if (finding.action === "removed") {
-          checks.push({ field: `email[${email.sequenceOrder}].${finding.path}`, issue: `Hallucinated pattern detected: ${finding.text?.substring(0, 60)}` });
-        }
-      }
-    }
-    if (checks.length > 0) {
-      results.valid = false;
-      results.issues.push({ sequenceOrder: email.sequenceOrder, checks });
-    }
-  }
-  return results;
-}
-
-function buildDefaultEmail(seqOrder, purpose, daysDelay, context) {
-  const funnelStage = seqOrder <= 2 ? "awareness" : seqOrder <= 4 ? "consideration" : seqOrder <= 5 ? "conversion" : "retention";
-  return {
-    sequenceOrder: seqOrder,
-    emailName: `${purpose} - ${context.companyName || context.productName || "Campaign"}`,
-    purpose,
-    funnelStage,
-    subjectLine: null,
-    alternativeSubjectLines: [],
-    previewText: null,
-    greetingStrategy: "Personalized with {{firstName}}",
-    emailBodyText: null,
-    primaryCta: null,
-    secondaryCta: null,
-    personalizationFields: ["{{firstName}}", "{{companyName}}"],
-    evidenceUsed: [],
-    inferenceStatus: "NOT_MEASURED",
-    complianceNotes: "AI generation pending. No claims verified.",
-  };
-}
-
-export async function loadEvidence(campaignPlan) {
-  const chatId = campaignPlan.chatId;
-  const evidence = {};
-
-  try {
-    const evidenceSnapshot = await prisma.evidenceSnapshot.findFirst({
-      where: { chatId },
-      orderBy: { createdAt: "desc" },
-    });
-    if (evidenceSnapshot?.data) {
-      const raw = typeof evidenceSnapshot.data === "string" ? JSON.parse(evidenceSnapshot.data) : evidenceSnapshot.data;
-      Object.assign(evidence, raw);
-    }
-  } catch (e) {
-    console.warn("[EmailCampaign] Evidence load warning:", e.message);
-  }
-
-  try {
-    const assets = await prisma.automationAsset.findMany({
-      where: { chatId },
-      orderBy: { createdAt: "desc" },
-    });
-    for (const asset of assets) {
-      const key = asset.type || "asset";
-      if (!evidence[key]) {
-        evidence[key] = {};
-      }
-      try {
-        const data = typeof asset.data === "string" ? JSON.parse(asset.data) : asset.data;
-        evidence[key][asset.id] = data;
-      } catch {
-        evidence[key][asset.id] = asset.data;
-      }
-    }
-  } catch (e) {
-    console.warn("[EmailCampaign] Asset load warning:", e.message);
-  }
-
-  return evidence;
-}
-
-export async function generateEmailCampaign(chatId, userId, campaignPlanId) {
-  const plan = await prisma.campaignPlan.findUnique({
-    where: { id: campaignPlanId },
-  });
-  if (!plan) {
-    throw new Error(`CampaignPlan not found: ${campaignPlanId}`);
-  }
-
-  const evidence = await loadEvidence(plan);
-  const context = buildContextFromPlan(plan, evidence);
-
-  const channelFit = determineChannelFit(plan);
-
-  const campaignName = `Email Campaign - ${context.productName || plan.executiveSummary?.campaignName || plan.campaignObjective?.primary || "Untitled"}`;
-
-  const existingCampaign = await prisma.emailCampaign.findFirst({
-    where: { campaignPlanId, status: { in: ["DRAFT", "GENERATED", "PARTIALLY_GENERATED"] } },
-    orderBy: { createdAt: "desc" },
-  });
-
-  let dbCampaign;
-  if (existingCampaign) {
-    dbCampaign = await prisma.emailCampaign.update({
-      where: { id: existingCampaign.id },
-      data: {
-        name: campaignName,
-        objective: context.campaignObjective || plan.campaignObjective?.primary || null,
-        audienceSummary: context.targetAudience || null,
-        funnelStage: context.funnelStages?.[0] || null,
-        sequenceType: "lead_outreach",
-        senderName: context.companyName || null,
-        generationStatus: "running",
-        evidenceSummary: {
-          sourcesUsed: context.evidenceSources,
-          evidenceCount: context.evidenceSources.length,
-          missingEvidence: [],
-        },
-      },
-    });
-  } else {
-    dbCampaign = await prisma.emailCampaign.create({
-      data: {
-        chatId,
-        userId,
-        campaignPlanId,
-        name: campaignName,
-        objective: context.campaignObjective || plan.campaignObjective?.primary || null,
-        audienceSummary: context.targetAudience || null,
-        funnelStage: context.funnelStages?.[0] || null,
-        sequenceType: "lead_outreach",
-        senderName: context.companyName || null,
-        status: "DRAFT",
-        approvalStatus: "NOT_SUBMITTED",
-        generationStatus: "running",
-        evidenceSummary: {
-          sourcesUsed: context.evidenceSources,
-          evidenceCount: context.evidenceSources.length,
-          missingEvidence: [],
-        },
-      },
-    });
-  }
-
-  const aiResult = await callAI(buildAIPrompt(context));
-
-  let items = [];
-  let generationStatus = "completed";
-  let missingEvidence = [];
-
-  if (aiResult.success && aiResult.data?.emails) {
-    items = aiResult.data.emails;
-    const validation = validateEmailContent(items);
-    if (!validation.valid) {
-      generationStatus = "partial";
-      missingEvidence = validation.issues.map(i => ({
-        sequenceOrder: i.sequenceOrder,
-        reason: i.checks.map(c => c.issue).join("; "),
-      }));
-    }
-  } else {
-    generationStatus = "failed";
-    items = EMAIL_SEQUENCE_TEMPLATES.map((tpl, idx) =>
-      buildDefaultEmail(idx + 1, tpl.purpose, tpl.daysDelay, context)
-    );
-  }
-
-  for (const emailData of items) {
-    let itemRecord = await prisma.emailSequenceItem.findFirst({
-      where: { emailCampaignId: dbCampaign.id, sequenceOrder: emailData.sequenceOrder },
-    });
-
-    const cleanedEvidence = (emailData.evidenceUsed || []).map(ev => ({
-      claim: ev.claim || "",
-      source: ev.source || "Not available",
-      inferenceStatus: ev.inferenceStatus || "NOT_MEASURED",
-    }));
-
-    if (itemRecord) {
-      await prisma.emailSequenceItem.update({
-        where: { id: itemRecord.id },
-        data: {
-          emailName: emailData.emailName || `${emailData.purpose} - ${context.companyName || "Campaign"}`,
-          purpose: emailData.purpose || null,
-          funnelStage: emailData.funnelStage || null,
-          subjectLine: emailData.subjectLine || null,
-          alternativeSubjectLines: emailData.alternativeSubjectLines || [],
-          previewText: emailData.previewText || null,
-          greetingStrategy: emailData.greetingStrategy || null,
-          emailBodyText: emailData.emailBodyText || null,
-          emailBodyHtml: emailData.emailBodyHtml || null,
-          primaryCta: emailData.primaryCta || null,
-          secondaryCta: emailData.secondaryCta || null,
-          personalizationFields: emailData.personalizationFields || ["{{firstName}}", "{{companyName}}"],
-          evidenceUsed: cleanedEvidence,
-          inferenceStatus: emailData.inferenceStatus || "NOT_MEASURED",
-          complianceNotes: emailData.complianceNotes || null,
-          status: "draft",
-        },
-      });
-    } else {
-      await prisma.emailSequenceItem.create({
-        data: {
-          emailCampaignId: dbCampaign.id,
-          sequenceOrder: emailData.sequenceOrder,
-          emailName: emailData.emailName || `${emailData.purpose} - ${context.companyName || "Campaign"}`,
-          purpose: emailData.purpose || null,
-          funnelStage: emailData.funnelStage || null,
-          delayAfterPreviousDays: EMAIL_SEQUENCE_TEMPLATES[emailData.sequenceOrder - 1]?.daysDelay || 0,
-          subjectLine: emailData.subjectLine || null,
-          alternativeSubjectLines: emailData.alternativeSubjectLines || [],
-          previewText: emailData.previewText || null,
-          greetingStrategy: emailData.greetingStrategy || null,
-          emailBodyText: emailData.emailBodyText || null,
-          emailBodyHtml: emailData.emailBodyHtml || null,
-          primaryCta: emailData.primaryCta || null,
-          secondaryCta: emailData.secondaryCta || null,
-          personalizationFields: emailData.personalizationFields || ["{{firstName}}", "{{companyName}}"],
-          evidenceUsed: cleanedEvidence,
-          inferenceStatus: emailData.inferenceStatus || "NOT_MEASURED",
-          complianceNotes: emailData.complianceNotes || null,
-          status: "draft",
-        },
-      });
-    }
-
-    if (emailData.subjectLine && !emailData.emailBodyText) {
-      generationStatus = "partial";
-    }
-  }
-
-  const totalEmails = await prisma.emailSequenceItem.count({
-    where: { emailCampaignId: dbCampaign.id },
-  });
-
-  const newStatus = generationStatus === "failed" ? "FAILED" :
-                    generationStatus === "partial" ? "PARTIALLY_GENERATED" : "GENERATED";
-
-  dbCampaign = await prisma.emailCampaign.update({
-    where: { id: dbCampaign.id },
-    data: {
-      status: newStatus,
-      generationStatus,
-      totalEmails,
-      missingEvidence: missingEvidence.length > 0 ? missingEvidence : null,
-      evidenceSummary: {
-        sourcesUsed: context.evidenceSources,
-        evidenceCount: context.evidenceSources.length,
-        missingEvidence: missingEvidence.length,
-      },
-    },
-  });
-
-  await createVersionSnapshot(dbCampaign.id, "Initial email campaign generation", userId);
-
-  await prisma.emailCampaignLog.create({
-    data: {
-      emailCampaignId: dbCampaign.id,
-      action: "campaign_generated",
-      status: generationStatus,
-      message: `Email campaign generated with ${totalEmails} emails. Status: ${generationStatus}`,
-      metadata: {
-        totalEmails,
-        generationStatus,
-        provider: aiResult.provider || null,
-        fallbackUsed: !aiResult.success,
-      },
-    },
-  });
-
-  const sequence = await prisma.emailSequenceItem.findMany({
-    where: { emailCampaignId: dbCampaign.id },
-    orderBy: { sequenceOrder: "asc" },
-  });
+  const seoKeywords = [
+    ...(Array.isArray(seo.primaryKeywords) ? seo.primaryKeywords.map(k => k.keyword || k) : []),
+    ...(Array.isArray(seo.secondaryKeywords) ? seo.secondaryKeywords.map(k => k.keyword || k) : []),
+    ...(Array.isArray(evidence?.seo?.keywords?.value) ? evidence.seo.keywords.value : [])
+  ].filter(Boolean).slice(0, 10);
 
   return {
-    campaign: dbCampaign,
-    items: sequence,
-    channelFit,
-    aiProvider: aiResult.provider || null,
-    validationIssues: missingEvidence,
+    productName: product.name || product.productName || company.name || plan?.inputJson?.productName || '',
+    companyName: company.name || company.companyName || plan?.inputJson?.companyName || '',
+    industry: product.industry || evidence?.industry?.name || plan?.inputJson?.industry || '',
+    targetAudience: audience.primary || audience.description || plan?.inputJson?.targetAudience || '',
+    audiencePainPoints: painPoints.slice(0, 5),
+    audienceRole: audience.role || audience.title || '',
+    audienceIndustry: audience.industry || '',
+    companySize: audience.companySize || audience.size || '',
+    productFeatures: features.slice(0, 8),
+    productCategory: product.category || product.productCategory || '',
+    productType: product.type || product.productType || 'SaaS',
+    valueProposition: product.valueProposition || product.usp || website.heroText || '',
+    competitorNames: competitors.slice(0, 5).map(c => c.name || c.url || c).filter(Boolean),
+    seoKeywords,
+    tone: plan?.tone || company.tone || 'professional',
+    brandVoice: company.brandVoice || product.brandVoice || '',
+    pricingModel: product.pricing || product.pricingModel || '',
+    targetMarket: product.targetMarket || product.marketSegment || '',
+    businessModel: product.businessModel || '',
+    revenueModel: product.revenueModel || '',
+    ctaTexts: (website.ctaTexts?.value || website.ctaTexts || []).slice(0, 3),
+    socialProof: (product.testimonials || product.caseStudies || []).slice(0, 3),
+    evidenceSources: evidence?.sourceSummary?.sourcesCollected || []
   };
 }
 
-export async function createVersionSnapshot(campaignId, reason, userId) {
-  const campaign = await prisma.emailCampaign.findUnique({
-    where: { id: campaignId },
-    include: { sequenceItems: { orderBy: { sequenceOrder: "asc" } } },
-  });
-  if (!campaign) throw new Error(`EmailCampaign not found: ${campaignId}`);
+function buildAIPrompt(context, emailType = 'campaign') {
+  const features = context.productFeatures.join(', ') || 'Not specified';
+  const painPoints = context.audiencePainPoints.join(', ') || 'Not specified';
+  const competitors = context.competitorNames.join(', ') || 'Not specified';
+  const keywords = context.seoKeywords.join(', ') || 'Not specified';
 
-  const lastVersion = await prisma.emailCampaignVersion.findFirst({
-    where: { emailCampaignId: campaignId },
-    orderBy: { versionNumber: "desc" },
-  });
+  return `You are a Senior Email Marketing Strategist. Generate a unique, high-converting ${emailType} email using ONLY the verified context below.
 
-  const versionNumber = (lastVersion?.versionNumber || 0) + 1;
+COMPANY & PRODUCT (REAL - DO NOT CHANGE):
+- Product: ${context.productName || 'N/A'}
+- Company: ${context.companyName || 'N/A'}
+- Industry: ${context.industry || 'N/A'}
+- Category: ${context.productCategory || 'N/A'}
+- Business Model: ${context.businessModel || 'N/A'}
+- Pricing: ${context.pricingModel || 'N/A'}
+- Value Proposition: ${context.valueProposition || 'N/A'}
 
-  const snapshot = {
-    campaign: {
-      name: campaign.name,
-      objective: campaign.objective,
-      audienceSummary: campaign.audienceSummary,
-      funnelStage: campaign.funnelStage,
-      sequenceType: campaign.sequenceType,
-      senderName: campaign.senderName,
-      senderEmail: campaign.senderEmail,
-      replyToEmail: campaign.replyToEmail,
-      totalEmails: campaign.totalEmails,
-      status: campaign.status,
-      approvalStatus: campaign.approvalStatus,
-      evidenceSummary: campaign.evidenceSummary,
-      missingEvidence: campaign.missingEvidence,
-    },
-    items: campaign.sequenceItems.map(item => ({
-      id: item.id,
-      sequenceOrder: item.sequenceOrder,
-      emailName: item.emailName,
-      purpose: item.purpose,
-      funnelStage: item.funnelStage,
-      delayAfterPreviousDays: item.delayAfterPreviousDays,
-      subjectLine: item.subjectLine,
-      alternativeSubjectLines: item.alternativeSubjectLines,
-      previewText: item.previewText,
-      greetingStrategy: item.greetingStrategy,
-      emailBodyText: item.emailBodyText,
-      primaryCta: item.primaryCta,
-      secondaryCta: item.secondaryCta,
-      personalizationFields: item.personalizationFields,
-      evidenceUsed: item.evidenceUsed,
-      inferenceStatus: item.inferenceStatus,
-      complianceNotes: item.complianceNotes,
-      status: item.status,
-    })),
-  };
+TARGET AUDIENCE:
+- Audience: ${context.targetAudience || 'N/A'}
+- Role: ${context.audienceRole || 'N/A'}
+- Industry: ${context.audienceIndustry || 'N/A'}
+- Company Size: ${context.companySize || 'N/A'}
+- Pain Points: ${painPoints}
 
-  const version = await prisma.emailCampaignVersion.create({
-    data: {
-      emailCampaignId: campaignId,
-      versionNumber,
-      snapshot,
-      changeReason: reason || null,
-      createdBy: userId || null,
-    },
-  });
+PRODUCT FEATURES & BENEFITS:
+- Features: ${features}
+- Tone: ${context.tone || 'professional'}
+- Brand Voice: ${context.brandVoice || 'N/A'}
 
-  await prisma.emailCampaignLog.create({
-    data: {
-      emailCampaignId: campaignId,
-      action: "version_created",
-      status: "completed",
-      message: `Version ${versionNumber} created: ${reason || "No reason provided"}`,
-      metadata: { versionNumber, reason },
-    },
-  });
+COMPETITIVE LANDSCAPE:
+- Competitors: ${competitors}
 
-  return version;
-}
+SEO KEYWORDS: ${keywords}
 
-export async function updateEmailItem(campaignId, itemId, updates, userId) {
-  const existingItem = await prisma.emailSequenceItem.findUnique({
-    where: { id: itemId },
-  });
-  if (!existingItem) throw new Error(`EmailSequenceItem not found: ${itemId}`);
-
-  const campaign = await prisma.emailCampaign.findUnique({
-    where: { id: campaignId },
-  });
-  if (!campaign) throw new Error(`EmailCampaign not found: ${campaignId}`);
-
-  const changedFields = [];
-  for (const [key, value] of Object.entries(updates)) {
-    if (JSON.stringify(existingItem[key]) !== JSON.stringify(value)) {
-      changedFields.push(key);
-    }
-  }
-
-  const item = await prisma.emailSequenceItem.update({
-    where: { id: itemId },
-    data: updates,
-  });
-
-  if (campaign.approvalStatus === "APPROVED") {
-    await prisma.emailCampaign.update({
-      where: { id: campaignId },
-      data: {
-        approvalStatus: "NOT_SUBMITTED",
-        status: "DRAFT",
-        approvedAt: null,
-      },
-    });
-    await prisma.emailCampaignLog.create({
-      data: {
-        emailCampaignId: campaignId,
-        emailSequenceItemId: itemId,
-        action: "approval_invalidated",
-        status: "completed",
-        message: "Edit after approval — approval status reset to NOT_SUBMITTED",
-        metadata: { changedFields, userId, previousApprovalStatus: "APPROVED" },
-      },
-    });
-  }
-
-  await prisma.emailCampaignLog.create({
-    data: {
-      emailCampaignId: campaignId,
-      emailSequenceItemId: itemId,
-      action: "item_edited",
-      message: `Updated fields: ${changedFields.join(", ")}`,
-      metadata: { changedFields, userId },
-    },
-  });
-
-  return item;
-}
-
-export async function regenerateEmailItem(campaignId, itemId, customPrompt) {
-  const item = await prisma.emailSequenceItem.findUnique({
-    where: { id: itemId },
-  });
-  if (!item) throw new Error(`EmailSequenceItem not found: ${itemId}`);
-
-  const campaign = await prisma.emailCampaign.findUnique({
-    where: { id: campaignId },
-  });
-  if (!campaign) throw new Error(`EmailCampaign not found: ${campaignId}`);
-
-  const plan = await prisma.campaignPlan.findUnique({
-    where: { id: campaign.campaignPlanId },
-  });
-
-  const evidence = plan ? await loadEvidence(plan) : {};
-  const context = buildContextFromPlan(plan || {}, evidence);
-
-  const prompt = customPrompt || `Regenerate ONLY email ${item.sequenceOrder} ("${item.purpose}") for this sequence. Use this context:
-Product: ${context.productName}
-Company: ${context.companyName}
-Target: ${context.targetAudience}
-Pain Points: ${context.painPoints.join("; ") || "Not available"}
-
-Current subject: ${item.subjectLine || "None"}
-Current body: ${(item.emailBodyText || "None").substring(0, 200)}
+Generate a complete email with these EXACT sections:
+- Subject Line (max 60 chars, specific to product, no clickbait)
+- Preview Text (max 100 chars)
+- Opening Hook (personalized, pain-point driven)
+- Problem Statement (reference audience pain points)
+- Solution Introduction (position product as solution)
+- Features & Benefits (use actual features from context)
+- Social Proof (reference adoption, trust signals - NO fake statistics)
+- Call to Action (specific, action-oriented)
+- Closing (warm, professional)
+- Signature (include company name)
+- P.S. (optional reinforcement of key benefit)
 
 Return ONLY valid JSON:
 {
-  "sequenceOrder": ${item.sequenceOrder},
-  "subjectLine": "New subject line max 60 chars",
-  "alternativeSubjectLines": ["alt1", "alt2"],
-  "previewText": "New preview text max 100 chars",
-  "emailBodyText": "New plain-text email body",
-  "primaryCta": "New single CTA",
-  "secondaryCta": null,
-  "evidenceUsed": [{"claim": "Claim", "source": "Provided evidence", "inferenceStatus": "EVIDENCE_BACKED"}],
-  "inferenceStatus": "EVIDENCE_BACKED",
-  "complianceNotes": "All claims from provided data"
+  "subjectLine": "...",
+  "previewText": "...",
+  "opening": "...",
+  "problem": "...",
+  "solution": "...",
+  "features": "...",
+  "benefits": "...",
+  "socialProof": "...",
+  "cta": "...",
+  "closing": "...",
+  "signature": "...",
+  "ps": "...",
+  "plainTextBody": "Full plain text version",
+  "htmlBody": "<html><body><p>Full HTML version</p></body></html>"
 }
 
-CRITICAL: No fake stats, no testimonials, no "studies show".`;
-
-  const aiResult = await callAI(prompt);
-
-  let data;
-  if (aiResult.success && aiResult.data) {
-    data = aiResult.data;
-  } else {
-    data = {
-      subjectLine: null,
-      alternativeSubjectLines: [],
-      previewText: null,
-      emailBodyText: null,
-      primaryCta: null,
-      secondaryCta: null,
-      evidenceUsed: [],
-      inferenceStatus: "AI_INFERRED",
-      complianceNotes: "Regeneration failed. Placeholder content.",
-    };
-  }
-
-  const updatedItem = await prisma.emailSequenceItem.update({
-    where: { id: itemId },
-    data: {
-      subjectLine: data.subjectLine || null,
-      alternativeSubjectLines: data.alternativeSubjectLines || [],
-      previewText: data.previewText || null,
-      emailBodyText: data.emailBodyText || null,
-      emailBodyHtml: data.emailBodyHtml || null,
-      primaryCta: data.primaryCta || null,
-      secondaryCta: data.secondaryCta || null,
-      evidenceUsed: (data.evidenceUsed || []).map(ev => ({
-        claim: ev.claim || "",
-        source: ev.source || "Not available",
-        inferenceStatus: ev.inferenceStatus || "NOT_MEASURED",
-      })),
-      inferenceStatus: data.inferenceStatus || "AI_INFERRED",
-      complianceNotes: data.complianceNotes || null,
-    },
-  });
-
-  await prisma.emailCampaignLog.create({
-    data: {
-      emailCampaignId: campaignId,
-      emailSequenceItemId: itemId,
-      action: "item_regenerated",
-      status: aiResult.success ? "completed" : "partial",
-      message: `Email ${item.sequenceOrder} regenerated${aiResult.success ? "" : " with fallback"}`,
-      metadata: { provider: aiResult.provider || null, success: aiResult.success },
-    },
-  });
-
-  return updatedItem;
+CRITICAL RULES:
+1. Use ONLY the verified context above. NEVER invent statistics, ROI, conversion rates, or customer counts.
+2. NEVER use: "studies show", "research indicates", "industry experts say", "join X+ customers", "trusted by X companies"
+3. NEVER fabricate testimonials or case studies.
+4. The product name MUST be "${context.productName || 'the product'}" - never generic like "your product" or "our solution".
+5. Every feature mentioned MUST come from the Features list above.
+6. Every pain point MUST come from the Pain Points list above.
+7. Subject line MUST be unique and specific to ${context.productName || 'the product'}.
+8. Return ONLY valid JSON. No markdown, no extra text.`;
 }
 
-export async function submitForReview(campaignId, userId) {
-  const campaign = await prisma.emailCampaign.update({
-    where: { id: campaignId },
-    data: {
-      approvalStatus: "PENDING_REVIEW",
-      submittedAt: new Date(),
-    },
-  });
+function validateEmailOutput(email, context) {
+  const issues = [];
+  const productName = context.productName || '';
+  const companyName = context.companyName || '';
 
-  await createVersionSnapshot(campaignId, "Submitted for review", userId);
+  if (!email) { issues.push('Email object is null/undefined'); return { valid: false, issues }; }
 
-  await prisma.emailCampaignLog.create({
-    data: {
-      emailCampaignId: campaignId,
-      action: "submitted_review",
-      status: "pending",
-      message: "Campaign submitted for approval review",
-      metadata: { userId },
-    },
-  });
+  const checks = [
+    { field: 'subjectLine', check: (v) => v && v.length > 0 && v.length <= 60, msg: 'Missing or too long (max 60)' },
+    { field: 'previewText', check: (v) => v && v.length > 0 && v.length <= 100, msg: 'Missing or too long (max 100)' },
+    { field: 'opening', check: (v) => v && v.length >= 20, msg: 'Missing or too short (min 20 chars)' },
+    { field: 'problem', check: (v) => v && v.length >= 20, msg: 'Missing or too short' },
+    { field: 'solution', check: (v) => v && v.length >= 20, msg: 'Missing or too short' },
+    { field: 'cta', check: (v) => v && v.length > 0, msg: 'Missing CTA' },
+    { field: 'plainTextBody', check: (v) => v && v.length >= 100, msg: 'Missing or too short (min 100 chars)' },
+    { field: 'htmlBody', check: (v) => v && v.length >= 100, msg: 'Missing or too short (min 100 chars)' }
+  ];
 
-  return campaign;
-}
-
-export async function approveCampaign(campaignId, userId) {
-  const campaign = await prisma.emailCampaign.update({
-    where: { id: campaignId },
-    data: {
-      approvalStatus: "APPROVED",
-      status: "APPROVED",
-      approvedAt: new Date(),
-    },
-  });
-
-  await createVersionSnapshot(campaignId, "Approved - ready for sending", userId);
-
-  await prisma.emailCampaignLog.create({
-    data: {
-      emailCampaignId: campaignId,
-      action: "approved",
-      status: "completed",
-      message: "Campaign approved",
-      metadata: { userId },
-    },
-  });
-
-  return campaign;
-}
-
-export async function requestChanges(campaignId, userId, feedback) {
-  const campaign = await prisma.emailCampaign.update({
-    where: { id: campaignId },
-    data: {
-      approvalStatus: "CHANGES_REQUESTED",
-      status: "PARTIALLY_GENERATED",
-    },
-  });
-
-  await prisma.emailCampaignLog.create({
-    data: {
-      emailCampaignId: campaignId,
-      action: "changes_requested",
-      status: "pending",
-      message: feedback || "Changes requested by reviewer",
-      metadata: { userId, feedback },
-    },
-  });
-
-  return campaign;
-}
-
-export async function restoreVersion(campaignId, versionId, userId) {
-  const version = await prisma.emailCampaignVersion.findUnique({
-    where: { id: versionId },
-  });
-  if (!version) throw new Error(`Version not found: ${versionId}`);
-
-  const snapshot = version.snapshot?.campaign || {};
-  const items = version.snapshot?.items || [];
-
-  await prisma.emailCampaign.update({
-    where: { id: campaignId },
-    data: {
-      name: snapshot.name,
-      objective: snapshot.objective,
-      audienceSummary: snapshot.audienceSummary,
-      funnelStage: snapshot.funnelStage,
-      sequenceType: snapshot.sequenceType,
-      senderName: snapshot.senderName,
-      senderEmail: snapshot.senderEmail,
-      replyToEmail: snapshot.replyToEmail,
-      totalEmails: snapshot.totalEmails,
-      status: "DRAFT",
-      approvalStatus: "NOT_SUBMITTED",
-      evidenceSummary: snapshot.evidenceSummary,
-      missingEvidence: snapshot.missingEvidence,
-      approvedAt: null,
-    },
-  });
-
-  for (const item of items) {
-    await prisma.emailSequenceItem.upsert({
-      where: { id: item.id },
-      update: {
-        sequenceOrder: item.sequenceOrder,
-        emailName: item.emailName,
-        purpose: item.purpose,
-        funnelStage: item.funnelStage,
-        delayAfterPreviousDays: item.delayAfterPreviousDays,
-        subjectLine: item.subjectLine,
-        alternativeSubjectLines: item.alternativeSubjectLines,
-        previewText: item.previewText,
-        greetingStrategy: item.greetingStrategy,
-        emailBodyText: item.emailBodyText,
-        primaryCta: item.primaryCta,
-        secondaryCta: item.secondaryCta,
-        personalizationFields: item.personalizationFields,
-        evidenceUsed: item.evidenceUsed,
-        inferenceStatus: item.inferenceStatus,
-        complianceNotes: item.complianceNotes,
-        status: "draft",
-      },
-      create: {
-        emailCampaignId: campaignId,
-        sequenceOrder: item.sequenceOrder,
-        emailName: item.emailName,
-        purpose: item.purpose,
-        funnelStage: item.funnelStage,
-        delayAfterPreviousDays: item.delayAfterPreviousDays,
-        subjectLine: item.subjectLine,
-        alternativeSubjectLines: item.alternativeSubjectLines,
-        previewText: item.previewText,
-        greetingStrategy: item.greetingStrategy,
-        emailBodyText: item.emailBodyText,
-        primaryCta: item.primaryCta,
-        secondaryCta: item.secondaryCta,
-        personalizationFields: item.personalizationFields,
-        evidenceUsed: item.evidenceUsed,
-        inferenceStatus: item.inferenceStatus,
-        complianceNotes: item.complianceNotes,
-        status: "draft",
-      },
-    });
-  }
-
-  await createVersionSnapshot(campaignId, `Restored from version ${version.versionNumber}`, userId);
-
-  await prisma.emailCampaignLog.create({
-    data: {
-      emailCampaignId: campaignId,
-      action: "version_restored",
-      status: "completed",
-      message: `Restored to version ${version.versionNumber}`,
-      metadata: { versionNumber: version.versionNumber, userId },
-    },
-  });
-
-  return { campaignId, restoredVersion: version.versionNumber };
-}
-
-export async function getCampaignWithDetails(campaignId) {
-  const campaign = await prisma.emailCampaign.findUnique({
-    where: { id: campaignId },
-    include: {
-      sequenceItems: { orderBy: { sequenceOrder: "asc" } },
-      versions: { orderBy: { versionNumber: "desc" } },
-      logs: { orderBy: { createdAt: "desc" }, take: 50 },
-    },
-  });
-  return campaign;
-}
-
-export async function listCampaigns(chatId) {
-  const campaigns = await prisma.emailCampaign.findMany({
-    where: { chatId },
-    orderBy: { updatedAt: "desc" },
-    include: {
-      _count: { select: { sequenceItems: true } },
-    },
-  });
-  return campaigns;
-}
-
-export async function handleProviderHealth() {
-  return getEmailProviderHealth();
-}
-
-export async function sendTestCampaignEmail(campaignId, recipientEmail, itemId) {
-  const campaign = await prisma.emailCampaign.findUnique({
-    where: { id: campaignId },
-  });
-  if (!campaign) throw new Error(`EmailCampaign not found: ${campaignId}`);
-
-  if (campaign.approvalStatus !== "APPROVED") {
-    return { success: false, error: "Campaign must be approved before sending.", code: "APPROVAL_REQUIRED" };
-  }
-
-  let items;
-  if (itemId) {
-    items = await prisma.emailSequenceItem.findMany({
-      where: { id: itemId, emailCampaignId: campaignId },
-    });
-  } else {
-    items = await prisma.emailSequenceItem.findMany({
-      where: { emailCampaignId: campaignId },
-      orderBy: { sequenceOrder: "asc" },
-      take: 1,
-    });
-  }
-
-  if (!items || items.length === 0) throw new Error("No email sequence items found");
-
-  const item = items[0];
-  const html = renderEmailHtml({
-    subject: item.subjectLine || "",
-    previewText: item.previewText || "",
-    greeting: item.greetingStrategy ? `Hi {{firstName}},` : "",
-    opening: "",
-    bodyParagraphs: [item.emailBodyText || ""],
-    bulletPoints: item.evidenceUsed?.map(e => e.claim).filter(Boolean) || [],
-    cta: item.primaryCta ? { text: item.primaryCta } : null,
-    closing: "",
-    signature: campaign.senderName ? `${campaign.senderName}` : "",
-  });
-
-  const text = renderPlainText({
-    greeting: item.greetingStrategy ? `Hi {{firstName}},` : "",
-    bodyParagraphs: [item.emailBodyText || ""],
-    bulletPoints: item.evidenceUsed?.map(e => e.claim).filter(Boolean) || [],
-    cta: item.primaryCta ? { text: item.primaryCta } : null,
-    closing: "",
-    signature: campaign.senderName ? `${campaign.senderName}` : "",
-  });
-
-  const idempotencyKey = `test_${campaignId}_${item.id}_${Date.now()}`;
-
-  const result = await sendEmail({
-    to: recipientEmail,
-    subject: item.subjectLine || "No subject",
-    html,
-    text,
-    senderName: campaign.senderName || undefined,
-    tags: [`campaign:${campaignId}`, `item:${item.id}`, "test-send"],
-    idempotencyKey,
-  });
-
-  if (result.success) {
-    await prisma.emailCampaignLog.create({
-      data: {
-        emailCampaignId: campaignId,
-        emailSequenceItemId: item.id,
-        action: "test_sent",
-        status: "submitted",
-        message: `Test email submitted to provider (${result.provider}) — awaiting delivery webhook`,
-        metadata: { recipient: recipientEmail, provider: result.provider, providerMessageId: result.providerMessageId, idempotencyKey },
-      },
-    });
-  }
-
-  return result;
-}
-
-export async function sendCampaignEmails(campaignId) {
-  const campaign = await prisma.emailCampaign.findUnique({
-    where: { id: campaignId },
-    include: {
-      sequenceItems: { orderBy: { sequenceOrder: "asc" } },
-      crmDeals: { include: { contact: true } },
-    },
-  });
-  if (!campaign) throw new Error(`EmailCampaign not found: ${campaignId}`);
-
-  if (campaign.approvalStatus !== "APPROVED") {
-    return { success: false, error: "Campaign must be approved before sending.", code: "APPROVAL_REQUIRED" };
-  }
-
-  const health = getEmailProviderHealth();
-  if (!health.canSend) {
-    return { success: false, error: "No email provider configured.", code: "NO_PROVIDER", providers: health.providers };
-  }
-
-  const recipients = campaign.crmDeals
-    ?.map(d => d.contact)
-    ?.filter(c => c && c.email)
-    ?.filter(c => {
-      if (c.status === "ARCHIVED" || c.archivedAt) return false;
-      if (c.consentStatus === "NOT_MEASURED" || c.consentStatus === "REVOKED") return false;
-      return true;
-    }) || [];
-
-  const skippedContacts = campaign.crmDeals
-    ?.map(d => d.contact)
-    ?.filter(c => c && c.email)
-    ?.filter(c => !(c.status === "ACTIVE" && (c.consentStatus === "GRANTED" || c.consentStatus === "NOT_MEASURED"))) || [];
-
-  if (recipients.length === 0) {
-    return {
-      success: false,
-      error: "No eligible recipients found. All associated contacts are archived, unsubscribed, or have revoked consent.",
-      code: "NO_ELIGIBLE_RECIPIENTS",
-      skippedContacts: skippedContacts.map(c => ({ id: c.id, email: c.email, reason: c.status !== "ACTIVE" ? "archived" : c.consentStatus === "REVOKED" ? "consent_revoked" : "consent_not_granted" })),
-    };
-  }
-
-  const results = [];
-  for (const item of campaign.sequenceItems) {
-    if (item.status !== "draft") {
-      results.push({ sequenceOrder: item.sequenceOrder, skipped: true, reason: `Item status is "${item.status}", not "draft"` });
-      continue;
-    }
-
-    const existingLog = await prisma.emailCampaignLog.findFirst({
-      where: { emailCampaignId: campaignId, emailSequenceItemId: item.id, action: { in: ["sent", "send_failed"] } },
-      orderBy: { createdAt: "desc" },
-    });
-    if (existingLog) {
-      results.push({ sequenceOrder: item.sequenceOrder, skipped: true, reason: "Already sent/failed — idempotency block" });
-      continue;
-    }
-
-    const html = renderEmailHtml({
-      subject: item.subjectLine || "",
-      previewText: item.previewText || "",
-      greeting: item.greetingStrategy ? `Hi {{firstName}},` : "",
-      opening: "",
-      bodyParagraphs: [item.emailBodyText || ""],
-      bulletPoints: item.evidenceUsed?.map(e => e.claim).filter(Boolean) || [],
-      cta: item.primaryCta ? { text: item.primaryCta } : null,
-      closing: "",
-      signature: campaign.senderName ? `${campaign.senderName}` : "",
-    });
-
-    const text = renderPlainText({
-      greeting: item.greetingStrategy ? `Hi {{firstName}},` : "",
-      bodyParagraphs: [item.emailBodyText || ""],
-      bulletPoints: item.evidenceUsed?.map(e => e.claim).filter(Boolean) || [],
-      cta: item.primaryCta ? { text: item.primaryCta } : null,
-      closing: "",
-      signature: campaign.senderName ? `${campaign.senderName}` : "",
-    });
-
-    const itemResults = [];
-    for (const contact of recipients) {
-      const personalizedHtml = html.replace(/\{\{firstName\}\}/g, contact.firstName || 'there').replace(/\{\{companyName\}\}/g, contact.company?.name || '');
-      const personalizedText = text.replace(/\{\{firstName\}\}/g, contact.firstName || 'there').replace(/\{\{companyName\}\}/g, contact.company?.name || '');
-
-      const idempotencyKey = `send_${campaignId}_${item.id}_${contact.id}_${Date.now()}`;
-
-      const result = await sendEmail({
-        to: contact.email,
-        subject: item.subjectLine?.replace(/\{\{firstName\}\}/g, contact.firstName || 'there').replace(/\{\{companyName\}\}/g, contact.company?.name || '') || "No subject",
-        html: personalizedHtml,
-        text: personalizedText,
-        senderName: campaign.senderName || undefined,
-        tags: [`campaign:${campaignId}`, `item:${item.id}`, `contact:${contact.id}`],
-        idempotencyKey,
-      });
-
-      itemResults.push({ contactId: contact.id, email: contact.email, result });
-      await prisma.emailCampaignLog.create({
-        data: {
-          emailCampaignId: campaignId,
-          emailSequenceItemId: item.id,
-          action: result.success ? "sent" : "send_failed",
-          status: result.success ? "submitted" : "failed",
-          message: result.success ? `Email submitted to provider for ${contact.email}` : `Send failed for ${contact.email}: ${result.error?.message || "Unknown"}`,
-          metadata: { contactId: contact.id, recipient: contact.email, provider: result.provider, providerMessageId: result.providerMessageId, error: result.error, idempotencyKey },
-        },
-      });
-    }
-
-    const allSucceeded = itemResults.every(r => r.result.success);
-    results.push({ sequenceOrder: item.sequenceOrder, itemResults });
-    await prisma.emailSequenceItem.update({
-      where: { id: item.id },
-      data: { status: allSucceeded ? "sent" : "partial" },
-    });
-  }
-
-  const sentCount = results.reduce((sum, r) => sum + (r.itemResults?.filter(ir => ir.result.success).length || 0), 0);
-  const totalCount = results.reduce((sum, r) => sum + (r.itemResults?.length || 0), 0);
-
-  return { success: true, results, totalItems: results.length, totalRecipients: totalCount, sentCount, skippedContacts: skippedContacts.map(c => ({ id: c.id, email: c.email })) };
-}
-
-export async function handleBrevoWebhook(payload) {
-  const { event, messageId, email, date, tag, ts } = payload || {};
-
-  if (!messageId) {
-    return { success: false, error: "Missing messageId in webhook payload" };
-  }
-
-  const eventAction = event || "unknown";
-  const eventStatusMap = {
-    delivered: "delivered",
-    bounce: "bounced",
-    blocked: "bounced",
-    spam: "marked_spam",
-    invalid: "invalid",
-    deferred: "deferred",
-    click: "clicked",
-    open: "opened",
-    unsubscribed: "unsubscribed",
-    error: "failed",
-  };
-  const mappedStatus = eventStatusMap[eventAction] || eventAction;
-
-  const allLogs = await prisma.emailCampaignLog.findMany({
-    where: {
-      action: { in: ["sent", "test_sent", "send_failed"] },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 500,
-  });
-
-  const logs = allLogs.filter(log => {
-    const meta = log.metadata;
-    return meta && typeof meta === "object" && meta.providerMessageId === messageId;
-  });
-
-  if (logs.length === 0) {
-    return { success: false, error: `No EmailCampaignLog found for providerMessageId: ${messageId}`, messageId };
-  }
-
-  for (const log of logs) {
-    await prisma.emailCampaignLog.create({
-      data: {
-        emailCampaignId: log.emailCampaignId,
-        emailSequenceItemId: log.emailSequenceItemId,
-        action: `provider_${mappedStatus}`,
-        status: mappedStatus,
-        message: `Brevo webhook: ${eventAction} for ${email || "unknown"} at ${date || new Date().toISOString()}`,
-        metadata: {
-          providerEvent: eventAction,
-          providerMessageId: messageId,
-          recipient: email,
-          timestamp: date || ts || new Date().toISOString(),
-          previousLogId: log.id,
-        },
-      },
-    });
-  }
-
-  return { success: true, event: eventAction, messageId, status: mappedStatus, logsUpdated: logs.length };
-}
-
-export async function getDeliveryLogs(campaignId) {
-  const logs = await prisma.emailCampaignLog.findMany({
-    where: { emailCampaignId: campaignId },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
-  return logs;
-}
-
-export async function fromAssetToEmailCampaign({ chatId, userId, automationAssetId, campaignPlanId, sequenceOrder, purpose, delayAfterPreviousDays }) {
-  const asset = await prisma.automationAsset.findFirst({
-    where: { id: automationAssetId, automationPlan: { chatId } },
-    include: { automationPlan: { select: { chatId: true, userId: true } } },
-  });
-
-  if (!asset) {
-    return { success: false, error: "Asset not found" };
-  }
-  if (asset.automationPlan.userId !== userId) {
-    return { success: false, error: "Asset does not belong to user" };
-  }
-  if (asset.assetType !== "email_copy") {
-    return { success: false, error: "Asset type must be email_copy" };
-  }
-
-  const content = typeof asset.assetContent === "object" ? asset.assetContent : {};
-  const subject = content.subject || content.subjectLine || "";
-  const previewText = content.previewText || "";
-  const greeting = content.greeting || "Hi there,";
-  const opening = content.opening || "";
-  const bodyParagraphs = Array.isArray(content.bodyParagraphs) ? content.bodyParagraphs : [];
-  const bulletPoints = Array.isArray(content.bulletPoints) ? content.bulletPoints : [];
-  const ctaText = content.ctaText || content.cta?.text || "";
-  const ctaUrl = content.ctaUrl || content.cta?.url || "";
-  const closing = content.closing || "";
-  const signature = content.signature || "";
-  const personalizationFields = content.personalizationFields || [];
-  const evidenceUsed = content.evidenceUsed || [];
-  const claimsRequiringReview = content.claimsRequiringReview || [];
-  const inferenceStatus = content.inferenceStatus || "ai_generated";
-
-  let campaignPlan;
-  if (campaignPlanId) {
-    campaignPlan = await prisma.campaignPlan.findFirst({
-      where: { id: campaignPlanId, chatId, userId },
-    });
-    if (!campaignPlan) {
-      return { success: false, error: "CampaignPlan not found or does not belong to user" };
+  for (const { field, check, msg } of checks) {
+    if (!check(email[field])) {
+      issues.push({ field, message: msg });
     }
   }
 
-  const productIntel = await prisma.productIntelligence.findFirst({
-    where: { chatId, userId },
-    select: { inputJson: true, productAnalysis: true, id: true },
-  });
+  if (productName) {
+    const subject = (email.subjectLine || '').toLowerCase();
+    const body = (email.plainTextBody || '').toLowerCase();
+    const productLower = productName.toLowerCase();
 
-  const emailCampaign = await prisma.emailCampaign.create({
-    data: {
-      userId,
-      chatId,
-      campaignPlanId: campaignPlanId || null,
-      name: campaignPlan?.campaignName || `${asset.assetTitle || "Email"} Campaign`,
-      objective: purpose || subject || null,
-      status: "DRAFT",
-      approvalStatus: "NOT_SUBMITTED",
-      generationStatus: "completed",
-      evidenceSummary: { assetId: asset.id, assetTitle: asset.assetTitle, evidenceUsed },
-    },
-  });
+    if (!subject.includes(productLower) && !body.includes(productLower)) {
+      issues.push({ field: 'product', message: `Email does not mention product: "${productName}"` });
+    }
 
-  const fullHtml = renderEmailHtml({
-    subject,
-    previewText,
-    greeting,
-    opening,
-    bodyParagraphs,
-    bulletPoints,
-    ctaText,
-    ctaUrl,
-    closing,
-    signature,
-  });
+    const genericPatterns = [/your product/i, /our product/i, /this tool/i, /our tool/i, /the software/i, /our software/i, /your software/i, /the platform/i, /our platform/i, /your platform/i, /our solution/i, /your solution/i, /the solution/i, /ai tool/i, /ai platform/i, /ai solution/i, /ai powered/i];
+    for (const pattern of genericPatterns) {
+      if (pattern.test(email.plainTextBody || '') || pattern.test(email.subjectLine || '')) {
+        issues.push({ field: 'generic', message: `Contains generic placeholder: "${pattern.source}" - use real product name` });
+      }
+    }
+  }
 
-  const plainText = renderPlainText({
-    subject,
-    previewText,
-    greeting,
-    opening,
-    bodyParagraphs,
-    bulletPoints,
-    ctaText,
-    ctaUrl,
-    closing,
-    signature,
-  });
-
-  const sequenceItem = await prisma.emailSequenceItem.create({
-    data: {
-      emailCampaignId: emailCampaign.id,
-      sequenceOrder: sequenceOrder || 1,
-      emailName: asset.assetTitle || `${purpose || "Email"} ${sequenceOrder || 1}`,
-      purpose: purpose || null,
-      delayAfterPreviousDays: delayAfterPreviousDays ?? 0,
-      subjectLine: subject || null,
-      previewText: previewText || null,
-      emailBodyText: plainText,
-      emailBodyHtml: fullHtml,
-      primaryCta: ctaText || null,
-      personalizationFields: personalizationFields,
-      evidenceUsed: evidenceUsed,
-      inferenceStatus: inferenceStatus,
-      status: "draft",
-    },
-  });
-
-  await prisma.emailCampaignLog.create({
-    data: {
-      emailCampaignId: emailCampaign.id,
-      emailSequenceItemId: sequenceItem.id,
-      action: "from_asset",
-      status: "created",
-      message: `Email campaign created from Content Studio asset: ${asset.assetTitle || asset.id}`,
-      metadata: { assetId: asset.id, contentType: "email_copy" },
-    },
-  });
-
-  const version = await prisma.emailCampaignVersion.create({
-    data: {
-      emailCampaignId: emailCampaign.id,
-      versionNumber: 1,
-      snapshot: { campaign: emailCampaign, items: [sequenceItem] },
-      changeReason: "Created from Content Studio asset",
-      createdBy: userId,
-    },
-  });
+  const fakePatterns = [/studies show/i, /research indicates/i, /industry experts say/i, /join \d+\+/i, /trusted by \d+/i, /\d+% (increase|improvement|reduction|boost)/i, /up to \d+/i, /over \d+ (customers|users|businesses)/i, /our research shows/i];
+  for (const pattern of fakePatterns) {
+    if (pattern.test(email.plainTextBody || '') || pattern.test(email.htmlBody || '')) {
+      issues.push({ field: 'fabricated', message: `Contains fabricated claim: "${pattern.source}"` });
+    }
+  }
 
   return {
-    success: true,
-    data: { campaign: emailCampaign, items: [sequenceItem], version },
+    valid: issues.length === 0,
+    issues,
+    sanitized: issues.length > 0 ? sanitizeEmail(email, issues, productName, companyName) : email
   };
+}
+
+function sanitizeEmail(email, issues, productName, companyName) {
+  const sanitized = { ...email };
+  if (!sanitized.subjectLine) sanitized.subjectLine = `Introducing ${productName || 'Our Platform'}`;
+  if (!sanitized.previewText) sanitized.previewText = `Learn how ${productName || 'we'} can help your business`;
+  if (!sanitized.plainTextBody) sanitized.plainTextBody = `Hello,\n\nThank you for your interest in ${productName || 'our platform'}.\n\nBest regards,\n${companyName || 'The Team'}`;
+  if (!sanitized.htmlBody) sanitized.htmlBody = `<html><body><p>Hello,</p><p>Thank you for your interest in ${productName || 'our platform'}.</p><p>Best regards,<br/>${companyName || 'The Team'}</p></body></html>`;
+
+  const genericPatterns = [/your product/gi, /our product/gi, /this tool/gi, /our tool/gi, /the software/gi, /our software/gi, /your software/gi, /the platform/gi, /our platform/gi, /your platform/gi, /our solution/gi, /your solution/gi, /the solution/gi, /ai tool/gi, /ai platform/gi, /ai solution/gi];
+  for (const pattern of genericPatterns) {
+    const replacement = productName || 'our platform';
+    if (sanitized.plainTextBody) sanitized.plainTextBody = sanitized.plainTextBody.replace(pattern, replacement);
+    if (sanitized.htmlBody) sanitized.htmlBody = sanitized.htmlBody.replace(pattern, replacement);
+    if (sanitized.subjectLine) sanitized.subjectLine = sanitized.subjectLine.replace(pattern, replacement);
+  }
+
+  return sanitized;
+}
+
+function buildResponsiveHTML(email) {
+  const body = email.plainTextBody || email.htmlBody || '';
+  const subject = email.subjectLine || '';
+  const previewText = email.previewText || '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <title>${subject}</title>
+  <style>
+    /* Reset */
+    body, table, td, p, a, li, blockquote { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+    body { margin: 0; padding: 0; width: 100% !important; height: 100% !important; }
+    /* Container */
+    .email-container { max-width: 600px; margin: 0 auto; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; background-color: #ffffff; }
+    /* Header */
+    .email-header { text-align: center; padding: 20px 0; border-bottom: 1px solid #e0e0e0; margin-bottom: 20px; }
+    .email-header h1 { font-size: 24px; margin: 0; color: #111111; }
+    .preview-text { display: none; font-size: 1px; color: #ffffff; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden; }
+    /* Body */
+    .email-body { padding: 20px 0; }
+    .email-body p { margin: 0 0 16px 0; }
+    /* CTA */
+    .cta-button { display: inline-block; padding: 14px 32px; background-color: #0066ff; color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; margin: 16px 0; }
+    .cta-button:hover { background-color: #0052cc; }
+    /* Footer */
+    .email-footer { text-align: center; padding: 20px 0; border-top: 1px solid #e0e0e0; margin-top: 20px; font-size: 14px; color: #888888; }
+    /* Responsive */
+    @media screen and (max-width: 600px) { .email-container { width: 100% !important; padding: 10px !important; } .cta-button { display: block !important; text-align: center !important; } }
+    @media (prefers-color-scheme: dark) { .email-container { background-color: #1a1a1a; color: #e0e0e0; } .email-header { border-bottom-color: #333; } .email-header h1 { color: #ffffff; } .email-footer { border-top-color: #333; color: #888; } .cta-button { background-color: #3388ff; } }
+  </style>
+</head>
+<body>
+  <div class="preview-text">${previewText}</div>
+  <div class="email-container">
+    <div class="email-header">
+      <h1>${subject}</h1>
+    </div>
+    <div class="email-body">
+      ${body.replace(/\n/g, '<br/>')}
+    </div>
+    <div class="email-footer">
+      <p>If you have any questions, please reply to this email.</p>
+      <p>&copy; ${new Date().getFullYear()} ${previewText.includes('@') ? '' : 'All rights reserved.'}</p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function buildPreviewData(email) {
+  const plainText = email.plainTextBody || '';
+  const htmlBody = email.htmlBody || '';
+  const responsiveHTML = buildResponsiveHTML(email);
+  const words = plainText.split(/\s+/).filter(Boolean);
+  const readingTime = Math.max(1, Math.round(words.length / 200));
+
+  return {
+    subjectLine: email.subjectLine || '',
+    previewText: email.previewText || '',
+    desktopPreview: {
+      html: htmlBody,
+      responsiveHTML,
+      characters: htmlBody.length,
+      words: words.length,
+      readingTimeMinutes: readingTime
+    },
+    mobilePreview: {
+      html: responsiveHTML,
+      responsiveHTML,
+      characters: responsiveHTML.length,
+      words: words.length,
+      readingTimeMinutes: readingTime
+    },
+    plainText: {
+      text: plainText,
+      characters: plainText.length,
+      words: words.length,
+      readingTimeMinutes: readingTime
+    },
+    htmlPreview: {
+      html: htmlBody,
+      responsiveHTML,
+      characters: htmlBody.length
+    }
+  };
+}
+
+export async function generateEmailCampaign({ chatId, userId, planId, campaignPlanId, emailType = 'campaign' }) {
+  try {
+    const plan = await prisma.campaignPlan.findUnique({
+      where: { id: planId || campaignPlanId },
+      include: { chat: true }
+    });
+
+    if (!plan) throw new Error('Campaign plan not found');
+
+    const [productIntelligence, seoData, competitorIntelligence, audienceData] = await Promise.allSettled([
+      prisma.productIntelligence.findUnique({ where: { chatId } }),
+      prisma.seoIntelligence.findUnique({ where: { chatId } }),
+      prisma.competitorIntelligence.findUnique({ where: { chatId } }),
+      prisma.campaignIntelligence.findUnique({ where: { chatId } })
+    ]);
+
+    const context = buildRichContext(
+      plan,
+      { website: {}, product: {}, company: {}, audience: {}, competitors: {}, seo: {} },
+      productIntelligence.status === 'fulfilled' ? productIntelligence.value : null,
+      seoData.status === 'fulfilled' ? seoData.value : null,
+      null,
+      audienceData.status === 'fulfilled' ? audienceData.value : null,
+      competitorIntelligence.status === 'fulfilled' ? competitorIntelligence.value : null
+    );
+
+    const prompt = buildAIPrompt(context, emailType);
+
+    const aiResult = await callAI([
+      { role: 'system', content: 'You are a Senior Email Marketing Strategist. Return ONLY valid JSON with no markdown formatting.' },
+      { role: 'user', content: prompt }
+    ], { responseFormat: 'json', temperature: 0.8 });
+
+    let emailData;
+    try {
+      emailData = typeof aiResult === 'string' ? JSON.parse(aiResult) : (aiResult?.data || aiResult);
+    } catch (e) {
+      console.warn('[EmailCampaign] AI response parse failed, generating structured email');
+      emailData = generateFallbackEmail(context);
+    }
+
+    const validation = validateEmailOutput(emailData, context);
+
+    if (!validation.valid) {
+      console.warn('[EmailCampaign] Validation issues:', validation.issues);
+    }
+
+    const finalEmail = validation.sanitized || emailData;
+    const preview = buildPreviewData(finalEmail);
+
+    const campaignRecord = await prisma.emailCampaign.upsert({
+      where: { id: `${chatId}_${planId || campaignPlanId}` },
+      create: {
+        chatId, userId,
+        campaignPlanId: planId || campaignPlanId,
+        name: `${context.productName || 'Product'} - ${new Date().toLocaleDateString()}`,
+        status: 'draft',
+        sequenceItems: {
+          create: [{
+            sequenceOrder: 1,
+            emailName: `Email 1: ${finalEmail.subjectLine || 'Campaign Email'}`,
+            purpose: 'campaign',
+            subjectLine: finalEmail.subjectLine || '',
+            alternativeSubjectLines: [],
+            previewText: finalEmail.previewText || '',
+            emailBodyText: finalEmail.plainTextBody || '',
+            emailBodyHtml: finalEmail.htmlBody || '',
+            responsiveHtml: buildResponsiveHTML(finalEmail),
+            primaryCta: finalEmail.cta || '',
+            personalizationFields: ['{{firstName}}', '{{companyName}}'],
+            inferenceStatus: 'EVIDENCE_BACKED',
+            preview: preview
+          }]
+        }
+      },
+      update: {
+        status: 'draft',
+        updatedAt: new Date()
+      }
+    });
+
+    return {
+      success: true,
+      data: {
+        email: finalEmail,
+        preview,
+        validation,
+        context: {
+          productName: context.productName,
+          companyName: context.companyName,
+          targetAudience: context.targetAudience
+        },
+        campaignId: campaignRecord?.id || null
+      }
+    };
+  } catch (error) {
+    console.error('[EmailCampaign] Generate failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+function generateFallbackEmail(context) {
+  const product = context.productName || 'our platform';
+  const company = context.companyName || 'our team';
+  const painPoint = context.audiencePainPoints[0] || 'common challenges';
+  const feature = context.productFeatures[0] || 'powerful features';
+  const competitor = context.competitorNames[0] || '';
+
+  return {
+    subjectLine: `How ${product} Solves ${painPoint.substring(0, 30)}`,
+    previewText: `Discover how ${product} helps ${context.targetAudience || 'businesses'} overcome ${painPoint.substring(0, 20)}`,
+    opening: `Are you tired of dealing with ${painPoint}? You're not alone.`,
+    problem: `Many ${context.targetAudience || 'businesses'} struggle with ${painPoint}, spending valuable time and resources on manual processes.`,
+    solution: `${product} by ${company} is designed to help you overcome these challenges with ${feature}.`,
+    features: `With ${product}, you get:\n- ${feature}\n- Streamlined workflows\n- Real-time insights\n- Seamless integrations`,
+    benefits: `By using ${product}, you can:\n- Save time and reduce manual work\n- Improve team collaboration\n- Make data-driven decisions\n- Scale your operations efficiently`,
+    socialProof: `${product} is trusted by innovative companies to transform their operations.`,
+    cta: `Try ${product} Free Today`,
+    closing: `Ready to see what ${product} can do for you?`,
+    signature: `Best regards,\nThe ${company} Team`,
+    ps: `P.S. Start your free trial today and experience the difference ${product} can make.`,
+    plainTextBody: `Hello,\n\nAre you tired of dealing with ${painPoint}? You're not alone.\n\nMany ${context.targetAudience || 'businesses'} struggle with these challenges. That's where ${product} comes in.\n\n${product} by ${company} helps you:\n- ${feature}\n- Streamline operations\n- Save time and resources\n- Drive better results\n\n${context.competitorNames.length > 0 ? `Unlike ${competitor}, ${product} is designed specifically for your needs.` : ''}\n\nReady to get started? Try ${product} today.\n\nBest regards,\nThe ${company} Team\n\nP.S. Start your free trial and see the difference.`,
+    htmlBody: `<html><body><p>Hello,</p><p>Are you tired of dealing with ${painPoint}? You're not alone.</p><p>Many ${context.targetAudience || 'businesses'} struggle with these challenges. That's where ${product} comes in.</p><p><strong>${product}</strong> by ${company} helps you:</p><ul><li>${feature}</li><li>Streamline operations</li><li>Save time and resources</li><li>Drive better results</li></ul><p>Ready to get started? Try ${product} today.</p><p>Best regards,<br/>The ${company} Team</p><p>P.S. Start your free trial and see the difference.</p></body></html>`
+  };
+}
+
+export async function sendCampaignEmail({ campaignId, itemId, recipientEmail, recipientName, companyName }) {
+  try {
+    const item = await prisma.emailSequenceItem.findUnique({ where: { id: itemId } });
+    if (!item) throw new Error('Email item not found');
+
+    const personalizedBody = (item.emailBodyText || '')
+      .replace(/{{firstName}}/g, recipientName || 'there')
+      .replace(/{{companyName}}/g, companyName || '');
+
+    const personalizedHtml = (item.responsiveHtml || item.emailBodyHtml || '')
+      .replace(/{{firstName}}/g, recipientName || 'there')
+      .replace(/{{companyName}}/g, companyName || '');
+
+    const sentResult = await sendEmail({
+      to: recipientEmail,
+      subject: item.subjectLine || '',
+      text: personalizedBody,
+      html: personalizedHtml
+    });
+
+    await prisma.emailCampaignLog.create({
+      data: {
+        emailCampaignId: campaignId,
+        sequenceItemId: itemId,
+        recipientEmail,
+        status: sentResult.success ? 'sent' : 'failed',
+        error: sentResult.error || null,
+        metadata: { provider: sentResult.provider, timestamp: new Date().toISOString() }
+      }
+    }).catch(() => {});
+
+    return sentResult;
+  } catch (error) {
+    console.error('[EmailCampaign] Send failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function scheduleCampaign({ campaignId, scheduledDate }) {
+  try {
+    const campaign = await prisma.emailCampaign.update({
+      where: { id: campaignId },
+      data: { scheduledAt: new Date(scheduledDate), status: 'scheduled' }
+    });
+    return { success: true, data: campaign };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function approveCampaign(campaignId) {
+  try {
+    const campaign = await prisma.emailCampaign.update({
+      where: { id: campaignId },
+      data: { status: 'approved', approvedAt: new Date() }
+    });
+    return { success: true, data: campaign };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 }

@@ -32,6 +32,8 @@ model User {
   evidenceSnapshots      EvidenceSnapshot[]
   campaignPlans          CampaignPlan[]
   emailCampaigns         EmailCampaign[]
+  emailTemplates         EmailTemplate[]
+  emailAutomations       EmailAutomation[]
   crmContacts            CRMContact[]
   crmCompanies           CRMCompany[]
   crmDeals               CRMDeal[]
@@ -81,6 +83,8 @@ model Chat {
   evidenceSnapshots EvidenceSnapshot[]
   campaignPlans     CampaignPlan[]
   emailCampaigns    EmailCampaign[]
+  emailTemplates    EmailTemplate[]
+  emailAutomations  EmailAutomation[]
   crmContacts       CRMContact[]
   crmCompanies      CRMCompany[]
   crmDeals          CRMDeal[]
@@ -1128,6 +1132,10 @@ model EmailCampaign {
   logs          EmailCampaignLog[]
   crmDeals      CRMDeal[]
   crmWorkflows  CRMWorkflow[]
+  automations   EmailAutomation[]
+  schedules     EmailSchedule[]
+  deliveryLogs  EmailDeliveryLog[]
+  emailEvents   EmailEvent[]
 
   approvedAt  DateTime?
   scheduledAt DateTime?
@@ -1168,14 +1176,218 @@ model EmailSequenceItem {
   inferenceStatus        String?
   complianceNotes        String?  @db.Text
 
+  responsiveHtml         String?  @db.Text
+  preview                Json?
+
   status                 String   @default("draft")
 
-  logEntries EmailCampaignLog[]
+  logEntries    EmailCampaignLog[]
+  deliveryLogs  EmailDeliveryLog[]
+  emailEvents   EmailEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([emailCampaignId, sequenceOrder])
+}
+
+// ============================================
+// EMAIL TEMPLATES (Reusable templates)
+// ============================================
+
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  chat      Chat?    @relation(fields: [chatId], references: [id], onDelete: SetNull)
+  chatId    String?
+
+  name              String
+  description       String?
+  category          String?  // newsletter, promotional, transactional, onboarding, reengagement
+  subjectLine       String?
+  previewText       String?
+  emailBodyText     String?  @db.Text
+  emailBodyHtml     String?  @db.Text
+  responsiveHtml    String?  @db.Text
+  personalizationFields Json?
+
+  // Brand settings
+  senderName        String?
+  senderEmail       String?
+  replyToEmail      String?
+  headerImageUrl    String?
+  footerText        String?
+  socialLinks       Json?
+  brandColors       Json?
+
+  useCount          Int      @default(0)
+  isDefault         Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([category])
+  @@index([chatId])
+}
+
+// ============================================
+// EMAIL AUTOMATION RULES
+// ============================================
+
+model EmailAutomation {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId    String
+
+  name              String
+  description       String?
+  triggerType       String   // schedule, campaign_approval, form_submission, lead_created, deal_stage_change
+  triggerConfig     Json?    // { field, operator, value, schedule }
+  conditions        Json?    // [{ field, operator, value }]
+  actions           Json?    // [{ type: 'send_email', templateId, delay, config }]
+
+  status            String   @default("DRAFT") // DRAFT, ACTIVE, PAUSED, COMPLETED, FAILED
+  executionStatus   String   @default("never_run")
+
+  campaign     EmailCampaign?  @relation(fields: [emailCampaignId], references: [id], onDelete: SetNull)
+  emailCampaignId String?
+
+  schedules     EmailSchedule[]
+  deliveryLogs  EmailDeliveryLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([chatId])
+  @@index([userId])
+  @@index([status])
+}
+
+// ============================================
+// EMAIL SCHEDULE
+// ============================================
+
+model EmailSchedule {
+  id        String   @id @default(cuid())
+  automation EmailAutomation? @relation(fields: [emailAutomationId], references: [id], onDelete: Cascade)
+  emailAutomationId String?
+  campaign   EmailCampaign?   @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
+  emailCampaignId String?
+
+  scheduleType String   // once, daily, weekly, monthly, custom
+  scheduledAt  DateTime?
+  timezone     String?
+  dayOfWeek    Int?
+  dayOfMonth   Int?
+  timeOfDay    String?
+  cronExpression String?
+  startDate    DateTime?
+  endDate      DateTime?
+  repeatCount  Int?     @default(1)
+  repeatInterval Int?   // in days
+
+  status       String   @default("pending") // pending, scheduled, running, completed, cancelled, failed
+
+  lastRunAt    DateTime?
+  nextRunAt    DateTime?
+  completedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([emailAutomationId])
+  @@index([emailCampaignId])
+  @@index([status])
+  @@index([nextRunAt])
+}
+
+// ============================================
+// EMAIL DELIVERY LOG
+// ============================================
+
+model EmailDeliveryLog {
+  id        String   @id @default(cuid())
+
+  campaign      EmailCampaign?      @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
+  emailCampaignId String?
+  sequenceItem  EmailSequenceItem?  @relation(fields: [emailSequenceItemId], references: [id], onDelete: SetNull)
+  emailSequenceItemId String?
+  automation    EmailAutomation?    @relation(fields: [emailAutomationId], references: [id], onDelete: SetNull)
+  emailAutomationId String?
+
+  recipientEmail   String
+  recipientName    String?
+  provider         String   // brevo, sendgrid, resend, gmail_smtp
+  providerMessageId String?
+  subjectLine      String?
+
+  status           String   // pending, sent, delivered, opened, clicked, bounced, failed, spam, unsubscribed
+  previousStatus   String?
+  errorMessage     String?  @db.Text
+  errorCategory    String?  // rate_limit, invalid_email, provider_error, authentication, unknown
+
+  attemptCount     Int      @default(1)
+  maxAttempts      Int      @default(3)
+  lastAttemptAt    DateTime?
+  sentAt           DateTime?
+  deliveredAt      DateTime?
+  openedAt         DateTime?
+  clickedAt        DateTime?
+  bouncedAt        DateTime?
+
+  metadata         Json?    // provider response, headers, tracking data
+
+  eventHistory     Json?    // [{ status, timestamp, detail }]
+
+  emailEvents  EmailEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([emailCampaignId])
+  @@index([emailSequenceItemId])
+  @@index([recipientEmail])
+  @@index([status])
+  @@index([providerMessageId])
+  @@index([emailAutomationId])
+}
+
+// ============================================
+// EMAIL EVENTS (Tracking webhook events)
+// ============================================
+
+model EmailEvent {
+  id        String   @id @default(cuid())
+  deliveryLog EmailDeliveryLog? @relation(fields: [emailDeliveryLogId], references: [id], onDelete: Cascade)
+  emailDeliveryLogId String?
+  campaign      EmailCampaign?   @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
+  emailCampaignId String?
+  sequenceItem  EmailSequenceItem? @relation(fields: [emailSequenceItemId], references: [id], onDelete: SetNull)
+  emailSequenceItemId String?
+
+  eventType    String   // sent, delivered, opened, clicked, bounced, complained, unsubscribed, failed
+  eventData    Json?    // provider-specific event data
+  provider     String?  // brevo, sendgrid, resend
+  providerEventId String?
+  recipientEmail String?
+  userAgent    String?
+  ipAddress    String?
+  linkClicked  String?  // for click events
+  bounceType   String?  // hard, soft
+  bounceReason String?  @db.Text
+
+  occurredAt   DateTime?
+  receivedAt   DateTime @default(now())
+
+  @@index([emailDeliveryLogId])
+  @@index([emailCampaignId])
+  @@index([eventType])
+  @@index([providerEventId])
+  @@index([occurredAt])
 }
 
 model EmailCampaignVersion {
