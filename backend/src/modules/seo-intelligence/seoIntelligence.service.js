@@ -450,7 +450,7 @@ function buildKeywordIntelligence(validatedKeywords, keywordMetrics, identity) {
       clustersCount: 0,
       opportunitiesCount: primary.filter(k => k.opportunityScore >= 70).length,
       analyzedAt: new Date().toISOString(),
-      serpapiConfigured: providers?.serpapi?.configured || !!process.env.SERPAPI_API_KEY,
+      serpapiConfigured: !!process.env.SERPAPI_API_KEY,
       dataforseoConfigured: !!process.env.DATAFORSEO_LOGIN
     }
   };
