@@ -166,6 +166,71 @@ emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/send-test', async 
   }
 });
 
+// Alias route matching frontend path
+emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/test-send', async (req, res) => {
+  const { campaignId } = req.params;
+  const { recipientEmail, recipientName, companyName } = req.body || {};
+
+  if (!recipientEmail) return res.status(400).json({ success: false, error: 'recipientEmail required' });
+
+  try {
+    const campaign = await prisma.emailCampaign.findUnique({
+      where: { id: campaignId },
+      include: { sequenceItems: { take: 1, orderBy: { sequenceOrder: 'asc' } } }
+    });
+    if (!campaign || !campaign.sequenceItems[0]) return res.status(404).json({ success: false, error: 'Campaign or email item not found' });
+
+    const result = await sendCampaignEmail({
+      campaignId,
+      itemId: campaign.sequenceItems[0].id,
+      recipientEmail,
+      recipientName: recipientName || 'Test User',
+      companyName: companyName || campaign.name
+    });
+
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/send', async (req, res) => {
+  const { campaignId } = req.params;
+
+  try {
+    const campaign = await prisma.emailCampaign.findUnique({
+      where: { id: campaignId },
+      include: { sequenceItems: { orderBy: { sequenceOrder: 'asc' } } }
+    });
+    if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+    if (!campaign.sequenceItems || campaign.sequenceItems.length === 0) return res.status(400).json({ success: false, error: 'No sequence items to send' });
+
+    const results = [];
+    for (const item of campaign.sequenceItems) {
+      const result = await sendCampaignEmail({
+        campaignId,
+        itemId: item.id,
+        recipientEmail: campaign.audienceSummary || '',
+        recipientName: campaign.name || 'Valued Customer',
+        companyName: campaign.name || ''
+      });
+      results.push(result);
+    }
+
+    const allSuccess = results.every(r => r.success);
+    const sentCount = results.filter(r => r.success).length;
+
+    await prisma.emailCampaign.update({
+      where: { id: campaignId },
+      data: { status: allSuccess ? 'sent' : 'failed', sentAt: new Date() }
+    }).catch(() => {});
+
+    return res.json({ success: allSuccess, sentCount, totalRecipients: results.length, results });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/items/:itemId/send', async (req, res) => {
   const { campaignId, itemId } = req.params;
   const { recipientEmail, recipientName, companyName } = req.body || {};

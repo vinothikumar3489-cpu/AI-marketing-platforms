@@ -229,7 +229,7 @@ function ContentGeneratorPanel({
   brief: any; evidenceContext: any; onGenerated: (result: any) => void;
   selectedChatId: string; abortRef: React.MutableRefObject<AbortController | null>;
 }) {
-  const [selectedType, setSelectedType] = useState<ContentType>('blog_article');
+  const [selectedType, setSelectedType] = useState<ContentType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeGroup, setActiveGroup] = useState<string>('long-form');
@@ -240,8 +240,16 @@ function ContentGeneratorPanel({
   const GOALS = ['Awareness', 'Education', 'Engagement', 'Lead generation', 'Trial conversion', 'Product announcement'];
   const TONES = ['Professional', 'Educational', 'Conversational', 'Bold', 'Technical', 'Founder-led'];
 
+  const handleGroupChange = useCallback((group: string) => {
+    setActiveGroup(group);
+    const groupTypes = CONTENT_TYPES.filter(t => t.group === group);
+    if (groupTypes.length > 0) {
+      setSelectedType(groupTypes[0].value as ContentType);
+    }
+  }, []);
+
   const handleGenerate = useCallback(async () => {
-    // PART 9: In-flight protection to prevent duplicate POSTs
+    if (!selectedType) { setError('Select a content type first'); return; }
     if (!selectedChatId || loading || generatingRef.current) return;
     
     generatingRef.current = true;
@@ -285,7 +293,7 @@ function ContentGeneratorPanel({
         {grouped.map(g => (
           <button
             key={g.group}
-            onClick={() => setActiveGroup(g.group)}
+            onClick={() => handleGroupChange(g.group)}
             style={{
               padding: '4px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer',
               fontSize: '10px', fontWeight: 600, background: activeGroup === g.group ? `${C.accent}20` : 'transparent', color: activeGroup === g.group ? C.accent : C.muted,

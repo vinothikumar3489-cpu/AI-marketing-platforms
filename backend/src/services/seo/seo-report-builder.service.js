@@ -31,7 +31,21 @@ export function buildSEOReport({
   const coreWebVitals = extractCoreWebVitals(technicalAudit, pageSpeed);
   const keywordOpportunities = buildKeywordOpportunities(keywordIntelligence);
   const serpFeaturesData = serpFeatures || [];
-  const competitors = competitorIntelligence?.competitors || competitorIntelligence?.competitorProfiles || [];
+  let competitors = competitorIntelligence?.competitorProfiles || [];
+  if (competitors.length === 0 && competitorIntelligence?.competitors?.length > 0) {
+    competitors = competitorIntelligence.competitors.map(c => ({
+      name: c.name,
+      domain: c.domain,
+      type: c.type || 'direct',
+      relevance: c.relevance || 50,
+      estimatedTraffic: null,
+      seoAuthority: null,
+      topKeywordOverlap: [],
+      source: 'COMPETITOR_INTELLIGENCE',
+      validation: 'ESTIMATED',
+      confidence: 'MEDIUM',
+    }));
+  }
   const paak = peopleAlsoAsk || [];
   const trends = trendAnalysis || {};
 
@@ -86,7 +100,7 @@ export function buildSEOReport({
       }))
     },
     searchIntent: keywordIntelligence?.metadata?.searchIntent || detectSearchIntent(keywordIntelligence),
-    contentGaps: buildContentGapSummary(contentGapIntelligence),
+    contentGaps: buildContentGapSummary(contentGapIntelligence, keywordIntelligence),
     recommendations: buildRecommendations({
       technicalAudit,
       keywordIntelligence,
@@ -326,17 +340,17 @@ function classifyIntent(keyword) {
   return 'informational';
 }
 
-function buildContentGapSummary(contentGapIntelligence) {
-  if (!contentGapIntelligence) return null;
-  const cg = contentGapIntelligence;
-  const existingGaps = cg.contentGaps || [];
-  const fallbackGaps = existingGaps.length === 0 ? [
-    { title: 'Getting Started Documentation', gapType: 'documentation', opportunityScore: 75, priority: 'high' },
-    { title: 'Step-by-Step Tutorials', gapType: 'tutorials', opportunityScore: 65, priority: 'medium' },
-    { title: 'Product Demo & Walkthrough Videos', gapType: 'video_ideas', opportunityScore: 55, priority: 'medium' }
-  ] : [];
+function buildContentGapSummary(contentGapIntelligence, keywordIntelligence) {
+  if (!contentGapIntelligence && !keywordIntelligence) return [];
+  const cg = contentGapIntelligence || {};
+  const kw = keywordIntelligence || {};
+  let extracted = cg.contentGaps || [];
+  if (extracted.length === 0) extracted = cg.contentGapAnalysis?.gaps || [];
+  if (extracted.length === 0) extracted = cg.contentOpportunities || [];
+  if (extracted.length === 0) extracted = kw.contentOpportunities || [];
+  if (extracted.length === 0) return [];
 
-  const gaps = existingGaps.length > 0 ? existingGaps : fallbackGaps;
+  const gaps = extracted;
   return {
     totalGaps: gaps.length + (cg.summary?.totalGaps || 0),
     highPriority: gaps.filter(g => g.priority === 'high' || g.opportunityScore >= 80).length || 0,

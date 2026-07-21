@@ -9,6 +9,7 @@ import {
   generateGrowthMatrixChart, generateScoreRadarChart
 } from './chart-generator.service.js';
 import { prisma } from '../../config/prisma.js';
+import { buildSeoViewModel } from './seo-view-model.service.js';
 
 export async function buildReportData(chatId, userId) {
   console.log('[Report] Building report data for chat:', chatId);
@@ -347,9 +348,10 @@ function normalizeSeoIntelligence(seoIntel) {
   const blogRecord = seoIntel.blogIntelligenceRecord || { blogIdeas: seoIntel.blogIdeas || [] };
 
   return {
-    scores: (seoIntel.technicalAuditDetail || seoIntel.technicalAudit || {}).auditData || seoIntel.technicalAuditDetail || seoIntel.technicalAudit || {},
+    __raw: seoIntel,
+    scores: buildSeoViewModel(seoIntel),
     keywords: normalizeSeoKeywordArray(keywordRecord),
-    competitors: extractArray(competitorRecord?.competitors || competitorRecord?.competitorProfiles || competitorRecord),
+    competitors: normalizeCompetitorsForReport(competitorRecord),
     gaps: extractArray(gapRecord?.contentGaps || seoIntel.contentGaps),
     geo: {
       ...geoRecord,
@@ -426,6 +428,8 @@ function generateMarkdown(data, type = 'executive') {
         md += `| ${c.name || c.domain || 'Unknown'} | ${c.domain || '—'} | ${c.seoAuthority != null ? `${c.seoAuthority}/100` : c.estimatedAuthority != null ? `${c.estimatedAuthority}/100` : 'Not measured'} | ${c.estimatedTraffic || 'Not measured'} |\n`;
       });
       md += '\n';
+    } else if (seo?.__raw?.competitorIntelligence?.competitors?.length > 0) {
+      md += '> Competitor intelligence partially available — platform-level estimates present. Connect DataForSEO for detailed SERP analysis.\n\n';
     } else {
       md += '> Competitor SEO data unavailable. Configure DataForSEO for competitor analysis.\n\n';
     }
@@ -637,6 +641,27 @@ function extractTechnologies(market, product, seo) {
   }
 
   return tech;
+}
+
+function normalizeCompetitorsForReport(competitorRecord) {
+  let competitors = extractArray(competitorRecord?.competitorProfiles || competitorRecord?.competitors || competitorRecord);
+  if (competitors.length > 0 && !competitors[0].competitorType && competitors[0].type) {
+    competitors = competitors.map(c => ({
+      name: c.name,
+      domain: c.domain,
+      competitorType: c.type || 'direct',
+      relevanceScore: c.relevance || 50,
+      estimatedTraffic: c.estimatedTraffic || null,
+      seoAuthority: c.seoAuthority || c.estimatedAuthority || null,
+      estimatedAuthority: c.estimatedAuthority || null,
+      sharedKeywords: c.sharedKeywords || c.keywordOverlap || [],
+      keywordOverlap: c.keywordOverlap || c.sharedKeywords || [],
+      source: c.source || 'COMPETITOR_INTELLIGENCE',
+      validation: c.validation || 'ESTIMATED',
+      confidence: c.confidence || 'MEDIUM'
+    }));
+  }
+  return competitors;
 }
 
 function extractArray(value) {

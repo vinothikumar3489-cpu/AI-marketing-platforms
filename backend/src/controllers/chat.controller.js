@@ -554,6 +554,10 @@ export const getFullResults = async (req, res) => {
     } : null) ||
     null;
 
+  const pageSpeedAudit = seoIntelligence?.technicalAuditDetail?.auditData?.pageSpeed || {};
+  const pageSpeedMobileScore = pageSpeedAudit?.mobile?.lighthouseScores?.performance ?? null;
+  const pageSpeedDesktopScore = pageSpeedAudit?.desktop?.lighthouseScores?.performance ?? null;
+
   const normalizedSeoIntelligence = seoIntelligence ? {
     // Canonical structure
     identity: seoIntelligence.identity || {},
@@ -567,6 +571,10 @@ export const getFullResults = async (req, res) => {
     executiveStory: executiveStory,
     actionPlan: normalizedActionPlan,
     scoreBreakdown: seoIntelligence.scoreBreakdown || {},
+    // Top-level score fields for direct access (fixes SEO dashboard mapping)
+    seoScore: seoIntelligence.seoScore ?? null,
+    pageSpeedMobileScore,
+    pageSpeedDesktopScore,
     // Legacy fields for backward compatibility (under _legacy)
     _legacy: {
       technicalAuditDetail: seoIntelligence.technicalAuditDetail,

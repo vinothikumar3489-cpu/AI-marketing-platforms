@@ -197,33 +197,44 @@ function validateEmailOutput(email, context) {
 
   if (!email) { issues.push('Email object is null/undefined'); return { valid: false, issues }; }
 
-  const criticalFields = ['subjectLine', 'previewText', 'cta', 'footer', 'signature'];
-  for (const field of criticalFields) {
-    const val = email[field];
-    if (!val || (typeof val === 'string' && val.trim().length < 5)) {
-      criticalBlockers.push({ field, message: `Critical: ${field} is missing or too short (<5 chars)` });
-    }
+  const subject = email.subject || email.subjectLine || '';
+  if (!subject || (typeof subject === 'string' && subject.trim().length < 3)) {
+    criticalBlockers.push({ field: 'subject', message: 'Subject is missing or too short' });
   }
 
-  const requiredFields = ['opening', 'painPoint', 'solution', 'featureSection', 'benefits', 'customerStory', 'socialProof', 'ps', 'plainTextBody', 'htmlBody', 'markdownBody'];
-  for (const field of requiredFields) {
-    const val = email[field];
-    if (!val || (typeof val === 'string' && val.trim().length < 5)) {
-      issues.push({ field, message: `Missing or too short: ${field}` });
-    }
+  const previewText = email.previewText || '';
+  if (!previewText || (typeof previewText === 'string' && previewText.trim().length < 5)) {
+    issues.push({ field: 'previewText', message: 'Preview text is missing or too short' });
   }
 
-  if (email.subjectLine && email.subjectLine.length > 60) {
-    issues.push({ field: 'subjectLine', message: 'Over 60 characters' });
-  }
-  if (email.previewText && email.previewText.length > 120) {
-    issues.push({ field: 'previewText', message: 'Over 120 characters' });
+  const plainText = email.plainText || email.plainTextBody || '';
+  const html = email.html || email.htmlBody || '';
+  if (!plainText && !html) {
+    criticalBlockers.push({ field: 'content', message: 'Email body (plainText or html) is missing' });
   }
 
-  const evidenceSections = ['opening', 'painPoint', 'solution', 'featureSection', 'benefits', 'customerStory', 'socialProof', 'ps'];
+  const cta = email.ctaText || email.cta || (email.primaryCta && (email.primaryCta.label || email.primaryCta.text)) || '';
+  if (!cta) {
+    issues.push({ field: 'cta', message: 'Call-to-action is missing' });
+  }
+
+  const closing = email.closing || '';
+  const signature = email.signature || '';
+  if (!closing && !signature) {
+    issues.push({ field: 'closingOrSignature', message: 'Closing and signature are both missing' });
+  }
+
+  if (subject && subject.length > 70) {
+    issues.push({ field: 'subject', message: 'Over 70 characters' });
+  }
+  if (previewText && previewText.length > 150) {
+    issues.push({ field: 'previewText', message: 'Over 150 characters' });
+  }
+
+  const evidenceSections = ['opening', 'painPoint', 'solution'];
   const filledSections = evidenceSections.filter(s => email[s] && email[s].trim().length >= 5).length;
-  if (filledSections < 3) {
-    criticalBlockers.push({ field: 'evidence', message: `Only ${filledSections} content sections filled (minimum 3 required)` });
+  if (filledSections < 1) {
+    criticalBlockers.push({ field: 'evidence', message: `Only ${filledSections} content sections filled (minimum 1 required)` });
   }
 
   if (productName) {

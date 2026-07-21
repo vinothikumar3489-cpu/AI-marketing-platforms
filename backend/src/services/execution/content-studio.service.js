@@ -331,115 +331,128 @@ Return valid JSON:
 }
 
 async function generateEmailCopy(brief) {
-  const evidence = buildEvidenceSection(brief);
+  const productIdentity = brief?.productIdentity || {};
+  const displayName = productIdentity.displayName || brief?.product?.name || brief?.product?.brandName || brief?.company?.name || 'this solution';
+  const internalName = productIdentity.internalName || '';
+  const brandName = productIdentity.brandName || brief?.product?.brandName || '';
+  const domain = productIdentity.domain || '';
   const productContext = buildProductEvidenceContext(brief);
-  const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
-  const companyName = brief?.company?.name || brief?.product?.brandName || productName;
 
-  const hasFreeTrial = brief?.pricing?.hasFreeTrial || brief?.product?.pricing?.hasFreeTrial;
-  const hasFreePlan = brief?.pricing?.hasFree || brief?.product?.pricing?.hasFree;
-  const ctaIsFree = hasFreeTrial ? 'Start Free Trial' : hasFreePlan ? 'Get Started Free' : 'Learn More';
+  const emailType = brief?.emailType || 'promotional';
 
-  const prompt = `You are writing a professional email for ${productName} (${companyName}).
+  const wordCountMap = {
+    promotional: { min: 180, max: 350 },
+    newsletter: { min: 350, max: 700 },
+    product_announcement: { min: 250, max: 500 },
+    nurture: { min: 200, max: 450 },
+  };
 
-Write a send-ready email targeting ${persona} who face "${painPoint}".
+  const wc = wordCountMap[emailType] || { min: 200, max: 500 };
+
+  const prompt = `You are a professional email copywriter. Generate a ${emailType} email for ${displayName}.
 
 ${productContext}
 
 REQUIREMENTS:
-- emailType: One of "outreach", "nurture", "product_announcement", "newsletter", "follow_up", "trial_conversion".
-- subjectOptions: Array of 3 subject line options each with subject, angle, evidence, confidence.
-- selectedSubject: The best subject line from subjectOptions.
-- previewText: Preview/snippet text. Max 150 chars.
-- senderName: "${companyName} Team" or similar.
-- replyTo: "noreply@company.com" placeholder.
-- campaignName: Short campaign name derived from the email goal.
-- goal: Primary goal of this email.
-- audience: Target audience segment description.
-- sections: Object with preheader (string), header (string), greeting (string), openingHook (strong opening), audienceProblem (problem statement), valueProposition (key value), benefits (list), featureHighlights (list), proof (evidence or null), primaryCta (object with label and destination), secondaryCta (object with label and destination or null), closing (string), signature (string), footer (string), unsubscribe (string placeholder).
-- subject: Compelling subject line. Max 70 chars.
-- greeting: Professional greeting (e.g., "Hi {{firstName}},").
-- bodyParagraphs: 2-3 short paragraphs about ${productName}.
-- bulletPoints: 3 key benefits or features as bullet points.
-- ctaText: "${ctaIsFree}" — must be based on verified offer.
-- ctaUrl: null — do not invent URLs.
-- closing: Closing paragraph.
-- signature: Sender signature.
-- personalizationVariables: Array of { name, description, example }.
-- links: Array of link objects with { label, url, verified }.
-- evidenceUsed: ["list evidence fields referenced"].
-- claimsRequiringReview: []
-- qualityReport: Object with checks object.
+- emailType: "${emailType}"
+- Word count: ${wc.min}-${wc.max} words total
+- Use product name "${displayName}" consistently (NOT internal name)
+- subject: Compelling subject line, max 70 chars, include product name
+- previewText: Compelling preview, max 150 chars
+- greeting: Professional greeting with personalization placeholder (e.g., "Hi {{firstName}},")
+- opening: Strong opening paragraph addressing the pain point
+- painPoint: 1-2 sentences describing the specific problem
+- solution: 2-3 sentences on how ${displayName} solves it
+- benefits: Array of 3-5 key benefits
+- evidence: Array of evidence points referenced from context
+- cta: Object with label (CTA button text) and url (null — do not invent URLs)
+- closing: Warm closing paragraph
+- signature: Sender signature with company name
+- footer: Professional footer with company info and copyright
+- postscript: Optional P.S. line reinforcing key benefit
+- bodyParagraphs: Array of 2-3 paragraphs that form the email body
+- html: Basic HTML version of the email (inline styles, ready to send)
+- plainText: Plain text version of the email
 
-Do NOT use: fake stats, testimonials, ROI claims, fake pricing, fake urgency.
-Do NOT invent discount percentages or customer numbers.
+Do NOT use: fake stats, testimonials, ROI claims, invented data, superlatives, competitor bashing, generic placeholders like "our product" or "the platform".
 
 Return valid JSON:
 {
-  "emailType": "string",
-  "campaignName": "string",
-  "goal": "string",
-  "audience": "string",
-  "subjectOptions": [{"subject": "string", "angle": "string", "evidence": "string", "confidence": "medium"}],
-  "selectedSubject": "string",
-  "previewText": "string",
-  "senderName": "string",
-  "replyTo": "string",
   "subject": "string",
+  "previewText": "string",
   "greeting": "string",
-  "openingHook": "string",
-  "audienceProblem": "string",
-  "valueProposition": "string",
+  "opening": "string",
+  "painPoint": "string",
+  "solution": "string",
   "benefits": ["string"],
-  "featureHighlights": ["string"],
-  "proof": null,
-  "primaryCta": {"label": "string", "destination": null, "offerType": "${hasFreeTrial ? 'free_trial' : hasFreePlan ? 'free_plan' : 'info'}", "evidenceSource": "pricing", "verified": ${!!(hasFreeTrial || hasFreePlan)}},
-  "secondaryCta": null,
+  "evidence": ["string"],
+  "cta": { "label": "string", "url": null },
   "closing": "string",
   "signature": "string",
-  "sections": {"preheader": "string", "header": "string", "body": "string", "footer": "string", "unsubscribe": "string"},
-  "personalizationVariables": [{"name": "string", "description": "string", "example": "string"}],
-  "links": [{"label": "string", "url": null, "verified": false}],
-  "evidenceUsed": [],
-  "claimsRequiringReview": [],
-  "qualityReport": {"checks": {}, "overallStatus": "NEEDS_REVIEW"}
+  "footer": "string",
+  "postscript": "string",
+  "bodyParagraphs": ["string"],
+  "html": "string",
+  "plainText": "string",
+  "evidenceUsed": ["list evidence fields referenced"],
+  "claimsRequiringReview": []
 }`;
 
   try {
     const result = await callAI(prompt);
     if (result.success && result.data) {
       const data = result.data;
-      const sections = data.sections || {};
-      data.greeting = data.greeting || sections.greeting || '';
-      data.opening = data.opening || sections.openingHook || data.audienceProblem || '';
-      data.bodyParagraphs = data.bodyParagraphs && data.bodyParagraphs.length > 0 ? data.bodyParagraphs : [
-        sections.audienceProblem || data.audienceProblem || '',
-        sections.valueProposition || data.valueProposition || '',
-        ...(Array.isArray(data.benefits) ? data.benefits : []),
-        ...(Array.isArray(data.featureHighlights) ? data.featureHighlights : []),
-      ].filter(Boolean);
-      data.bulletPoints = data.bulletPoints && data.bulletPoints.length > 0 ? data.bulletPoints : [
-        ...(Array.isArray(data.benefits) ? data.benefits : []),
-        ...(Array.isArray(data.featureHighlights) ? data.featureHighlights : []),
-      ].filter(Boolean);
-      data.ctaText = data.ctaText || (data.primaryCta && data.primaryCta.label) || '';
-      data.ctaUrl = data.ctaUrl || (data.primaryCta && data.primaryCta.destination) || null;
-      data.closing = data.closing || sections.closing || '';
-      data.signature = data.signature || sections.signature || '';
-      data.personalizationVariables = data.personalizationVariables || [];
-      if (!data.sections || Object.keys(data.sections).length === 0) {
-        data.sections = {
-          preheader: data.previewText || '',
-          header: data.senderName || '',
-          greeting: data.greeting,
-          body: [data.opening, ...data.bodyParagraphs, ...data.bulletPoints].filter(Boolean).join('\n\n'),
-          footer: `${new Date().getFullYear()} ${brief?.company?.name || companyName}`,
-          unsubscribe: 'To unsubscribe, reply with UNSUBSCRIBE',
-        };
-      }
-      return { ...data, _provider: result.provider };
+      const benefits = Array.isArray(data.benefits) ? data.benefits : [];
+      const evidenceList = Array.isArray(data.evidence) ? data.evidence : [];
+
+      const structuredBody = {
+        greeting: data.greeting || '',
+        opening: data.opening || '',
+        painPoint: data.painPoint || '',
+        solution: data.solution || '',
+        benefits,
+        evidence: evidenceList,
+        cta: data.cta && typeof data.cta === 'object' ? { label: data.cta.label || '', url: data.cta.url || null } : { label: '', url: null },
+        closing: data.closing || '',
+        signature: data.signature || '',
+        footer: data.footer || '',
+        postscript: data.postscript || '',
+      };
+
+      return {
+        id: `email_${Date.now()}`,
+        contentType: 'email_copy',
+        productIdentity: {
+          internalName,
+          displayName,
+          brandName,
+          domain,
+        },
+        subject: data.subject || '',
+        previewText: data.previewText || '',
+        html: data.html || '',
+        plainText: data.plainText || '',
+        structuredBody,
+        bodyParagraphs: Array.isArray(data.bodyParagraphs) ? data.bodyParagraphs : [data.opening || ''],
+        ctaText: structuredBody.cta.label,
+        ctaUrl: structuredBody.cta.url,
+        closing: data.closing || '',
+        signature: data.signature || '',
+        footer: data.footer || '',
+        greeting: data.greeting || '',
+        opening: data.opening || '',
+        emailType,
+        evidenceSources: evidenceList,
+        quality: {
+          score: 1,
+          checks: {},
+          blockingIssues: [],
+        },
+        createdAt: new Date().toISOString(),
+        _provider: result.provider,
+      };
     }
   } catch (e) { /* fall through to rule-based */ }
   return FALLBACK_FAILURE;

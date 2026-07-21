@@ -56,6 +56,53 @@ const FOOTER_PATTERNS = [
   /follow us/i, /stay connected/i, /powered by/i, /built with/i
 ];
 
+const BOUNDARY_STOP_WORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'for', 'of', 'to', 'in', 'with', 'on', 'at', 'by',
+  'your', 'our', 'its', 'their', 'my', 'this', 'that', 'these', 'those'
+]);
+
+const DOMAIN_TERMS = new Set([
+  'meeting', 'meetings', 'video', 'conference', 'conferencing', 'call', 'calls',
+  'online', 'digital', 'software', 'platform', 'tool', 'app', 'application',
+  'business', 'enterprise', 'solution', 'solutions', 'service', 'services',
+  'security', 'secure', 'cloud', 'data', 'intelligence', 'automated', 'automation',
+  'integration', 'workspace', 'collaboration', 'collaborative', 'team', 'teams',
+  'communication', 'messaging', 'chat', 'email', 'document', 'documents',
+  'file', 'files', 'storage', 'sync', 'synchronization', 'calendar', 'schedule',
+  'scheduling', 'task', 'tasks', 'project', 'projects', 'workflow', 'workflows',
+  'productivity', 'efficiency', 'management', 'analytics', 'insight', 'insights',
+  'report', 'reports', 'dashboard', 'monitoring', 'network', 'networking',
+  'content', 'marketing', 'sales', 'customer', 'customers', 'support', 'training',
+  'learning', 'education', 'healthcare', 'recording', 'recordings', 'transcript',
+  'transcription', 'caption', 'captioning', 'host', 'hosting', 'participant',
+  'attendee', 'screen', 'sharing', 'presentation', 'presentations', 'slide', 'slides',
+  'whiteboard', 'poll', 'polls', 'breakout', 'room', 'rooms', 'channel', 'channels',
+  'group', 'groups', 'space', 'spaces', 'ai', 'machine', 'learning', 'deep',
+  'neural', 'algorithm', 'api', 'sdk', 'framework', 'library', 'database',
+  'server', 'client', 'frontend', 'backend', 'fullstack', 'developer', 'development',
+  'deployment', 'release', 'version', 'update', 'upgrade', 'migration', 'migrate',
+  'optimization', 'optimize', 'performance', 'scalability', 'reliability',
+  'availability', 'compliance', 'governance', 'audit', 'logging', 'monitoring',
+  'analytics', 'dashboard', 'visualization', 'insight', 'metric', 'metrics',
+  'kpi', 'roi', 'growth', 'revenue', 'cost', 'costs', 'pricing', 'subscription',
+  'license', 'licensing', 'tier', 'plan', 'plans', 'feature', 'features',
+  'benefit', 'benefits', 'capability', 'capabilities', 'functionality',
+  'integration', 'integrations', 'connector', 'connectors', 'extension', 'extensions',
+  'addon', 'addons', 'plugin', 'plugins', 'module', 'modules', 'template', 'templates',
+  'workflow', 'automation', 'orchestration', 'pipeline', 'pipeline', 'process', 'processes',
+  'google', 'microsoft', 'apple', 'amazon', 'aws', 'azure', 'zoom', 'slack', 'teams',
+  'outlook', 'gmail', 'drive', 'dropbox', 'box', 'notion', 'asana', 'trello', 'jira',
+  'confluence', 'salesforce', 'hubspot', 'zendesk', 'intercom', 'stripe', 'paypal',
+  'square', 'shopify', 'wordpress', 'drupal', 'joomla', 'react', 'angular', 'vue',
+  'node', 'python', 'java', 'go', 'rust', 'typescript', 'javascript', 'html', 'css'
+]);
+
+const BOILERPLATE_KEYWORDS = [
+  'cookie', 'privacy', 'terms', 'subscribe', 'sign up', 'all rights reserved',
+  'copyright', 'legal notice', 'disclaimer', 'sitemap', 'accessibility',
+  'cookie policy', 'privacy policy', 'terms of service'
+];
+
 const GENERIC_WORDS = new Set([
   'software', 'platform', 'tool', 'solution', 'app', 'service', 'product',
   'business', 'company', 'enterprise', 'management', 'system', 'online',
@@ -80,6 +127,54 @@ const INFORMATIONAL_KEYWORDS = new Set([
   'benefits', 'features', 'overview', 'introduction', 'basics'
 ]);
 
+export function rejectFragment(phrase) {
+  if (!phrase || typeof phrase !== 'string') return true;
+  const trimmed = phrase.trim();
+  const lower = trimmed.toLowerCase();
+
+  if (/https?:\/\//.test(lower)) return true;
+  if (/^www\.\S+/.test(lower)) return true;
+
+  if (/[#*_\[\]`]/.test(lower)) return true;
+
+  const words = lower.split(/\s+/).filter(w => w.length > 0);
+  if (words.length === 0) return true;
+
+  const startsWithBoundary = /^(a|an|the|and|or|for|of|to|in|with|on|at|by|your|our|its|their|my|this|that|these|those)\s/i;
+  if (startsWithBoundary.test(lower)) return true;
+
+  const endsWithBoundary = /\s+(a|an|the|and|or|for|of|to|in|with|on|at|by|your|our|its|their|my|this|that|these|those)$/i;
+  if (endsWithBoundary.test(lower)) return true;
+
+  const hangingEnd = /\s+(and|or|for|nor|but|yet|with|by|to|in|of|on|at|into|through|during|without|within|along|about|upon)\s*$/i;
+  if (hangingEnd.test(lower)) return true;
+
+  const fragmentStart = /^(your|our|their|its|my|this|that|these|those|best|some|any|no|each|every|both|few|more|most|only)\s+(best|no matter|way|same|own|very|about|more|most|some|any|all|each|every|both|few|just|only)\b/i;
+  if (fragmentStart.test(lower)) return true;
+
+  const contentWords = words.filter(w => !STOP_WORDS.has(w));
+  if (contentWords.length === 0) return true;
+
+  const allGeneric = words.every(w => STOP_WORDS.has(w) || GENERIC_WORDS.has(w) || BOUNDARY_STOP_WORDS.has(w));
+  if (words.length <= 2 && allGeneric) return true;
+
+  return false;
+}
+
+function isNonEnglish(text) {
+  if (!text || text.length < 3) return false;
+  const nonLatin = text.replace(/[a-zA-Z0-9\s.,!?;:'"\-_()@&%$#/=+~<>\[\]{}|^`]/g, '');
+  return nonLatin.length / text.length > 0.3;
+}
+
+function removeBoilerplate(texts) {
+  if (!Array.isArray(texts)) return [];
+  const lowerTexts = texts.map(t => t.toLowerCase());
+  return texts.filter((_, i) => {
+    return !BOILERPLATE_KEYWORDS.some(kw => lowerTexts[i].includes(kw));
+  });
+}
+
 export function detectLanguage(text) {
   if (!text || text.length < 20) return 'unknown';
   const commonEnglish = /^(the|a|an|is|are|was|were|been|have|has|had|do|does|did|will|would|can|could|should|may|might|shall|this|that|these|those|we|you|they|he|she|it|my|your|his|her|our|their|its|in|on|at|to|for|of|with|by|from|as|into|through|during|before|after|above|below|between|out|off|over|under|again|further|then|once|here|there|when|where|why|how|all|each|every|both|few|more|most|other|some|such|no|nor|not|only|own|same|so|than|too|very|just|because|about|up|down|and|but|or|if|while|although|since|until|upon|vs|versus)/im;
@@ -88,6 +183,7 @@ export function detectLanguage(text) {
 
 export function extractCandidatePhrases(sources = {}) {
   const candidates = new Map();
+  let rawCandidateCount = 0;
 
   const sourcePriority = {
     title: 10, description: 9, h1: 8, h2: 7, h3: 6,
@@ -97,7 +193,9 @@ export function extractCandidatePhrases(sources = {}) {
 
   for (const [sourceType, texts] of Object.entries(sources)) {
     const priority = sourcePriority[sourceType] || 3;
-    const items = Array.isArray(texts) ? texts : (texts ? [texts] : []);
+    let items = Array.isArray(texts) ? texts : (texts ? [texts] : []);
+    items = items.filter(item => !isNonEnglish(item));
+    items = removeBoilerplate(items);
     for (const item of items) {
       if (!item || typeof item !== 'string') continue;
       if (isPrivacyContent(item)) continue;
@@ -105,11 +203,8 @@ export function extractCandidatePhrases(sources = {}) {
       if (isFooterContent(item)) continue;
       if (isNavigationText(item)) continue;
       const phrases = extractPhrases(item);
+      rawCandidateCount += phrases.length;
       for (const phrase of phrases) {
-        if (isPrivacyContent(phrase)) continue;
-        if (isCookieContent(phrase)) continue;
-        if (isFooterContent(phrase)) continue;
-        if (isNavigationText(phrase)) continue;
         const existing = candidates.get(phrase);
         if (existing) {
           existing.priority = Math.max(existing.priority, priority);
@@ -127,29 +222,40 @@ export function extractCandidatePhrases(sources = {}) {
     }
   }
 
-  return Array.from(candidates.values());
+  return {
+    candidates: Array.from(candidates.values()),
+    rawCandidateCount
+  };
 }
 
 function extractPhrases(text, maxWords = 4, minWords = 2) {
-  const normalized = text.toLowerCase()
-    .replace(/[.,/#!$%^&*;:{}=\-_`~()"']/g, ' ')
+  const normalized = text
+    .replace(/[.,/#!$%^&*;:{}=\-_~`()"']/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   const words = normalized.split(' ').filter(w => w.length > 0);
+  const lowerWords = words.map(w => w.toLowerCase());
+  const capitalizedWords = new Set(
+    words.filter(w => /^[A-Z]/.test(w[0])).map(w => w.toLowerCase())
+  );
   const phrases = new Set();
 
   for (let len = Math.min(maxWords, words.length); len >= minWords; len--) {
     for (let i = 0; i <= words.length - len; i++) {
-      const window = words.slice(i, i + len);
-      const contentWords = window.filter(w => !STOP_WORDS.has(w) && w.length > 1);
+      const lowerWindow = lowerWords.slice(i, i + len);
+      const contentWords = lowerWindow.filter(w => !STOP_WORDS.has(w) && w.length > 1);
       if (contentWords.length < minWords) continue;
       if (contentWords.some(w => w.length > 25)) continue;
-      const phrase = window.join(' ');
+      const phrase = lowerWindow.join(' ');
       if (phrase.length < 5) continue;
       if (isNavigationText(phrase)) continue;
       if (isPrivacyContent(phrase)) continue;
       if (isCookieContent(phrase)) continue;
       if (isFooterContent(phrase)) continue;
+      if (rejectFragment(phrase)) continue;
+      const hasEntity = lowerWindow.some(w => capitalizedWords.has(w)) ||
+                        lowerWindow.some(w => DOMAIN_TERMS.has(w));
+      if (!hasEntity) continue;
       phrases.add(phrase);
     }
   }
@@ -370,7 +476,7 @@ export function buildKeywordSources(websiteData) {
   return sources;
 }
 
-export function rankAndFilterKeywords(keywords, productName = '', companyName = '') {
+export function rankAndFilterKeywords(keywords, productName = '', companyName = '', rawCandidateCount = 0) {
   const scored = keywords
     .map(kw => {
       const phrase = kw.phrase || kw.keyword || kw;
@@ -383,9 +489,10 @@ export function rankAndFilterKeywords(keywords, productName = '', companyName = 
   const addType = (items, type) => items.map(item => ({ ...item, type }));
 
   return {
+    rawCandidateCount,
     all: scored,
     primary: addType(scored.filter(k => k.relevanceScore >= 70).slice(0, 10), 'primary'),
-    secondary: addType(scored.filter(k => k.relevanceScore >= 50 && k.relevanceScore < 70).slice(0, 20), 'secondary'),
+    secondary: addType(scored.filter(k => k.relevanceScore >= 50 && k.relevanceScore < 70).slice(0, 15), 'secondary'),
     longTail: addType(scored.filter(k => k.phrase.split(' ').length >= 4).slice(0, 20), 'longTail'),
     question: addType(scored.filter(k => classifyKeyword(k.phrase) === 'question').slice(0, 10), 'question'),
     commercial: addType(scored.filter(k => classifyKeyword(k.phrase) === 'commercial').slice(0, 5), 'commercial'),

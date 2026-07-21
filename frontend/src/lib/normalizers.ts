@@ -800,6 +800,17 @@ export function normalizeSeo(data: any) {
     return { ...blogData, blogIdeas: filteredBlogs, ideas: filteredBlogs };
   })();
 
+  // Extract pageSpeed mobile/desktop performance from audit data
+  const psAudit = technicalData?.auditData?.pageSpeed || {};
+  const pageSpeedMobileScore = extractScore([
+    psAudit?.mobile?.lighthouseScores?.performance,
+    psAudit?.mobile?.performance,
+  ]) ?? null;
+  const pageSpeedDesktopScore = extractScore([
+    psAudit?.desktop?.lighthouseScores?.performance,
+    psAudit?.desktop?.performance,
+  ]) ?? null;
+
   const normalizedSeo = {
     ...seo,
     // API-compatible key aliases (tabs expect these exact names)
@@ -829,6 +840,8 @@ export function normalizeSeo(data: any) {
     bestPracticesScore,
     mobileScore,
     desktopScore,
+    pageSpeedMobileScore,
+    pageSpeedDesktopScore,
     // Identity aliases at top level for easy access
     websiteUrl: seo.identity?.websiteUrl || seo.websiteUrl || '',
     domain: seo.identity?.domain || seo.domain || '',

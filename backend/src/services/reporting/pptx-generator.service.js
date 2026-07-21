@@ -206,7 +206,8 @@ export async function generatePptx(data) {
     // ----------------------------------------------------------------
     if (hasSeo) {
       const comps = arr(seo?.competitors).slice(0, 8);
-      addSectionSlide(pptx, 'Competitor SEO', `${comps.length} SEO Competitors`, C.danger);
+      const hasPlatformComps = seo?.__raw?.competitorIntelligence?.competitors?.length > 0;
+      addSectionSlide(pptx, 'Competitor SEO', `${comps.length > 0 ? comps.length : hasPlatformComps ? 'Estimated' : '0'} SEO Competitors`, C.danger);
       if (comps.length > 0) {
         const maxScore = Math.max(...comps.map(c => c.seoAuthority || c.estimatedAuthority || 50), 1);
         comps.forEach((c, i) => {
@@ -218,6 +219,8 @@ export async function generatePptx(data) {
           pptx.addShape(pptx.ShapeType.roundRect, { x: 3.5, y: y + 0.08, w: Math.min(barW, 4.5), h: 0.3, fill: { color: auth >= 70 ? C.secondary : auth >= 40 ? C.accent : C.danger }, rectRadius: 0.05 });
           pptx.addText(`${auth}/100`, { x: 8.2, y, w: 1.3, h: 0.45, fontSize: 10, fontFace: FONT, color: auth >= 70 ? C.secondary : auth >= 40 ? C.accent : C.danger, bold: true });
         });
+      } else if (hasPlatformComps) {
+        pptx.addText('Competitor intelligence partially available — platform-level estimates present. Connect DataForSEO for detailed SERP analysis.', { x: 0.5, y: 2, w: 9, h: 0.5, fontSize: 14, fontFace: FONT, color: C.muted, italic: true });
       } else {
         pptx.addText('Competitor SEO data unavailable. Configure DataForSEO.', { x: 0.5, y: 2, w: 9, h: 0.5, fontSize: 14, fontFace: FONT, color: C.muted, italic: true });
       }

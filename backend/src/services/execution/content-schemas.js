@@ -224,84 +224,21 @@ const youtubeDescriptionSchema = z.object({
 });
 
 // ---------- EMAIL COPY ----------
-const subjectOptionSchema = z.object({
-  subject: z.string(),
-  angle: z.string().optional(),
-  evidence: z.string().optional(),
-  confidence: z.string().optional(),
-  aScore: z.number().optional(),
-  bScore: z.number().optional(),
-});
-
-const ctaObjectSchema = z.object({
-  label: z.string(),
-  destination: z.string().nullable().optional(),
-  offerType: z.string().optional(),
-  evidenceSource: z.string().optional(),
-  verified: z.boolean().optional(),
-  url: z.string().nullable().optional(),
-});
-
-const linkSchema = z.object({
-  label: z.string(),
-  url: z.string().nullable().optional(),
-  verified: z.boolean().optional(),
-});
-
 const emailCopySchema = z.object({
   _type: z.string().optional(),
-  assetName: z.string().optional(),
-  campaignName: z.string().optional(),
-  emailType: z.enum(['outreach', 'nurture', 'product_announcement', 'newsletter', 'follow_up', 'trial_conversion']),
-  audience: z.string().optional(),
-  goal: z.string().optional(),
-  subject: z.string(),
-  selectedSubject: z.string().optional(),
-  subjectOptions: z.array(subjectOptionSchema).default([]),
+  emailType: z.enum(['promotional', 'newsletter', 'product_announcement', 'nurture', 'outreach', 'follow_up', 'trial_conversion']),
+  subject: z.string().min(1),
   previewText: z.string().nullable(),
-  senderName: z.string().optional(),
-  replyTo: z.string().optional(),
   greeting: z.string(),
   opening: z.string(),
-  openingHook: z.string().optional(),
-  audienceProblem: z.string().optional(),
-  valueProposition: z.string().optional(),
-  benefits: z.array(z.string()).default([]),
-  featureHighlights: z.array(z.string()).default([]),
-  proof: z.string().nullable().optional(),
   bodyParagraphs: z.array(z.string()).min(1),
-  bulletPoints: z.array(z.string()).default([]),
   ctaText: z.string(),
   ctaUrl: z.string().nullable(),
-  primaryCta: ctaObjectSchema.optional(),
-  secondaryCta: ctaObjectSchema.nullable().optional(),
   closing: z.string(),
   signature: z.string(),
-  personalizationFields: z.array(z.string()).default([]),
-  personalizationVariables: z.array(z.object({
-    name: z.string(),
-    description: z.string(),
-    example: z.string().optional(),
-  })).default([]),
-  links: z.array(linkSchema).default([]),
-  sections: z.object({
-    preheader: z.string().optional(),
-    header: z.string().optional(),
-    body: z.string().optional(),
-    footer: z.string().optional(),
-    unsubscribe: z.string().optional(),
-    greeting: z.string().optional(),
-    openingHook: z.string().optional(),
-    audienceProblem: z.string().optional(),
-    valueProposition: z.string().optional(),
-    closing: z.string().optional(),
-    signature: z.string().optional(),
-  }).optional(),
-  complianceNote: z.string().nullable(),
-  qualityReport: z.object({
-    checks: z.record(z.any()).optional(),
-    overallStatus: z.string().optional(),
-  }).optional(),
+  footer: z.string().nullable(),
+  plainText: z.string().nullable(),
+  html: z.string().nullable(),
   evidenceUsed,
   claimsRequiringReview,
 });
@@ -418,6 +355,23 @@ export function normalizeLegacyAsset(raw, assetType) {
       raw.faqs = raw.faqItems;
       delete raw.faqItems;
     }
+  }
+
+  if (assetType === 'email_copy' || assetType === 'email_campaign' || assetType === 'email_nurture' || assetType === 'email_newsletter') {
+    if (raw.subjectLine && !raw.subject) raw.subject = raw.subjectLine;
+    if (raw.preheader && !raw.previewText) raw.previewText = raw.preheader;
+    if (raw.greetingText && !raw.greeting) raw.greeting = raw.greetingText;
+    if (raw.cta && !raw.ctaText) raw.ctaText = typeof raw.cta === 'object' ? raw.cta.label || raw.cta.text || '' : raw.cta;
+    if (raw.ctaUrl === undefined && raw.cta && typeof raw.cta === 'object') raw.ctaUrl = raw.cta.url || raw.cta.destination || null;
+    if (raw.body && !raw.bodyParagraphs) raw.bodyParagraphs = [raw.body];
+    if (!raw.bodyParagraphs && raw.sections?.body) raw.bodyParagraphs = [raw.sections.body];
+    if (raw.plainTextBody && !raw.plainText) raw.plainText = raw.plainTextBody;
+    if (raw.htmlBody && !raw.html) raw.html = raw.htmlBody;
+    if (raw.footerText && !raw.footer) raw.footer = raw.footerText;
+    delete raw.title;
+    delete raw.article;
+    delete raw.headline;
+    delete raw.blogContent;
   }
 
   return raw;

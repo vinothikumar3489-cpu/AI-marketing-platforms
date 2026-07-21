@@ -1,3 +1,5 @@
+import { buildSeoViewModel } from './seo-view-model.service.js';
+
 function esc(val) {
   if (val === null || val === undefined) return 'Data unavailable';
   const s = String(val);
@@ -887,9 +889,11 @@ ${buildSwotSection(market, data?.product, data?.channelData?.[0])}
 
 export function buildSeoReportHtml(data) {
   const { seo, company } = data;
-  const scores = seo?.scores || {};
+  const rawIntel = seo?.__raw;
+  const scores = rawIntel ? buildSeoViewModel(rawIntel) : (seo?.scores || {});
   const keywords = arr(seo?.keywords);
   const competitors = arr(seo?.competitors);
+  const hasPlatformCompetitors = rawIntel?.competitorIntelligence?.competitors?.length > 0;
   const gaps = arr(seo?.gaps);
   const geo = seo?.geo || {};
   const blogs = arr(seo?.blogs);
@@ -1009,8 +1013,8 @@ ${getReportStyles()}
       safe(c.overlapReason || c.reason || c.description),
       confidenceBadge(c.confidence || c.relevanceScore)
     ]),
-    'Competitor SEO data unavailable. Configure DataForSEO for competitor analysis.'
-  ) : '<div class="notice warn">Competitor SEO data unavailable. Configure DataForSEO for competitor analysis.</div>'}
+    'Competitor intelligence incomplete — estimated data available.'
+  ) : hasPlatformCompetitors ? '<div class="notice info">Competitor intelligence partially available — platform-level estimates present. Connect DataForSEO for detailed SERP analysis.</div>' : '<div class="notice warn">Competitor SEO data unavailable. Configure DataForSEO for competitor analysis.</div>'}
 </div>
 
 <div class="page-break"></div>

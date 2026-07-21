@@ -153,8 +153,8 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     const websiteData = modules.crawl.websiteData;
     if (websiteData) {
       const keywordSources = buildKeywordSources(websiteData);
-      let rawCandidates = extractCandidatePhrases(keywordSources);
-      rawCandidates = deduplicateKeywords(rawCandidates);
+      const { candidates: extractedCandidates, rawCandidateCount } = extractCandidatePhrases(keywordSources);
+      let rawCandidates = deduplicateKeywords(extractedCandidates);
 
       validatedKeywords = rawCandidates
         .filter(c => validateKeyword(c.phrase, identity?.productName, identity?.companyName))
@@ -219,7 +219,13 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
   try {
     if (providerSelection.selectedProvider === 'SERPAPI' || providerSelection.selectedProvider === 'DATAFORSEO') {
       const keywordMetrics = await resolveKeywordMetrics(validatedKeywords.slice(0, 20).map(k => k.keyword));
-      keywordIntelligence = buildKeywordIntelligence(validatedKeywords, keywordMetrics, identity);
+      const usableResultCount = keywordMetrics?.data?.length || 0;
+
+      if (usableResultCount > 0) {
+        keywordIntelligence = buildKeywordIntelligence(validatedKeywords, keywordMetrics, identity);
+      } else {
+        keywordIntelligence = buildKeywordIntelligence(validatedKeywords, { data: [] }, identity);
+      }
 
       const [competitorResult, serpResult, autoResult, trendResult] = await Promise.allSettled([
         discoverCompetitorsViaSerpAPI(identity?.productName || '', identity?.industry || '', websiteUrl),
@@ -250,8 +256,21 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
         trendAnalysis = trendResult.value.data;
       }
 
-      modules.searchEnrichment = { status: 'SUCCESS' };
-      console.log('[SEO MODULE RESULT]', { module: 'SearchEnrichment', status: 'SUCCESS', provider: providerSelection.selectedProvider });
+      if (usableResultCount > 0) {
+        modules.searchEnrichment = { status: 'SUCCESS', usableResultCount };
+        console.log('[SEO MODULE RESULT]', { module: 'SearchEnrichment', status: 'SUCCESS', provider: providerSelection.selectedProvider, usableResultCount });
+      } else if (providers?.dataforseo?.status === 'PAYMENT_REQUIRED') {
+        modules.searchEnrichment = { status: 'UNAVAILABLE', provider: 'DATAFORSEO', reason: 'PAYMENT_REQUIRED', usableResultCount: 0 };
+        warnings.push({ code: 'SEARCH_ENRICHMENT_UNAVAILABLE', message: 'Search enrichment unavailable: DataForSEO payment required' });
+        console.log('[SEO MODULE RESULT]', { module: 'SearchEnrichment', status: 'UNAVAILABLE', provider: 'DATAFORSEO', reason: 'PAYMENT_REQUIRED', usableResultCount: 0 });
+      } else if (keywordMetrics?.success === false) {
+        modules.searchEnrichment = { status: 'UNAVAILABLE', reason: providerSelection.reason || 'All providers unavailable', usableResultCount: 0 };
+        warnings.push({ code: 'SEARCH_ENRICHMENT_UNAVAILABLE', message: `Search enrichment unavailable: ${providerSelection.reason || 'No provider returned data'}` });
+        console.log('[SEO MODULE RESULT]', { module: 'SearchEnrichment', status: 'UNAVAILABLE', reason: providerSelection.reason, usableResultCount: 0 });
+      } else {
+        modules.searchEnrichment = { status: 'EMPTY', usableResultCount: 0 };
+        console.log('[SEO MODULE RESULT]', { module: 'SearchEnrichment', status: 'EMPTY', usableResultCount: 0 });
+      }
     } else {
       keywordIntelligence = buildKeywordIntelligence(validatedKeywords, { data: [] }, identity);
       modules.searchEnrichment = { status: 'UNAVAILABLE', reason: providerSelection.reason };
@@ -283,8 +302,6 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
   else unavailableModules.push('TECHNICAL_AUDIT');
   if (modules.crawl.status === 'SUCCESS') measuredModules.push('CRAWL');
   else unavailableModules.push('CRAWL');
-  if (modules.searchEnrichment.status === 'SUCCESS') measuredModules.push('SERP');
-  else unavailableModules.push('SERP');
   if (modules.searchConsole.status === 'SUCCESS') measuredModules.push('SEARCH_CONSOLE');
   else unavailableModules.push('SEARCH_CONSOLE');
 
@@ -293,7 +310,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
   let overallScore = null;
   let confidence = 'LOW';
   if (measuredModules.length > 0) {
-    const weights = { PAGESPEED_MOBILE: 20, PAGESPEED_DESKTOP: 15, TECHNICAL_AUDIT: 25, CRAWL: 15, SERP: 15, SEARCH_CONSOLE: 10 };
+    const weights = { PAGESPEED_MOBILE: 20, PAGESPEED_DESKTOP: 15, TECHNICAL_AUDIT: 25, CRAWL: 15, SEARCH_CONSOLE: 10 };
     const availableWeights = measuredModules.reduce((sum, m) => sum + (weights[m] || 10), 0);
     const renormalized = measuredModules.reduce((sum, m) => {
       const w = weights[m] || 10;
@@ -302,7 +319,6 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
         case 'PAGESPEED_DESKTOP': return sum + (pageSpeedDesktopScore * w);
         case 'TECHNICAL_AUDIT': return sum + (techScore * w);
         case 'CRAWL': return sum + (65 * w);
-        case 'SERP': return sum + (50 * w);
         case 'SEARCH_CONSOLE': return sum + (50 * w);
         default: return sum + (50 * w);
       }
@@ -311,6 +327,9 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     if (coverage >= 0.8) confidence = 'HIGH';
     else if (coverage >= 0.5) confidence = 'MEDIUM';
     else confidence = 'LOW';
+    if (confidence === 'HIGH' && modules.searchEnrichment.status !== 'SUCCESS') {
+      confidence = 'MEDIUM';
+    }
   }
 
   console.log('[SEO PARTIAL MODE]', {

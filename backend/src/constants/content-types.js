@@ -1,3 +1,11 @@
+export const CONTENT_TYPE_ENUM = {
+  BLOG_ARTICLE: 'blog_article',
+  SOCIAL_POST: 'social_post',
+  EMAIL_COPY: 'email_copy',
+  CONTENT_BRIEF: 'content_brief',
+  SCRIPT: 'script',
+};
+
 export const CONTENT_TYPES = {
   email_copy: { label: 'Email Copy' },
   email_campaign: { label: 'Email Campaign' },

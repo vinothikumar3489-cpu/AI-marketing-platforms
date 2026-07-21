@@ -7,7 +7,10 @@ const DATAFORSEO_API_URL = 'https://api.dataforseo.com/v3';
 console.log("[DataForSEO] login loaded", !!DATAFORSEO_LOGIN);
 console.log("[DataForSEO] password loaded", !!DATAFORSEO_PASSWORD);
 
-let _dataforseoAuthenticated = true;
+let _dataforseoVerified = false;
+let _dataforseoAuthFailed = false;
+let _dataforseoPaymentRequired = false;
+let _dataforseoBlockedUntil = 0;
 
 const GENERIC_KEYWORDS = new Set([
   'business', 'custom', 'systems', 'built', 'everything', 'right', 'before',
@@ -113,7 +116,11 @@ export function sanitizeKeywords(keywords) {
 }
 
 async function dataforseoRequest(endpoint, method = 'POST', body = null) {
-  if (!_dataforseoAuthenticated) {
+  if (Date.now() < _dataforseoBlockedUntil) {
+    return { success: false, error: 'DataForSEO temporarily blocked', unavailable: true, available: false, reason: 'PAYMENT_REQUIRED', statusCode: 40200, httpStatus: 402, status: 'PAYMENT_REQUIRED' };
+  }
+
+  if (_dataforseoAuthFailed) {
     return { success: false, error: 'DataForSEO unavailable: authentication previously failed', unavailable: true, available: false, reason: 'AUTHENTICATION_FAILED' };
   }
 
@@ -124,7 +131,7 @@ async function dataforseoRequest(endpoint, method = 'POST', body = null) {
 
   const authHeader = getAuthHeader();
   if (!authHeader) {
-    _dataforseoAuthenticated = false;
+    _dataforseoAuthFailed = true;
     return { success: false, error: 'DataForSEO credentials not configured', unavailable: true };
   }
 
@@ -154,7 +161,8 @@ async function dataforseoRequest(endpoint, method = 'POST', body = null) {
     console.log(`[DataForSEO] Response Status: ${response.status}`);
 
     if (response.status === 401) {
-      _dataforseoAuthenticated = false;
+      _dataforseoAuthFailed = true;
+      _dataforseoVerified = false;
       const errorText = await response.text();
       console.warn('⚠️ [DataForSEO] Authentication failed');
 
@@ -183,7 +191,9 @@ async function dataforseoRequest(endpoint, method = 'POST', body = null) {
     if (response.status === 402) {
       const errorText = await response.text();
       console.warn(`⚠️ [DataForSEO] Payment Required (402): ${endpoint}`);
-      _dataforseoAuthenticated = false;
+      _dataforseoBlockedUntil = Date.now() + 300000;
+      _dataforseoPaymentRequired = true;
+      _dataforseoVerified = false;
       return {
         success: false,
         error: 'DataForSEO credits exhausted (HTTP 402)',
@@ -225,6 +235,9 @@ async function dataforseoRequest(endpoint, method = 'POST', body = null) {
       }
     }
 
+    _dataforseoVerified = true;
+    _dataforseoAuthFailed = false;
+    _dataforseoPaymentRequired = false;
     return { success: true, data };
   } catch (error) {
     console.error(`❌ [DataForSEO] Request failed:`, error.message);
@@ -724,29 +737,29 @@ export function separateCompetitorsByType(competitors) {
 }
 
 export function isDataForSEOConfigured() {
+  if (process.env.SEO_PROVIDER_DATAFORSEO_ENABLED === 'false') return false;
   return !!(DATAFORSEO_LOGIN && DATAFORSEO_PASSWORD);
 }
 
 export function isDataForSEOAvailable() {
-  return isDataForSEOConfigured() && _dataforseoAuthenticated;
+  return isDataForSEOConfigured() && _dataforseoVerified && !_dataforseoPaymentRequired && Date.now() >= _dataforseoBlockedUntil;
 }
 
 export function getDataForSEOStatus() {
   const configured = isDataForSEOConfigured();
-  return {
-    provider: 'DataForSEO',
-    enabled: true,
-    configured,
-    available: configured && _dataforseoAuthenticated,
-    status: !configured ? 'NOT_CONFIGURED'
-      : _dataforseoAuthenticated ? 'AVAILABLE'
-      : 'AUTHENTICATION_FAILED',
-    reason: !configured ? 'DATAFORSEO_LOGIN or DATAFORSEO_PASSWORD not set'
-      : _dataforseoAuthenticated ? null
-      : 'DataForSEO authentication failed or credits exhausted',
-    searchedRemaining: null,
-    checkedAt: new Date().toISOString()
-  };
+  if (!configured) {
+    return { provider: 'DataForSEO', enabled: true, configured: false, available: false, status: 'NOT_CONFIGURED', reason: 'DATAFORSEO_LOGIN or DATAFORSEO_PASSWORD not set', searchesRemaining: null, checkedAt: new Date().toISOString() };
+  }
+  if (Date.now() < _dataforseoBlockedUntil || _dataforseoPaymentRequired) {
+    return { provider: 'DataForSEO', enabled: true, configured: true, available: false, status: 'PAYMENT_REQUIRED', reason: 'DataForSEO credits exhausted (HTTP 402)', searchesRemaining: null, checkedAt: new Date().toISOString() };
+  }
+  if (_dataforseoAuthFailed) {
+    return { provider: 'DataForSEO', enabled: true, configured: true, available: false, status: 'AUTHENTICATION_FAILED', reason: 'DataForSEO authentication failed', searchesRemaining: null, checkedAt: new Date().toISOString() };
+  }
+  if (_dataforseoVerified) {
+    return { provider: 'DataForSEO', enabled: true, configured: true, available: true, status: 'AVAILABLE', reason: null, searchesRemaining: null, checkedAt: new Date().toISOString() };
+  }
+  return { provider: 'DataForSEO', enabled: true, configured: true, available: false, status: 'CONFIGURED_UNVERIFIED', reason: 'Credentials present but not yet verified', searchesRemaining: null, checkedAt: new Date().toISOString() };
 }
 
 // ============================================

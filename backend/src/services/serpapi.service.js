@@ -39,7 +39,7 @@ const _keyConfigured = (() => {
 
 if (SERPAPI_API_KEY) {
   console.log('[SERPAPI DIAG]', {
-    keyPresent: true, keyLength: SERPAPI_API_KEY.length, keySuffix: SERPAPI_API_KEY.slice(-4),
+    keyPresent: true, keyLength: SERPAPI_API_KEY.length,
     isPlaceholder: isPlaceholderKey(SERPAPI_API_KEY), configured: _keyConfigured
   });
 } else {
@@ -48,11 +48,7 @@ if (SERPAPI_API_KEY) {
 
 function _keyDiagnostic() {
   if (!SERPAPI_API_KEY || !_keyConfigured) return { configured: false };
-  return {
-    configured: true,
-    keyLength: SERPAPI_API_KEY.length,
-    suffix: SERPAPI_API_KEY.slice(-4)
-  };
+  return { configured: true, keyLength: SERPAPI_API_KEY.length };
 }
 
 export async function getSerpAPIStatus() {
@@ -75,7 +71,7 @@ export async function getSerpAPIStatus() {
       searchesRemaining: null,
       checkedAt: new Date(now).toISOString()
     };
-    console.log('[SEO SERPAPI STATUS]', { ..._lastStatus, keyDiagnostic: _keyDiagnostic() });
+      console.log('[SEO SERPAPI STATUS]', { ..._lastStatus, keyDiagnostic: { configured: !!SERPAPI_API_KEY, keyLength: SERPAPI_API_KEY?.length } });
     return { ..._lastStatus };
   }
 
@@ -99,7 +95,7 @@ export async function getSerpAPIStatus() {
         reason: 'SerpAPI rejected the API key (HTTP 401)',
         searchesRemaining: null, checkedAt: new Date(now).toISOString()
       };
-      console.log('[SEO SERPAPI STATUS]', _lastStatus);
+      console.log('[SEO SERPAPI STATUS]', { configured: !!SERPAPI_API_KEY, keyLength: SERPAPI_API_KEY?.length, statusCode: 401 });
       return { ..._lastStatus };
     }
 

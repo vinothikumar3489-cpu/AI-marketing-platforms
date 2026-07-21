@@ -40,17 +40,35 @@ export function EmailAutomationWorkspace() {
   const [sendResult, setSendResult] = useState<any>(null);
   const [testSendResult, setTestSendResult] = useState<any>(null);
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile' | 'dark'>('desktop');
+  const [previewTab, setPreviewTab] = useState<'html' | 'plain'>('html');
   const [showPreview, setShowPreview] = useState(false);
   const [copied, setCopied] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduling, setScheduling] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
   const [workflowStep, setWorkflowStep] = useState(0);
+  const [brevoHealth, setBrevoHealth] = useState<any>(null);
+  const [verificationErrors, setVerificationErrors] = useState<string[]>([]);
 
   useEffect(() => {
     if (!selectedChatId) return;
     loadCampaigns();
+    fetchBrevoHealth();
   }, [selectedChatId]);
+
+  async function fetchBrevoHealth() {
+    try {
+      const res = await fetch('/api/integrations/health', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+      });
+      const data = await res.json();
+      if (data?.success) {
+        setBrevoHealth(data.providers?.email || null);
+      }
+    } catch {}
+  }
+
+
 
   async function loadCampaigns() {
     if (!selectedChatId) return;
@@ -109,11 +127,26 @@ export function EmailAutomationWorkspace() {
       const result = await getEmailCampaign(selectedChatId, campaignId);
       setSelectedCampaign(result);
       setView('detail');
+      setVerificationErrors(computePreSendErrors(result));
     } catch (err: any) {
       setError(err.message || 'Failed to load campaign');
     } finally {
       setLoading(false);
     }
+  }
+
+  function computePreSendErrors(campaign: any): string[] {
+    const errors: string[] = [];
+    if (!brevoHealth?.brevoConfigured) errors.push('Brevo API key not configured');
+    if (!brevoHealth?.from) errors.push('Sender email not verified in Brevo');
+    if (!campaign) { errors.push('No campaign selected'); return errors; }
+    if (campaign.status !== 'approved' && campaign.approvalStatus !== 'APPROVED') errors.push('Campaign not approved');
+    const item = campaign.sequenceItems?.[0];
+    if (!item?.responsiveHtml && !item?.emailBodyHtml) errors.push('No HTML content generated');
+    if (!item?.emailBodyText) errors.push('No plain text content generated');
+    if (!campaign.audienceSummary && !campaign.totalEmails) errors.push('No audience/recipients configured');
+    if (!item?.unsubscribeFooter && !item?.emailBodyHtml?.includes('unsubscribe')) errors.push('Unsubscribe handling missing in email');
+    return errors;
   }
 
   async function handleEditItem(itemId: string, field: string, value: string) {
@@ -166,7 +199,9 @@ export function EmailAutomationWorkspace() {
     if (!selectedChatId || !selectedCampaign) return;
     try {
       const result = await approveEmailCampaign(selectedChatId, selectedCampaign.id);
-      setSelectedCampaign((prev: any) => ({ ...prev, ...result }));
+      const updated = { ...selectedCampaign, ...result };
+      setSelectedCampaign(updated);
+      setVerificationErrors(computePreSendErrors(updated));
       setWorkflowStep(3);
     } catch (err: any) {
       setError(err.message || 'Failed to approve');
@@ -206,6 +241,9 @@ export function EmailAutomationWorkspace() {
 
   async function handleTestSend() {
     if (!selectedChatId || !selectedCampaign || !testRecipient.trim()) return;
+    const errors = computePreSendErrors(selectedCampaign);
+    setVerificationErrors(errors);
+    if (errors.length > 0) return;
     setSendingTest(true);
     setTestSendResult(null);
     try {
@@ -221,6 +259,9 @@ export function EmailAutomationWorkspace() {
 
   async function handleRealSend() {
     if (!selectedChatId || !selectedCampaign) return;
+    const errors = computePreSendErrors(selectedCampaign);
+    setVerificationErrors(errors);
+    if (errors.length > 0) return;
     setSendingReal(true);
     setSendResult(null);
     try {
@@ -360,18 +401,14 @@ export function EmailAutomationWorkspace() {
     const logs: any[] = campaign.logs || [];
     const channelFit = campaign.channelFit;
     const firstItem = items[0] || {};
-    const preview = firstItem.preview || {};
-    const sectionTexts = preview?.sections || {};
 
     function getPreviewHtml() {
-      if (previewMode === 'desktop') return preview?.desktopPreview?.html || firstItem.emailBodyHtml || '';
-      if (previewMode === 'mobile') return preview?.mobilePreview?.html || firstItem.responsiveHtml || '';
-      if (previewMode === 'dark') return preview?.darkModePreview?.html || preview?.desktopPreview?.html || '';
-      return '';
+      return firstItem.html || firstItem.emailBodyHtml || firstItem.responsiveHtml || '';
     }
 
     function getWordCount() {
-      return preview?.plainText?.words || firstItem.emailBodyText?.split(/\s+/).filter(Boolean).length || 0;
+      const pt = firstItem.plainText || firstItem.emailBodyText || '';
+      return pt.split(/\s+/).filter(Boolean).length;
     }
 
     return (
@@ -500,6 +537,8 @@ export function EmailAutomationWorkspace() {
               onCopyText={() => copyText(firstItem.emailBodyText || '')}
               onDownloadPdf={() => downloadPdf(firstItem.responsiveHtml || firstItem.emailBodyHtml || '', `${campaign.name || 'email'}-${firstItem.subjectLine || 'campaign'}`)}
               copied={copied}
+              brevoHealth={brevoHealth}
+              verificationErrors={verificationErrors}
             />
 
             <div style={{ fontSize: '11px', color: '#6b7a93', padding: '8px' }}>
@@ -540,6 +579,7 @@ export function EmailAutomationWorkspace() {
         {showPreview && (
           <div style={{
             background: '#0f1729', borderRadius: '8px', border: '1px solid #293245', overflow: 'hidden',
+            minHeight: '300px', display: 'flex', flexDirection: 'column',
           }}>
             <div style={{
               padding: '10px 16px', borderBottom: '1px solid #293245',
@@ -552,24 +592,55 @@ export function EmailAutomationWorkspace() {
                 </span>
               </div>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '11px', color: '#6b7a93' }}>
+                <button onClick={() => setPreviewTab('html')} style={{
+                  padding: '2px 8px', borderRadius: '4px', border: '1px solid #293245',
+                  background: previewTab === 'html' ? 'rgba(83,167,255,0.15)' : 'transparent',
+                  color: previewTab === 'html' ? '#53a7ff' : '#6b7a93', cursor: 'pointer', fontSize: '11px',
+                }}>HTML</button>
+                <button onClick={() => setPreviewTab('plain')} style={{
+                  padding: '2px 8px', borderRadius: '4px', border: '1px solid #293245',
+                  background: previewTab === 'plain' ? 'rgba(83,167,255,0.15)' : 'transparent',
+                  color: previewTab === 'plain' ? '#53a7ff' : '#6b7a93', cursor: 'pointer', fontSize: '11px',
+                }}>Plain Text</button>
+                <span>|</span>
                 <span>{getWordCount()} words</span>
                 <span>|</span>
                 <span>{Math.max(1, Math.round(getWordCount() / 200))} min read</span>
               </div>
             </div>
-            <div style={{
-              padding: '20px', maxHeight: '600px', overflow: 'auto',
-              display: 'flex', justifyContent: 'center',
-              background: previewMode === 'dark' ? '#0a0a14' : '#f0f0f5',
-            }}>
+
+            {(firstItem.subjectLine || firstItem.previewText) && (
               <div style={{
-                width: previewMode === 'mobile' ? '375px' : '100%',
-                maxWidth: previewMode === 'mobile' ? '375px' : '600px',
-                background: previewMode === 'dark' ? '#1a1a2e' : '#ffffff',
-                borderRadius: '8px', overflow: 'hidden',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                padding: '12px 16px', borderBottom: '1px solid #293245',
+                background: '#0d1421',
               }}>
-                {firstItem.emailBodyHtml ? (
+                {firstItem.subjectLine && (
+                  <div style={{ color: '#e5e7eb', fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>
+                    {firstItem.subjectLine}
+                  </div>
+                )}
+                {firstItem.previewText && (
+                  <div style={{ color: '#9aa7bd', fontSize: '12px', fontStyle: 'italic' }}>
+                    {firstItem.previewText}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {previewTab === 'html' && (firstItem.html || firstItem.emailBodyHtml || firstItem.responsiveHtml) ? (
+              <div style={{
+                padding: '20px', flex: 1,
+                display: 'flex', justifyContent: 'center',
+                background: previewMode === 'dark' ? '#0a0a14' : '#f0f0f5',
+                minHeight: '300px',
+              }}>
+                <div style={{
+                  width: previewMode === 'mobile' ? '375px' : '100%',
+                  maxWidth: previewMode === 'mobile' ? '375px' : '600px',
+                  background: previewMode === 'dark' ? '#1a1a2e' : '#ffffff',
+                  borderRadius: '8px', overflow: 'hidden',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                }}>
                   <iframe
                     srcDoc={getPreviewHtml()}
                     title="Email Preview"
@@ -578,12 +649,89 @@ export function EmailAutomationWorkspace() {
                       height: previewMode === 'mobile' ? '700px' : '500px',
                     }}
                   />
-                ) : (
-                  <div style={{ padding: '24px', color: '#6b7a93', fontSize: '13px', whiteSpace: 'pre-wrap' }}>
-                    {firstItem.emailBodyText || 'No email content available'}
-                  </div>
-                )}
+                </div>
               </div>
+            ) : previewTab === 'plain' && (firstItem.plainText || firstItem.emailBodyText) ? (
+              <div style={{
+                padding: '20px', flex: 1,
+                background: '#0d1421',
+                minHeight: '300px', overflow: 'auto',
+              }}>
+                <pre style={{
+                  margin: 0, color: '#e5e7eb', fontSize: '13px',
+                  fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                  lineHeight: 1.5,
+                }}>
+                  {firstItem.plainText || firstItem.emailBodyText}
+                </pre>
+              </div>
+            ) : (
+              <div style={{
+                padding: '40px 20px', textAlign: 'center', color: '#6b7a93', fontSize: '13px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', minHeight: '300px',
+                justifyContent: 'center',
+              }}>
+                <AlertTriangle size={24} style={{ color: '#ffb347' }} />
+                <div>No email content available</div>
+                <div style={{ fontSize: '11px', color: '#4a5568' }}>Generate the email campaign first or edit an item to add content.</div>
+              </div>
+            )}
+
+            <div style={{
+              padding: '10px 16px', borderTop: '1px solid #293245',
+              display: 'flex', gap: '8px', flexWrap: 'wrap',
+              background: '#0d1421',
+            }}>
+              <button onClick={() => handleRegenerateItem(firstItem.id)}
+                disabled={regeneratingItem === firstItem.id || !firstItem.id}
+                style={{
+                  padding: '6px 12px', borderRadius: '4px', border: '1px solid #a855f7',
+                  background: 'rgba(168,85,247,0.12)', color: '#a855f7', cursor: 'pointer', fontSize: '11px',
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                  opacity: regeneratingItem === firstItem.id || !firstItem.id ? 0.5 : 1,
+                }}>
+                {regeneratingItem === firstItem.id ? <Loader2 className="spin" size={12} /> : <RotateCcw size={12} />}
+                Regenerate
+              </button>
+              <button onClick={handleCreateVersion} style={{
+                padding: '6px 12px', borderRadius: '4px', border: '1px solid #293245',
+                background: '#101622', color: '#9aa7bd', cursor: 'pointer', fontSize: '11px',
+                display: 'flex', alignItems: 'center', gap: '4px',
+              }}>
+                <FileText size={12} /> Save Draft
+              </button>
+              <button onClick={handleApprove}
+                disabled={campaign.approvalStatus !== 'PENDING_REVIEW'}
+                style={{
+                  padding: '6px 12px', borderRadius: '4px', border: '1px solid #10e18b',
+                  background: 'rgba(16,225,139,0.12)', color: '#10e18b', cursor: 'pointer', fontSize: '11px',
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                  opacity: campaign.approvalStatus === 'PENDING_REVIEW' ? 1 : 0.5,
+                }}>
+                <ThumbsUp size={12} /> Approve
+              </button>
+              <button onClick={handleTestSend}
+                disabled={sendingTest || !testRecipient.trim()}
+                style={{
+                  padding: '6px 12px', borderRadius: '4px', border: '1px solid #53a7ff',
+                  background: 'rgba(83,167,255,0.15)', color: '#53a7ff', cursor: 'pointer', fontSize: '11px',
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                  opacity: sendingTest || !testRecipient.trim() ? 0.5 : 1,
+                }}>
+                {sendingTest ? <Loader2 className="spin" size={12} /> : <Send size={12} />}
+                Send Test
+              </button>
+              <button onClick={handleSchedule}
+                disabled={scheduling || !scheduleDate}
+                style={{
+                  padding: '6px 12px', borderRadius: '4px', border: '1px solid #7c3aed',
+                  background: 'rgba(124,58,237,0.12)', color: '#a855f7', cursor: 'pointer', fontSize: '11px',
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                  opacity: scheduling || !scheduleDate ? 0.5 : 1,
+                }}>
+                {scheduling ? <Loader2 className="spin" size={12} /> : <Calendar size={12} />}
+                Schedule
+              </button>
             </div>
           </div>
         )}
@@ -1094,14 +1242,18 @@ function SenderPanel({
   campaign, testRecipient, onTestRecipientChange, onTestSend, onRealSend,
   sendingTest, sendingReal, testSendResult, sendResult, approvalStatus, item,
   onCopyHtml, onDownloadHtml, onDownloadText, onCopyText, onDownloadPdf, copied,
+  brevoHealth, verificationErrors,
 }: {
   campaign: any; testRecipient: string; onTestRecipientChange: (v: string) => void;
   onTestSend: () => void; onRealSend: () => void;
   sendingTest: boolean; sendingReal: boolean; testSendResult: any; sendResult: any;
   approvalStatus?: string; item: any;
   onCopyHtml: () => void; onDownloadHtml: () => void; onDownloadText: () => void; onCopyText: () => void; onDownloadPdf: () => void; copied: boolean;
+  brevoHealth: any; verificationErrors: string[];
 }) {
   const isApproved = approvalStatus === 'APPROVED';
+  const canSend = isApproved && verificationErrors.length === 0;
+  const canSendTest = isApproved && testRecipient.trim().length > 0 && verificationErrors.length === 0;
 
   return (
     <Card>
@@ -1162,27 +1314,39 @@ function SenderPanel({
             flex: 1, padding: '6px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px',
             color: '#e5e7eb', fontSize: '11px',
           }} />
-          <button onClick={onTestSend} disabled={sendingTest || !testRecipient.trim() || !isApproved} style={{
+          <button onClick={onTestSend} disabled={sendingTest || !canSendTest} style={{
             padding: '6px 12px', borderRadius: '4px', border: '1px solid #53a7ff',
             background: 'rgba(83,167,255,0.15)', color: '#53a7ff', cursor: 'pointer', fontSize: '11px', fontWeight: 600,
-            opacity: sendingTest || !testRecipient.trim() || !isApproved ? 0.5 : 1, whiteSpace: 'nowrap',
+            opacity: sendingTest || !canSendTest ? 0.5 : 1, whiteSpace: 'nowrap',
           }}>
             {sendingTest ? <><Loader2 className="spin" size={12} /> Sending...</> : 'Test Send'}
           </button>
         </div>
-        {!isApproved && (
+
+        {verificationErrors.length > 0 && (
+          <div style={{ fontSize: '10px', color: '#ff4757', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {verificationErrors.map((err, i) => (
+              <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <AlertTriangle size={10} /> {err}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {!isApproved && verificationErrors.length === 0 && (
           <div style={{ fontSize: '10px', color: '#ffb347' }}>Approve the campaign before sending.</div>
         )}
+
         {testSendResult && (
           <div style={{ padding: '6px 10px', borderRadius: '4px', fontSize: '11px', background: testSendResult.success ? 'rgba(16,225,139,0.08)' : 'rgba(255,71,87,0.08)', border: `1px solid ${testSendResult.success ? 'rgba(16,225,139,0.2)' : 'rgba(255,71,87,0.2)'}` }}>
             {testSendResult.success ? <>Submitted to Brevo (ID: {testSendResult.providerMessageId || testSendResult.data?.providerMessageId})</> : <>Failed: {testSendResult.error}</>}
           </div>
         )}
-        <button onClick={onRealSend} disabled={sendingReal || !isApproved} style={{
+        <button onClick={onRealSend} disabled={sendingReal || !canSend} style={{
           padding: '8px 16px', borderRadius: '6px', border: '1px solid #10e18b',
           background: 'rgba(16,225,139,0.12)', color: '#10e18b', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
           display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center',
-          opacity: sendingReal || !isApproved ? 0.5 : 1,
+          opacity: sendingReal || !canSend ? 0.5 : 1,
         }}>
           {sendingReal ? <><Loader2 className="spin" size={14} /> Sending...</> : <><Send size={14} /> Send Campaign</>}
         </button>
