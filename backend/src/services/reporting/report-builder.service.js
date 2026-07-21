@@ -104,7 +104,7 @@ export async function buildReportData(chatId, userId) {
 
   const hasMarketData = market?.tam && market.tam !== 'Unknown' && market.tam !== 'Not measured';
   const industry = company?.industry || input?.industry || 'technology';
-  const audience = company?.targetMarket || input?.targetAudience || 'business professionals';
+  const audienceLabel = company?.targetMarket || input?.targetAudience || 'business professionals';
 
   function estimateMarketValue(field, label) {
     if (market?.[field] && market[field] !== 'Unknown' && market[field] !== 'Not measured') return market[field];
@@ -115,7 +115,7 @@ export async function buildReportData(chatId, userId) {
   const marketData = {
     tam: estimateMarketValue('tam', 'TAM') || `Estimated $30B – $200B (global ${industry} market)`,
     tamConfidence: market?.tamConfidence || 'Estimated (industry benchmark)',
-    sam: estimateMarketValue('sam', 'SAM') || `Estimated 3% – 10% of TAM (${audience} segment)`,
+    sam: estimateMarketValue('sam', 'SAM') || `Estimated 3% – 10% of TAM (${audienceLabel} segment)`,
     samConfidence: market?.samConfidence || 'Estimated (segment projection)',
     som: estimateMarketValue('som', 'SOM') || `Estimated 0.15% – 1.5% of SAM (realistic near-term)`,
     somConfidence: market?.somConfidence || 'Estimated (stage-adjusted)',
