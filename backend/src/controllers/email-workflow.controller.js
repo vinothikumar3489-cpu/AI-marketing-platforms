@@ -6,7 +6,7 @@
 import { generateEmailCopy } from '../services/execution/content-studio.service.js';
 import { validateEmail, validateForSending } from '../services/execution/email-validator.service.js';
 import { generateEmailHtmlTemplate, generatePlainTextFromEmailData } from '../services/execution/email-html-generator.service.js';
-import { sendTransactionalEmail, sendTestEmail, scheduleEmail, cancelScheduledEmail } from '../services/integrations/email/brevo.provider.js';
+import { sendTransactionalEmail, sendTestEmail, scheduleEmail, cancelScheduledEmail, getDeliveryStatus as getBrevoDeliveryStatus } from '../services/integrations/email/brevo.provider.js';
 import { 
   saveEmailDraft, 
   updateEmailTemplate, 
