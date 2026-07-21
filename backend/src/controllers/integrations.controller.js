@@ -1,4 +1,4 @@
-import { sendTestEmail, checkEmailProvider } from '../services/integrations/email.service.js';
+import { sendTestEmail, checkEmailProvider } from '../services/integrations/email/email-service-legacy.js';
 import { checkStorageProvider, testCloudinaryConnection } from '../services/integrations/storage.service.js';
 import { generateImage } from '../services/integrations/imageExecution.service.js';
 import { renderVideo, getVideoStatus } from '../services/integrations/videoExecution.service.js';

@@ -1,5 +1,5 @@
 import { callAI } from "../../ai/services/aiRouter.service.js";
-import { sendTestEmail } from "../integrations/email.service.js";
+import { sendTestEmail } from "../integrations/email/email-service-legacy.js";
 import { getEmailProviderHealth } from "../integrations/email/email-provider-registry.js";
 
 // Email campaign types with purpose and audience metadata
