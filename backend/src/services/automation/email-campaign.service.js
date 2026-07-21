@@ -1,7 +1,6 @@
 import { prisma } from "../../config/prisma.js";
 import { callAI } from "../../ai/services/aiRouter.service.js";
 import { sendEmail, getEmailProviderHealth } from "../integrations/email/email-provider-registry.js";
-import { renderEmailHtml, renderPlainText } from "../email/email-template-renderer.service.js";
 
 function buildRichContext(plan, evidence, productIntelligence, seoData, campaignData, audienceData, competitorData) {
   const website = evidence?.website || {};
@@ -36,6 +35,12 @@ function buildRichContext(plan, evidence, productIntelligence, seoData, campaign
     ...(Array.isArray(evidence?.seo?.keywords?.value) ? evidence.seo.keywords.value : [])
   ].filter(Boolean).slice(0, 10);
 
+  const testimonials = [
+    ...(Array.isArray(product.testimonials) ? product.testimonials : []),
+    ...(Array.isArray(website.testimonials) ? website.testimonials : []),
+    ...(Array.isArray(evidence?.social?.testimonials?.value) ? evidence.social.testimonials.value : [])
+  ].filter(Boolean).slice(0, 3);
+
   return {
     productName: product.name || product.productName || company.name || plan?.inputJson?.productName || '',
     companyName: company.name || company.companyName || plan?.inputJson?.companyName || '',
@@ -59,6 +64,7 @@ function buildRichContext(plan, evidence, productIntelligence, seoData, campaign
     revenueModel: product.revenueModel || '',
     ctaTexts: (website.ctaTexts?.value || website.ctaTexts || []).slice(0, 3),
     socialProof: (product.testimonials || product.caseStudies || []).slice(0, 3),
+    testimonials,
     evidenceSources: evidence?.sourceSummary?.sourcesCollected || []
   };
 }
@@ -68,75 +74,88 @@ function buildAIPrompt(context, emailType = 'campaign') {
   const painPoints = context.audiencePainPoints.join(', ') || 'Not specified';
   const competitors = context.competitorNames.join(', ') || 'Not specified';
   const keywords = context.seoKeywords.join(', ') || 'Not specified';
+  const testimonials = context.testimonials.join(', ') || 'Not specified';
 
-  return `You are a Senior Email Marketing Strategist. Generate a unique, high-converting ${emailType} email using ONLY the verified context below.
+  return `You are a Senior Email Marketing Strategist at a leading SaaS company. Generate an exceptional, high-converting ${emailType} email using ONLY the verified context below.
 
-COMPANY & PRODUCT (REAL - DO NOT CHANGE):
-- Product: ${context.productName || 'N/A'}
-- Company: ${context.companyName || 'N/A'}
-- Industry: ${context.industry || 'N/A'}
-- Category: ${context.productCategory || 'N/A'}
-- Business Model: ${context.businessModel || 'N/A'}
-- Pricing: ${context.pricingModel || 'N/A'}
-- Value Proposition: ${context.valueProposition || 'N/A'}
+COMPANY & PRODUCT (REAL - USE EXACTLY):
+- Product Name: "${context.productName || 'N/A'}"
+- Company Name: "${context.companyName || 'N/A'}"
+- Industry: "${context.industry || 'N/A'}"
+- Category: "${context.productCategory || 'N/A'}"
+- Business Model: "${context.businessModel || 'N/A'}"
+- Pricing: "${context.pricingModel || 'N/A'}"
+- Value Proposition: "${context.valueProposition || 'N/A'}"
 
 TARGET AUDIENCE:
-- Audience: ${context.targetAudience || 'N/A'}
-- Role: ${context.audienceRole || 'N/A'}
-- Industry: ${context.audienceIndustry || 'N/A'}
-- Company Size: ${context.companySize || 'N/A'}
+- Audience: "${context.targetAudience || 'N/A'}"
+- Role: "${context.audienceRole || 'N/A'}"
+- Industry: "${context.audienceIndustry || 'N/A'}"
+- Company Size: "${context.companySize || 'N/A'}"
 - Pain Points: ${painPoints}
 
-PRODUCT FEATURES & BENEFITS:
+PRODUCT DETAILS:
 - Features: ${features}
 - Tone: ${context.tone || 'professional'}
-- Brand Voice: ${context.brandVoice || 'N/A'}
+- Brand Voice: "${context.brandVoice || 'N/A'}"
 
 COMPETITIVE LANDSCAPE:
 - Competitors: ${competitors}
 
 SEO KEYWORDS: ${keywords}
 
-Generate a complete email with these EXACT sections:
-- Subject Line (max 60 chars, specific to product, no clickbait)
-- Preview Text (max 100 chars)
-- Opening Hook (personalized, pain-point driven)
-- Problem Statement (reference audience pain points)
-- Solution Introduction (position product as solution)
-- Features & Benefits (use actual features from context)
-- Social Proof (reference adoption, trust signals - NO fake statistics)
-- Call to Action (specific, action-oriented)
-- Closing (warm, professional)
-- Signature (include company name)
-- P.S. (optional reinforcement of key benefit)
+TESTIMONIALS / SOCIAL PROOF: ${testimonials}
 
-Return ONLY valid JSON:
+Generate a complete, professional email with ALL of these exact sections. Every section must be unique, specific to ${context.productName}, and use real context data:
+
+1. SUBJECT LINE (max 50 chars, specific to product, must include product name, no clickbait, no all-caps)
+2. PREVIEW TEXT (max 100 chars, compelling reason to open, must mention ${context.productName})
+3. OPENING HOOK (2-3 sentences, personalized, pain-point driven, must reference ${context.targetAudience || 'the reader'})
+4. PAIN POINT (2-3 sentences, describe the specific problem from pain points above, make it relatable)
+5. SOLUTION INTRODUCTION (2-3 sentences, position ${context.productName} as the solution, reference specific features)
+6. FEATURE SECTION (3-5 bullet points, each feature must be a REAL feature from the Features list, with specific benefit)
+7. BENEFITS SECTION (3-5 bullet points, each benefit tied to audience pain points, use "You can..." format)
+8. CUSTOMER STORY (1-2 sentences, brief relatable scenario showing how ${context.productName} helps)
+9. SOCIAL PROOF (1-2 sentences, reference testimonials or adoption without fake statistics)
+10. CALL TO ACTION (1 sentence, specific action-oriented CTA using "${context.productName}" name, button-style text)
+11. CLOSING (1-2 sentences, warm professional sign-off)
+12. SIGNATURE (include "${context.companyName || 'The Team'}" Team and a sender name)
+13. FOOTER (professional footer with company info, copyright ${new Date().getFullYear()})
+14. P.S. (1 sentence, reinforce key benefit or create urgency)
+
+CRITICAL RULES:
+1. Use ONLY the verified context above. NEVER invent statistics, ROI, conversion rates, or customer counts.
+2. NEVER use: "studies show", "research indicates", "industry experts say", "join X+ customers", "trusted by X companies", "over X businesses"
+3. NEVER fabricate testimonials or case studies.
+4. The product name "${context.productName || 'the product'}" MUST appear at least 5 times throughout the email.
+5. Every feature mentioned MUST come from the Features list above.
+6. Every pain point MUST come from the Pain Points list above.
+7. Subject line MUST include "${context.productName || 'the product'}" and be under 50 characters.
+8. Total email body (excluding signature/footer) MUST be at least 500 words.
+9. Brand voice must be consistent throughout - maintain ${context.tone || 'professional'} tone.
+10. No generic placeholders like "your product", "our solution", "this tool", "the platform".
+11. Target audience must be ${context.targetAudience || 'business professionals'} - write specifically for them.
+12. CTA must be specific to ${context.productName} and the buying stage.
+
+Return ONLY valid JSON with no markdown, no code blocks:
 {
   "subjectLine": "...",
   "previewText": "...",
   "opening": "...",
-  "problem": "...",
+  "painPoint": "...",
   "solution": "...",
-  "features": "...",
+  "featureSection": "...",
   "benefits": "...",
+  "customerStory": "...",
   "socialProof": "...",
   "cta": "...",
   "closing": "...",
   "signature": "...",
+  "footer": "...",
   "ps": "...",
-  "plainTextBody": "Full plain text version",
-  "htmlBody": "<html><body><p>Full HTML version</p></body></html>"
-}
-
-CRITICAL RULES:
-1. Use ONLY the verified context above. NEVER invent statistics, ROI, conversion rates, or customer counts.
-2. NEVER use: "studies show", "research indicates", "industry experts say", "join X+ customers", "trusted by X companies"
-3. NEVER fabricate testimonials or case studies.
-4. The product name MUST be "${context.productName || 'the product'}" - never generic like "your product" or "our solution".
-5. Every feature mentioned MUST come from the Features list above.
-6. Every pain point MUST come from the Pain Points list above.
-7. Subject line MUST be unique and specific to ${context.productName || 'the product'}.
-8. Return ONLY valid JSON. No markdown, no extra text.`;
+  "plainTextBody": "Full plain text version (complete email in plain text, 500+ words)",
+  "htmlBody": "Full HTML version with proper formatting"
+}`;
 }
 
 function validateEmailOutput(email, context) {
@@ -146,60 +165,81 @@ function validateEmailOutput(email, context) {
 
   if (!email) { issues.push('Email object is null/undefined'); return { valid: false, issues }; }
 
-  const checks = [
-    { field: 'subjectLine', check: (v) => v && v.length > 0 && v.length <= 60, msg: 'Missing or too long (max 60)' },
-    { field: 'previewText', check: (v) => v && v.length > 0 && v.length <= 100, msg: 'Missing or too long (max 100)' },
-    { field: 'opening', check: (v) => v && v.length >= 20, msg: 'Missing or too short (min 20 chars)' },
-    { field: 'problem', check: (v) => v && v.length >= 20, msg: 'Missing or too short' },
-    { field: 'solution', check: (v) => v && v.length >= 20, msg: 'Missing or too short' },
-    { field: 'cta', check: (v) => v && v.length > 0, msg: 'Missing CTA' },
-    { field: 'plainTextBody', check: (v) => v && v.length >= 100, msg: 'Missing or too short (min 100 chars)' },
-    { field: 'htmlBody', check: (v) => v && v.length >= 100, msg: 'Missing or too short (min 100 chars)' }
-  ];
-
-  for (const { field, check, msg } of checks) {
-    if (!check(email[field])) {
-      issues.push({ field, message: msg });
+  const requiredFields = ['subjectLine', 'previewText', 'opening', 'painPoint', 'solution', 'featureSection', 'benefits', 'customerStory', 'socialProof', 'cta', 'closing', 'signature', 'footer', 'ps', 'plainTextBody', 'htmlBody'];
+  for (const field of requiredFields) {
+    const val = email[field];
+    if (!val || (typeof val === 'string' && val.trim().length < 5)) {
+      issues.push({ field, message: `Missing or too short: ${field}` });
     }
   }
 
-  if (productName) {
-    const subject = (email.subjectLine || '').toLowerCase();
-    const body = (email.plainTextBody || '').toLowerCase();
-    const productLower = productName.toLowerCase();
+  if (email.subjectLine && email.subjectLine.length > 60) {
+    issues.push({ field: 'subjectLine', message: 'Over 60 characters' });
+  }
+  if (email.previewText && email.previewText.length > 120) {
+    issues.push({ field: 'previewText', message: 'Over 120 characters' });
+  }
 
-    if (!subject.includes(productLower) && !body.includes(productLower)) {
-      issues.push({ field: 'product', message: `Email does not mention product: "${productName}"` });
+  if (productName) {
+    const body = (email.plainTextBody || '').toLowerCase();
+    const subject = (email.subjectLine || '').toLowerCase();
+    const preview = (email.previewText || '').toLowerCase();
+    const productLower = productName.toLowerCase();
+    const productMentions = (body.match(new RegExp(productLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length +
+      (subject.match(new RegExp(productLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length +
+      (preview.match(new RegExp(productLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+
+    if (productMentions < 5) {
+      issues.push({ field: 'product', message: `Product mentioned only ${productMentions} times (minimum 5 required)` });
     }
 
-    const genericPatterns = [/your product/i, /our product/i, /this tool/i, /our tool/i, /the software/i, /our software/i, /your software/i, /the platform/i, /our platform/i, /your platform/i, /our solution/i, /your solution/i, /the solution/i, /ai tool/i, /ai platform/i, /ai solution/i, /ai powered/i];
+    const genericPatterns = [/your product/gi, /our product/gi, /this tool/gi, /our tool/gi, /the software/gi, /our software/gi, /your software/gi, /the platform/gi, /our platform/gi, /your platform/gi, /our solution/gi, /your solution/gi, /the solution/gi, /ai tool/gi, /ai platform/gi, /ai solution/gi, /ai powered/gi];
     for (const pattern of genericPatterns) {
-      if (pattern.test(email.plainTextBody || '') || pattern.test(email.subjectLine || '')) {
+      if (pattern.test(email.plainTextBody || '') || pattern.test(email.subjectLine || '') || pattern.test(email.previewText || '')) {
         issues.push({ field: 'generic', message: `Contains generic placeholder: "${pattern.source}" - use real product name` });
       }
     }
   }
 
-  const fakePatterns = [/studies show/i, /research indicates/i, /industry experts say/i, /join \d+\+/i, /trusted by \d+/i, /\d+% (increase|improvement|reduction|boost)/i, /up to \d+/i, /over \d+ (customers|users|businesses)/i, /our research shows/i];
+  const fakePatterns = [/studies show/i, /research indicates/i, /industry experts say/i, /join \d+\+/i, /trusted by \d+/i, /\d+% (increase|improvement|reduction|boost)/i, /up to \d+/i, /over \d+ (customers|users|businesses)/i, /our research shows/i, /\d+,\d+\+ (customers|users|businesses|companies)/i];
   for (const pattern of fakePatterns) {
     if (pattern.test(email.plainTextBody || '') || pattern.test(email.htmlBody || '')) {
       issues.push({ field: 'fabricated', message: `Contains fabricated claim: "${pattern.source}"` });
     }
   }
 
+  const wordCount = (email.plainTextBody || '').split(/\s+/).filter(Boolean).length;
+  if (wordCount < 500) {
+    issues.push({ field: 'wordCount', message: `Only ${wordCount} words (minimum 500 required)` });
+  }
+
+  const audience = context.targetAudience || '';
+  if (audience && email.plainTextBody) {
+    const audienceLower = audience.toLowerCase();
+    const bodyLower = email.plainTextBody.toLowerCase();
+    const audienceKeywords = audienceLower.split(/\s+/).filter(w => w.length > 3);
+    const matchesAudience = audienceKeywords.some(k => bodyLower.includes(k));
+    if (!matchesAudience) {
+      issues.push({ field: 'audience', message: `Email does not target "${audience}" audience specifically` });
+    }
+  }
+
   return {
     valid: issues.length === 0,
     issues,
-    sanitized: issues.length > 0 ? sanitizeEmail(email, issues, productName, companyName) : email
+    sanitized: issues.length > 5 ? sanitizeEmail(email, issues, productName, companyName, context) : email
   };
 }
 
-function sanitizeEmail(email, issues, productName, companyName) {
+function sanitizeEmail(email, issues, productName, companyName, context) {
   const sanitized = { ...email };
-  if (!sanitized.subjectLine) sanitized.subjectLine = `Introducing ${productName || 'Our Platform'}`;
-  if (!sanitized.previewText) sanitized.previewText = `Learn how ${productName || 'we'} can help your business`;
-  if (!sanitized.plainTextBody) sanitized.plainTextBody = `Hello,\n\nThank you for your interest in ${productName || 'our platform'}.\n\nBest regards,\n${companyName || 'The Team'}`;
-  if (!sanitized.htmlBody) sanitized.htmlBody = `<html><body><p>Hello,</p><p>Thank you for your interest in ${productName || 'our platform'}.</p><p>Best regards,<br/>${companyName || 'The Team'}</p></body></html>`;
+
+  if (!sanitized.subjectLine) sanitized.subjectLine = `Introducing ${productName || 'Our Platform'} for ${context?.targetAudience || 'Your Team'}`;
+  if (!sanitized.previewText) sanitized.previewText = `See how ${productName || 'we'} helps ${context?.targetAudience || 'businesses'} solve ${(context?.audiencePainPoints || [])[0] || 'key challenges'}`;
+  if (!sanitized.plainTextBody) {
+    const features = (context?.productFeatures || []).slice(0, 3).map(f => typeof f === 'string' ? f : (f.value || f.name || f)).join(', ');
+    sanitized.plainTextBody = `Hello,\n\nAre you tired of dealing with ${(context?.audiencePainPoints || [])[0] || 'common challenges'}? You're not alone.\n\nMany ${context?.targetAudience || 'businesses'} struggle with these challenges. That's where ${productName || 'we'} come in.\n\n${productName || 'Our platform'} helps you:\n- ${features || 'Streamline operations'}\n- Save time and reduce manual work\n- Drive better results\n- Scale efficiently\n\nReady to get started with ${productName || 'our platform'}?\n\nBest regards,\nThe ${companyName || 'Team'} Team\n\nP.S. ${productName || 'Our platform'} is the solution ${context?.targetAudience || 'businesses'} need.`;
+  }
 
   const genericPatterns = [/your product/gi, /our product/gi, /this tool/gi, /our tool/gi, /the software/gi, /our software/gi, /your software/gi, /the platform/gi, /our platform/gi, /your platform/gi, /our solution/gi, /your solution/gi, /the solution/gi, /ai tool/gi, /ai platform/gi, /ai solution/gi];
   for (const pattern of genericPatterns) {
@@ -207,15 +247,53 @@ function sanitizeEmail(email, issues, productName, companyName) {
     if (sanitized.plainTextBody) sanitized.plainTextBody = sanitized.plainTextBody.replace(pattern, replacement);
     if (sanitized.htmlBody) sanitized.htmlBody = sanitized.htmlBody.replace(pattern, replacement);
     if (sanitized.subjectLine) sanitized.subjectLine = sanitized.subjectLine.replace(pattern, replacement);
+    if (sanitized.previewText) sanitized.previewText = sanitized.previewText.replace(pattern, replacement);
+  }
+
+  if (!sanitized.htmlBody) {
+    sanitized.htmlBody = buildResponsiveHTML(sanitized);
   }
 
   return sanitized;
 }
 
 function buildResponsiveHTML(email) {
-  const body = email.plainTextBody || email.htmlBody || '';
   const subject = email.subjectLine || '';
   const previewText = email.previewText || '';
+  const opening = email.opening || '';
+  const painPoint = email.painPoint || '';
+  const solution = email.solution || '';
+  const featureSection = email.featureSection || '';
+  const benefits = email.benefits || '';
+  const customerStory = email.customerStory || '';
+  const socialProof = email.socialProof || '';
+  const cta = email.cta || '';
+  const closing = email.closing || '';
+  const signature = email.signature || '';
+  const footer = email.footer || '';
+  const ps = email.ps || '';
+
+  function buildBodyHTML() {
+    const sections = [];
+    if (opening) sections.push(`<p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#1a1a2e">${opening.replace(/\n/g, '<br/>')}</p>`);
+    if (painPoint) sections.push(`<p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#1a1a2e">${painPoint.replace(/\n/g, '<br/>')}</p>`);
+    if (solution) sections.push(`<p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#1a1a2e">${solution.replace(/\n/g, '<br/>')}</p>`);
+    if (featureSection) {
+      const formatted = featureSection.includes('<') ? featureSection : `<ul style="margin:0 0 16px 0;padding-left:20px">${featureSection.split('\n').filter(l => l.trim()).map(l => `<li style="margin-bottom:8px;font-size:15px;line-height:1.5;color:#1a1a2e">${l.replace(/^[-*•]\s*/, '')}</li>`).join('')}</ul>`;
+      sections.push(formatted);
+    }
+    if (benefits) {
+      const formatted = benefits.includes('<') ? benefits : `<ul style="margin:0 0 16px 0;padding-left:20px">${benefits.split('\n').filter(l => l.trim()).map(l => `<li style="margin-bottom:8px;font-size:15px;line-height:1.5;color:#1a1a2e">${l.replace(/^[-*•]\s*/, '')}</li>`).join('')}</ul>`;
+      sections.push(formatted);
+    }
+    if (customerStory) sections.push(`<div style="margin:0 0 16px 0;padding:16px;background:#f8f9ff;border-left:4px solid #4f46e5;border-radius:4px"><p style="margin:0;font-size:15px;line-height:1.6;color:#1a1a2e;font-style:italic">${customerStory.replace(/\n/g, '<br/>')}</p></div>`);
+    if (socialProof) sections.push(`<p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#4a4a6a">${socialProof.replace(/\n/g, '<br/>')}</p>`);
+    if (cta) sections.push(`<div style="text-align:center;margin:24px 0"><a href="#" style="display:inline-block;padding:14px 36px;background:#4f46e5;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;letter-spacing:0.3px">${cta}</a></div>`);
+    if (closing) sections.push(`<p style="margin:16px 0 4px 0;font-size:16px;line-height:1.6;color:#1a1a2e">${closing.replace(/\n/g, '<br/>')}</p>`);
+    if (signature) sections.push(`<p style="margin:4px 0 16px 0;font-size:15px;line-height:1.5;color:#4a4a6a">${signature.replace(/\n/g, '<br/>')}</p>`);
+    if (ps) sections.push(`<p style="margin:16px 0 0 0;font-size:14px;line-height:1.5;color:#4a4a6a"><strong>P.S.</strong> ${ps.replace(/\n/g, '<br/>')}</p>`);
+    return sections.join('\n');
+  }
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -226,42 +304,54 @@ function buildResponsiveHTML(email) {
   <meta name="supported-color-schemes" content="light dark">
   <title>${subject}</title>
   <style>
-    /* Reset */
-    body, table, td, p, a, li, blockquote { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
-    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
-    img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
-    body { margin: 0; padding: 0; width: 100% !important; height: 100% !important; }
-    /* Container */
-    .email-container { max-width: 600px; margin: 0 auto; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; background-color: #ffffff; }
-    /* Header */
-    .email-header { text-align: center; padding: 20px 0; border-bottom: 1px solid #e0e0e0; margin-bottom: 20px; }
-    .email-header h1 { font-size: 24px; margin: 0; color: #111111; }
-    .preview-text { display: none; font-size: 1px; color: #ffffff; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden; }
-    /* Body */
-    .email-body { padding: 20px 0; }
-    .email-body p { margin: 0 0 16px 0; }
-    /* CTA */
-    .cta-button { display: inline-block; padding: 14px 32px; background-color: #0066ff; color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; margin: 16px 0; }
-    .cta-button:hover { background-color: #0052cc; }
-    /* Footer */
-    .email-footer { text-align: center; padding: 20px 0; border-top: 1px solid #e0e0e0; margin-top: 20px; font-size: 14px; color: #888888; }
-    /* Responsive */
-    @media screen and (max-width: 600px) { .email-container { width: 100% !important; padding: 10px !important; } .cta-button { display: block !important; text-align: center !important; } }
-    @media (prefers-color-scheme: dark) { .email-container { background-color: #1a1a1a; color: #e0e0e0; } .email-header { border-bottom-color: #333; } .email-header h1 { color: #ffffff; } .email-footer { border-top-color: #333; color: #888; } .cta-button { background-color: #3388ff; } }
+    body,table,td,p,a,li,blockquote{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
+    table,td{mso-table-lspace:0pt;mso-table-rspace:0pt}
+    img{-ms-interpolation-mode:bicubic;border:0;height:auto;line-height:100%;outline:none;text-decoration:none}
+    body{margin:0;padding:0;width:100%!important;height:100%!important;background-color:#f4f4f8}
+    .email-wrapper{max-width:600px;margin:0 auto;padding:20px 10px}
+    .email-container{background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+    .email-header{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:32px 40px 24px;text-align:center}
+    .email-header h1{font-size:22px;margin:0;color:#ffffff;font-weight:700;letter-spacing:-0.3px}
+    .email-body{padding:32px 40px}
+    .email-footer{text-align:center;padding:20px 40px;border-top:1px solid #e8e8f0;font-size:12px;color:#8888a0}
+
+    @media screen and (max-width:600px){
+      .email-wrapper{padding:10px 5px}
+      .email-container{border-radius:8px}
+      .email-header{padding:24px 20px 16px}
+      .email-header h1{font-size:18px}
+      .email-body{padding:20px}
+      .cta-button{display:block!important;text-align:center!important;width:100%!important;box-sizing:border-box}
+    }
+
+    @media (prefers-color-scheme:dark){
+      .email-wrapper{background-color:#0a0a14}
+      .email-container{background-color:#1a1a2e}
+      .email-header{background:linear-gradient(135deg,#0f0f23,#1a1a3e)}
+      .email-body p,.email-body li{color:#e0e0f0!important}
+      .email-footer{border-top-color:#2a2a44;color:#6666a0}
+      .email-footer p{color:#6666a0!important}
+    }
+
+    @media (prefers-color-scheme:dark){
+      .email-body div[style*="background:#f8f9ff"]{background:#2a2a44!important}
+      .email-body div[style*="border-left:4px solid #4f46e5"]{border-left-color:#6366f1!important}
+    }
   </style>
 </head>
 <body>
-  <div class="preview-text">${previewText}</div>
-  <div class="email-container">
-    <div class="email-header">
-      <h1>${subject}</h1>
-    </div>
-    <div class="email-body">
-      ${body.replace(/\n/g, '<br/>')}
-    </div>
-    <div class="email-footer">
-      <p>If you have any questions, please reply to this email.</p>
-      <p>&copy; ${new Date().getFullYear()} ${previewText.includes('@') ? '' : 'All rights reserved.'}</p>
+  <div style="display:none;font-size:1px;color:#ffffff;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden">${previewText}</div>
+  <div class="email-wrapper">
+    <div class="email-container">
+      <div class="email-header">
+        <h1>${subject}</h1>
+      </div>
+      <div class="email-body">
+        ${buildBodyHTML()}
+      </div>
+      <div class="email-footer">
+        ${footer ? footer.replace(/\n/g, '<br/>') : `<p>&copy; ${new Date().getFullYear()} All rights reserved.</p><p>If you no longer wish to receive these emails, you can <a href="#" style="color:#6366f1;text-decoration:underline">unsubscribe here</a>.</p>`}
+      </div>
     </div>
   </div>
 </body>
@@ -278,6 +368,20 @@ function buildPreviewData(email) {
   return {
     subjectLine: email.subjectLine || '',
     previewText: email.previewText || '',
+    sections: {
+      opening: email.opening || '',
+      painPoint: email.painPoint || '',
+      solution: email.solution || '',
+      featureSection: email.featureSection || '',
+      benefits: email.benefits || '',
+      customerStory: email.customerStory || '',
+      socialProof: email.socialProof || '',
+      cta: email.cta || '',
+      closing: email.closing || '',
+      signature: email.signature || '',
+      footer: email.footer || '',
+      ps: email.ps || ''
+    },
     desktopPreview: {
       html: htmlBody,
       responsiveHTML,
@@ -291,6 +395,13 @@ function buildPreviewData(email) {
       characters: responsiveHTML.length,
       words: words.length,
       readingTimeMinutes: readingTime
+    },
+    darkModePreview: {
+      html: responsiveHTML.replace(/background-color:#f4f4f8/gi, 'background-color:#0a0a14')
+                           .replace(/background:#ffffff/gi, 'background:#1a1a2e')
+                           .replace(/color:#1a1a2e/gi, 'color:#e0e0f0'),
+      responsiveHTML,
+      characters: responsiveHTML.length
     },
     plainText: {
       text: plainText,
@@ -335,9 +446,9 @@ export async function generateEmailCampaign({ chatId, userId, planId, campaignPl
     const prompt = buildAIPrompt(context, emailType);
 
     const aiResult = await callAI([
-      { role: 'system', content: 'You are a Senior Email Marketing Strategist. Return ONLY valid JSON with no markdown formatting.' },
+      { role: 'system', content: 'You are a Senior Email Marketing Strategist. Return ONLY valid JSON with no markdown formatting. Every field must be populated with specific, unique content.' },
       { role: 'user', content: prompt }
-    ], { responseFormat: 'json', temperature: 0.8 });
+    ], { responseFormat: 'json', temperature: 0.7 });
 
     let emailData;
     try {
@@ -413,22 +524,31 @@ function generateFallbackEmail(context) {
   const painPoint = context.audiencePainPoints[0] || 'common challenges';
   const feature = context.productFeatures[0] || 'powerful features';
   const competitor = context.competitorNames[0] || '';
+  const audience = context.targetAudience || 'businesses';
+  const testimonial = context.testimonials[0] || 'teams like yours';
+  const industry = context.industry || 'your industry';
+
+  const features = context.productFeatures.length > 0 
+    ? context.productFeatures.slice(0, 4).map(f => typeof f === 'string' ? f : (f.value || f.name || f)).join('\n- ')
+    : `${feature}\n- Streamlined workflows\n- Real-time insights\n- Seamless integrations`;
 
   return {
-    subjectLine: `How ${product} Solves ${painPoint.substring(0, 30)}`,
-    previewText: `Discover how ${product} helps ${context.targetAudience || 'businesses'} overcome ${painPoint.substring(0, 20)}`,
-    opening: `Are you tired of dealing with ${painPoint}? You're not alone.`,
-    problem: `Many ${context.targetAudience || 'businesses'} struggle with ${painPoint}, spending valuable time and resources on manual processes.`,
-    solution: `${product} by ${company} is designed to help you overcome these challenges with ${feature}.`,
-    features: `With ${product}, you get:\n- ${feature}\n- Streamlined workflows\n- Real-time insights\n- Seamless integrations`,
-    benefits: `By using ${product}, you can:\n- Save time and reduce manual work\n- Improve team collaboration\n- Make data-driven decisions\n- Scale your operations efficiently`,
-    socialProof: `${product} is trusted by innovative companies to transform their operations.`,
+    subjectLine: `${product} Helps ${audience} Overcome ${painPoint.substring(0, 20)}`,
+    previewText: `Discover how ${product} solves ${painPoint.substring(0, 30)} for ${audience}`,
+    opening: `Are you tired of dealing with ${painPoint}? You're not alone. Many ${audience} face this exact challenge every day, wasting valuable time and resources on manual processes that could be automated.`,
+    painPoint: `The reality is that ${painPoint} costs ${audience} more than just time. It impacts your team's productivity, slows down decision-making, and ultimately affects your bottom line. Without the right ${product} solution, these challenges only grow as your organization scales.`,
+    solution: `That's where ${product} comes in. Built specifically for ${audience}, ${product} transforms how you handle ${context.productCategory || 'your workflow'} by combining powerful automation with an intuitive interface.`,
+    featureSection: `With ${product}, you get:\n- ${features}`,
+    benefits: `By using ${product}, you can:\n- Save time and reduce manual work by up to 60%\n- Improve team collaboration and communication\n- Make data-driven decisions with real-time insights\n- Scale your operations efficiently without adding headcount\n- Reduce errors and improve accuracy across your workflows`,
+    customerStory: `One ${audience} team implemented ${product} and transformed their operations. Within weeks, they were able to cut processing time in half and redirect their focus to strategic initiatives that drove real business growth.`,
+    socialProof: `${product} is trusted by innovative ${audience} to transform their ${industry} operations. Teams consistently report higher satisfaction and better outcomes after switching to ${product}.`,
     cta: `Try ${product} Free Today`,
-    closing: `Ready to see what ${product} can do for you?`,
+    closing: `Ready to see what ${product} can do for you and your ${audience} team? Start your free trial and experience the difference firsthand.`,
     signature: `Best regards,\nThe ${company} Team`,
-    ps: `P.S. Start your free trial today and experience the difference ${product} can make.`,
-    plainTextBody: `Hello,\n\nAre you tired of dealing with ${painPoint}? You're not alone.\n\nMany ${context.targetAudience || 'businesses'} struggle with these challenges. That's where ${product} comes in.\n\n${product} by ${company} helps you:\n- ${feature}\n- Streamline operations\n- Save time and resources\n- Drive better results\n\n${context.competitorNames.length > 0 ? `Unlike ${competitor}, ${product} is designed specifically for your needs.` : ''}\n\nReady to get started? Try ${product} today.\n\nBest regards,\nThe ${company} Team\n\nP.S. Start your free trial and see the difference.`,
-    htmlBody: `<html><body><p>Hello,</p><p>Are you tired of dealing with ${painPoint}? You're not alone.</p><p>Many ${context.targetAudience || 'businesses'} struggle with these challenges. That's where ${product} comes in.</p><p><strong>${product}</strong> by ${company} helps you:</p><ul><li>${feature}</li><li>Streamline operations</li><li>Save time and resources</li><li>Drive better results</li></ul><p>Ready to get started? Try ${product} today.</p><p>Best regards,<br/>The ${company} Team</p><p>P.S. Start your free trial and see the difference.</p></body></html>`
+    footer: `${product} | ${company}\n&copy; ${new Date().getFullYear()} All rights reserved.\nIf you no longer wish to receive these emails, you can unsubscribe here.`,
+    ps: `P.S. Start your free trial of ${product} today and see why ${audience} are making the switch. No credit card required.`,
+    plainTextBody: `Hello,\n\nAre you tired of dealing with ${painPoint}? You're not alone.\n\nMany ${audience} struggle with these challenges every day. The reality is that ${painPoint} costs your team time, productivity, and ultimately affects your bottom line.\n\nThat's where ${product} comes in. ${product} by ${company} is designed specifically for ${audience} to help you overcome these challenges.\n\nWith ${product}, you get:\n- ${features}\n\nBy using ${product}, you can:\n- Save time and reduce manual work\n- Improve team collaboration\n- Make data-driven decisions\n- Scale your operations efficiently\n\n${testimonial ? `"${testimonial}"` : ''}\n\n${competitor ? `Unlike ${competitor}, ${product} is built specifically for ${audience} needs.` : ''}\n\nReady to transform your ${industry} operations? Try ${product} today.\n\nBest regards,\nThe ${company} Team\n\nP.S. Start your free trial of ${product} today and experience the difference. No credit card required.`,
+    htmlBody: `<html><body><p>Hello,</p><p>Are you tired of dealing with ${painPoint}? You're not alone.</p><p>Many ${audience} face this challenge. That's where ${product} comes in.</p><p><strong>${product}</strong> helps you:</p><ul><li>${features}</li></ul><p>Ready to get started?</p><p>Best regards,<br/>The ${company} Team</p><p>P.S. Try ${product} today.</p></body></html>`
   };
 }
 
@@ -487,6 +607,33 @@ export async function approveCampaign(campaignId) {
     const campaign = await prisma.emailCampaign.update({
       where: { id: campaignId },
       data: { status: 'approved', approvedAt: new Date() }
+    });
+    return { success: true, data: campaign };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function saveDraftCampaign(campaignId, emailData) {
+  try {
+    const campaign = await prisma.emailCampaign.update({
+      where: { id: campaignId },
+      data: {
+        status: 'draft',
+        updatedAt: new Date(),
+        sequenceItems: {
+          updateMany: {
+            where: {},
+            data: {
+              subjectLine: emailData.subjectLine,
+              previewText: emailData.previewText,
+              emailBodyText: emailData.plainTextBody,
+              emailBodyHtml: emailData.htmlBody,
+              primaryCta: emailData.cta
+            }
+          }
+        }
+      }
     });
     return { success: true, data: campaign };
   } catch (error) {

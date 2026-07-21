@@ -87,6 +87,58 @@ emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/schedule', async (
   }
 });
 
+emailCampaignRouter.post('/:chatId/email-campaign/save-draft', async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user?.id;
+  const { emailData } = req.body || {};
+
+  if (!chatId || !userId) return res.status(400).json({ success: false, error: 'Missing chatId or user' });
+
+  try {
+    const campaign = await prisma.emailCampaign.findFirst({
+      where: { chatId, userId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!campaign) {
+      const newCampaign = await prisma.emailCampaign.create({
+        data: {
+          chatId, userId,
+          name: emailData?.subjectLine ? `Draft: ${emailData.subjectLine}` : 'New Draft',
+          status: 'draft',
+          campaignPlanId: req.body.campaignPlanId || null
+        }
+      });
+      return res.json({ success: true, data: newCampaign });
+    }
+
+    const result = await prisma.emailCampaign.update({
+      where: { id: campaign.id },
+      data: {
+        status: 'draft',
+        updatedAt: new Date(),
+        sequenceItems: emailData ? {
+          deleteMany: {},
+          create: [{
+            sequenceOrder: 1,
+            emailName: emailData.subjectLine || 'Draft Email',
+            subjectLine: emailData.subjectLine || '',
+            previewText: emailData.previewText || '',
+            emailBodyText: emailData.plainTextBody || emailData.body || '',
+            emailBodyHtml: emailData.htmlBody || '',
+            primaryCta: emailData.cta || '',
+            purpose: 'campaign',
+            inferenceStatus: 'DRAFT'
+          }]
+        } : undefined
+      }
+    });
+    return res.json({ success: true, data: result });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/send-test', async (req, res) => {
   const { campaignId } = req.params;
   const { recipientEmail, recipientName, companyName } = req.body || {};

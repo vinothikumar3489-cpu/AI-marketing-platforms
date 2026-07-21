@@ -32,6 +32,30 @@ const NAVIGATION_PATTERNS = [
   /workspace/i, /google workspace/i, /admin console/i, /google admin/i
 ];
 
+const PRIVACY_POLICY_PATTERNS = [
+  /privacy policy/i, /privacy notice/i, /data protection/i, /gdpr/i,
+  /ccpa/i, /personal data/i, /data collection/i, /information we collect/i,
+  /how we use your/i, /data sharing/i, /third.party sharing/i,
+  /data retention/i, /your rights/i, /opt.out/i, /do not sell/i,
+  /data subject/i, /lawful basis/i, /legitimate interest/i, /consent/i,
+  /data processor/i, /data controller/i, /data protection officer/i
+];
+
+const COOKIE_PATTERNS = [
+  /cookie/i, /cookies?/i, /cookie notice/i, /cookie consent/i,
+  /cookie preference/i, /cookie setting/i, /cookie banner/i,
+  /necessary cookies/i, /functional cookies/i, /analytics cookies/i,
+  /advertising cookies/i, /cookie declaration/i, /cookie policy/i
+];
+
+const FOOTER_PATTERNS = [
+  /all rights reserved/i, /copyright/i, /\u00a9/i, /\u2122/i, /\u00ae/i,
+  /terms of service/i, /terms of use/i, /terms and conditions/i,
+  /privacy policy/i, /cookie policy/i, /legal notice/i, /disclaimer/i,
+  /sitemap/i, /accessibility/i, /contact us/i, /about us/i,
+  /follow us/i, /stay connected/i, /powered by/i, /built with/i
+];
+
 const GENERIC_WORDS = new Set([
   'software', 'platform', 'tool', 'solution', 'app', 'service', 'product',
   'business', 'company', 'enterprise', 'management', 'system', 'online',
@@ -42,6 +66,25 @@ const GENERIC_WORDS = new Set([
   'download', 'install', 'login', 'signup', 'register', 'home', 'about',
   'contact', 'blog', 'news', 'help', 'support', 'faq', 'docs', 'guide'
 ]);
+
+const COMMERCIAL_KEYWORDS = new Set([
+  'buy', 'purchase', 'price', 'pricing', 'cost', 'cheap', 'affordable',
+  'discount', 'deal', 'coupon', 'offer', 'sale', 'best', 'top', 'review',
+  'vs', 'versus', 'alternative', 'compare', 'comparison', 'software',
+  'platform', 'tool', 'solution', 'enterprise', 'business'
+]);
+
+const INFORMATIONAL_KEYWORDS = new Set([
+  'how', 'what', 'why', 'when', 'where', 'which', 'who', 'guide',
+  'tutorial', 'example', 'tips', 'best practices', 'strategy',
+  'benefits', 'features', 'overview', 'introduction', 'basics'
+]);
+
+export function detectLanguage(text) {
+  if (!text || text.length < 20) return 'unknown';
+  const commonEnglish = /^(the|a|an|is|are|was|were|been|have|has|had|do|does|did|will|would|can|could|should|may|might|shall|this|that|these|those|we|you|they|he|she|it|my|your|his|her|our|their|its|in|on|at|to|for|of|with|by|from|as|into|through|during|before|after|above|below|between|out|off|over|under|again|further|then|once|here|there|when|where|why|how|all|each|every|both|few|more|most|other|some|such|no|nor|not|only|own|same|so|than|too|very|just|because|about|up|down|and|but|or|if|while|although|since|until|upon|vs|versus)/im;
+  return commonEnglish.test(text) ? 'en' : 'unknown';
+}
 
 export function extractCandidatePhrases(sources = {}) {
   const candidates = new Map();
@@ -57,8 +100,16 @@ export function extractCandidatePhrases(sources = {}) {
     const items = Array.isArray(texts) ? texts : (texts ? [texts] : []);
     for (const item of items) {
       if (!item || typeof item !== 'string') continue;
+      if (isPrivacyContent(item)) continue;
+      if (isCookieContent(item)) continue;
+      if (isFooterContent(item)) continue;
+      if (isNavigationText(item)) continue;
       const phrases = extractPhrases(item);
       for (const phrase of phrases) {
+        if (isPrivacyContent(phrase)) continue;
+        if (isCookieContent(phrase)) continue;
+        if (isFooterContent(phrase)) continue;
+        if (isNavigationText(phrase)) continue;
         const existing = candidates.get(phrase);
         if (existing) {
           existing.priority = Math.max(existing.priority, priority);
@@ -80,7 +131,10 @@ export function extractCandidatePhrases(sources = {}) {
 }
 
 function extractPhrases(text, maxWords = 4, minWords = 2) {
-  const normalized = text.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()"']/g, ' ').replace(/\s+/g, ' ').trim();
+  const normalized = text.toLowerCase()
+    .replace(/[.,/#!$%^&*;:{}=\-_`~()"']/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   const words = normalized.split(' ').filter(w => w.length > 0);
   const phrases = new Set();
 
@@ -93,6 +147,9 @@ function extractPhrases(text, maxWords = 4, minWords = 2) {
       const phrase = window.join(' ');
       if (phrase.length < 5) continue;
       if (isNavigationText(phrase)) continue;
+      if (isPrivacyContent(phrase)) continue;
+      if (isCookieContent(phrase)) continue;
+      if (isFooterContent(phrase)) continue;
       phrases.add(phrase);
     }
   }
@@ -102,6 +159,18 @@ function extractPhrases(text, maxWords = 4, minWords = 2) {
 
 function isNavigationText(phrase) {
   return NAVIGATION_PATTERNS.some(p => p.test(phrase));
+}
+
+function isPrivacyContent(phrase) {
+  return PRIVACY_POLICY_PATTERNS.some(p => p.test(phrase));
+}
+
+function isCookieContent(phrase) {
+  return COOKIE_PATTERNS.some(p => p.test(phrase));
+}
+
+function isFooterContent(phrase) {
+  return FOOTER_PATTERNS.some(p => p.test(phrase));
 }
 
 export function validateKeyword(phrase, productName = '', companyName = '') {
@@ -123,6 +192,9 @@ export function validateKeyword(phrase, productName = '', companyName = '') {
   if (/http[s]?:\/\//.test(trimmed)) return false;
 
   if (isNavigationText(trimmed)) return false;
+  if (isPrivacyContent(trimmed)) return false;
+  if (isCookieContent(trimmed)) return false;
+  if (isFooterContent(trimmed)) return false;
 
   return true;
 }
@@ -172,7 +244,12 @@ export function scoreKeywordRelevance(phrase, productName = '', companyName = ''
   const specificCount = specific.filter(s => lower.includes(s)).length;
   score += specificCount * 3;
 
-  return Math.min(100, score);
+  if (isNavigationText(phrase)) score -= 30;
+  if (isPrivacyContent(phrase)) score -= 40;
+  if (isCookieContent(phrase)) score -= 40;
+  if (isFooterContent(phrase)) score -= 30;
+
+  return Math.max(0, Math.min(100, score));
 }
 
 export function classifyKeyword(phrase) {
@@ -200,6 +277,58 @@ export function classifyKeyword(phrase) {
   }
 
   return 'informational';
+}
+
+export function categorizeKeyword(phrase) {
+  const lower = phrase.toLowerCase();
+  const categories = [];
+
+  if (lower.startsWith('how') || lower.startsWith('what') || lower.startsWith('why') ||
+      lower.startsWith('when') || lower.startsWith('where') || lower.startsWith('which') ||
+      lower.startsWith('who') || lower.startsWith('does') || lower.startsWith('can')) {
+    categories.push('question');
+  }
+
+  if (lower.includes('buy') || lower.includes('purchase') || lower.includes('order') ||
+      lower.includes('get') || lower.includes('sign up') || lower.includes('subscribe')) {
+    categories.push('transactional');
+  }
+
+  if (lower.includes('price') || lower.includes('pricing') || lower.includes('cost') ||
+      lower.includes('best') || lower.includes('top') || lower.includes('review') ||
+      lower.includes('vs') || lower.includes('versus') || lower.includes('compare') ||
+      lower.includes('alternative') || lower.includes('discount') || lower.includes('deal') ||
+      lower.includes('coupon')) {
+    categories.push('commercial');
+  }
+
+  if (lower.includes('guide') || lower.includes('tutorial') || lower.includes('what is') ||
+      lower.includes('how to') || lower.includes('tips') || lower.includes('examples') ||
+      lower.includes('benefits') || lower.includes('overview')) {
+    categories.push('informational');
+  }
+
+  if (lower.startsWith('login') || lower.startsWith('sign in') || lower.startsWith('dashboard') ||
+      lower.includes('my account') || lower.includes('app') || lower.includes('homepage') ||
+      lower.includes('official site')) {
+    categories.push('navigational');
+  }
+
+  if (lower.split(' ').length >= 4) {
+    categories.push('long_tail');
+  }
+
+  const primaryPatterns = [productName, companyName].filter(Boolean);
+  const isBrand = primaryPatterns.some(p => p && lower.includes(p.toLowerCase()));
+  if (isBrand) {
+    categories.push('brand');
+  }
+
+  if (categories.length === 0) {
+    categories.push('informational');
+  }
+
+  return categories;
 }
 
 export function buildKeywordSources(websiteData) {
@@ -241,6 +370,41 @@ export function buildKeywordSources(websiteData) {
   return sources;
 }
 
+export function rankAndFilterKeywords(keywords, productName = '', companyName = '', maxResults = 50) {
+  const scored = keywords
+    .map(kw => {
+      const phrase = kw.phrase || kw.keyword || kw;
+      const score = scoreKeywordRelevance(phrase, productName, companyName);
+      return { ...kw, relevanceScore: score, phrase };
+    })
+    .filter(kw => kw.relevanceScore >= 25)
+    .sort((a, b) => b.relevanceScore - a.relevanceScore);
+
+  const topKeywords = scored.slice(0, maxResults);
+
+  const primary = topKeywords.filter(k => k.relevanceScore >= 70);
+  const secondary = topKeywords.filter(k => k.relevanceScore >= 50 && k.relevanceScore < 70);
+  const longTail = topKeywords.filter(k => k.phrase.split(' ').length >= 4);
+
+  return {
+    all: topKeywords,
+    primary: primary.slice(0, 15),
+    secondary: secondary.slice(0, 20),
+    longTail: longTail.slice(0, 15),
+    question: topKeywords.filter(k => classifyKeyword(k.phrase) === 'question'),
+    commercial: topKeywords.filter(k => classifyKeyword(k.phrase) === 'commercial'),
+    transactional: topKeywords.filter(k => categorizeKeyword(k.phrase).includes('transactional')),
+    navigational: topKeywords.filter(k => categorizeKeyword(k.phrase).includes('navigational')),
+    informational: topKeywords.filter(k => classifyKeyword(k.phrase) === 'informational'),
+    brand: topKeywords.filter(k => {
+      const pLower = (productName || '').toLowerCase();
+      const cLower = (companyName || '').toLowerCase();
+      return (pLower && k.phrase.toLowerCase().includes(pLower)) ||
+             (cLower && k.phrase.toLowerCase().includes(cLower));
+    })
+  };
+}
+
 function extractSchemaTexts(schema) {
   if (!schema) return [];
   const texts = [];
@@ -270,3 +434,5 @@ function extractFAQTexts(faqs) {
   }
   return texts;
 }
+
+export { isNavigationText, isPrivacyContent, isCookieContent, isFooterContent };
