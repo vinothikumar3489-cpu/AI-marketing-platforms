@@ -673,7 +673,7 @@ P.S. Start your journey with ${displayName} today and see immediate results.
 Unsubscribe: [unsubscribe link]`;
 }
 
-async function generateCreativeBrief(brief) {
+async function generateBlogArticle(brief) {
   const evidence = buildEvidenceSection(brief);
   const productContext = buildProductEvidenceContext(brief);
   const productName = getProductName(brief);
@@ -963,6 +963,49 @@ Return valid JSON:
   return FALLBACK_FAILURE;
 }
 
+
+async function generateVideoScript(brief) {
+  const evidence = buildEvidenceSection(brief);
+  const productContext = buildProductEvidenceContext(brief);
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const painPoint = getFirstPainPoint(brief);
+
+  const prompt = `You are writing a video script for ${productName}.
+
+${productContext}
+
+REQUIREMENTS:
+- title: Video title. Include product name and target keyword if available.
+- format: "Explainer" or "Testimonial" or "Demo".
+- duration: Estimated duration like "60-90 seconds".
+- scenes: Array of {scene, narration, onScreenText, visual, evidencePoint, cta}. 3-5 scenes.
+- Each scene should reference specific evidence from the evidence above.
+- scene must start at 1.
+- Last scene should include cta.
+- Use "evidencePoint" (not "evidence") for the evidence reference field.
+- Use "onScreenText" (not "on_screen_text") for on-screen text.
+- narration should be speakable, natural dialogue, not formal copy.
+- Do NOT: invent testimonials, fake data, unverifiable claims, superlatives.
+
+Return valid JSON:
+{
+  "title": "string",
+  "format": "string",
+  "duration": "string",
+  "scenes": [{"scene": 1, "narration": "string", "onScreenText": "string or null", "visual": "string", "evidencePoint": "string or null", "cta": "string or null"}],
+  "evidenceUsed": ["list evidence fields referenced"],
+  "claimsRequiringReview": [],
+  "limitations": []
+}`;
+
+  try {
+    const result = await callAI(prompt);
+    if (result.success && result.data) return { ...result.data, _provider: result.provider };
+  } catch (e) { /* fall through to rule-based */ }
+  return FALLBACK_FAILURE;
+}
+
 async function generateCreativeBrief(brief) {
   const evidence = buildEvidenceSection(brief);
   const productContext = buildProductEvidenceContext(brief);
@@ -999,48 +1042,6 @@ Return valid JSON:
   "evidenceLimitations": [],
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
-}`;
-
-  try {
-    const result = await callAI(prompt);
-    if (result.success && result.data) return { ...result.data, _provider: result.provider };
-  } catch (e) { /* fall through to rule-based */ }
-  return FALLBACK_FAILURE;
-}
-
-async function generateVideoScript(brief) {
-  const evidence = buildEvidenceSection(brief);
-  const productContext = buildProductEvidenceContext(brief);
-  const productName = getProductName(brief);
-  const persona = getPersonaName(brief);
-  const painPoint = getFirstPainPoint(brief);
-
-  const prompt = `You are writing a video script for ${productName}.
-
-${productContext}
-
-REQUIREMENTS:
-- title: Video title. Include product name and target keyword if available.
-- format: "Explainer" or "Testimonial" or "Demo".
-- duration: Estimated duration like "60-90 seconds".
-- scenes: Array of {scene, narration, onScreenText, visual, evidencePoint, cta}. 3-5 scenes.
-- Each scene should reference specific evidence from the evidence above.
-- scene must start at 1.
-- Last scene should include cta.
-- Use "evidencePoint" (not "evidence") for the evidence reference field.
-- Use "onScreenText" (not "on_screen_text") for on-screen text.
-- narration should be speakable, natural dialogue, not formal copy.
-- Do NOT: invent testimonials, fake data, unverifiable claims, superlatives.
-
-Return valid JSON:
-{
-  "title": "string",
-  "format": "string",
-  "duration": "string",
-  "scenes": [{"scene": 1, "narration": "string", "onScreenText": "string or null", "visual": "string", "evidencePoint": "string or null", "cta": "string or null"}],
-  "evidenceUsed": ["list evidence fields referenced"],
-  "claimsRequiringReview": [],
-  "limitations": []
 }`;
 
   try {
