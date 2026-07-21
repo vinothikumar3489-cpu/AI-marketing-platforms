@@ -11,7 +11,7 @@ export function Badge({ children, tone = 'blue' }: any) { return <span className
 export function ScoreCard({ label, value, tone = 'purple', source, evidence }: any) {
   return (
     <Card className={`score-card ${tone}`}>
-      <div className="score-value">{value !== null && value !== undefined ? <SafeValue value={value} /> : 'Not measured'}</div>
+      <div className="score-value">{value !== null && value !== undefined ? <SafeValue value={value} /> : '—'}</div>
       <div><SafeValue value={label} /></div>
       {source && <div className="score-source" style={{ fontSize: '11px', color: '#9aa7bd', marginTop: '4px' }}>Source: <SafeValue value={source} /></div>}
       {evidence && <div className="score-evidence" style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}><SafeValue value={evidence} /></div>}

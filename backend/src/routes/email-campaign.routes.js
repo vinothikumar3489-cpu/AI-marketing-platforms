@@ -1,6 +1,6 @@
 import express from 'express';
 import { requireAuth } from '../middleware/auth.middleware.js';
-import { generateEmailCampaign, sendCampaignEmail, scheduleCampaign, approveCampaign } from '../services/automation/email-campaign.service.js';
+import { generateEmailCampaign, sendCampaignEmail, scheduleCampaign, approveCampaign, createRecurringCampaign, listAudienceSegments, createAudienceSegment } from '../services/automation/email-campaign.service.js';
 import { prisma } from '../config/prisma.js';
 
 export const emailCampaignRouter = express.Router();
@@ -214,6 +214,42 @@ emailCampaignRouter.put('/:chatId/email-campaign/:campaignId/items/:itemId', asy
       }
     });
     return res.json({ success: true, data: item });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/recurring', async (req, res) => {
+  const { chatId, campaignId } = req.params;
+  const userId = req.user?.id;
+  const { name, recurrence, listIds, senderId } = req.body || {};
+
+  try {
+    const result = await createRecurringCampaign({ chatId, userId, campaignId, name, recurrence, listIds, senderId });
+    if (!result.success) return res.status(500).json({ success: false, error: result.error });
+    return res.json({ success: true, data: result.data });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.get('/:chatId/email-campaign/segments', async (req, res) => {
+  try {
+    const result = await listAudienceSegments();
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.post('/:chatId/email-campaign/segments', async (req, res) => {
+  const { segmentName, conditions } = req.body || {};
+  if (!segmentName) return res.status(400).json({ success: false, error: 'segmentName required' });
+
+  try {
+    const result = await createAudienceSegment({ segmentName, conditions });
+    if (!result.success) return res.status(500).json({ success: false, error: result.error });
+    return res.json({ success: true, data: result.data });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

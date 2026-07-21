@@ -36,7 +36,7 @@ const isPlainObject = (value: unknown): value is Record<string, any> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
 // Coerce any value to a display string without dumping raw JSON.
-const renderText = (value: unknown, fallback = 'Not measured'): string => {
+const renderText = (value: unknown, fallback = '—'): string => {
   if (value === null || value === undefined || value === '') return fallback;
   if (typeof value === 'string' || typeof value === 'number') return String(value);
   if (Array.isArray(value)) return value.map(v => renderText(v, '')).filter(Boolean).join(', ') || fallback;
@@ -596,7 +596,7 @@ function ExecutiveDashboard({ data }: { data: any }) {
       } : null,
       executiveRecommendation: {
         text: toDisplayText(execOverview.priorityActions?.[0], 'Improve technical SEO and content authority to boost overall visibility.'),
-        reasoning: `Based on current scores: Technical ${technicalHealth ?? 'Not measured'}, Content ${contentAuthority ?? 'Not measured'}, AI Visibility ${aiVisibility ?? 'Not measured'}`,
+        reasoning: `Based on current scores: Technical ${technicalHealth ?? '—'}, Content ${contentAuthority ?? '—'}, AI Visibility ${aiVisibility ?? '—'}`,
         confidence: null
       }
     };
@@ -1503,17 +1503,17 @@ function KeywordIntelligence({ data }: { data: any }) {
             <tbody>
               {table.data.map((k: any, i: number) => {
                 const kd = asNumber(k.keywordDifficulty || k.difficulty || k.kd, null);
-                const kdDisplay = kd !== null ? kd : 'Not measured';
+                const kdDisplay = kd !== null ? kd : '—';
                 const kdColor = kd > 70 ? '#ff4757' : kd > 40 ? '#ffa502' : kd !== null ? '#10e18b' : '#9aa7bd';
                 const volume = k.volume !== null ? k.volume : k.searchVolume !== null ? k.searchVolume : null;
-                const volumeDisplay = volume !== null ? formatNumber(volume) : 'Not measured';
+                const volumeDisplay = volume !== null ? formatNumber(volume) : '—';
                 const cpc = k.cpc !== null ? k.cpc : null;
-                const cpcDisplay = cpc !== null ? formatMoney(cpc) : 'Not measured';
+                const cpcDisplay = cpc !== null ? formatMoney(cpc) : '—';
                 const competition = k.competition !== null ? k.competition : null;
-                const competitionDisplay = competition !== null ? (competition * 100).toFixed(0) + '%' : 'Not measured';
+                const competitionDisplay = competition !== null ? (competition * 100).toFixed(0) + '%' : '—';
                 const competitionIndex = k.competitionIndex !== null ? k.competitionIndex : null;
-                const competitionIndexDisplay = competitionIndex !== null ? competitionIndex : 'Not measured';
-                const intent = k.intent || k.searchIntent || 'Not measured';
+                const competitionIndexDisplay = competitionIndex !== null ? competitionIndex : '—';
+                const intent = k.intent || k.searchIntent || '—';
                 const source = k.source || k.dataSource || 'Not specified';
                 const hasDataForSEO = k.source === 'DataForSEO';
                 
@@ -1853,7 +1853,7 @@ function GeoIntelligence({ data }: { data: any }) {
                 <b style={{ display: 'block', fontSize: '14px' }}>Entity Coverage</b>
                 <span style={{ fontSize: '12px', color: '#9aa7bd' }}>Brand presence in LLM training data</span>
               </div>
-              <strong style={{ fontSize: '20px', color: entityCoverageScore != null ? '#10e18b' : '#9aa7bd' }}>{entityCoverageScore != null ? `${Math.round(entityCoverageScore)}/100` : 'Not measured'}</strong>
+              <strong style={{ fontSize: '20px', color: entityCoverageScore != null ? '#10e18b' : '#9aa7bd' }}>{entityCoverageScore != null ? `${Math.round(entityCoverageScore)}/100` : '—'}</strong>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0b1220', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #ff4757' }}>
@@ -1861,7 +1861,7 @@ function GeoIntelligence({ data }: { data: any }) {
                 <b style={{ display: 'block', fontSize: '14px' }}>Citation Readiness</b>
                 <span style={{ fontSize: '12px', color: '#9aa7bd' }}>Probability of being cited as source</span>
               </div>
-              <strong style={{ fontSize: '20px', color: citationReadinessScore != null ? '#ff4757' : '#9aa7bd' }}>{citationReadinessScore != null ? `${Math.round(citationReadinessScore)}/100` : 'Not measured'}</strong>
+              <strong style={{ fontSize: '20px', color: citationReadinessScore != null ? '#ff4757' : '#9aa7bd' }}>{citationReadinessScore != null ? `${Math.round(citationReadinessScore)}/100` : '—'}</strong>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0b1220', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #53a7ff' }}>
@@ -1869,7 +1869,7 @@ function GeoIntelligence({ data }: { data: any }) {
                 <b style={{ display: 'block', fontSize: '14px' }}>Answerability</b>
                 <span style={{ fontSize: '12px', color: '#9aa7bd' }}>How well content resolves user queries</span>
               </div>
-              <strong style={{ fontSize: '20px', color: answerabilityScore != null ? '#53a7ff' : '#9aa7bd' }}>{answerabilityScore != null ? `${Math.round(answerabilityScore)}/100` : 'Not measured'}</strong>
+              <strong style={{ fontSize: '20px', color: answerabilityScore != null ? '#53a7ff' : '#9aa7bd' }}>{answerabilityScore != null ? `${Math.round(answerabilityScore)}/100` : '—'}</strong>
             </div>
           </div>
         </Card>

@@ -190,6 +190,32 @@ export async function getCampaignStatus(campaignId) {
   return brevoRequest('GET', `/emailCampaigns/${campaignId}`);
 }
 
+export async function createRecurringCampaign({ name, subject, htmlContent, plainTextContent, senderId, listIds, recurrence, scheduledAt = null }) {
+  const body = {
+    name,
+    subject,
+    htmlContent,
+    plainTextContent: plainTextContent || '',
+    senderId,
+    listIds: Array.isArray(listIds) ? listIds : [listIds],
+    scheduledAt: scheduledAt || undefined,
+    recurrence: recurrence || 'monthly',
+  };
+  return brevoRequest('POST', '/emailCampaigns', body);
+}
+
+export async function listSegments(limit = 50, offset = 0) {
+  return brevoRequest('GET', `/contacts/segments?limit=${limit}&offset=${offset}`);
+}
+
+export async function createSegment({ segmentName, segmentType = 'static', conditions }) {
+  return brevoRequest('POST', '/contacts/segments', { segmentName, segmentType, conditions });
+}
+
+export async function deleteSegment(segmentId) {
+  return brevoRequest('DELETE', `/contacts/segments/${segmentId}`);
+}
+
 export async function createSender({ name, email }) {
   return brevoRequest('POST', '/senders', { name, email });
 }
@@ -217,6 +243,10 @@ export default {
   sendCampaignNow,
   sendTestEmail,
   getCampaignStatus,
+  createRecurringCampaign,
+  listSegments,
+  createSegment,
+  deleteSegment,
   createSender,
   isBrevoConfigured,
   getBrevoStatus,

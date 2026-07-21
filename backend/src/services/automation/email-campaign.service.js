@@ -1,6 +1,8 @@
 import { prisma } from "../../config/prisma.js";
 import { callAI } from "../../ai/services/aiRouter.service.js";
 import { sendEmail, getEmailProviderHealth } from "../integrations/email/email-provider-registry.js";
+import * as brevoProvider from "../brevo/brevo.provider.js";
+import { getLatestEvidenceSnapshot } from "../../modules/evidence/evidence.service.js";
 
 function buildRichContext(plan, evidence, productIntelligence, seoData, campaignData, audienceData, competitorData) {
   const website = evidence?.website || {};
@@ -35,6 +37,21 @@ function buildRichContext(plan, evidence, productIntelligence, seoData, campaign
     ...(Array.isArray(evidence?.seo?.keywords?.value) ? evidence.seo.keywords.value : [])
   ].filter(Boolean).slice(0, 10);
 
+  const primaryKeywords = [
+    ...(Array.isArray(seo.primaryKeywords) ? seo.primaryKeywords.map(k => k.keyword || k) : []),
+    ...(Array.isArray(evidence?.seo?.primaryKeywords?.value) ? evidence.seo.primaryKeywords.value : [])
+  ].filter(Boolean);
+
+  const secondaryKeywords = [
+    ...(Array.isArray(seo.secondaryKeywords) ? seo.secondaryKeywords.map(k => k.keyword || k) : []),
+    ...(Array.isArray(evidence?.seo?.secondaryKeywords?.value) ? evidence.seo.secondaryKeywords.value : [])
+  ].filter(Boolean);
+
+  const questionKeywords = [
+    ...(Array.isArray(seo.questionKeywords) ? seo.questionKeywords.map(k => k.keyword || k) : []),
+    ...(Array.isArray(evidence?.seo?.questionKeywords?.value) ? evidence.seo.questionKeywords.value : [])
+  ].filter(Boolean);
+
   const testimonials = [
     ...(Array.isArray(product.testimonials) ? product.testimonials : []),
     ...(Array.isArray(website.testimonials) ? website.testimonials : []),
@@ -56,6 +73,9 @@ function buildRichContext(plan, evidence, productIntelligence, seoData, campaign
     valueProposition: product.valueProposition || product.usp || website.heroText || '',
     competitorNames: competitors.slice(0, 5).map(c => c.name || c.url || c).filter(Boolean),
     seoKeywords,
+    primaryKeywords,
+    secondaryKeywords,
+    questionKeywords,
     tone: plan?.tone || company.tone || 'professional',
     brandVoice: company.brandVoice || product.brandVoice || '',
     pricingModel: product.pricing || product.pricingModel || '',
@@ -74,6 +94,9 @@ function buildAIPrompt(context, emailType = 'campaign') {
   const painPoints = context.audiencePainPoints.join(', ') || 'Not specified';
   const competitors = context.competitorNames.join(', ') || 'Not specified';
   const keywords = context.seoKeywords.join(', ') || 'Not specified';
+  const primaryKw = context.primaryKeywords.join(', ') || 'Not specified';
+  const secondaryKw = context.secondaryKeywords.join(', ') || 'Not specified';
+  const questionKw = context.questionKeywords.join(', ') || 'Not specified';
   const testimonials = context.testimonials.join(', ') || 'Not specified';
 
   return `You are a Senior Email Marketing Strategist at a leading SaaS company. Generate an exceptional, high-converting ${emailType} email using ONLY the verified context below.
@@ -102,7 +125,11 @@ PRODUCT DETAILS:
 COMPETITIVE LANDSCAPE:
 - Competitors: ${competitors}
 
-SEO KEYWORDS: ${keywords}
+SEO KEYWORDS:
+- All Keywords: ${keywords}
+- Primary Keywords (use at least 2 times): ${primaryKw}
+- Secondary Keywords (use at least 1 time): ${secondaryKw}
+- Question Keywords (use at least 1 time): ${questionKw}
 
 TESTIMONIALS / SOCIAL PROOF: ${testimonials}
 
@@ -131,11 +158,14 @@ CRITICAL RULES:
 5. Every feature mentioned MUST come from the Features list above.
 6. Every pain point MUST come from the Pain Points list above.
 7. Subject line MUST include "${context.productName || 'the product'}" and be under 50 characters.
-8. Total email body (excluding signature/footer) MUST be at least 500 words.
+8. Total email body (excluding signature/footer) MUST be at least 600 words, maximum 900 words.
 9. Brand voice must be consistent throughout - maintain ${context.tone || 'professional'} tone.
 10. No generic placeholders like "your product", "our solution", "this tool", "the platform".
 11. Target audience must be ${context.targetAudience || 'business professionals'} - write specifically for them.
 12. CTA must be specific to ${context.productName} and the buying stage.
+13. Use primary keywords (${primaryKw}) at least 2 times across the email body.
+14. Use secondary keywords (${secondaryKw}) at least 1 time across the email body.
+15. Use question keywords (${questionKw}) at least 1 time across the email body.
 
 Return ONLY valid JSON with no markdown, no code blocks:
 {
@@ -153,19 +183,29 @@ Return ONLY valid JSON with no markdown, no code blocks:
   "signature": "...",
   "footer": "...",
   "ps": "...",
-  "plainTextBody": "Full plain text version (complete email in plain text, 500+ words)",
-  "htmlBody": "Full HTML version with proper formatting"
+  "plainTextBody": "Full plain text version (complete email in plain text, 600-900 words)",
+  "htmlBody": "Full HTML version with proper formatting",
+  "markdownBody": "Full markdown version of the email"
 }`;
 }
 
 function validateEmailOutput(email, context) {
   const issues = [];
+  const criticalBlockers = [];
   const productName = context.productName || '';
   const companyName = context.companyName || '';
 
   if (!email) { issues.push('Email object is null/undefined'); return { valid: false, issues }; }
 
-  const requiredFields = ['subjectLine', 'previewText', 'opening', 'painPoint', 'solution', 'featureSection', 'benefits', 'customerStory', 'socialProof', 'cta', 'closing', 'signature', 'footer', 'ps', 'plainTextBody', 'htmlBody'];
+  const criticalFields = ['subjectLine', 'previewText', 'cta', 'footer', 'signature'];
+  for (const field of criticalFields) {
+    const val = email[field];
+    if (!val || (typeof val === 'string' && val.trim().length < 5)) {
+      criticalBlockers.push({ field, message: `Critical: ${field} is missing or too short (<5 chars)` });
+    }
+  }
+
+  const requiredFields = ['opening', 'painPoint', 'solution', 'featureSection', 'benefits', 'customerStory', 'socialProof', 'ps', 'plainTextBody', 'htmlBody', 'markdownBody'];
   for (const field of requiredFields) {
     const val = email[field];
     if (!val || (typeof val === 'string' && val.trim().length < 5)) {
@@ -180,17 +220,26 @@ function validateEmailOutput(email, context) {
     issues.push({ field: 'previewText', message: 'Over 120 characters' });
   }
 
+  const evidenceSections = ['opening', 'painPoint', 'solution', 'featureSection', 'benefits', 'customerStory', 'socialProof', 'ps'];
+  const filledSections = evidenceSections.filter(s => email[s] && email[s].trim().length >= 5).length;
+  if (filledSections < 3) {
+    criticalBlockers.push({ field: 'evidence', message: `Only ${filledSections} content sections filled (minimum 3 required)` });
+  }
+
   if (productName) {
     const body = (email.plainTextBody || '').toLowerCase();
     const subject = (email.subjectLine || '').toLowerCase();
     const preview = (email.previewText || '').toLowerCase();
     const productLower = productName.toLowerCase();
-    const productMentions = (body.match(new RegExp(productLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length +
-      (subject.match(new RegExp(productLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length +
-      (preview.match(new RegExp(productLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+    const escapedProduct = productLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const productMentions = (body.match(new RegExp(escapedProduct, 'g')) || []).length +
+      (subject.match(new RegExp(escapedProduct, 'g')) || []).length +
+      (preview.match(new RegExp(escapedProduct, 'g')) || []).length;
 
     if (productMentions < 5) {
-      issues.push({ field: 'product', message: `Product mentioned only ${productMentions} times (minimum 5 required)` });
+      criticalBlockers.push({ field: 'product', message: `Product mentioned only ${productMentions} times (minimum 5 required)` });
+    } else if (productMentions > 10) {
+      criticalBlockers.push({ field: 'product', message: `Product mentioned ${productMentions} times (maximum 10 allowed) - keyword stuffing detected` });
     }
 
     const genericPatterns = [/your product/gi, /our product/gi, /this tool/gi, /our tool/gi, /the software/gi, /our software/gi, /your software/gi, /the platform/gi, /our platform/gi, /your platform/gi, /our solution/gi, /your solution/gi, /the solution/gi, /ai tool/gi, /ai platform/gi, /ai solution/gi, /ai powered/gi];
@@ -209,8 +258,10 @@ function validateEmailOutput(email, context) {
   }
 
   const wordCount = (email.plainTextBody || '').split(/\s+/).filter(Boolean).length;
-  if (wordCount < 500) {
-    issues.push({ field: 'wordCount', message: `Only ${wordCount} words (minimum 500 required)` });
+  if (wordCount < 600) {
+    issues.push({ field: 'wordCount', message: `Only ${wordCount} words (minimum 600 required)` });
+  } else if (wordCount > 900) {
+    issues.push({ field: 'wordCount', message: `${wordCount} words exceeds maximum of 900` });
   }
 
   const audience = context.targetAudience || '';
@@ -224,10 +275,37 @@ function validateEmailOutput(email, context) {
     }
   }
 
+  const bodyText = (email.plainTextBody || '').toLowerCase();
+  const primaryKeywords = context.primaryKeywords || [];
+  const secondaryKeywords = context.secondaryKeywords || [];
+  const questionKeywords = context.questionKeywords || [];
+
+  if (primaryKeywords.length > 0) {
+    const primaryFound = primaryKeywords.filter(kw => bodyText.includes(kw.toLowerCase())).length;
+    if (primaryFound < Math.min(2, primaryKeywords.length)) {
+      issues.push({ field: 'primaryKeywords', message: `Only ${primaryFound} of ${primaryKeywords.length} primary keywords found (at least 2 expected)` });
+    }
+  }
+
+  if (secondaryKeywords.length > 0) {
+    const secondaryFound = secondaryKeywords.filter(kw => bodyText.includes(kw.toLowerCase())).length;
+    if (secondaryFound < Math.min(1, secondaryKeywords.length)) {
+      issues.push({ field: 'secondaryKeywords', message: `No secondary keywords found in email body` });
+    }
+  }
+
+  if (questionKeywords.length > 0) {
+    const questionFound = questionKeywords.filter(kw => bodyText.includes(kw.toLowerCase())).length;
+    if (questionFound < Math.min(1, questionKeywords.length)) {
+      issues.push({ field: 'questionKeywords', message: `No question keywords found in email body` });
+    }
+  }
+
   return {
-    valid: issues.length === 0,
+    valid: criticalBlockers.length === 0,
+    criticalBlockers,
     issues,
-    sanitized: issues.length > 5 ? sanitizeEmail(email, issues, productName, companyName, context) : email
+    sanitized: (issues.length > 5 || criticalBlockers.length > 0) ? sanitizeEmail(email, issues, productName, companyName, context) : email
   };
 }
 
@@ -252,6 +330,10 @@ function sanitizeEmail(email, issues, productName, companyName, context) {
 
   if (!sanitized.htmlBody) {
     sanitized.htmlBody = buildResponsiveHTML(sanitized);
+  }
+
+  if (!sanitized.markdownBody) {
+    sanitized.markdownBody = generateMarkdownBody(sanitized);
   }
 
   return sanitized;
@@ -358,6 +440,25 @@ function buildResponsiveHTML(email) {
 </html>`;
 }
 
+function generateMarkdownBody(email) {
+  const sections = [];
+  if (email.subjectLine) sections.push(`# ${email.subjectLine}`);
+  if (email.previewText) sections.push(`> ${email.previewText}`);
+  if (email.opening) sections.push(`\n${email.opening}`);
+  if (email.painPoint) sections.push(`\n## The Challenge\n\n${email.painPoint}`);
+  if (email.solution) sections.push(`\n## The Solution\n\n${email.solution}`);
+  if (email.featureSection) sections.push(`\n## Features\n\n${email.featureSection.split('\n').filter(l => l.trim()).map(l => l.replace(/^[-*•]\s*/, '- ')).join('\n')}`);
+  if (email.benefits) sections.push(`\n## Benefits\n\n${email.benefits.split('\n').filter(l => l.trim()).map(l => l.replace(/^[-*•]\s*/, '- ')).join('\n')}`);
+  if (email.customerStory) sections.push(`\n> ${email.customerStory}`);
+  if (email.socialProof) sections.push(`\n${email.socialProof}`);
+  if (email.cta) sections.push(`\n---\n\n**[${email.cta}](#)**`);
+  if (email.closing) sections.push(`\n${email.closing}`);
+  if (email.signature) sections.push(`\n${email.signature}`);
+  if (email.footer) sections.push(`\n---\n\n${email.footer}`);
+  if (email.ps) sections.push(`\n*P.S. ${email.ps}*`);
+  return sections.join('\n\n');
+}
+
 function buildPreviewData(email) {
   const plainText = email.plainTextBody || '';
   const htmlBody = email.htmlBody || '';
@@ -426,6 +527,42 @@ export async function generateEmailCampaign({ chatId, userId, planId, campaignPl
 
     if (!plan) throw new Error('Campaign plan not found');
 
+    const evidenceSnapshot = await getLatestEvidenceSnapshot({ chatId, userId });
+
+    const evidenceData = {
+      website: {
+        title: evidenceSnapshot?.websiteEvidence?.title || '',
+        metaDescription: evidenceSnapshot?.websiteEvidence?.metaDescription || '',
+        headings: evidenceSnapshot?.websiteEvidence?.headings || [],
+        featuresText: evidenceSnapshot?.websiteEvidence?.features || [],
+        usps: evidenceSnapshot?.websiteEvidence?.usps || [],
+        ctas: evidenceSnapshot?.websiteEvidence?.ctas || [],
+        pageTypes: evidenceSnapshot?.websiteEvidence?.pageTypes || [],
+        technologies: evidenceSnapshot?.contentEvidence?.technologies || [],
+      },
+      product: {
+        features: evidenceSnapshot?.websiteEvidence?.features || [],
+        usps: evidenceSnapshot?.websiteEvidence?.usps || [],
+        benefits: [],
+        targetAudience: evidenceSnapshot?.websiteEvidence?.targetAudience || '',
+        industry: '',
+        productCategory: '',
+        pricingModel: '',
+      },
+      company: {
+        name: evidenceSnapshot?.companyName || '',
+        website: evidenceSnapshot?.websiteUrl || '',
+        industry: evidenceSnapshot?.websiteEvidence?.industry || '',
+        targetMarket: evidenceSnapshot?.websiteEvidence?.targetAudience || '',
+      },
+      audience: {},
+      competitors: {},
+      seo: {
+        scores: evidenceSnapshot?.technicalSeoEvidence || {},
+        keywords: evidenceSnapshot?.contentEvidence?.keywords || [],
+      }
+    };
+
     const [productIntelligence, seoData, competitorIntelligence, audienceData] = await Promise.allSettled([
       prisma.productIntelligence.findUnique({ where: { chatId } }),
       prisma.seoIntelligence.findUnique({ where: { chatId } }),
@@ -435,7 +572,7 @@ export async function generateEmailCampaign({ chatId, userId, planId, campaignPl
 
     const context = buildRichContext(
       plan,
-      { website: {}, product: {}, company: {}, audience: {}, competitors: {}, seo: {} },
+      evidenceData,
       productIntelligence.status === 'fulfilled' ? productIntelligence.value : null,
       seoData.status === 'fulfilled' ? seoData.value : null,
       null,
@@ -461,7 +598,24 @@ export async function generateEmailCampaign({ chatId, userId, planId, campaignPl
     const validation = validateEmailOutput(emailData, context);
 
     if (!validation.valid) {
-      console.warn('[EmailCampaign] Validation issues:', validation.issues);
+      console.warn('[EmailCampaign] Validation failed - not saving campaign. Issues:', validation.issues);
+      if (validation.criticalBlockers && validation.criticalBlockers.length > 0) {
+        console.warn('[EmailCampaign] Critical blockers:', validation.criticalBlockers);
+      }
+      return {
+        success: false,
+        error: 'Email validation failed',
+        data: {
+          email: validation.sanitized || emailData,
+          validation,
+          context: {
+            productName: context.productName,
+            companyName: context.companyName,
+            targetAudience: context.targetAudience
+          },
+          campaignId: null
+        }
+      };
     }
 
     const finalEmail = validation.sanitized || emailData;
@@ -548,7 +702,8 @@ function generateFallbackEmail(context) {
     footer: `${product} | ${company}\n&copy; ${new Date().getFullYear()} All rights reserved.\nIf you no longer wish to receive these emails, you can unsubscribe here.`,
     ps: `P.S. Start your free trial of ${product} today and see why ${audience} are making the switch. No credit card required.`,
     plainTextBody: `Hello,\n\nAre you tired of dealing with ${painPoint}? You're not alone.\n\nMany ${audience} struggle with these challenges every day. The reality is that ${painPoint} costs your team time, productivity, and ultimately affects your bottom line.\n\nThat's where ${product} comes in. ${product} by ${company} is designed specifically for ${audience} to help you overcome these challenges.\n\nWith ${product}, you get:\n- ${features}\n\nBy using ${product}, you can:\n- Save time and reduce manual work\n- Improve team collaboration\n- Make data-driven decisions\n- Scale your operations efficiently\n\n${testimonial ? `"${testimonial}"` : ''}\n\n${competitor ? `Unlike ${competitor}, ${product} is built specifically for ${audience} needs.` : ''}\n\nReady to transform your ${industry} operations? Try ${product} today.\n\nBest regards,\nThe ${company} Team\n\nP.S. Start your free trial of ${product} today and experience the difference. No credit card required.`,
-    htmlBody: `<html><body><p>Hello,</p><p>Are you tired of dealing with ${painPoint}? You're not alone.</p><p>Many ${audience} face this challenge. That's where ${product} comes in.</p><p><strong>${product}</strong> helps you:</p><ul><li>${features}</li></ul><p>Ready to get started?</p><p>Best regards,<br/>The ${company} Team</p><p>P.S. Try ${product} today.</p></body></html>`
+    htmlBody: `<html><body><p>Hello,</p><p>Are you tired of dealing with ${painPoint}? You're not alone.</p><p>Many ${audience} face this challenge. That's where ${product} comes in.</p><p><strong>${product}</strong> helps you:</p><ul><li>${features}</li></ul><p>Ready to get started?</p><p>Best regards,<br/>The ${company} Team</p><p>P.S. Try ${product} today.</p></body></html>`,
+    markdownBody: `# ${product} Helps ${audience} Overcome ${painPoint.substring(0, 20)}\n\n> Discover how ${product} solves ${painPoint.substring(0, 30)} for ${audience}\n\nAre you tired of dealing with ${painPoint}? You're not alone.\n\n## The Challenge\n\nThe reality is that ${painPoint} costs ${audience} more than just time.\n\n## The Solution\n\nThat's where ${product} comes in.\n\n## Features\n\n- ${features}\n\n## Benefits\n\n- Save time and reduce manual work\n- Improve team collaboration\n- Make data-driven decisions\n- Scale your operations efficiently\n\n> One ${audience} team implemented ${product} and transformed their operations.\n\n**[Try ${product} Free Today](#)**\n\nReady to see what ${product} can do for you?\n\nBest regards,\nThe ${company} Team\n\n---\n\n${product} | ${company}\n\n*P.S. Start your free trial of ${product} today and see why ${audience} are making the switch.*`
   };
 }
 
@@ -636,6 +791,58 @@ export async function saveDraftCampaign(campaignId, emailData) {
       }
     });
     return { success: true, data: campaign };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function createRecurringCampaign({ chatId, userId, name, recurrence = 'monthly', listIds, senderId, campaignId }) {
+  try {
+    const campaign = await prisma.emailCampaign.findUnique({ where: { id: campaignId }, include: { sequenceItems: { take: 1 } } });
+    if (!campaign) return { success: false, error: 'Campaign not found' };
+
+    const item = campaign.sequenceItems[0];
+    const result = await brevoProvider.createRecurringCampaign({
+      name: name || campaign.name,
+      subject: item?.subjectLine || '',
+      htmlContent: item?.responsiveHtml || item?.emailBodyHtml || '',
+      plainTextContent: item?.emailBodyText || '',
+      senderId: senderId || 1,
+      listIds: listIds || [],
+      recurrence,
+    });
+
+    if (!result.success) return { success: false, error: result.error };
+
+    await prisma.emailCampaignLog.create({
+      data: {
+        emailCampaignId: campaignId,
+        action: 'recurring_campaign_created',
+        status: 'scheduled',
+        message: `Recurring campaign created with recurrence: ${recurrence}`,
+        metadata: { brevoCampaignId: result.data?.id, recurrence }
+      }
+    });
+
+    return { success: true, data: result.data };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function listAudienceSegments() {
+  try {
+    const result = await brevoProvider.listSegments();
+    return { success: true, data: result.data?.segments || [] };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function createAudienceSegment({ segmentName, conditions }) {
+  try {
+    const result = await brevoProvider.createSegment({ segmentName, conditions });
+    return { success: true, data: result.data };
   } catch (error) {
     return { success: false, error: error.message };
   }

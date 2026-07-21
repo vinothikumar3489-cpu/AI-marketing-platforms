@@ -370,7 +370,7 @@ export function buildKeywordSources(websiteData) {
   return sources;
 }
 
-export function rankAndFilterKeywords(keywords, productName = '', companyName = '', maxResults = 50) {
+export function rankAndFilterKeywords(keywords, productName = '', companyName = '') {
   const scored = keywords
     .map(kw => {
       const phrase = kw.phrase || kw.keyword || kw;
@@ -380,28 +380,16 @@ export function rankAndFilterKeywords(keywords, productName = '', companyName = 
     .filter(kw => kw.relevanceScore >= 25)
     .sort((a, b) => b.relevanceScore - a.relevanceScore);
 
-  const topKeywords = scored.slice(0, maxResults);
-
-  const primary = topKeywords.filter(k => k.relevanceScore >= 70);
-  const secondary = topKeywords.filter(k => k.relevanceScore >= 50 && k.relevanceScore < 70);
-  const longTail = topKeywords.filter(k => k.phrase.split(' ').length >= 4);
+  const addType = (items, type) => items.map(item => ({ ...item, type }));
 
   return {
-    all: topKeywords,
-    primary: primary.slice(0, 15),
-    secondary: secondary.slice(0, 20),
-    longTail: longTail.slice(0, 15),
-    question: topKeywords.filter(k => classifyKeyword(k.phrase) === 'question'),
-    commercial: topKeywords.filter(k => classifyKeyword(k.phrase) === 'commercial'),
-    transactional: topKeywords.filter(k => categorizeKeyword(k.phrase).includes('transactional')),
-    navigational: topKeywords.filter(k => categorizeKeyword(k.phrase).includes('navigational')),
-    informational: topKeywords.filter(k => classifyKeyword(k.phrase) === 'informational'),
-    brand: topKeywords.filter(k => {
-      const pLower = (productName || '').toLowerCase();
-      const cLower = (companyName || '').toLowerCase();
-      return (pLower && k.phrase.toLowerCase().includes(pLower)) ||
-             (cLower && k.phrase.toLowerCase().includes(cLower));
-    })
+    all: scored,
+    primary: addType(scored.filter(k => k.relevanceScore >= 70).slice(0, 10), 'primary'),
+    secondary: addType(scored.filter(k => k.relevanceScore >= 50 && k.relevanceScore < 70).slice(0, 20), 'secondary'),
+    longTail: addType(scored.filter(k => k.phrase.split(' ').length >= 4).slice(0, 20), 'longTail'),
+    question: addType(scored.filter(k => classifyKeyword(k.phrase) === 'question').slice(0, 10), 'question'),
+    commercial: addType(scored.filter(k => classifyKeyword(k.phrase) === 'commercial').slice(0, 5), 'commercial'),
+    transactional: addType(scored.filter(k => categorizeKeyword(k.phrase).includes('transactional')).slice(0, 5), 'transactional')
   };
 }
 

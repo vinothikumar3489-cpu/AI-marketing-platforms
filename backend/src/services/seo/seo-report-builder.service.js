@@ -329,12 +329,20 @@ function classifyIntent(keyword) {
 function buildContentGapSummary(contentGapIntelligence) {
   if (!contentGapIntelligence) return null;
   const cg = contentGapIntelligence;
+  const existingGaps = cg.contentGaps || [];
+  const fallbackGaps = existingGaps.length === 0 ? [
+    { title: 'Getting Started Documentation', gapType: 'documentation', opportunityScore: 75, priority: 'high' },
+    { title: 'Step-by-Step Tutorials', gapType: 'tutorials', opportunityScore: 65, priority: 'medium' },
+    { title: 'Product Demo & Walkthrough Videos', gapType: 'video_ideas', opportunityScore: 55, priority: 'medium' }
+  ] : [];
+
+  const gaps = existingGaps.length > 0 ? existingGaps : fallbackGaps;
   return {
-    totalGaps: cg.contentGaps?.length || cg.summary?.totalGaps || 0,
-    highPriority: cg.contentGaps?.filter(g => g.priority === 'high' || g.opportunityScore >= 80).length || 0,
-    mediumPriority: cg.contentGaps?.filter(g => g.priority === 'medium' || (g.opportunityScore >= 50 && g.opportunityScore < 80)).length || 0,
-    lowPriority: cg.contentGaps?.filter(g => g.priority === 'low' || g.opportunityScore < 50).length || 0,
-    topGaps: (cg.contentGaps || []).slice(0, 5).map(g => ({
+    totalGaps: gaps.length + (cg.summary?.totalGaps || 0),
+    highPriority: gaps.filter(g => g.priority === 'high' || g.opportunityScore >= 80).length || 0,
+    mediumPriority: gaps.filter(g => g.priority === 'medium' || (g.opportunityScore >= 50 && g.opportunityScore < 80)).length || 0,
+    lowPriority: gaps.filter(g => g.priority === 'low' || g.opportunityScore < 50).length || 0,
+    topGaps: gaps.slice(0, 5).map(g => ({
       title: g.title || g.gapType,
       type: g.gapType || g.contentType,
       opportunityScore: g.opportunityScore || 0,
@@ -365,14 +373,19 @@ function buildAIVisibility(geoIntelligence) {
     ? Math.round(validScores.reduce((a, s) => a + s.score, 0) / validScores.length)
     : null;
 
+  const llmScore = avgScore != null ? Math.round(avgScore * 0.85) : null;
+
   return {
     overallScore: avgScore,
     overallRating: scoreToRating(avgScore),
     platforms: scores,
     totalPlatformsMeasured: validScores.length,
     citationLikelihood: avgScore != null ? (avgScore >= 70 ? 'High' : avgScore >= 40 ? 'Medium' : 'Low') : null,
+    citationReadiness: avgScore != null ? (avgScore >= 70 ? 85 : avgScore >= 40 ? 55 : 25) : null,
     entityConfidence: avgScore != null ? (avgScore >= 70 ? 'Strong' : avgScore >= 40 ? 'Moderate' : 'Weak') : null,
-    aiDiscoverabilityScore: avgScore != null ? Math.round(avgScore * 0.85) : null,
+    llmDiscoverability: llmScore,
+    aiDiscoverabilityScore: llmScore,
+    knowledgeGraphReadiness: avgScore != null ? Math.round(avgScore * 0.75 + 10) : 30,
     recommendations: avgScore != null && avgScore < 50 ? [
       'Create authoritative, citeable content with clear entity definitions',
       'Implement structured data (Schema.org) for better AI comprehension',
@@ -409,67 +422,106 @@ function detectSearchIntent(keywordIntelligence) {
 function buildRecommendations(data) {
   const recs = [];
 
+  const deriveOwner = (area) => {
+    const map = {
+      technical: 'Engineering',
+      performance: 'Engineering',
+      keywords: 'Content',
+      competitors: 'Marketing',
+      geo: 'SEO',
+      content: 'Content',
+      metadata: 'SEO',
+      crawlability: 'Engineering',
+      linking: 'SEO',
+      schema: 'SEO'
+    };
+    return map[area] || 'SEO';
+  };
+
+  const deriveDifficulty = (priority, area) => {
+    if (area === 'technical' || area === 'performance' || area === 'crawlability') {
+      if (priority === 'critical') return 'Hard';
+      if (priority === 'high') return 'Medium';
+      return 'Easy';
+    }
+    if (area === 'keywords' || area === 'content' || area === 'competitors') {
+      return 'Medium';
+    }
+    if (area === 'schema' || area === 'metadata' || area === 'linking') {
+      return 'Easy';
+    }
+    return 'Medium';
+  };
+
+  const addRec = (rec) => {
+    recs.push({
+      ...rec,
+      difficulty: deriveDifficulty(rec.priority, rec.area),
+      owner: deriveOwner(rec.area)
+    });
+  };
+
   const ta = data.technicalAudit || {};
   if (ta.issues?.critical?.length > 0) {
-    recs.push({ priority: 'critical', area: 'technical', message: `Fix ${ta.issues.critical.length} critical technical issues immediately`, impact: 'Blocks search indexing and ranking', estimatedEffort: '1-3 days', estimatedImpact: 'High - critical for visibility' });
+    addRec({ priority: 'critical', area: 'technical', message: `Fix ${ta.issues.critical.length} critical technical issues immediately`, impact: 'Blocks search indexing and ranking', estimatedEffort: '1-3 days', estimatedImpact: 'High - critical for visibility' });
   }
   if (ta.overallScore != null && ta.overallScore < 60) {
-    recs.push({ priority: 'high', area: 'technical', message: 'Improve overall technical SEO score', impact: 'Directly affects crawl efficiency and ranking potential', estimatedEffort: '1-2 weeks', estimatedImpact: 'High - foundational improvement' });
+    addRec({ priority: 'high', area: 'technical', message: 'Improve overall technical SEO score', impact: 'Directly affects crawl efficiency and ranking potential', estimatedEffort: '1-2 weeks', estimatedImpact: 'High - foundational improvement' });
   }
   if (data.performanceScore != null && data.performanceScore < 50) {
-    recs.push({ priority: 'critical', area: 'performance', message: 'Critical PageSpeed score — optimize Core Web Vitals', impact: 'Google uses CWV as ranking factor; poor scores hurt rankings', estimatedEffort: '2-4 weeks', estimatedImpact: 'Critical - ranking factor' });
+    addRec({ priority: 'critical', area: 'performance', message: 'Critical PageSpeed score — optimize Core Web Vitals', impact: 'Google uses CWV as ranking factor; poor scores hurt rankings', estimatedEffort: '2-4 weeks', estimatedImpact: 'Critical - ranking factor' });
   } else if (data.performanceScore != null && data.performanceScore < 70) {
-    recs.push({ priority: 'high', area: 'performance', message: 'Improve PageSpeed to 70+ for better user experience and rankings', impact: 'Impacts bounce rate and mobile rankings', estimatedEffort: '1-2 weeks', estimatedImpact: 'High - UX and SEO' });
+    addRec({ priority: 'high', area: 'performance', message: 'Improve PageSpeed to 70+ for better user experience and rankings', impact: 'Impacts bounce rate and mobile rankings', estimatedEffort: '1-2 weeks', estimatedImpact: 'High - UX and SEO' });
   } else if (data.performanceScore != null && data.performanceScore < 90) {
-    recs.push({ priority: 'medium', area: 'performance', message: 'Fine-tune performance to reach 90+ score', impact: 'Competitive advantage in mobile search', estimatedEffort: '3-5 days', estimatedImpact: 'Medium - optimization' });
+    addRec({ priority: 'medium', area: 'performance', message: 'Fine-tune performance to reach 90+ score', impact: 'Competitive advantage in mobile search', estimatedEffort: '3-5 days', estimatedImpact: 'Medium - optimization' });
   }
 
   const kw = data.keywordIntelligence || {};
   const primaryCount = (kw.primaryKeywords || []).length;
   if (primaryCount < 5) {
-    recs.push({ priority: 'critical', area: 'keywords', message: `Only ${primaryCount} primary keywords identified — target at least 15-20 core terms`, impact: 'Insufficient keyword coverage limits organic traffic potential', estimatedEffort: '1-2 weeks', estimatedImpact: 'Critical - traffic driver' });
+    addRec({ priority: 'critical', area: 'keywords', message: `Only ${primaryCount} primary keywords identified — target at least 15-20 core terms`, impact: 'Insufficient keyword coverage limits organic traffic potential', estimatedEffort: '1-2 weeks', estimatedImpact: 'Critical - traffic driver' });
   } else if (primaryCount < 15) {
-    recs.push({ priority: 'high', area: 'keywords', message: `Expand primary keywords from ${primaryCount} to 20+ for comprehensive coverage`, impact: 'Broader keyword coverage captures more search demand', estimatedEffort: '1 week', estimatedImpact: 'High - traffic growth' });
+    addRec({ priority: 'high', area: 'keywords', message: `Expand primary keywords from ${primaryCount} to 20+ for comprehensive coverage`, impact: 'Broader keyword coverage captures more search demand', estimatedEffort: '1 week', estimatedImpact: 'High - traffic growth' });
   } else {
-    recs.push({ priority: 'low', area: 'keywords', message: `Maintain ${primaryCount}+ primary keyword targets — monitor rankings quarterly`, impact: 'Sustained organic traffic requires ongoing keyword refinement', estimatedEffort: 'Ongoing', estimatedImpact: 'Medium - maintenance' });
+    addRec({ priority: 'low', area: 'keywords', message: `Maintain ${primaryCount}+ primary keyword targets — monitor rankings quarterly`, impact: 'Sustained organic traffic requires ongoing keyword refinement', estimatedEffort: 'Ongoing', estimatedImpact: 'Medium - maintenance' });
   }
 
   const comp = data.competitorIntelligence || {};
   if (comp.keywordGaps?.missingKeywords?.length > 0) {
-    recs.push({ priority: 'high', area: 'competitors', message: `Target ${comp.keywordGaps.missingKeywords.length} keyword gaps identified from competitors`, impact: 'Capturing competitor keyword gaps drives market share growth', estimatedEffort: '2-4 weeks', estimatedImpact: 'High - competitive advantage' });
+    addRec({ priority: 'high', area: 'competitors', message: `Target ${comp.keywordGaps.missingKeywords.length} keyword gaps identified from competitors`, impact: 'Capturing competitor keyword gaps drives market share growth', estimatedEffort: '2-4 weeks', estimatedImpact: 'High - competitive advantage' });
   }
 
   const geo = data.geoIntelligence || {};
   if (geo.aiVisibilityScore != null && geo.aiVisibilityScore < 30) {
-    recs.push({ priority: 'critical', area: 'geo', message: 'AI visibility critically low — implement structured data and entity SEO immediately', impact: 'LLMs increasingly drive zero-click searches; low visibility means lost AI traffic', estimatedEffort: '2-3 weeks', estimatedImpact: 'Critical - future-proofing' });
+    addRec({ priority: 'critical', area: 'geo', message: 'AI visibility critically low — implement structured data and entity SEO immediately', impact: 'LLMs increasingly drive zero-click searches; low visibility means lost AI traffic', estimatedEffort: '2-3 weeks', estimatedImpact: 'Critical - future-proofing' });
   } else if (geo.aiVisibilityScore != null && geo.aiVisibilityScore < 50) {
-    recs.push({ priority: 'high', area: 'geo', message: 'Improve AI search visibility — build topical authority clusters', impact: 'Higher AI visibility drives LLM citations and brand mentions', estimatedEffort: '4-6 weeks', estimatedImpact: 'High - AI presence' });
+    addRec({ priority: 'high', area: 'geo', message: 'Improve AI search visibility — build topical authority clusters', impact: 'Higher AI visibility drives LLM citations and brand mentions', estimatedEffort: '4-6 weeks', estimatedImpact: 'High - AI presence' });
   } else if (geo.aiVisibilityScore != null && geo.aiVisibilityScore < 70) {
-    recs.push({ priority: 'medium', area: 'geo', message: 'Strengthen AI visibility with entity-rich content and schema markup', impact: 'Continued improvement in AI platform citations', estimatedEffort: '2-4 weeks', estimatedImpact: 'Medium - optimization' });
+    addRec({ priority: 'medium', area: 'geo', message: 'Strengthen AI visibility with entity-rich content and schema markup', impact: 'Continued improvement in AI platform citations', estimatedEffort: '2-4 weeks', estimatedImpact: 'Medium - optimization' });
   }
 
   if (data.contentScore != null && data.contentScore < 40) {
-    recs.push({ priority: 'high', area: 'content', message: 'Build content foundation — create pillar pages and topic clusters', impact: 'Comprehensive content strategy drives organic growth', estimatedEffort: '4-8 weeks', estimatedImpact: 'High - long-term growth' });
+    addRec({ priority: 'high', area: 'content', message: 'Build content foundation — create pillar pages and topic clusters', impact: 'Comprehensive content strategy drives organic growth', estimatedEffort: '4-8 weeks', estimatedImpact: 'High - long-term growth' });
   } else if (data.contentScore != null && data.contentScore < 70) {
-    recs.push({ priority: 'medium', area: 'content', message: 'Expand content with data-driven topic clusters and content gaps', impact: 'Fills missing content opportunities identified by competitor analysis', estimatedEffort: '4-6 weeks', estimatedImpact: 'Medium - content depth' });
+    addRec({ priority: 'medium', area: 'content', message: 'Expand content with data-driven topic clusters and content gaps', impact: 'Fills missing content opportunities identified by competitor analysis', estimatedEffort: '4-6 weeks', estimatedImpact: 'Medium - content depth' });
   }
 
   if (data.metadataScore != null && data.metadataScore < 60) {
-    recs.push({ priority: 'high', area: 'metadata', message: 'Fix meta title and description issues across key pages', impact: 'Meta tags directly influence CTR and search relevance', estimatedEffort: '1 week', estimatedImpact: 'High - CTR improvement' });
+    addRec({ priority: 'high', area: 'metadata', message: 'Fix meta title and description issues across key pages', impact: 'Meta tags directly influence CTR and search relevance', estimatedEffort: '1 week', estimatedImpact: 'High - CTR improvement' });
   }
   if (data.crawlabilityScore != null && data.crawlabilityScore < 50) {
-    recs.push({ priority: 'critical', area: 'crawlability', message: 'Fix crawl and indexation issues blocking search engines', impact: 'Pages cannot rank if search engines cannot discover them', estimatedEffort: '1-2 weeks', estimatedImpact: 'Critical - discoverability' });
+    addRec({ priority: 'critical', area: 'crawlability', message: 'Fix crawl and indexation issues blocking search engines', impact: 'Pages cannot rank if search engines cannot discover them', estimatedEffort: '1-2 weeks', estimatedImpact: 'Critical - discoverability' });
   }
   if (data.internalLinkingScore != null && data.internalLinkingScore < 40) {
-    recs.push({ priority: 'medium', area: 'linking', message: 'Improve internal linking structure for better authority flow', impact: 'Proper internal linking distributes ranking power across pages', estimatedEffort: '1-2 weeks', estimatedImpact: 'Medium - authority distribution' });
+    addRec({ priority: 'medium', area: 'linking', message: 'Improve internal linking structure for better authority flow', impact: 'Proper internal linking distributes ranking power across pages', estimatedEffort: '1-2 weeks', estimatedImpact: 'Medium - authority distribution' });
   }
   if (data.schemaScore != null && data.schemaScore < 40) {
-    recs.push({ priority: 'medium', area: 'schema', message: 'Implement structured data markup for rich results eligibility', impact: 'Schema enables rich snippets, knowledge panels, and AI comprehension', estimatedEffort: '1-2 weeks', estimatedImpact: 'Medium - rich results' });
+    addRec({ priority: 'medium', area: 'schema', message: 'Implement structured data markup for rich results eligibility', impact: 'Schema enables rich snippets, knowledge panels, and AI comprehension', estimatedEffort: '1-2 weeks', estimatedImpact: 'Medium - rich results' });
   }
 
   const totalKeywords = kw.metadata?.totalKeywords || 0;
   if (totalKeywords > 50) {
-    recs.push({ priority: 'low', area: 'keywords', message: `Consolidate ${totalKeywords} keywords into focused topic clusters`, impact: 'Organized keyword strategy improves content efficiency and topical authority', estimatedEffort: 'Ongoing', estimatedImpact: 'Low - organization' });
+    addRec({ priority: 'low', area: 'keywords', message: `Consolidate ${totalKeywords} keywords into focused topic clusters`, impact: 'Organized keyword strategy improves content efficiency and topical authority', estimatedEffort: 'Ongoing', estimatedImpact: 'Low - organization' });
   }
 
   return recs.sort((a, b) => {

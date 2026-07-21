@@ -283,6 +283,22 @@ export function EmailAutomationWorkspace() {
     URL.revokeObjectURL(url);
   }
 
+  function copyText(text: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  function downloadPdf(html: string, filename: string) {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>${filename}</title><style>body{font-family:Arial,sans-serif;padding:40px;line-height:1.6;color:#333;max-width:600px;margin:0 auto}img{max-width:100%}a{color:#0066cc}@media print{body{padding:20px}}</style></head><body>${html}</body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); }, 500);
+  }
+
   function backToList() {
     setView('list');
     setSelectedCampaign(null);
@@ -435,6 +451,8 @@ export function EmailAutomationWorkspace() {
               onCopyHtml={() => copyHtml(firstItem.responsiveHtml || firstItem.emailBodyHtml || '')}
               onDownloadHtml={() => downloadHtml(firstItem.responsiveHtml || firstItem.emailBodyHtml || '', `${campaign.name || 'email'}-${firstItem.subjectLine || 'campaign'}`)}
               onDownloadText={() => downloadText(firstItem.emailBodyText || '', `${campaign.name || 'email'}-${firstItem.subjectLine || 'campaign'}`)}
+              onCopyText={() => copyText(firstItem.emailBodyText || '')}
+              onDownloadPdf={() => downloadPdf(firstItem.responsiveHtml || firstItem.emailBodyHtml || '', `${campaign.name || 'email'}-${firstItem.subjectLine || 'campaign'}`)}
               copied={copied}
               wordCount={getWordCount()}
             />
@@ -479,6 +497,8 @@ export function EmailAutomationWorkspace() {
               onCopyHtml={() => copyHtml(firstItem.responsiveHtml || firstItem.emailBodyHtml || '')}
               onDownloadHtml={() => downloadHtml(firstItem.responsiveHtml || firstItem.emailBodyHtml || '', `${campaign.name || 'email'}-${firstItem.subjectLine || 'campaign'}`)}
               onDownloadText={() => downloadText(firstItem.emailBodyText || '', `${campaign.name || 'email'}-${firstItem.subjectLine || 'campaign'}`)}
+              onCopyText={() => copyText(firstItem.emailBodyText || '')}
+              onDownloadPdf={() => downloadPdf(firstItem.responsiveHtml || firstItem.emailBodyHtml || '', `${campaign.name || 'email'}-${firstItem.subjectLine || 'campaign'}`)}
               copied={copied}
             />
 
@@ -758,7 +778,7 @@ function OverviewCard({ campaign, channelFit }: { campaign: any; channelFit?: an
 function TimelineSection({
   items, editItemId, editField, editValue, regeneratingItem,
   onStartEdit, onEditChange, onSaveEdit, onCancelEdit, onRegenerate, onAddVersion,
-  onCopyHtml, onDownloadHtml, onDownloadText, copied, wordCount,
+  onCopyHtml, onDownloadHtml, onDownloadText, onCopyText, onDownloadPdf, copied, wordCount,
 }: {
   items: any[]; editItemId: string | null; editField: string | null; editValue: string;
   regeneratingItem: string | null;
@@ -770,6 +790,8 @@ function TimelineSection({
   onAddVersion: () => void;
   onCopyHtml: () => void;
   onDownloadHtml: () => void;
+  onCopyText: () => void;
+  onDownloadPdf: () => void;
   onDownloadText: () => void;
   copied: boolean;
   wordCount: number;
@@ -888,6 +910,22 @@ function TimelineSection({
                     color: '#6b7a93', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px',
                   }}>
                     <FileText size={10} /> Text
+                  </button>
+                )}
+                {item.emailBodyText && (
+                  <button onClick={onCopyText} style={{
+                    padding: '4px 8px', background: '#101622', border: '1px solid #293245', borderRadius: '4px',
+                    color: copied ? '#10e18b' : '#6b7a93', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px',
+                  }}>
+                    <Copy size={10} /> {copied ? 'Copied!' : 'Copy Text'}
+                  </button>
+                )}
+                {item.responsiveHtml && (
+                  <button onClick={onDownloadPdf} style={{
+                    padding: '4px 8px', background: '#101622', border: '1px solid #293245', borderRadius: '4px',
+                    color: '#6b7a93', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px',
+                  }}>
+                    <Download size={10} /> PDF
                   </button>
                 )}
                 <button onClick={() => onRegenerate(item.id)} disabled={regeneratingItem === item.id}
@@ -1055,13 +1093,13 @@ function SchedulePanel({
 function SenderPanel({
   campaign, testRecipient, onTestRecipientChange, onTestSend, onRealSend,
   sendingTest, sendingReal, testSendResult, sendResult, approvalStatus, item,
-  onCopyHtml, onDownloadHtml, onDownloadText, copied,
+  onCopyHtml, onDownloadHtml, onDownloadText, onCopyText, onDownloadPdf, copied,
 }: {
   campaign: any; testRecipient: string; onTestRecipientChange: (v: string) => void;
   onTestSend: () => void; onRealSend: () => void;
   sendingTest: boolean; sendingReal: boolean; testSendResult: any; sendResult: any;
   approvalStatus?: string; item: any;
-  onCopyHtml: () => void; onDownloadHtml: () => void; onDownloadText: () => void; copied: boolean;
+  onCopyHtml: () => void; onDownloadHtml: () => void; onDownloadText: () => void; onCopyText: () => void; onDownloadPdf: () => void; copied: boolean;
 }) {
   const isApproved = approvalStatus === 'APPROVED';
 
@@ -1097,6 +1135,24 @@ function SenderPanel({
               display: 'flex', alignItems: 'center', gap: '4px', flex: 1, justifyContent: 'center',
             }}>
               <FileText size={12} /> Text
+            </button>
+          )}
+          {item?.emailBodyText && (
+            <button onClick={onCopyText} style={{
+              padding: '6px 12px', borderRadius: '4px', border: '1px solid #293245',
+              background: '#101622', color: copied ? '#10e18b' : '#6b7a93', cursor: 'pointer', fontSize: '11px',
+              display: 'flex', alignItems: 'center', gap: '4px', flex: 1, justifyContent: 'center',
+            }}>
+              <Copy size={12} /> {copied ? 'Copied!' : 'Copy Text'}
+            </button>
+          )}
+          {item?.responsiveHtml && (
+            <button onClick={onDownloadPdf} style={{
+              padding: '6px 12px', borderRadius: '4px', border: '1px solid #293245',
+              background: '#101622', color: '#6b7a93', cursor: 'pointer', fontSize: '11px',
+              display: 'flex', alignItems: 'center', gap: '4px', flex: 1, justifyContent: 'center',
+            }}>
+              <Download size={12} /> PDF
             </button>
           )}
         </div>
