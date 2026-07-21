@@ -1,7 +1,7 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
 import { requireAuth } from "../middleware/auth.middleware.js";
-import { getHealth, sendEmail, generatePosterImage, renderVideoHandler, getVideoStatusHandler, debugTestPollinations, debugTestFal, debugTestCloudinary, debugTestShotstack, debugTestCreatomate } from "../controllers/integrations.controller.js";
+import { getHealth, sendEmail, generatePosterImage, renderVideoHandler, getVideoStatusHandler, debugTestPollinations, debugTestFal, debugTestCloudinary, debugTestShotstack, debugTestCreatomate, handleBrevoWebhook } from "../controllers/integrations.controller.js";
 
 export const integrationsRouter = express.Router();
 
@@ -33,6 +33,9 @@ const videoLimiter = rateLimit({
 });
 
 integrationsRouter.use(requireAuth);
+
+// Brevo webhook endpoint (no auth required - public endpoint for Brevo)
+integrationsRouter.post("/webhooks/brevo", handleBrevoWebhook);
 
 // Provider health check
 integrationsRouter.get("/health", getHealth);

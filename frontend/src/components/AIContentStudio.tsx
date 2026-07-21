@@ -15,6 +15,7 @@ import {
   regenerateContentAsset, getIntegrationHealth, fromAssetToEmailCampaign
 } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
+import { EmailWorkflow } from './email/EmailWorkflow';
 
 // ============================================
 // CONSTANTS
@@ -724,7 +725,7 @@ function ContentPreview({ content, selectedChatId, onAddToCampaign }: { content:
   } else if (contentType === 'youtube_description' || (content.openingHook && content.description)) {
     renderer = <YouTubeRenderer content={content} onCopy={handleCopy} />;
   } else if (contentType === 'email_copy' || (content.emailType && content.subject)) {
-    renderer = <EmailRenderer content={content} onCopy={handleCopy} selectedChatId={selectedChatId} onAddToCampaign={onAddToCampaign} />;
+    renderer = <EmailWorkflow />;
   } else if (contentType === 'creative_brief' || (content.objective && content.visualDirection)) {
     renderer = <CreativeBriefRenderer content={content} onCopy={handleCopy} />;
   } else if (contentType === 'video_script' || (content.duration && content.scenes)) {

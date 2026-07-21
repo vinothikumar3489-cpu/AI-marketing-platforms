@@ -342,55 +342,94 @@ async function generateEmailCopy(brief, aiFunction = callAI) {
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
 
-  // PART 4: Use emailType from brief or request body
-  const emailType = brief?.emailType || brief?.goal || 'promotional';
+  // Enhanced email workflow configuration
+  const emailType = brief?.emailType || 'Product Announcement';
+  const goal = brief?.goal || 'Product Adoption';
+  const tone = brief?.tone || 'Professional';
+  const audience = brief?.audience || persona;
+  const language = brief?.language || 'en';
+  
+  // Sender information from brief or defaults
+  const sender = {
+    name: brief?.senderName || brandName || displayName,
+    email: brief?.senderEmail || `noreply@${domain || 'example.com'}`,
+    replyTo: brief?.replyToEmail || brief?.senderEmail || `noreply@${domain || 'example.com'}`
+  };
+
+  // Recipient information for personalization
+  const recipient = brief?.recipient || {
+    email: '',
+    firstName: '',
+    lastName: '',
+    companyName: ''
+  };
+
+  // CTA URL from brief
+  const ctaUrl = brief?.ctaUrl || brief?.websiteUrl || `https://${domain || 'example.com'}`;
 
   // PART 4: Use stable word count limits from DTO
-  const wc = EMAIL_WORD_COUNT_LIMITS[emailType] || EMAIL_WORD_COUNT_LIMITS.promotional;
+  const wc = EMAIL_WORD_COUNT_LIMITS[emailType] || EMAIL_WORD_COUNT_LIMITS['Product Announcement'];
 
   const prompt = `You are a professional email copywriter. Generate a ${emailType} email for ${displayName}.
 
 ${productContext}
 
+EMAIL CONFIGURATION:
+- Email Type: ${emailType}
+- Goal: ${goal}
+- Tone: ${tone}
+- Audience: ${audience}
+- Language: ${language}
+- Sender: ${sender.name} (${sender.email})
+- CTA URL: ${ctaUrl}
+
 REQUIREMENTS:
-- emailType: "${emailType}"
 - Word count: ${wc.min}-${wc.max} words total
-- Use product name "${displayName}" consistently (NOT internal name)
+- Use product name "${displayName}" consistently (NOT internal name "${internalName}")
 - subject: Compelling subject line, max 70 chars, include product name
-- previewText: Compelling preview, max 150 chars
+- subjectAlternatives: Array of 2-3 alternative subject lines for A/B testing
+- previewText: Compelling preview text, max 150 chars
 - greeting: Professional greeting with personalization placeholder (e.g., "Hi {{firstName}},")
+- headline: Main headline or hook that captures attention
 - opening: Strong opening paragraph addressing the pain point
 - painPoint: 1-2 sentences describing the specific problem
 - solution: 2-3 sentences on how ${displayName} solves it
 - benefits: Array of 3-5 key benefits
-- evidence: Array of evidence points referenced from context
-- cta: Object with label (CTA button text) and url (null — do not invent URLs)
+- bodyParagraphs: Array of 2-4 paragraphs that form the email body
+- socialProof: Social proof or testimonials (if available from evidence)
+- primaryCta: Object with label (CTA button text) and url (use provided CTA URL)
+- secondaryCta: Optional secondary CTA object
 - closing: Warm closing paragraph
 - signature: Sender signature with company name
-- footer: Professional footer with company info and copyright
 - postscript: Optional P.S. line reinforcing key benefit
-- bodyParagraphs: Array of 2-3 paragraphs that form the email body
-- html: Basic HTML version of the email (inline styles, ready to send)
+- complianceFooter: Compliance footer with legal information
+- unsubscribeText: Unsubscribe text and link
+- html: Responsive HTML version of the email (inline styles, ready to send)
 - plainText: Plain text version of the email
+- evidenceUsed: Array of evidence fields referenced from context
 
-Do NOT use: fake stats, testimonials, ROI claims, invented data, superlatives, competitor bashing, generic placeholders like "our product" or "the platform".
+Do NOT use: fake stats, testimonials (unless in evidence), ROI claims, invented data, superlatives, competitor bashing, generic placeholders like "our product" or "the platform".
 
 Return valid JSON:
 {
   "subject": "string",
+  "subjectAlternatives": ["string"],
   "previewText": "string",
   "greeting": "string",
+  "headline": "string",
   "opening": "string",
   "painPoint": "string",
   "solution": "string",
   "benefits": ["string"],
-  "evidence": ["string"],
-  "cta": { "label": "string", "url": null },
+  "bodyParagraphs": ["string"],
+  "socialProof": "string",
+  "primaryCta": { "label": "string", "url": "string" },
+  "secondaryCta": { "label": "string", "url": "string" } or null,
   "closing": "string",
   "signature": "string",
-  "footer": "string",
   "postscript": "string",
-  "bodyParagraphs": ["string"],
+  "complianceFooter": "string",
+  "unsubscribeText": "string",
   "html": "string",
   "plainText": "string",
   "evidenceUsed": ["list evidence fields referenced"],
@@ -402,7 +441,8 @@ Return valid JSON:
     if (result.success && result.data) {
       const data = result.data;
       const benefits = Array.isArray(data.benefits) ? data.benefits : [];
-      const evidenceList = Array.isArray(data.evidence) ? data.evidence : [];
+      const bodyParagraphs = Array.isArray(data.bodyParagraphs) ? data.bodyParagraphs : [];
+      const subjectAlternatives = Array.isArray(data.subjectAlternatives) ? data.subjectAlternatives : [];
 
       // PART 4: Validate against DTO schema
       const validationResult = validateEmailCopyDTO(data);
@@ -411,49 +451,61 @@ Return valid JSON:
         // Continue with best-effort data but log warnings
       }
 
-      const structuredBody = {
-        greeting: data.greeting || '',
-        opening: data.opening || '',
-        painPoint: data.painPoint || '',
-        solution: data.solution || '',
-        benefits,
-        evidence: evidenceList,
-        cta: data.cta && typeof data.cta === 'object' ? { label: data.cta.label || '', url: data.cta.url || null } : { label: '', url: null },
-        closing: data.closing || '',
-        signature: data.signature || '',
-        footer: data.footer || '',
-        postscript: data.postscript || '',
+      // Ensure CTA URL is set from brief
+      const primaryCta = {
+        label: data.primaryCta?.label || 'Learn More',
+        url: data.primaryCta?.url || ctaUrl
       };
+
+      const secondaryCta = data.secondaryCta ? {
+        label: data.secondaryCta.label,
+        url: data.secondaryCta.url || ctaUrl
+      } : null;
 
       return {
         id: `email_${Date.now()}`,
         contentType: 'email_copy',
+        emailType,
+        goal,
+        tone,
+        audience,
+        language,
+        sender,
+        recipient,
         productIdentity: {
           internalName,
           displayName,
           brandName,
           domain,
         },
-        subject: data.subject || '',
-        previewText: data.previewText || '',
+        subject: data.subject || `${displayName}: ${goal}`,
+        subjectAlternatives,
+        previewText: data.previewText || `Discover how ${displayName} can help you`,
+        greeting: data.greeting || 'Hi {{firstName}},',
+        headline: data.headline || `Transform Your Experience with ${displayName}`,
+        opening: data.opening || '',
+        painPoint: data.painPoint || '',
+        solution: data.solution || '',
+        benefits,
+        bodyParagraphs,
+        socialProof: data.socialProof || '',
+        primaryCta,
+        secondaryCta,
+        closing: data.closing || '',
+        signature: data.signature || sender.name,
+        postscript: data.postscript || '',
+        complianceFooter: data.complianceFooter || `© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
+        unsubscribeText: data.unsubscribeText || 'Unsubscribe',
         html: data.html || '',
         plainText: data.plainText || '',
-        structuredBody,
-        bodyParagraphs: Array.isArray(data.bodyParagraphs) ? data.bodyParagraphs : [data.opening || ''],
-        ctaText: structuredBody.cta.label,
-        ctaUrl: structuredBody.cta.url,
-        closing: data.closing || '',
-        signature: data.signature || '',
-        footer: data.footer || '',
-        greeting: data.greeting || '',
-        opening: data.opening || '',
-        emailType,
-        evidenceSources: evidenceList,
+        evidenceUsed: data.evidenceUsed || [],
         quality: {
-          score: 1,
-          checks: {},
-          blockingIssues: [],
+          score: validationResult.valid ? 1 : 0.5,
+          checks: validationResult.errors || [],
+          warnings: validationResult.warnings || [],
         },
+        approvalStatus: 'DRAFT',
+        deliveryStatus: null,
         createdAt: new Date().toISOString(),
         _provider: result.provider,
       };
@@ -463,17 +515,29 @@ Return valid JSON:
   }
 
   // PART 5: Deterministic complete fallback when AI parsing fails
-  return generateEmailCopyFallback(displayName, internalName, brandName, domain, emailType, persona, painPoint);
+  return generateEmailCopyFallback(displayName, internalName, brandName, domain, emailType, persona, painPoint, goal, tone, audience, sender, ctaUrl);
 }
 
 /**
  * PART 5: Deterministic fallback for email_copy generation
  * Returns complete, valid email structure with metadata marking
  */
-function generateEmailCopyFallback(displayName, internalName, brandName, domain, emailType, persona, painPoint) {
+function generateEmailCopyFallback(displayName, internalName, brandName, domain, emailType, persona, painPoint, goal, tone, audience, sender, ctaUrl) {
   const fallbackData = {
     id: `email_fallback_${Date.now()}`,
     contentType: 'email_copy',
+    emailType,
+    goal,
+    tone,
+    audience,
+    language: 'en',
+    sender,
+    recipient: {
+      email: '',
+      firstName: '',
+      lastName: '',
+      companyName: ''
+    },
     productIdentity: {
       internalName,
       displayName,
@@ -481,96 +545,135 @@ function generateEmailCopyFallback(displayName, internalName, brandName, domain,
       domain,
     },
     subject: `${displayName}: A Solution for ${persona}`,
-    previewText: `Discover how ${displayName} can help with ${painPoint}`,
-    emailType,
+    subjectAlternatives: [
+      `Discover ${displayName} for ${persona}`,
+      `${goal} with ${displayName}`
+    ],
+    previewText: `Learn how ${displayName} can help ${persona} overcome ${painPoint}`,
     greeting: 'Hi {{firstName}},',
-    opening: `I wanted to reach out about ${painPoint}, which I know is important to you.`,
-    painPoint: painPoint || 'This challenge affects many professionals like you.',
-    solution: `${displayName} offers a straightforward approach to address this need.`,
+    headline: `Transform Your Experience with ${displayName}`,
+    opening: `As a ${persona}, you understand the challenge of ${painPoint}.`,
+    painPoint: painPoint || 'Many professionals struggle with inefficient workflows and limited visibility.',
+    solution: `${displayName} provides a comprehensive solution that addresses these challenges directly.`,
     benefits: [
-      `Designed specifically for ${persona}`,
-      'Easy to implement and use',
-      'Backed by customer success'
+      `Streamlined workflows for ${persona}`,
+      `Enhanced visibility and control`,
+      `Improved productivity and efficiency`,
+      `Cost-effective solution`,
+      `Easy implementation and adoption`
     ],
-    evidence: ['Product analysis data', 'Customer feedback'],
-    cta: { label: 'Learn More', url: null },
-    closing: 'Thank you for considering this solution.',
-    signature: `The ${brandName || displayName} Team`,
-    footer: `© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
-    postscript: 'We\'re here to help if you have any questions.',
     bodyParagraphs: [
-      `I wanted to reach out about ${painPoint}, which I know is important to you.`,
-      `${displayName} offers a straightforward approach to address this need.`,
-      `We've designed this specifically for ${persona} to ensure it meets your requirements.`
+      `${displayName} is designed specifically for ${persona} who need to overcome ${painPoint}. Our platform combines advanced features with intuitive design to deliver measurable results.`,
+      `With ${displayName}, you gain access to powerful tools that help you ${goal.toLowerCase()}. Our solution has been tested and refined based on feedback from professionals like you.`,
+      `Get started today and see the difference ${displayName} can make for your workflow.`
     ],
-    html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2>${displayName}: A Solution for ${persona}</h2>
-      <p>Hi {{firstName}},</p>
-      <p>I wanted to reach out about ${painPoint}, which I know is important to you.</p>
-      <p>${displayName} offers a straightforward approach to address this need.</p>
-      <ul>
-        <li>Designed specifically for ${persona}</li>
-        <li>Easy to implement and use</li>
-        <li>Backed by customer success</li>
-      </ul>
-      <p>Thank you for considering this solution.</p>
-      <p>The ${brandName || displayName} Team</p>
-      <p style="font-size: 12px; color: #666;">© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.</p>
-    </div>`,
-    plainText: `${displayName}: A Solution for ${persona}
-
-Hi {{firstName}},
-
-I wanted to reach out about ${painPoint}, which I know is important to you.
-
-${displayName} offers a straightforward approach to address this need.
-
-Benefits:
-- Designed specifically for ${persona}
-- Easy to implement and use
-- Backed by customer success
-
-Thank you for considering this solution.
-
-The ${brandName || displayName} Team
-
-© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
-    structuredBody: {
-      greeting: 'Hi {{firstName}},',
-      opening: `I wanted to reach out about ${painPoint}, which I know is important to you.`,
-      painPoint: painPoint || 'This challenge affects many professionals like you.',
-      solution: `${displayName} offers a straightforward approach to address this need.`,
-      benefits: [
-        `Designed specifically for ${persona}`,
-        'Easy to implement and use',
-        'Backed by customer success'
-      ],
-      evidence: ['Product analysis data', 'Customer feedback'],
-      cta: { label: 'Learn More', url: null },
-      closing: 'Thank you for considering this solution.',
-      signature: `The ${brandName || displayName} Team`,
-      footer: `© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
-      postscript: 'We\'re here to help if you have any questions.'
+    socialProof: '',
+    primaryCta: {
+      label: 'Get Started',
+      url: ctaUrl
     },
-    ctaText: 'Learn More',
-    ctaUrl: null,
-    evidenceSources: ['Product analysis data', 'Customer feedback'],
+    secondaryCta: null,
+    closing: `We're excited to help you achieve your goals with ${displayName}.`,
+    signature: sender.name,
+    postscript: `P.S. Start your journey with ${displayName} today and see immediate results.`,
+    complianceFooter: `© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
+    unsubscribeText: 'Unsubscribe',
+    html: generateFallbackHtml(displayName, sender, ctaUrl),
+    plainText: generateFallbackPlainText(displayName, sender, ctaUrl),
+    evidenceUsed: [],
     quality: {
       score: 0.5,
-      checks: {},
-      blockingIssues: ['Generated using fallback due to AI parsing failure']
+      checks: ['fallback_used'],
+      warnings: ['Using deterministic fallback due to AI generation failure'],
     },
+    approvalStatus: 'DRAFT',
+    deliveryStatus: null,
     createdAt: new Date().toISOString(),
+    _fallbackUsed: true,
     _provider: 'fallback',
-    _fallback: true,
-    _fallbackReason: 'AI parsing failed'
   };
 
-  console.warn('[Email Copy] Using deterministic fallback for email generation');
   return fallbackData;
 }
 
-async function generateBlogArticle(brief) {
+/**
+ * Generate fallback HTML for email
+ */
+function generateFallbackHtml(displayName, sender, ctaUrl) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${displayName}</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
+    <h1 style="color: #0066cc; margin-top: 0;">Transform Your Experience with ${displayName}</h1>
+    <p>Hi {{firstName}},</p>
+    <p>As a professional, you understand the challenge of inefficient workflows and limited visibility.</p>
+    <p><strong>${displayName}</strong> provides a comprehensive solution that addresses these challenges directly.</p>
+    <ul>
+      <li>Streamlined workflows</li>
+      <li>Enhanced visibility and control</li>
+      <li>Improved productivity and efficiency</li>
+      <li>Cost-effective solution</li>
+      <li>Easy implementation and adoption</li>
+    </ul>
+    <p>${displayName} is designed specifically for professionals who need to overcome these challenges. Our platform combines advanced features with intuitive design to deliver measurable results.</p>
+    <p>With ${displayName}, you gain access to powerful tools that help you achieve your goals. Our solution has been tested and refined based on feedback from professionals like you.</p>
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${ctaUrl}" style="background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Get Started</a>
+    </div>
+    <p>We're excited to help you achieve your goals with ${displayName}.</p>
+    <p style="margin-top: 30px;">Best regards,<br>${sender.name}</p>
+    <p style="font-size: 12px; color: #666; margin-top: 30px;">P.S. Start your journey with ${displayName} today and see immediate results.</p>
+    <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+    <p style="font-size: 12px; color: #666;">© ${new Date().getFullYear()} ${sender.name}. All rights reserved.</p>
+    <p style="font-size: 12px; color: #666;"><a href="#" style="color: #666;">Unsubscribe</a></p>
+  </div>
+</body>
+</html>`;
+}
+
+/**
+ * Generate fallback plain text for email
+ */
+function generateFallbackPlainText(displayName, sender, ctaUrl) {
+  return `Transform Your Experience with ${displayName}
+
+Hi {{firstName}},
+
+As a professional, you understand the challenge of inefficient workflows and limited visibility.
+
+${displayName} provides a comprehensive solution that addresses these challenges directly.
+
+Key Benefits:
+- Streamlined workflows
+- Enhanced visibility and control
+- Improved productivity and efficiency
+- Cost-effective solution
+- Easy implementation and adoption
+
+${displayName} is designed specifically for professionals who need to overcome these challenges. Our platform combines advanced features with intuitive design to deliver measurable results.
+
+With ${displayName}, you gain access to powerful tools that help you achieve your goals. Our solution has been tested and refined based on feedback from professionals like you.
+
+Get Started: ${ctaUrl}
+
+We're excited to help you achieve your goals with ${displayName}.
+
+Best regards,
+${sender.name}
+
+P.S. Start your journey with ${displayName} today and see immediate results.
+
+---
+© ${new Date().getFullYear()} ${sender.name}. All rights reserved.
+Unsubscribe: [unsubscribe link]`;
+}
+
+async function generateCreativeBrief(brief) {
   const evidence = buildEvidenceSection(brief);
   const productContext = buildProductEvidenceContext(brief);
   const productName = getProductName(brief);

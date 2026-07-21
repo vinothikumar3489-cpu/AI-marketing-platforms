@@ -168,3 +168,100 @@ export async function debugTestCreatomate(req, res) {
   const result = await testCreatomateConnection();
   res.json(result);
 }
+
+/**
+ * Handle Brevo webhook events for email delivery tracking
+ */
+export async function handleBrevoWebhook(req, res) {
+  try {
+    const webhookSecret = process.env.BREVO_WEBHOOK_SECRET;
+    
+    // Verify webhook secret if configured
+    if (webhookSecret) {
+      const providedSecret = req.headers['x-webhook-secret'] || req.headers['x-brevo-signature'];
+      if (providedSecret !== webhookSecret) {
+        console.warn('[Brevo Webhook] Invalid webhook secret');
+        return res.status(401).json({ success: false, error: 'Invalid webhook secret' });
+      }
+    }
+
+    const eventData = req.body;
+    const eventType = eventData.event || eventData.type;
+    const messageId = eventData.messageId || eventData['message-id'];
+    const recipientEmail = eventData.email || eventData.recipient?.email;
+
+    if (!eventType || !messageId) {
+      console.warn('[Brevo Webhook] Missing required fields:', { eventType, messageId });
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+
+    // Map Brevo event types to our status
+    const statusMap = {
+      'delivered': 'DELIVERED',
+      'opened': 'OPENED',
+      'click': 'CLICKED',
+      'bounce': 'BOUNCED',
+      'spam': 'SPAM',
+      'blocked': 'BLOCKED',
+      'invalid_email': 'FAILED',
+      'deferred': 'QUEUED',
+      'sent': 'SENT',
+      'request': 'QUEUED'
+    };
+
+    const mappedStatus = statusMap[eventType] || 'UNKNOWN';
+
+    // Update delivery status in database
+    try {
+      // Find delivery record by Brevo message ID
+      const delivery = await prisma.emailDelivery.findFirst({
+        where: { brevoMessageId: messageId },
+        include: { recipient: true, template: true }
+      });
+
+      if (delivery) {
+        const updateData = {
+          status: mappedStatus,
+          updatedAt: new Date()
+        };
+
+        // Update timestamp based on event type
+        if (eventType === 'delivered') updateData.deliveredAt = new Date();
+        if (eventType === 'opened') updateData.openedAt = new Date();
+        if (eventType === 'click') updateData.clickedAt = new Date();
+        if (eventType === 'bounce') updateData.bouncedAt = new Date();
+        if (eventType === 'sent') updateData.sentAt = new Date();
+
+        // Update error information for failed events
+        if (eventType === 'bounce' || eventType === 'blocked' || eventType === 'invalid_email') {
+          updateData.errorMessage = eventData.reason || eventData.message || 'Delivery failed';
+          updateData.errorCategory = eventData.category || 'provider_error';
+        }
+
+        await prisma.emailDelivery.update({
+          where: { id: delivery.id },
+          data: updateData
+        });
+
+        // Also update recipient status
+        await prisma.emailRecipient.update({
+          where: { id: delivery.recipientId },
+          data: { status: mappedStatus }
+        });
+
+        console.log(`[Brevo Webhook] Updated delivery ${delivery.id} to ${mappedStatus} for ${recipientEmail}`);
+      } else {
+        console.warn(`[Brevo Webhook] No delivery record found for message ID: ${messageId}`);
+      }
+    } catch (dbError) {
+      console.error('[Brevo Webhook] Database update error:', dbError.message);
+      // Still return 200 to prevent Brevo from retrying
+    }
+
+    // Return 200 to acknowledge receipt
+    return res.status(200).json({ success: true, message: 'Webhook processed' });
+  } catch (error) {
+    console.error('[Brevo Webhook] Processing error:', error.message);
+    return res.status(500).json({ success: false, error: 'Webhook processing failed' });
+  }
+}

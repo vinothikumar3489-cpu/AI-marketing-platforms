@@ -689,3 +689,72 @@ export async function runCopilotAutomation(chatId: string, action: string, confi
 export async function getCopilotNotifications(chatId: string) {
   return api.get<any>(`/chats/${chatId}/copilot/notifications`);
 }
+
+// ============================================
+// EMAIL WORKFLOW (Content Studio Email)
+// ============================================
+
+export async function generateEmailContent(chatId: string, brief: any) {
+  return api.post<any>(`/content/email/${chatId}/generate`, brief);
+}
+
+export async function validateEmailContent(emailData: any) {
+  return api.post<any>(`/content/email/validate`, emailData);
+}
+
+export async function saveEmailDraft(chatId: string, emailData: any) {
+  return api.post<any>(`/content/email/${chatId}/draft`, emailData);
+}
+
+export async function updateEmailTemplate(templateId: string, emailData: any) {
+  return api.put<any>(`/content/email/templates/${templateId}`, emailData);
+}
+
+export async function getEmailTemplate(templateId: string) {
+  return api.get<any>(`/content/email/templates/${templateId}`);
+}
+
+export async function listEmailTemplates(chatId: string, filters?: any) {
+  const q = filters ? '?' + new URLSearchParams(filters).toString() : '';
+  return api.get<any>(`/content/email/${chatId}/templates${q}`);
+}
+
+export async function deleteEmailTemplate(templateId: string) {
+  return api.del<any>(`/content/email/templates/${templateId}`);
+}
+
+export async function approveEmailTemplate(templateId: string) {
+  return api.post<any>(`/content/email/templates/${templateId}/approve`);
+}
+
+export async function rejectEmailTemplate(templateId: string, reason: string) {
+  return api.post<any>(`/content/email/templates/${templateId}/reject`, { reason });
+}
+
+export async function sendTestEmailContent(chatId: string, data: any) {
+  return api.post<any>(`/content/email/${chatId}/send-test`, data);
+}
+
+export async function sendEmailNow(chatId: string, data: any) {
+  return api.post<any>(`/content/email/${chatId}/send-now`, data);
+}
+
+export async function scheduleEmailContent(chatId: string, data: any) {
+  return api.post<any>(`/content/email/${chatId}/schedule`, data);
+}
+
+export async function cancelScheduledEmail(scheduledId: string) {
+  return api.del<any>(`/content/email/scheduled/${scheduledId}`);
+}
+
+export async function getEmailDeliveryStatus(templateId: string) {
+  return api.get<any>(`/content/email/templates/${templateId}/delivery-status`);
+}
+
+export async function generateEmailHtml(emailData: any) {
+  return api.post<any>(`/content/email/generate-html`, emailData);
+}
+
+export async function generateEmailPlainText(emailData: any) {
+  return api.post<any>(`/content/email/generate-plain-text`, emailData);
+}
