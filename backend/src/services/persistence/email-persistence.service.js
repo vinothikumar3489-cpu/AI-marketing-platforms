@@ -3,7 +3,7 @@
  * Handles saving, updating, approving, and rejecting email templates
  */
 
-import { prisma } from '../config/prisma.js';
+import { prisma } from '../../config/prisma.js';
 
 /**
  * Save email template as draft
