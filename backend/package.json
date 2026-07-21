@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20 <25"
+  },
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
@@ -14,7 +17,9 @@
     "build": "prisma generate",
     "test": "node --test \"tests/*.test.js\"",
     "test:jest": "npx jest --passWithNoTests",
-    "test:all": "node --test \"tests/*.test.js\" && npx jest --passWithNoTests"
+    "test:all": "node --test \"tests/*.test.js\" && npx jest --passWithNoTests",
+    "check:imports": "node scripts/check-module-imports.mjs",
+    "test:startup": "node scripts/startup-smoke-test.mjs"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
