@@ -188,5 +188,107 @@ export async function discoverCompetitorsViaSerpAPI(productName, industry, websi
   }
 
   const filtered = filterCompetitors(allResults, targetDomain);
+  
+  // PART 15: Fallback to platform competitors if SerpAPI returns insufficient results
+  if (filtered.length < 3) {
+    console.warn(`[CompetitorPipeline] Only ${filtered.length} competitors found via SerpAPI, using platform fallback`);
+    const platformCompetitors = generatePlatformCompetitors(productName, industry, targetDomain);
+    return [...filtered, ...platformCompetitors].slice(0, 20);
+  }
+  
   return filtered;
+}
+
+// PART 15: Platform-level competitor fallback for when SerpAPI fails
+export function generatePlatformCompetitors(productName, industry, targetDomain) {
+  const industryCompetitors = getIndustryCompetitors(industry);
+  
+  return industryCompetitors
+    .filter(comp => extractDomain(comp.url) !== targetDomain)
+    .map(comp => ({
+      name: comp.name,
+      domain: extractDomain(comp.url),
+      url: comp.url,
+      title: comp.name,
+      snippet: comp.description || `${comp.name} - ${industry} platform`,
+      competitorType: 'platform',
+      relevanceScore: comp.relevanceScore || 60,
+      source: 'platform_fallback',
+      confidence: 50,
+      retrievedAt: new Date().toISOString(),
+      status: 'estimated'
+    }));
+}
+
+// PART 15: Industry-specific platform competitor database
+function getIndustryCompetitors(industry) {
+  const industryLower = (industry || '').toLowerCase();
+  
+  const competitorDatabase = {
+    'video conferencing': [
+      { name: 'Zoom', url: 'https://zoom.us', description: 'Video conferencing and online meeting platform', relevanceScore: 90 },
+      { name: 'Microsoft Teams', url: 'https://teams.microsoft.com', description: 'Team collaboration and video conferencing', relevanceScore: 88 },
+      { name: 'Google Meet', url: 'https://meet.google.com', description: 'Google video conferencing solution', relevanceScore: 85 },
+      { name: 'Webex', url: 'https://webex.com', description: 'Cisco video conferencing platform', relevanceScore: 75 },
+      { name: 'GoToMeeting', url: 'https://gotomeeting.com', description: 'Online meeting and video conferencing', relevanceScore: 70 },
+    ],
+    'collaboration': [
+      { name: 'Slack', url: 'https://slack.com', description: 'Team communication and collaboration', relevanceScore: 90 },
+      { name: 'Microsoft Teams', url: 'https://teams.microsoft.com', description: 'Team collaboration platform', relevanceScore: 88 },
+      { name: 'Asana', url: 'https://asana.com', description: 'Project management and collaboration', relevanceScore: 80 },
+      { name: 'Monday.com', url: 'https://monday.com', description: 'Work management platform', relevanceScore: 78 },
+      { name: 'Notion', url: 'https://notion.so', description: 'All-in-one workspace for teams', relevanceScore: 75 },
+    ],
+    'project management': [
+      { name: 'Asana', url: 'https://asana.com', description: 'Project management software', relevanceScore: 90 },
+      { name: 'Monday.com', url: 'https://monday.com', description: 'Work management platform', relevanceScore: 88 },
+      { name: 'Trello', url: 'https://trello.com', description: 'Visual project management', relevanceScore: 80 },
+      { name: 'Jira', url: 'https://atlassian.com/jira', description: 'Issue tracking and project management', relevanceScore: 85 },
+      { name: 'Basecamp', url: 'https://basecamp.com', description: 'Project management and team communication', relevanceScore: 70 },
+    ],
+    'crm': [
+      { name: 'Salesforce', url: 'https://salesforce.com', description: 'Customer relationship management platform', relevanceScore: 95 },
+      { name: 'HubSpot', url: 'https://hubspot.com', description: 'Marketing, sales, and service platform', relevanceScore: 90 },
+      { name: 'Zoho CRM', url: 'https://zoho.com/crm', description: 'Cloud-based CRM software', relevanceScore: 75 },
+      { name: 'Pipedrive', url: 'https://pipedrive.com', description: 'Sales-focused CRM', relevanceScore: 78 },
+      { name: 'Microsoft Dynamics', url: 'https://dynamics.microsoft.com', description: 'Business applications and CRM', relevanceScore: 85 },
+    ],
+    'marketing automation': [
+      { name: 'HubSpot', url: 'https://hubspot.com', description: 'Marketing automation platform', relevanceScore: 95 },
+      { name: 'Marketo', url: 'https://marketo.com', description: 'Marketing automation software', relevanceScore: 85 },
+      { name: 'Pardot', url: 'https://pardot.com', description: 'B2B marketing automation', relevanceScore: 80 },
+      { name: 'ActiveCampaign', url: 'https://activecampaign.com', description: 'Email marketing and automation', relevanceScore: 75 },
+      { name: 'Mailchimp', url: 'https://mailchimp.com', description: 'Email marketing platform', relevanceScore: 70 },
+    ],
+    'analytics': [
+      { name: 'Google Analytics', url: 'https://analytics.google.com', description: 'Web analytics platform', relevanceScore: 95 },
+      { name: 'Mixpanel', url: 'https://mixpanel.com', description: 'Product analytics', relevanceScore: 85 },
+      { name: 'Amplitude', url: 'https://amplitude.com', description: 'Digital analytics platform', relevanceScore: 82 },
+      { name: 'Adobe Analytics', url: 'https://adobe.com/analytics', description: 'Marketing analytics', relevanceScore: 88 },
+      { name: 'Hotjar', url: 'https://hotjar.com', description: 'Behavior analytics and user feedback', relevanceScore: 75 },
+    ],
+    'e-commerce': [
+      { name: 'Shopify', url: 'https://shopify.com', description: 'E-commerce platform', relevanceScore: 95 },
+      { name: 'WooCommerce', url: 'https://woocommerce.com', description: 'WordPress e-commerce plugin', relevanceScore: 80 },
+      { name: 'BigCommerce', url: 'https://bigcommerce.com', description: 'E-commerce platform', relevanceScore: 75 },
+      { name: 'Magento', url: 'https://magento.com', description: 'Open-source e-commerce platform', relevanceScore: 78 },
+      { name: 'Squarespace', url: 'https://squarespace.com', description: 'Website builder and e-commerce', relevanceScore: 70 },
+    ],
+    'default': [
+      { name: 'Salesforce', url: 'https://salesforce.com', description: 'Business software platform', relevanceScore: 80 },
+      { name: 'HubSpot', url: 'https://hubspot.com', description: 'Marketing and sales platform', relevanceScore: 80 },
+      { name: 'Microsoft 365', url: 'https://microsoft.com/microsoft-365', description: 'Productivity suite', relevanceScore: 75 },
+      { name: 'Google Workspace', url: 'https://workspace.google.com', description: 'Cloud productivity suite', relevanceScore: 75 },
+      { name: 'Zoho', url: 'https://zoho.com', description: 'Business software suite', relevanceScore: 70 },
+    ]
+  };
+  
+  // Find matching industry or use default
+  for (const [key, competitors] of Object.entries(competitorDatabase)) {
+    if (industryLower.includes(key) || key.includes(industryLower)) {
+      return competitors;
+    }
+  }
+  
+  return competitorDatabase.default;
 }

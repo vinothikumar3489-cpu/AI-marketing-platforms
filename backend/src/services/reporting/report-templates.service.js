@@ -832,9 +832,9 @@ ${buildSwotSection(market, data?.product, data?.channelData?.[0])}
   ${channels.length > 0 ? dataTable(
     ['Channel', 'Fit Level', 'Rationale'],
     channels.slice(0, 12).map(c => [
-      safe(c.name || c.channel),
-      c.fitScore || c.fit ? `${c.fitScore || c.fit}` : '<span class="na">—</span>',
-      safe(c.reasoning || c.reason || c.fit || '')
+      safe(c.name ?? c.channel),
+      c.fitScore ?? c.fit ? `${c.fitScore ?? c.fit}` : '<span class="na">—</span>',
+      safe(c.reasoning ?? c.reason ?? c.fit ?? '')
     ]),
     'Channel plan data unavailable. Connect analytics/ad account for verified recommendations.'
   ) : '<div class="notice warn">Channel plan data unavailable. Connect analytics/ad account for verified recommendations.</div>'}
@@ -941,7 +941,7 @@ ${getReportStyles()}
 <div class="section">
   <h2>1. SEO Executive Summary & KPI Dashboard</h2>
   <div class="kpi-grid">
-    ${scoreCard('SEO Score', scores.seoScore || scores.overall)}
+    ${scoreCard('SEO Score', scores.seoScore ?? scores.overall)}
     ${scoreCard('Performance', scores.performanceScore)}
     ${scoreCard('Accessibility', scores.accessibilityScore)}
     ${scoreCard('Best Practices', scores.bestPracticesScore)}
@@ -955,7 +955,7 @@ ${getReportStyles()}
   </div>
   <div class="callout primary">
     <strong>${esc(name)}</strong> — <strong>${safe(company?.industry, 'verified')}</strong> industry.
-    SEO score: <strong>${Number.isFinite(Number(scores.seoScore || scores.overall)) ? Math.round(Number(scores.seoScore || scores.overall)) + '/100' : 'Data unavailable'}</strong>.
+    SEO score: <strong>${Number.isFinite(Number(scores.seoScore ?? scores.overall)) ? Math.round(Number(scores.seoScore ?? scores.overall)) + '/100' : 'Data unavailable'}</strong>.
     ${keywords.length > 0 ? `${keywords.length} keywords evaluated with ${gaps.length} content gaps identified.` : ''}
     ${competitors.length > 0 ? `${competitors.length} SEO competitors mapped.` : ''}
   </div>
@@ -966,14 +966,14 @@ ${getReportStyles()}
   <h2>2. Technical Audit</h2>
   <div class="kpi-grid">
     ${scoreCard('Performance', scores.performanceScore)}
-    ${scoreCard('SEO', scores.seoScore || scores.overall)}
+    ${scoreCard('SEO', scores.seoScore ?? scores.overall)}
     ${scoreCard('Accessibility', scores.accessibilityScore)}
     ${scoreCard('Best Practices', scores.bestPracticesScore)}
   </div>
   ${(() => {
     const auditMetrics = [
       { label: 'Performance', score: scores.performanceScore },
-      { label: 'SEO', score: scores.seoScore || scores.overall },
+      { label: 'SEO', score: scores.seoScore ?? scores.overall },
       { label: 'Accessibility', score: scores.accessibilityScore },
       { label: 'Best Practices', score: scores.bestPracticesScore }
     ];
@@ -1097,8 +1097,8 @@ ${getReportStyles()}
 <div class="page-break"></div>
 <div class="section">
   <h2>9. Executive Conclusion</h2>
-  <div class="callout ${Number(scores.seoScore || scores.overall) >= 70 ? 'success' : Number(scores.seoScore || scores.overall) >= 40 ? 'primary' : 'warning'}">
-    <strong>SEO Outlook:</strong> ${esc(name)} scores <strong>${Number.isFinite(Number(scores.seoScore || scores.overall)) ? Math.round(Number(scores.seoScore || scores.overall)) + '/100' : 'Data unavailable'}</strong> on overall SEO health.
+  <div class="callout ${Number(scores.seoScore ?? scores.overall) >= 70 ? 'success' : Number(scores.seoScore ?? scores.overall) >= 40 ? 'primary' : 'warning'}">
+    <strong>SEO Outlook:</strong> ${esc(name)} scores <strong>${Number.isFinite(Number(scores.seoScore ?? scores.overall)) ? Math.round(Number(scores.seoScore ?? scores.overall)) + '/100' : 'Data unavailable'}</strong> on overall SEO health.
     ${keywords.length > 0 ? `${keywords.length} keywords analyzed with an average difficulty assessment.` : ''}
     ${gaps.length > 0 ? `${gaps.length} content gaps identified — prioritizing these will provide the highest organic traffic impact.` : ''}
     ${competitors.length > 0 ? `${competitors.length} SEO competitors tracked for ongoing monitoring.` : ''}

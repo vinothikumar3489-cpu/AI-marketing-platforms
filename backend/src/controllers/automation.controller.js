@@ -5,7 +5,7 @@ import { generateAllExecutionModules, generateSingleModule } from "../services/e
 import { buildEvidenceContext, buildReadinessChecklist } from "../services/execution/evidence-context-builder.service.js";
 import { buildContentBrief } from "../services/execution/content-brief.service.js";
 import { getSeoIntelligenceForChat } from "../services/loaders/seo-intelligence.loader.js";
-import { CONTENT_TYPES, CONTENT_TYPES_LIST, SUPPORTED_CONTENT_TYPES, getContentTypeRegistryEntry, getCanonicalContentType, getGeneratorNameForType } from "../constants/content-types.js";
+import { CONTENT_TYPES, CONTENT_TYPES_LIST, SUPPORTED_CONTENT_TYPES, getContentTypeRegistryEntry, getCanonicalContentType, getGeneratorNameForType, CANONICAL_CONTENT_TYPES } from "../constants/content-types.js";
 
 const inProgressAutomation = new Set();
 const inProgressCampaign = new Set();
@@ -925,14 +925,16 @@ export const getContentBrief = async (req, res) => {
 export const generateContentItem = async (req, res) => {
   const { chatId } = req.params;
   const userId = req.user.id;
-  const { contentType } = req.body;
+  const { contentType, goal, tone, emailType, _uiTab } = req.body;
 
-  if (!contentType || !CONTENT_TYPES_LIST.includes(contentType)) {
+  // PART 1: Validate against canonical content types
+  if (!contentType || !CANONICAL_CONTENT_TYPES.includes(contentType)) {
+    console.error("[Content Studio] Invalid content type", { contentType, canonicalTypes: CANONICAL_CONTENT_TYPES });
     return res.status(400).json({
       success: false,
       error: {
         code: "INVALID_CONTENT_TYPE",
-        message: `Invalid contentType. Must be one of: ${CONTENT_TYPES_LIST.join(', ')}`,
+        message: `Invalid contentType. Must be one of: ${CANONICAL_CONTENT_TYPES.join(', ')}`,
         retryable: false
       }
     });
@@ -955,14 +957,16 @@ export const generateContentItem = async (req, res) => {
       });
     }
 
-    console.info("[Content Studio] Content-type routing", {
-      uiTab: req.body._uiTab || 'unknown',
-      uiSelection: contentType,
-      requestContentType: contentType,
-      normalizedContentType: normalizedType,
-      generatorSelected: generatorName,
-      validatorSelected: registryEntry.validator || 'unknown',
-      persistedContentType: normalizedType,
+    // PART 1: Log CONTENT ROUTING VERIFIED
+    console.info("[CONTENT ROUTING VERIFIED]", {
+      contentType: contentType,
+      generator: generatorName,
+      validator: registryEntry.validator || 'unknown',
+      qualityRules: registryEntry.qualityRules || contentType,
+      goal: goal || 'not specified',
+      tone: tone || 'not specified',
+      emailType: emailType || 'not specified',
+      uiTab: _uiTab || 'not specified',
       chatId, userId
     });
     

@@ -6,6 +6,7 @@
  */
 
 import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
+import { validateEmailCopyDTO } from '../../dto/email-copy.dto.js';
 
 const INVALID_PRODUCT_IDENTITIES = new Set([
   'unknown product', 'unknown company', 'unknown',
@@ -52,18 +53,70 @@ const QUALITY_CHECKS = {
       const totalMentions = productMentions + brandMentions + featureMentions;
       
       if (totalMentions === 0) {
-        return { status: 'blocked', detail: `Product "${productName}" or brand "${brandName}" not mentioned in content` };
+        return { status: 'blocked', detail: 'No product mentions found' };
       }
+      
       if (totalMentions < 2) {
-        return { status: 'needs_review', detail: `Product/brand mentioned only ${totalMentions} time(s)` };
+        return { status: 'needs_review', detail: 'Insufficient product mentions' };
       }
       
-      const evidence = [];
-      if (productMentions > 0) evidence.push(`product "${productName}" (${productMentions}x)`);
-      if (brandMentions > 0) evidence.push(`brand "${brandName}" (${brandMentions}x)`);
-      if (featureMentions > 0) evidence.push(`features (${featureMentions}x)`);
+      return { status: 'passed', detail: `Product mentioned ${totalMentions} times` };
+    },
+  },
+  // PART 7: Email-specific schema and quality checks
+  emailCopySchema: {
+    label: 'Email copy schema validation',
+    check: (content, brief, assetType) => {
+      if (assetType !== 'email_copy') return { status: 'passed', detail: 'Not applicable for this content type' };
       
-      return { status: 'passed', detail: `Product identity mentioned ${totalMentions} times: ${evidence.join(', ')}` };
+      // PART 7: Validate against DTO schema
+      const validationResult = validateEmailCopyDTO(content);
+      
+      if (!validationResult.valid) {
+        return { 
+          status: 'blocked', 
+          detail: `Schema validation failed: ${validationResult.errors.join(', ')}` 
+        };
+      }
+      
+      return { status: 'passed', detail: 'Email copy schema valid' };
+    },
+  },
+  emailProductSpecificity: {
+    label: 'Email product specificity',
+    check: (content, brief, assetType) => {
+      if (assetType !== 'email_copy') return { status: 'passed', detail: 'Not applicable for this content type' };
+      
+      const productIdentity = brief?._productIdentity || resolveProductIdentity({
+        chat: brief?._chat,
+        productIntelligence: brief?._productIntel,
+        evidenceSnapshot: brief?._evidenceSnapshot,
+        websiteEvidence: brief?.website
+      });
+      
+      const displayName = productIdentity?.displayName || productIdentity?.productName;
+      
+      if (!displayName) return { status: 'blocked', detail: 'No product name available' };
+      
+      const contentStr = JSON.stringify(content).toLowerCase();
+      const productMentions = (contentStr.match(new RegExp(displayName.toLowerCase(), 'g')) || []).length;
+      
+      // PART 7: Block emails that don't mention the product
+      if (productMentions === 0) {
+        return { status: 'blocked', detail: 'Email does not mention the product' };
+      }
+      
+      // Check for generic placeholders
+      const genericPlaceholders = ['our product', 'the platform', 'this solution', 'our solution'];
+      const hasGeneric = genericPlaceholders.some(placeholder => 
+        contentStr.includes(placeholder.toLowerCase())
+      );
+      
+      if (hasGeneric) {
+        return { status: 'needs_review', detail: 'Email uses generic product placeholders' };
+      }
+      
+      return { status: 'passed', detail: `Product mentioned ${productMentions} times` };
     },
   },
   evidenceCoverage: {

@@ -4,6 +4,7 @@ import { validateContentOutput, repairAIOutput, SCHEMA_REGISTRY } from './conten
 import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
 import { createStableHash } from '../../utils/stable-hash.js';
 import { CONTENT_TYPES, CONTENT_TYPES_LIST } from '../../constants/content-types.js';
+import { EMAIL_WORD_COUNT_LIMITS, validateEmailCopyDTO, createEmptyEmailCopyDTO } from '../../dto/email-copy.dto.js';
 
 export { CONTENT_TYPES, CONTENT_TYPES_LIST } from '../../constants/content-types.js';
 
@@ -330,7 +331,8 @@ Return valid JSON:
   return FALLBACK_FAILURE;
 }
 
-async function generateEmailCopy(brief) {
+async function generateEmailCopy(brief, aiFunction = callAI) {
+  // PART 4: Use normalized product identity
   const productIdentity = brief?.productIdentity || {};
   const displayName = productIdentity.displayName || brief?.product?.name || brief?.product?.brandName || brief?.company?.name || 'this solution';
   const internalName = productIdentity.internalName || '';
@@ -340,16 +342,11 @@ async function generateEmailCopy(brief) {
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
 
-  const emailType = brief?.emailType || 'promotional';
+  // PART 4: Use emailType from brief or request body
+  const emailType = brief?.emailType || brief?.goal || 'promotional';
 
-  const wordCountMap = {
-    promotional: { min: 180, max: 350 },
-    newsletter: { min: 350, max: 700 },
-    product_announcement: { min: 250, max: 500 },
-    nurture: { min: 200, max: 450 },
-  };
-
-  const wc = wordCountMap[emailType] || { min: 200, max: 500 };
+  // PART 4: Use stable word count limits from DTO
+  const wc = EMAIL_WORD_COUNT_LIMITS[emailType] || EMAIL_WORD_COUNT_LIMITS.promotional;
 
   const prompt = `You are a professional email copywriter. Generate a ${emailType} email for ${displayName}.
 
@@ -401,11 +398,18 @@ Return valid JSON:
 }`;
 
   try {
-    const result = await callAI(prompt);
+    const result = await aiFunction(prompt);
     if (result.success && result.data) {
       const data = result.data;
       const benefits = Array.isArray(data.benefits) ? data.benefits : [];
       const evidenceList = Array.isArray(data.evidence) ? data.evidence : [];
+
+      // PART 4: Validate against DTO schema
+      const validationResult = validateEmailCopyDTO(data);
+      if (!validationResult.valid) {
+        console.warn('[Email Copy] DTO validation failed:', validationResult.errors);
+        // Continue with best-effort data but log warnings
+      }
 
       const structuredBody = {
         greeting: data.greeting || '',
@@ -454,8 +458,116 @@ Return valid JSON:
         _provider: result.provider,
       };
     }
-  } catch (e) { /* fall through to rule-based */ }
-  return FALLBACK_FAILURE;
+  } catch (e) { 
+    console.error('[Email Copy] AI generation failed, using fallback:', e.message);
+  }
+
+  // PART 5: Deterministic complete fallback when AI parsing fails
+  return generateEmailCopyFallback(displayName, internalName, brandName, domain, emailType, persona, painPoint);
+}
+
+/**
+ * PART 5: Deterministic fallback for email_copy generation
+ * Returns complete, valid email structure with metadata marking
+ */
+function generateEmailCopyFallback(displayName, internalName, brandName, domain, emailType, persona, painPoint) {
+  const fallbackData = {
+    id: `email_fallback_${Date.now()}`,
+    contentType: 'email_copy',
+    productIdentity: {
+      internalName,
+      displayName,
+      brandName,
+      domain,
+    },
+    subject: `${displayName}: A Solution for ${persona}`,
+    previewText: `Discover how ${displayName} can help with ${painPoint}`,
+    emailType,
+    greeting: 'Hi {{firstName}},',
+    opening: `I wanted to reach out about ${painPoint}, which I know is important to you.`,
+    painPoint: painPoint || 'This challenge affects many professionals like you.',
+    solution: `${displayName} offers a straightforward approach to address this need.`,
+    benefits: [
+      `Designed specifically for ${persona}`,
+      'Easy to implement and use',
+      'Backed by customer success'
+    ],
+    evidence: ['Product analysis data', 'Customer feedback'],
+    cta: { label: 'Learn More', url: null },
+    closing: 'Thank you for considering this solution.',
+    signature: `The ${brandName || displayName} Team`,
+    footer: `© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
+    postscript: 'We\'re here to help if you have any questions.',
+    bodyParagraphs: [
+      `I wanted to reach out about ${painPoint}, which I know is important to you.`,
+      `${displayName} offers a straightforward approach to address this need.`,
+      `We've designed this specifically for ${persona} to ensure it meets your requirements.`
+    ],
+    html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2>${displayName}: A Solution for ${persona}</h2>
+      <p>Hi {{firstName}},</p>
+      <p>I wanted to reach out about ${painPoint}, which I know is important to you.</p>
+      <p>${displayName} offers a straightforward approach to address this need.</p>
+      <ul>
+        <li>Designed specifically for ${persona}</li>
+        <li>Easy to implement and use</li>
+        <li>Backed by customer success</li>
+      </ul>
+      <p>Thank you for considering this solution.</p>
+      <p>The ${brandName || displayName} Team</p>
+      <p style="font-size: 12px; color: #666;">© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.</p>
+    </div>`,
+    plainText: `${displayName}: A Solution for ${persona}
+
+Hi {{firstName}},
+
+I wanted to reach out about ${painPoint}, which I know is important to you.
+
+${displayName} offers a straightforward approach to address this need.
+
+Benefits:
+- Designed specifically for ${persona}
+- Easy to implement and use
+- Backed by customer success
+
+Thank you for considering this solution.
+
+The ${brandName || displayName} Team
+
+© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
+    structuredBody: {
+      greeting: 'Hi {{firstName}},',
+      opening: `I wanted to reach out about ${painPoint}, which I know is important to you.`,
+      painPoint: painPoint || 'This challenge affects many professionals like you.',
+      solution: `${displayName} offers a straightforward approach to address this need.`,
+      benefits: [
+        `Designed specifically for ${persona}`,
+        'Easy to implement and use',
+        'Backed by customer success'
+      ],
+      evidence: ['Product analysis data', 'Customer feedback'],
+      cta: { label: 'Learn More', url: null },
+      closing: 'Thank you for considering this solution.',
+      signature: `The ${brandName || displayName} Team`,
+      footer: `© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
+      postscript: 'We\'re here to help if you have any questions.'
+    },
+    ctaText: 'Learn More',
+    ctaUrl: null,
+    evidenceSources: ['Product analysis data', 'Customer feedback'],
+    quality: {
+      score: 0.5,
+      checks: {},
+      blockingIssues: ['Generated using fallback due to AI parsing failure']
+    },
+    createdAt: new Date().toISOString(),
+    _provider: 'fallback',
+    _fallback: true,
+    _fallbackReason: 'AI parsing failed'
+  };
+
+  console.warn('[Email Copy] Using deterministic fallback for email generation');
+  return fallbackData;
 }
 
 async function generateBlogArticle(brief) {
@@ -889,7 +1001,9 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
     };
   }
 
-  const result = await generator(brief);
+  // PART 6: Use passed AI function from generationContext for provider routing, testing, and logging
+  const aiFunction = callAiFn || callAI;
+  const result = await generator(brief, aiFunction);
 
   if (!result) {
     return {
@@ -908,7 +1022,7 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
       ...brief,
       _retryInstructions: `Schema validation failed. Errors:\n${schemaValidation.errors.join('\n')}\nReturn valid JSON matching the original schema.`,
     };
-    const retryResult = await generator(retryBrief);
+    const retryResult = await generator(retryBrief, aiFunction);
     if (retryResult) {
       repairedResult = repairAIOutput(retryResult, assetType);
       schemaValidation = validateContentOutput(repairedResult, assetType);

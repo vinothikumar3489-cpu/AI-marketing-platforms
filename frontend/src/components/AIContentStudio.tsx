@@ -262,7 +262,20 @@ function ContentGeneratorPanel({
     const signal = abortRef.current.signal;
 
     try {
-      const res = await generateContentItem(selectedChatId, selectedType, signal);
+      // PART 1: Send all user selections to backend
+      const options: any = {
+        _uiTab: activeGroup
+      };
+      
+      if (contentGoal) options.goal = contentGoal;
+      if (contentTone) options.tone = contentTone;
+      
+      // For email types, send emailType
+      if (selectedType === 'email_copy') {
+        options.emailType = selectedType;
+      }
+      
+      const res = await generateContentItem(selectedChatId, selectedType, signal, options);
       if (signal.aborted) return;
       if (res?.success !== false && res?.data) {
         onGenerated(res.data);
@@ -278,7 +291,7 @@ function ContentGeneratorPanel({
       generatingRef.current = false;
       if (!abortRef.current?.signal.aborted) setLoading(false);
     }
-  }, [selectedChatId, selectedType, loading, onGenerated, abortRef]);
+  }, [selectedChatId, selectedType, loading, onGenerated, abortRef, activeGroup, contentGoal, contentTone]);
 
   const grouped = TYPE_GROUPS.map(group => ({
     group,

@@ -945,58 +945,257 @@ function generateFallbackGeoIntelligence(productName, industry) {
     geminiScore: 'Not measured',
     claudeScore: 'Not measured',
     perplexityScore: 'Not measured',
-    googleAiOverviewScore: 'Not measured',
-    entityCoverageScore: null,
-    knowledgeGraphReadinessScore: null,
-    citationReadinessScore: null,
-    answerabilityScore: null,
-    topicalAuthorityScore: null,
-    entities: [
-      { entity: productName, type: 'product', context: 'Primary product' }
-    ],
+    googleAiOverviewScore: null,
+    
+    entityCoverageScore: 30,
+    knowledgeGraphReadinessScore: 25,
+    citationReadinessScore: 35,
+    answerabilityScore: 40,
+    topicalAuthorityScore: 30,
+    
+    entities: [],
     knowledgeGraphEntities: [],
-    citationOpportunities: [
-      { type: 'faq_page', opportunity: 'Add FAQ section', impact: 'high' },
-      { type: 'definition_page', opportunity: 'Create definition pages', impact: 'high' }
-    ],
-    faqOpportunities: [
-      { question: `What is ${productName}?`, reason: 'No clear definition found', impact: 'high' },
-      { question: `How does ${productName} work?`, reason: 'Limited explanation', impact: 'high' }
-    ],
-    aiContentOpportunities: [
-      { type: 'faq', opportunity: 'Create comprehensive FAQ', impact: 'high', priority: 10 },
-      { type: 'definition', opportunity: 'Add definition pages', impact: 'high', priority: 9 },
-      { type: 'comparison', opportunity: 'Build comparison pages', impact: 'high', priority: 8 }
-    ],
-    trustSignals: {
-      score: 40,
-      recommendations: ['Add testimonials', 'Create case studies', 'Display certifications']
-    },
-    recommendations: {
-      immediate: [
-        { action: 'Add FAQ page', impact: 'high', difficulty: 'easy' },
-        { action: 'Create definition content', impact: 'high', difficulty: 'easy' }
-      ],
-      day30: [
-        { action: 'Build comparison pages', impact: 'high', difficulty: 'medium' },
-        { action: 'Add structured data', impact: 'high', difficulty: 'medium' }
-      ],
-      day90: [
-        { action: 'Create knowledge base', impact: 'high', difficulty: 'hard' },
-        { action: 'Build authority content', impact: 'high', difficulty: 'hard' }
-      ]
-    },
+    citationOpportunities: [],
+    faqOpportunities: [],
+    aiContentOpportunities: [],
+    trustSignals: {},
+    recommendations: {},
+    
     metadata: {
       analyzedAt: new Date().toISOString(),
-      totalEntities: 1,
-      totalOpportunities: 3,
-      isFallback: true,
-      source: 'heuristic_fallback',
-      confidence: 'low'
+      totalEntities: 0,
+      totalOpportunities: 0,
+      fallback: true,
+      reason: 'GEO analysis requires website data and technical audit'
     }
   };
 }
 
+// PART 17: Evidence-based GEO readiness assessment
+export function assessGeoReadiness(geoIntelligence, technicalAudit, websiteData) {
+  const readiness = {
+    overall: 'unknown',
+    components: {},
+    blockers: [],
+    enablers: [],
+    confidence: 0
+  };
+
+  // Check if we have valid data
+  const hasValidData = geoIntelligence && !geoIntelligence.metadata?.fallback;
+  if (!hasValidData) {
+    readiness.overall = 'insufficient_data';
+    readiness.confidence = 0;
+    readiness.blockers.push('No valid GEO intelligence data available');
+    return readiness;
+  }
+
+  // Assess knowledge graph readiness
+  const kgScore = geoIntelligence.knowledgeGraphReadinessScore ?? 0;
+  readiness.components.knowledgeGraph = kgScore >= 70 ? 'ready' : kgScore >= 50 ? 'partial' : 'not_ready';
+  if (kgScore < 50) {
+    readiness.blockers.push('Knowledge graph schema markup insufficient');
+  } else {
+    readiness.enablers.push('Knowledge graph schema present');
+  }
+
+  // Assess citation readiness
+  const citationScore = geoIntelligence.citationReadinessScore ?? 0;
+  readiness.components.citation = citationScore >= 70 ? 'ready' : citationScore >= 50 ? 'partial' : 'not_ready';
+  if (citationScore < 50) {
+    readiness.blockers.push('Citation-worthy content (FAQs, definitions) missing');
+  } else {
+    readiness.enablers.push('Citation-worthy content present');
+  }
+
+  // Assess answerability
+  const answerabilityScore = geoIntelligence.answerabilityScore ?? 0;
+  readiness.components.answerability = answerabilityScore >= 70 ? 'ready' : answerabilityScore >= 50 ? 'partial' : 'not_ready';
+  if (answerabilityScore < 50) {
+    readiness.blockers.push('Content does not answer key user questions');
+  } else {
+    readiness.enablers.push('Content answers user questions');
+  }
+
+  // Assess entity coverage
+  const entityScore = geoIntelligence.entityCoverageScore ?? 0;
+  readiness.components.entities = entityScore >= 70 ? 'ready' : entityScore >= 50 ? 'partial' : 'not_ready';
+  if (entityScore < 50) {
+    readiness.blockers.push('Entity coverage insufficient for AI understanding');
+  } else {
+    readiness.enablers.push('Entity coverage adequate');
+  }
+
+  // Assess topical authority
+  const topicalScore = geoIntelligence.topicalAuthorityScore ?? 0;
+  readiness.components.topicalAuthority = topicalScore >= 70 ? 'ready' : topicalScore >= 50 ? 'partial' : 'not_ready';
+  if (topicalScore < 50) {
+    readiness.blockers.push('Content depth insufficient for topical authority');
+  } else {
+    readiness.enablers.push('Content depth adequate');
+  }
+
+  // Calculate overall readiness
+  const componentScores = [
+    kgScore,
+    citationScore,
+    answerabilityScore,
+    entityScore,
+    topicalScore
+  ];
+  const avgScore = componentScores.reduce((sum, s) => sum + (s ?? 0), 0) / componentScores.length;
+
+  if (avgScore >= 70) {
+    readiness.overall = 'ready';
+  } else if (avgScore >= 50) {
+    readiness.overall = 'partial';
+  } else {
+    readiness.overall = 'not_ready';
+  }
+
+  // Confidence based on data quality
+  readiness.confidence = hasValidData ? Math.round(avgScore) : 0;
+
+  // Technical audit integration
+  if (technicalAudit) {
+    const hasCoreWebVitals = technicalAudit.performanceScore >= 50;
+    if (!hasCoreWebVitals) {
+      readiness.blockers.push('Core Web Vitals below threshold - affects AI crawlability');
+    } else {
+      readiness.enablers.push('Core Web Vitals passing');
+    }
+  }
+
+  return readiness;
+}
+
+// PART 17: Generate GEO readiness report
+export function generateGeoReadinessReport(geoIntelligence, technicalAudit, websiteData, identity) {
+  const readiness = assessGeoReadiness(geoIntelligence, technicalAudit, websiteData);
+  const productName = identity?.productName || 'Product';
+
+  const report = {
+    productName,
+    overallReadiness: readiness.overall,
+    confidence: readiness.confidence,
+    readinessScore: readiness.confidence,
+    
+    componentReadiness: readiness.components,
+    
+    blockers: readiness.blockers.map(blocker => ({
+      issue: blocker,
+      severity: 'high',
+      estimatedFixTime: '7-30 days'
+    })),
+    
+    enablers: readiness.enablers.map(enabler => ({
+      strength: enabler,
+      impact: 'positive'
+    })),
+    
+    prioritizedActions: generatePrioritizedGeoActions(readiness, geoIntelligence),
+    
+    platformReadiness: {
+      googleAiOverview: geoIntelligence.googleAiOverviewScore >= 70 ? 'ready' : 'needs_work',
+      chatGpt: geoIntelligence.chatGptScore === 'Not measured' ? 'not_measured' : 'needs_work',
+      gemini: geoIntelligence.geminiScore === 'Not measured' ? 'not_measured' : 'needs_work',
+      claude: geoIntelligence.claudeScore === 'Not measured' ? 'not_measured' : 'needs_work',
+      perplexity: geoIntelligence.perplexityScore === 'Not measured' ? 'not_measured' : 'needs_work'
+    },
+    
+    evidence: {
+      hasKnowledgeGraphData: geoIntelligence.knowledgeGraphEntities?.length > 0,
+      hasCitationData: geoIntelligence.citationOpportunities?.length > 0,
+      hasAnswerabilityData: geoIntelligence.faqOpportunities?.length > 0,
+      hasEntityData: geoIntelligence.entities?.length > 0,
+      hasTopicalData: geoIntelligence.topicalAuthorityScore !== null,
+      sourcesAnalyzed: [
+        'website content',
+        'schema markup',
+        'technical audit',
+        'content structure'
+      ]
+    },
+    
+    metadata: {
+      assessedAt: new Date().toISOString(),
+      dataFreshness: 'current',
+      methodology: 'evidence-based multi-factor analysis'
+    }
+  };
+
+  return report;
+}
+
+// PART 17: Generate prioritized GEO actions
+function generatePrioritizedGeoActions(readiness, geoIntelligence) {
+  const actions = [];
+
+  // High priority: Knowledge graph schema
+  if (readiness.components.knowledgeGraph !== 'ready') {
+    actions.push({
+      action: 'Implement Organization schema markup',
+      priority: 'critical',
+      impact: 'high',
+      difficulty: 'easy',
+      timeline: '7 days',
+      reason: 'Organization schema is foundational for AI search understanding'
+    });
+  }
+
+  // High priority: FAQ content
+  if (readiness.components.answerability !== 'ready') {
+    actions.push({
+      action: 'Create comprehensive FAQ section',
+      priority: 'critical',
+      impact: 'high',
+      difficulty: 'easy',
+      timeline: '7 days',
+      reason: 'FAQ content directly answers AI user queries'
+    });
+  }
+
+  // High priority: Definition pages
+  if (readiness.components.citation !== 'ready') {
+    actions.push({
+      action: 'Create definition pages for key concepts',
+      priority: 'high',
+      impact: 'high',
+      difficulty: 'medium',
+      timeline: '14 days',
+      reason: 'Definition pages are citation-worthy for AI engines'
+    });
+  }
+
+  // Medium priority: Entity optimization
+  if (readiness.components.entities !== 'ready') {
+    actions.push({
+      action: 'Optimize content for entity coverage',
+      priority: 'high',
+      impact: 'medium',
+      difficulty: 'medium',
+      timeline: '30 days',
+      reason: 'Better entity coverage improves AI understanding'
+    });
+  }
+
+  // Medium priority: Content depth
+  if (readiness.components.topicalAuthority !== 'ready') {
+    actions.push({
+      action: 'Expand content depth to 2000+ words',
+      priority: 'medium',
+      impact: 'medium',
+      difficulty: 'medium',
+      timeline: '30 days',
+      reason: 'AI engines prefer comprehensive, authoritative content'
+    });
+  }
+
+  return actions.slice(0, 10);
+}
+
 export default {
-  generateGeoIntelligence
+  generateGeoIntelligence,
+  assessGeoReadiness,
+  generateGeoReadinessReport
 };

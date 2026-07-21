@@ -310,8 +310,16 @@ export async function getContentBrief(chatId: string, signal?: AbortSignal) {
   return api.get<any>(`/automation/${chatId}/content-brief`, signal);
 }
 
-export async function generateContentItem(chatId: string, contentType: string, signal?: AbortSignal) {
-  return api.post<any>(`/automation/${chatId}/content`, { contentType }, signal);
+export async function generateContentItem(chatId: string, contentType: string, signal?: AbortSignal, options?: {
+  goal?: string;
+  tone?: string;
+  emailType?: string;
+  _uiTab?: string;
+}) {
+  return api.post<any>(`/automation/${chatId}/content`, { 
+    contentType,
+    ...options
+  }, signal);
 }
 
 export async function generateContentPlan(chatId: string, types?: string[], signal?: AbortSignal) {

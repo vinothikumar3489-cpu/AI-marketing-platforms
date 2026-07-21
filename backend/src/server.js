@@ -34,6 +34,7 @@ import { emailCampaignRouter, brevoWebhookRouter } from "./routes/email-campaign
 import { crmRouter } from "./routes/crm.routes.js";
 import { salesCopilotRouter } from "./routes/sales-copilot.routes.js";
 import diagnosticsRouter from "./routes/diagnostics.routes.js";
+import { logBuildInfo, buildHeadersMiddleware, getBuildInfo } from "./utils/build-info.util.js";
 
 dotenv.config();
 
@@ -278,6 +279,9 @@ app.use(cors({
 
 app.options("*", cors());
 
+// Add build headers middleware
+app.use(buildHeadersMiddleware);
+
 app.use(express.json({ limit: isProduction ? "1mb" : "10mb" }));
 
 app.get("/api/health", async (req, res) => {
@@ -295,6 +299,11 @@ app.get("/api/health", async (req, res) => {
     timestamp: new Date().toISOString(),
     commitSha: process.env.APP_COMMIT_SHA || 'unknown',
   });
+});
+
+app.get("/api/system/build-info", async (req, res) => {
+  const buildInfo = await getBuildInfo();
+  res.json(buildInfo);
 });
 
 app.get("/api/version", (req, res) => {
@@ -385,6 +394,9 @@ process.on('SIGINT', () => shutdownGracefully('SIGINT'));
 // Start server - always on port 5000
 (async () => {
   try {
+    // Log build information on startup
+    await logBuildInfo();
+    
     runningServer = await startServer(app);
   } catch (error) {
     console.error('❌ Failed to start backend server:', error.message);

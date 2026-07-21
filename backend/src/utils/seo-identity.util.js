@@ -1,6 +1,7 @@
 /**
  * Derive correct website identity without blindly trusting previous project names.
  * Fully safe - handles null/undefined inputs gracefully.
+ * PART 18: Enhanced subdomain handling for accurate identity derivation
  */
 import { sanitizeText } from './text.util.js';
 
@@ -11,6 +12,44 @@ function extractHostname(url) {
   } catch {
     return url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
   }
+}
+
+// PART 18: Extract root domain from hostname (handles subdomains)
+function extractRootDomain(hostname) {
+  if (!hostname) return '';
+  
+  const parts = hostname.split('.');
+  
+  // Handle common TLDs
+  const commonTlds = ['com', 'org', 'net', 'io', 'co', 'ai', 'app', 'dev', 'tech'];
+  
+  // If we have at least 3 parts and the last part is a common TLD
+  if (parts.length >= 3 && commonTlds.includes(parts[parts.length - 1])) {
+    // Return the last two parts as root domain (e.g., example.com from sub.example.com)
+    return parts.slice(-2).join('.');
+  }
+  
+  // If we have at least 2 parts, return the last two
+  if (parts.length >= 2) {
+    return parts.slice(-2).join('.');
+  }
+  
+  // Otherwise return the hostname as-is
+  return hostname;
+}
+
+// PART 18: Check if hostname is a subdomain
+function isSubdomain(hostname) {
+  if (!hostname) return false;
+  const parts = hostname.split('.');
+  return parts.length > 2;
+}
+
+// PART 18: Extract subdomain name if present
+function extractSubdomain(hostname) {
+  if (!hostname || !isSubdomain(hostname)) return null;
+  const parts = hostname.split('.');
+  return parts.slice(0, -2).join('.');
 }
 
 function cleanTitle(raw) {
@@ -47,6 +86,9 @@ export function deriveWebsiteIdentity(params = {}) {
     originalUrl: websiteUrl,
     hostname: extractHostname(websiteUrl),
     normalizedDomain: null,
+    rootDomain: null,
+    isSubdomain: false,
+    subdomainName: null,
     companyHint: null,
     productHint: null,
     evidence: [],
@@ -74,7 +116,17 @@ export function deriveWebsiteIdentity(params = {}) {
     (scrapedData?.content?.match?.(/<h1[^>]*>(.*?)<\/h1>/i)?.[1] || '');
 
   identityContext.normalizedDomain = identityContext.hostname;
-  const domainDerivedName = capitalizeDomain(identityContext.normalizedDomain);
+  identityContext.rootDomain = extractRootDomain(identityContext.hostname);
+  identityContext.isSubdomain = isSubdomain(identityContext.hostname);
+  identityContext.subdomainName = extractSubdomain(identityContext.hostname);
+  
+  // PART 18: Use root domain for name derivation if subdomain is generic
+  const domainForNaming = identityContext.isSubdomain && 
+    ['www', 'app', 'api', 'blog', 'docs', 'dev', 'staging', 'test'].includes(identityContext.subdomainName || '')
+    ? identityContext.rootDomain
+    : identityContext.normalizedDomain;
+    
+  const domainDerivedName = capitalizeDomain(domainForNaming);
 
   identityContext.productHint = ogSiteName || titlePart || h1 || domainDerivedName || identityContext.normalizedDomain;
   identityContext.companyHint = identityContext.productHint;
@@ -84,7 +136,11 @@ export function deriveWebsiteIdentity(params = {}) {
     chatHostname = extractHostname(chat.websiteUrl);
   }
 
-  if (chatHostname === identityContext.normalizedDomain && chat?.productName) {
+  // PART 18: Match on root domain for chat identity, not just hostname
+  const chatRootDomain = chatHostname ? extractRootDomain(chatHostname) : '';
+  const currentRootDomain = identityContext.rootDomain;
+  
+  if (chatRootDomain === currentRootDomain && chat?.productName) {
     identityContext.productHint = chat.productName;
     identityContext.companyHint = chat.companyName || chat.productName;
   }
@@ -120,11 +176,14 @@ export function deriveWebsiteIdentity(params = {}) {
     }
   }
 
-  const resolvedIndustry = category || (chatHostname === identityContext.normalizedDomain && chat?.industry ? chat.industry : null);
+  const resolvedIndustry = category || (chatRootDomain === currentRootDomain && chat?.industry ? chat.industry : null);
 
   return {
     websiteUrl: identityContext.originalUrl,
     domain: identityContext.normalizedDomain,
+    rootDomain: identityContext.rootDomain,
+    isSubdomain: identityContext.isSubdomain,
+    subdomainName: identityContext.subdomainName,
     brandName: sanitizeText(identityContext.productHint),
     companyName: sanitizeText(identityContext.companyHint),
     productName: sanitizeText(identityContext.productHint),
@@ -136,6 +195,6 @@ export function deriveWebsiteIdentity(params = {}) {
     businessModel,
     businessCategory,
     companySize,
-    source: (chatHostname === identityContext.normalizedDomain && chat?.productName) ? 'chat_match' : 'scraped_derived'
+    source: (chatRootDomain === currentRootDomain && chat?.productName) ? 'chat_match' : 'scraped_derived'
   };
 }

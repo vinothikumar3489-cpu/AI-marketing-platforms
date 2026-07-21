@@ -405,7 +405,7 @@ function generateMarkdown(data, type = 'executive') {
     md += `---\n\n`;
     md += `## 1. SEO Executive Summary\n\n`;
     const scores2 = seo?.scores || {};
-    const overall = scores2.seoScore || scores2.overall;
+    const overall = scores2.seoScore ?? scores2.overall;
     md += `| Metric | Value |\n| --- | --- |\n`;
     md += `| SEO Score | ${overall != null ? `${overall}/100` : 'Not measured'} |\n`;
     md += `| Performance | ${scores2.performanceScore != null ? `${scores2.performanceScore}/100` : 'Not measured'} |\n`;

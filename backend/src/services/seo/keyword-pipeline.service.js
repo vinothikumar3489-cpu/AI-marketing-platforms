@@ -500,6 +500,108 @@ export function rankAndFilterKeywords(keywords, productName = '', companyName = 
   };
 }
 
+// PART 14: Professional keyword pipeline enhancements
+export function estimateKeywordMetrics(keyword, category) {
+  const phrase = keyword.phrase || keyword.keyword || keyword;
+  const words = phrase.split(' ');
+  
+  // PART 14: Estimate volume based on category and length
+  let estimatedVolume = 0;
+  if (category === 'commercial') {
+    estimatedVolume = Math.floor(1000 / words.length) * 10;
+  } else if (category === 'transactional') {
+    estimatedVolume = Math.floor(500 / words.length) * 10;
+  } else if (category === 'question') {
+    estimatedVolume = Math.floor(200 / words.length) * 10;
+  } else {
+    estimatedVolume = Math.floor(100 / words.length) * 10;
+  }
+  
+  // PART 14: Estimate difficulty based on commercial intent
+  let estimatedDifficulty = 30;
+  if (category === 'commercial' || category === 'transactional') {
+    estimatedDifficulty = 60 + Math.floor(Math.random() * 30);
+  } else if (category === 'question') {
+    estimatedDifficulty = 40 + Math.floor(Math.random() * 20);
+  } else {
+    estimatedDifficulty = 30 + Math.floor(Math.random() * 30);
+  }
+  
+  return {
+    volume: estimatedVolume,
+    difficulty: estimatedDifficulty,
+    estimated: true
+  };
+}
+
+// PART 14: Enhanced intent classification
+export function classifyKeywordIntent(phrase, category) {
+  const lower = phrase.toLowerCase();
+  
+  if (category === 'transactional') {
+    return 'transactional';
+  }
+  
+  if (category === 'commercial') {
+    if (lower.includes('buy') || lower.includes('purchase') || lower.includes('order')) {
+      return 'transactional';
+    }
+    if (lower.includes('price') || lower.includes('pricing') || lower.includes('cost')) {
+      return 'commercial_investigation';
+    }
+    if (lower.includes('review') || lower.includes('vs') || lower.includes('compare')) {
+      return 'commercial_investigation';
+    }
+    return 'commercial';
+  }
+  
+  if (category === 'question') {
+    if (lower.startsWith('how') || lower.includes('how to')) {
+      return 'informational_how_to';
+    }
+    if (lower.startsWith('what') || lower.includes('what is')) {
+      return 'informational_definition';
+    }
+    if (lower.startsWith('why') || lower.includes('why')) {
+      return 'informational_explanation';
+    }
+    return 'informational';
+  }
+  
+  if (phrase.split(' ').length >= 4) {
+    return 'informational_long_tail';
+  }
+  
+  return 'informational';
+}
+
+// PART 14: Quality scoring for keywords
+export function scoreKeywordQuality(keyword, productName, companyName) {
+  const phrase = keyword.phrase || keyword.keyword || keyword;
+  let qualityScore = 50;
+  
+  // Length bonus (2-4 words is ideal)
+  const wordCount = phrase.split(' ').length;
+  if (wordCount >= 2 && wordCount <= 4) qualityScore += 20;
+  else if (wordCount >= 5) qualityScore += 10;
+  else qualityScore -= 10;
+  
+  // Brand relevance
+  const lower = phrase.toLowerCase();
+  if (productName && lower.includes(productName.toLowerCase())) qualityScore += 15;
+  if (companyName && lower.includes(companyName.toLowerCase())) qualityScore += 10;
+  
+  // Specificity bonus (avoid generic terms)
+  const genericTerms = ['software', 'platform', 'tool', 'solution', 'app', 'service'];
+  const hasGeneric = genericTerms.some(term => lower === term);
+  if (!hasGeneric) qualityScore += 10;
+  
+  // Commercial intent bonus
+  if (lower.includes('best') || lower.includes('top') || lower.includes('review')) qualityScore += 5;
+  
+  return Math.min(100, Math.max(0, qualityScore));
+}
+
 function extractSchemaTexts(schema) {
   if (!schema) return [];
   const texts = [];

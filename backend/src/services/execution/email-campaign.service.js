@@ -43,6 +43,67 @@ const CAMPAIGN_TYPES = {
 
 export { CAMPAIGN_TYPES };
 
+// PART 10: Brevo campaign statuses for Content Studio workflow
+export const BREVO_CAMPAIGN_STATUSES = {
+  draft: 'draft',
+  scheduled: 'scheduled',
+  sending: 'sending',
+  sent: 'sent',
+  paused: 'paused',
+  finished: 'finished',
+  failed: 'failed',
+};
+
+// PART 10: Required validations for Brevo campaign creation
+export function validateBrevoCampaignData(campaignData) {
+  const errors = [];
+  
+  if (!campaignData.name || typeof campaignData.name !== 'string') {
+    errors.push('Campaign name is required');
+  }
+  
+  if (!campaignData.subject || typeof campaignData.subject !== 'string') {
+    errors.push('Email subject is required');
+  }
+  
+  if (!campaignData.sender || !campaignData.sender.email) {
+    errors.push('Valid sender email is required');
+  }
+  
+  if (!campaignData.recipients || !Array.isArray(campaignData.recipients) || campaignData.recipients.length === 0) {
+    errors.push('At least one recipient is required');
+  }
+  
+  if (!campaignData.htmlContent && !campaignData.textContent) {
+    errors.push('Either HTML or text content is required');
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+// PART 10: Convert email_copy DTO to Brevo campaign format
+export function emailCopyToBrevoCampaign(emailCopy, campaignName) {
+  return {
+    name: campaignName || emailCopy.subject || 'Email Campaign',
+    subject: emailCopy.subject,
+    htmlContent: emailCopy.html,
+    textContent: emailCopy.plainText,
+    sender: {
+      name: emailCopy.signature?.split(' - ')[0] || emailCopy.productIdentity?.brandName || 'Team',
+      email: process.env.BREVO_FROM_EMAIL || 'noreply@example.com'
+    },
+    recipients: {
+      listIds: [] // To be populated by caller
+    },
+    type: 'classic',
+    status: BREVO_CAMPAIGN_STATUSES.draft,
+    tags: ['content-studio', emailCopy.emailType || 'promotional']
+  };
+}
+
 // ============================================
 // 1. CONTENT GENERATION (separate from delivery)
 // ============================================

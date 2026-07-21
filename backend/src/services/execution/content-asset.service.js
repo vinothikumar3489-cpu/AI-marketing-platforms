@@ -13,6 +13,26 @@ export async function saveContentAsset(prisma, { userId, chatId, contentType, br
 
   const claimStatus = metadata?.claimStatus || 'passed';
 
+  // PART 9: Email asset persistence verification
+  if (contentType === 'email_copy') {
+    const requiredFields = ['subject', 'previewText', 'greeting', 'opening', 'solution', 'benefits', 'cta'];
+    const missingFields = requiredFields.filter(field => !content[field]);
+    
+    if (missingFields.length > 0) {
+      throw new Error(`Email asset missing required fields: ${missingFields.join(', ')}`);
+    }
+
+    // Verify benefits is an array with at least 3 items
+    if (!Array.isArray(content.benefits) || content.benefits.length < 3) {
+      throw new Error('Email asset must have at least 3 benefits');
+    }
+
+    // Verify CTA has label
+    if (!content.cta || !content.cta.label) {
+      throw new Error('Email asset must have CTA with label');
+    }
+  }
+
   // Find existing plan or create one
   let plan = await prisma.automationPlan.findFirst({ where: { chatId, userId } });
   if (!plan) {
@@ -60,11 +80,19 @@ export async function saveContentAsset(prisma, { userId, chatId, contentType, br
     topicCount: evidenceSnapshot.topicIdeas?.length || 0,
   } : null;
 
+  // PART 9: Title priority for email_copy (subject first, then fallback)
+  let assetTitle;
+  if (contentType === 'email_copy') {
+    assetTitle = content.subject || content.title || content.headline || `Email Copy v${version}`;
+  } else {
+    assetTitle = content.title || content.headline || content.subjectLine || `${contentType} v${version}`;
+  }
+
   const asset = await prisma.automationAsset.create({
     data: {
       automationPlanId: plan.id,
       assetType: `content_${contentType}`,
-      assetTitle: content.title || content.headline || content.subjectLine || `${contentType} v${version}`,
+      assetTitle,
       assetContent: {
         content,
         metadata: {

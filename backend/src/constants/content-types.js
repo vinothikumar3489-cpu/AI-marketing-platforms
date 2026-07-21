@@ -1,10 +1,46 @@
+/**
+ * Canonical Content Type Contract
+ * Shared enum used by frontend and backend
+ */
+
 export const CONTENT_TYPE_ENUM = {
   BLOG_ARTICLE: 'blog_article',
-  SOCIAL_POST: 'social_post',
+  FAQ_PAGE: 'faq_page',
+  LANDING_PAGE: 'landing_page',
+  PRODUCT_PAGE: 'product_page',
+  COMPARISON_PAGE: 'comparison_page',
+  FEATURE_ANNOUNCEMENT: 'feature_announcement',
+  WHITEPAPER: 'whitepaper',
+  LINKEDIN_POST: 'linkedin_post',
+  INSTAGRAM_POST: 'instagram_post',
+  TWITTER_POST: 'twitter_post',
+  FACEBOOK_POST: 'facebook_post',
+  YOUTUBE_DESCRIPTION: 'youtube_description',
   EMAIL_COPY: 'email_copy',
-  CONTENT_BRIEF: 'content_brief',
-  SCRIPT: 'script',
+  CREATIVE_BRIEF: 'creative_brief',
+  VIDEO_SCRIPT: 'video_script',
 };
+
+/**
+ * Canonical content types - must match frontend exactly
+ */
+export const CANONICAL_CONTENT_TYPES = [
+  'blog_article',
+  'faq_page',
+  'landing_page',
+  'product_page',
+  'comparison_page',
+  'feature_announcement',
+  'whitepaper',
+  'linkedin_post',
+  'instagram_post',
+  'twitter_post',
+  'facebook_post',
+  'youtube_description',
+  'email_copy',
+  'creative_brief',
+  'video_script',
+];
 
 export const CONTENT_TYPES = {
   email_copy: { label: 'Email Copy' },
@@ -67,10 +103,10 @@ export const CONTENT_TYPE_GROUPS = {
 
 export const CONTENT_TYPE_REGISTRY = {
   email_copy: {
-    canonicalType: 'email_campaign',
-    generator: 'emailCampaignGenerator',
-    validator: 'emailCampaignValidator',
-    renderer: 'EmailAssetPreview',
+    canonicalType: 'email_copy',
+    generator: 'generateEmailCopy',
+    validator: 'emailCopySchema',
+    qualityRules: 'email_copy',
   },
   email_campaign: {
     canonicalType: 'email_campaign',

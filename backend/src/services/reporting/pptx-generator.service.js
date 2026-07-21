@@ -119,7 +119,7 @@ export async function generatePptx(data) {
       addSectionSlide(pptx, 'Technical Audit', 'Lighthouse Performance Scores', C.accent);
       const auditMetrics = [
         ['Performance', scores?.performanceScore],
-        ['SEO', scores?.seoScore || scores?.overall],
+        ['SEO', scores?.seoScore ?? scores?.overall],
         ['Accessibility', scores?.accessibilityScore],
         ['Best Practices', scores?.bestPracticesScore]
       ];
@@ -228,10 +228,10 @@ export async function generatePptx(data) {
       const comps = arr(competitor?.direct).slice(0, 8);
       addSectionSlide(pptx, 'Competitive Landscape', `${comps.length} Direct Competitors Identified`, C.danger);
       if (comps.length > 0) {
-        const maxScore = Math.max(...comps.map(c => c.similarityScore || 50), 1);
+        const maxScore = Math.max(...comps.map(c => c.similarityScore ?? 50), 1);
         comps.forEach((c, i) => {
           const y = 1.3 + i * 0.65;
-          const score = c.similarityScore || 50;
+          const score = c.similarityScore ?? 50;
           const barW = (score / maxScore) * 4.5;
           pptx.addText(c.name || c.domain, { x: 0.5, y, w: 2.8, h: 0.45, fontSize: 11, fontFace: FONT, color: C.dark });
           pptx.addShape(pptx.ShapeType.roundRect, { x: 3.5, y: y + 0.08, w: 4.5, h: 0.3, fill: { color: C.light }, rectRadius: 0.05 });
