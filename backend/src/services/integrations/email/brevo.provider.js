@@ -34,6 +34,7 @@ export function getBrevoHealth() {
 
 /**
  * Send transactional email through Brevo
+ * Canonical export: sendViaBrevo
  */
 export async function sendTransactionalEmail({ to, subject, html, text, senderName, replyTo, tags, metadata, idempotencyKey }) {
   const config = getConfig();
@@ -79,6 +80,9 @@ export async function sendTransactionalEmail({ to, subject, html, text, senderNa
     return handleBrevoError(err, to);
   }
 }
+
+// Canonical export alias for sendTransactionalEmail
+export { sendTransactionalEmail as sendViaBrevo };
 
 /**
  * Send test email through Brevo
