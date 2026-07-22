@@ -26,7 +26,8 @@ export function generateEmailHtmlTemplate(emailData) {
     complianceFooter,
     unsubscribeText,
     sender,
-    recipient
+    recipient,
+    productIdentity
   } = emailData;
 
   // Apply personalization if recipient data is available
@@ -40,6 +41,7 @@ export function generateEmailHtmlTemplate(emailData) {
     if (recipient?.lastName) personalized = personalized.replace(/\{\{lastName\}\}/g, recipient.lastName);
     if (recipient?.companyName) personalized = personalized.replace(/\{\{companyName\}\}/g, recipient.companyName);
     if (sender?.name) personalized = personalized.replace(/\{\{senderName\}\}/g, sender.name);
+    if (productIdentity?.displayName) personalized = personalized.replace(/\{\{productName\}\}/g, productIdentity.displayName);
     return personalized;
   });
 
@@ -67,6 +69,9 @@ export function generateEmailHtmlTemplate(emailData) {
     <p style="margin: 30px 0; font-size: 14px; color: #555;"><strong>P.S.</strong> ${postscript}</p>
   ` : '';
 
+  const brandColor = '#0066cc';
+  const brandColorLight = '#e6f0ff';
+  
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -87,10 +92,12 @@ export function generateEmailHtmlTemplate(emailData) {
       .email-container { width: 100% !important; }
       .email-content { padding: 15px !important; }
       .cta-button { width: 100% !important; }
+      .hero-section { padding: 20px !important; }
+      .benefit-item { display: block !important; width: 100% !important; }
     }
   </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+<body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
   <!-- Preview text -->
   <div style="display: none; max-height: 0; overflow: hidden;">
     ${previewText}
@@ -102,54 +109,59 @@ export function generateEmailHtmlTemplate(emailData) {
     <tr>
       <td align="center" style="padding: 20px 0;">
         <!-- Main content -->
-        <table class="email-container" border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        <table class="email-container" border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.08);">
           
-          <!-- Header -->
+          <!-- Header with brand color -->
           <tr>
-            <td style="background-color: #0066cc; padding: 20px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">${headline || subject}</h1>
+            <td class="hero-section" style="background: linear-gradient(135deg, ${brandColor} 0%, #004499 100%); padding: 30px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">${headline || subject}</h1>
+              ${previewText ? `<p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">${previewText}</p>` : ''}
             </td>
           </tr>
           
           <!-- Content -->
           <tr>
-            <td class="email-content" style="padding: 30px;">
+            <td class="email-content" style="padding: 35px;">
               <!-- Greeting -->
-              <p style="margin: 0 0 20px 0; font-size: 16px; color: #333;">${personalizedGreeting}</p>
+              <p style="margin: 0 0 24px 0; font-size: 17px; color: #333; font-weight: 500;">${personalizedGreeting}</p>
               
               <!-- Opening -->
-              <p style="margin: 0 0 20px 0; font-size: 16px; color: #333; line-height: 1.6;">${opening}</p>
+              <p style="margin: 0 0 24px 0; font-size: 16px; color: #444; line-height: 1.7;">${opening}</p>
               
               <!-- Pain Point -->
-              <p style="margin: 0 0 20px 0; font-size: 16px; color: #333; line-height: 1.6;">${painPoint}</p>
+              <div style="background-color: ${brandColorLight}; padding: 20px; margin: 24px 0; border-radius: 8px; border-left: 4px solid ${brandColor};">
+                <p style="margin: 0; font-size: 16px; color: #333; line-height: 1.6;">${painPoint}</p>
+              </div>
               
               <!-- Solution -->
-              <p style="margin: 0 0 20px 0; font-size: 16px; color: #333; line-height: 1.6;"><strong>${solution}</strong></p>
+              <p style="margin: 0 0 24px 0; font-size: 16px; color: #444; line-height: 1.7;"><strong>${solution}</strong></p>
               
               <!-- Body paragraphs -->
               ${bodyParagraphsHtml}
               
               <!-- Benefits -->
-              <div style="background-color: #f9f9f9; padding: 20px; margin: 20px 0; border-radius: 5px;">
-                <h3 style="margin: 0 0 15px 0; color: #0066cc; font-size: 18px;">Key Benefits:</h3>
-                <ul style="margin: 0; padding-left: 20px; color: #333;">
+              ${benefits && benefits.length > 0 ? `
+              <div style="background-color: #f8f9fa; padding: 24px; margin: 24px 0; border-radius: 8px; border: 1px solid #e9ecef;">
+                <h3 style="margin: 0 0 16px 0; color: ${brandColor}; font-size: 18px; font-weight: 600;">Key Benefits:</h3>
+                <ul style="margin: 0; padding-left: 20px; color: #333; line-height: 1.6;">
                   ${benefitsHtml}
                 </ul>
               </div>
+              ` : ''}
               
               <!-- Social Proof -->
               ${socialProofHtml}
               
               <!-- Primary CTA -->
-              <div style="text-align: center; margin: 30px 0;">
-                <a class="cta-button" href="${primaryCta?.url || '#'}" style="background-color: #0066cc; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-size: 16px; font-weight: bold;">${primaryCta?.label || 'Learn More'}</a>
+              <div style="text-align: center; margin: 32px 0;">
+                <a class="cta-button" href="${primaryCta?.url || '#'}" style="background: linear-gradient(135deg, ${brandColor} 0%, #004499 100%); color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 8px; display: inline-block; font-size: 16px; font-weight: 700; box-shadow: 0 4px 12px rgba(0,102,204,0.3); transition: transform 0.2s;">${primaryCta?.label || 'Learn More'}</a>
               </div>
               
               <!-- Secondary CTA -->
               ${secondaryCtaHtml}
               
               <!-- Closing -->
-              <p style="margin: 30px 0 20px 0; font-size: 16px; color: #333; line-height: 1.6;">${closing}</p>
+              <p style="margin: 32px 0 20px 0; font-size: 16px; color: #444; line-height: 1.7;">${closing}</p>
               
               <!-- Signature -->
               <p style="margin: 0 0 20px 0; font-size: 16px; color: #333;">
@@ -164,10 +176,13 @@ export function generateEmailHtmlTemplate(emailData) {
           
           <!-- Footer -->
           <tr>
-            <td style="background-color: #f4f4f4; padding: 20px; text-align: center; border-top: 1px solid #ddd;">
-              <p style="margin: 0 0 10px 0; font-size: 12px; color: #666;">${complianceFooter}</p>
-              <p style="margin: 0; font-size: 12px; color: #666;">
+            <td style="background-color: #f8f9fa; padding: 24px; text-align: center; border-top: 1px solid #e9ecef;">
+              <p style="margin: 0 0 12px 0; font-size: 13px; color: #666; line-height: 1.5;">${complianceFooter}</p>
+              <p style="margin: 0; font-size: 13px; color: #666;">
                 <a href="#" style="color: #666; text-decoration: underline;">${unsubscribeText}</a>
+              </p>
+              <p style="margin: 12px 0 0 0; font-size: 11px; color: #999;">
+                ${productIdentity?.displayName || 'Our Company'} • ${sender?.email || 'contact@example.com'}
               </p>
             </td>
           </tr>

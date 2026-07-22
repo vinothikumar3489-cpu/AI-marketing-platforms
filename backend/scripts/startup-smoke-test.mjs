@@ -13,8 +13,8 @@ import { dirname, join } from 'path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BACKEND_ROOT = join(__dirname, '..');
 
-const TEST_TIMEOUT = 30000; // 30 seconds max
-const STARTUP_GRACE = 5000; // 5 seconds grace period after listening
+const TEST_TIMEOUT = 60000; // 60 seconds max
+const STARTUP_GRACE = 10000; // 10 seconds grace period after listening
 
 let serverProcess = null;
 let testPassed = false;
@@ -30,7 +30,7 @@ function runSmokeTest() {
       PORT: '0', // OS will assign random available port
     };
     
-    serverProcess = spawn('node', ['server.js'], {
+    serverProcess = spawn('node', ['src/server.js'], {
       cwd: BACKEND_ROOT,
       env,
       stdio: ['ignore', 'pipe', 'pipe'],

@@ -27,7 +27,7 @@ import { SendTest } from './SendTest';
 import { SendSchedule } from './SendSchedule';
 import { DeliveryStatus } from './DeliveryStatus';
 
-export function EmailWorkflow() {
+export function EmailWorkflow({ content: initialContent }: { content?: any }) {
   const { selectedChatId } = useProject();
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -35,31 +35,31 @@ export function EmailWorkflow() {
 
   // Email data state
   const [emailConfig, setEmailConfig] = useState({
-    emailType: 'Product Announcement',
-    goal: 'Product Adoption',
-    tone: 'Professional',
-    audience: '',
-    language: 'en',
+    emailType: initialContent?.emailType || 'Product Announcement',
+    goal: initialContent?.goal || 'Product Adoption',
+    tone: initialContent?.tone || 'Professional',
+    audience: initialContent?.audience || '',
+    language: initialContent?.language || 'en',
     sender: {
-      name: '',
-      email: '',
-      replyTo: '',
+      name: initialContent?.sender?.name || '',
+      email: initialContent?.sender?.email || '',
+      replyTo: initialContent?.sender?.replyTo || '',
     },
   });
 
   const [recipient, setRecipient] = useState({
-    email: '',
-    firstName: '',
-    lastName: '',
-    companyName: '',
+    email: initialContent?.recipient?.email || '',
+    firstName: initialContent?.recipient?.firstName || '',
+    lastName: initialContent?.recipient?.lastName || '',
+    companyName: initialContent?.recipient?.companyName || '',
   });
 
-  const [emailData, setEmailData] = useState<any>(null);
-  const [html, setHtml] = useState('');
-  const [plainText, setPlainText] = useState('');
-  const [validation, setValidation] = useState<any>(null);
-  const [templateId, setTemplateId] = useState<string | null>(null);
-  const [approvalStatus, setApprovalStatus] = useState<'DRAFT' | 'APPROVED' | 'REJECTED'>('DRAFT');
+  const [emailData, setEmailData] = useState<any>(initialContent || null);
+  const [html, setHtml] = useState(initialContent?.html || '');
+  const [plainText, setPlainText] = useState(initialContent?.plainText || '');
+  const [validation, setValidation] = useState<any>(initialContent?.validation || null);
+  const [templateId, setTemplateId] = useState<string | null>(initialContent?.templateId || null);
+  const [approvalStatus, setApprovalStatus] = useState<'DRAFT' | 'APPROVED' | 'REJECTED'>(initialContent?.approvalStatus || 'DRAFT');
 
   // Generate email content
   const handleGenerate = async () => {
@@ -103,6 +103,60 @@ export function EmailWorkflow() {
       setGenerating(false);
     }
   };
+
+  // Initialize with existing content if provided
+  useEffect(() => {
+    if (initialContent && !emailData) {
+      setEmailData(initialContent);
+      setHtml(initialContent.html || '');
+      setPlainText(initialContent.plainText || '');
+      setValidation(initialContent.validation || null);
+      setTemplateId(initialContent.templateId || null);
+      setApprovalStatus(initialContent.approvalStatus || 'DRAFT');
+      
+      // Also update email config from initial content
+      if (initialContent.emailType) {
+        setEmailConfig(prev => ({
+          ...prev,
+          emailType: initialContent.emailType,
+          goal: initialContent.goal || prev.goal,
+          tone: initialContent.tone || prev.tone,
+          audience: initialContent.audience || prev.audience,
+          language: initialContent.language || prev.language,
+        }));
+      }
+    }
+  }, [initialContent]);
+
+  // Auto-generate HTML when email data changes
+  useEffect(() => {
+    if (emailData && !html && emailData !== initialContent) {
+      const generateHtmlFromData = async () => {
+        try {
+          const htmlResult = await generateEmailHtml(emailData);
+          if (htmlResult.success) {
+            setHtml(htmlResult.html);
+          }
+        } catch (err) {
+          console.error('Failed to generate HTML:', err);
+        }
+      };
+      
+      const generateTextFromData = async () => {
+        try {
+          const plainResult = await generateEmailPlainText(emailData);
+          if (plainResult.success) {
+            setPlainText(plainResult.plainText);
+          }
+        } catch (err) {
+          console.error('Failed to generate plain text:', err);
+        }
+      };
+      
+      generateHtmlFromData();
+      generateTextFromData();
+    }
+  }, [emailData]);
 
   // Save draft
   const handleSaveDraft = async () => {
@@ -296,7 +350,7 @@ export function EmailWorkflow() {
       </div>
 
       {/* Generate Button */}
-      {!emailData && (
+      {(!emailData || initialContent) && (
         <button
           onClick={handleGenerate}
           disabled={generating}
@@ -318,7 +372,7 @@ export function EmailWorkflow() {
           }}
         >
           {generating ? <Loader2 size={18} className="spin" /> : <Sparkles size={18} />}
-          {generating ? 'Generating Email...' : 'Generate Email'}
+          {generating ? 'Generating Email...' : initialContent ? 'Regenerate Email' : 'Generate Email'}
         </button>
       )}
 
