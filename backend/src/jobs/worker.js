@@ -6,16 +6,9 @@ let workers = [];
 export async function startWorkers() {
   if (workers.length > 0) return;
 
-  if (!isRedisAvailable()) {
-    console.warn('⚠️ Redis not available — BullMQ workers disabled');
-    return;
-  }
-
+  if (!isRedisAvailable()) return;
   const connection = getRedisConnection();
-  if (!connection) {
-    console.warn('⚠️ Cannot start workers — no Redis connection');
-    return;
-  }
+  if (!connection) return;
 
   const workerOptions = { connection, concurrency: 5 };
 

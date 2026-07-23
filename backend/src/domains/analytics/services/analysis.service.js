@@ -84,15 +84,6 @@ Return JSON only with the exact keys below. Use null for missing values, never i
 Use professional marketing language. Output valid JSON only — no markdown, no explanation, no commentary.`.trim();
 };
 
-const parseOpenAIResponse = async (response) => {
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || data.choices?.[0]?.text;
-  if (!content) {
-    throw new Error("OpenAI response missing content");
-  }
-  return content;
-};
-
 const safeJsonParse = (value) => {
   try {
     return JSON.parse(value);
@@ -102,13 +93,11 @@ const safeJsonParse = (value) => {
 };
 
 export const generateAnalysis = async ({ manualData = {}, scrapedData = {}, evidenceContext = "" } = {}) => {
-  const openAiKey = process.env.OPENAI_API_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY;
   const tavilyKey = process.env.TAVILY_API_KEY;
 
   // Attempt Tavily research for competitor and market signals
   let researchSummary = "";
-  const providerStatus = { tavily: "skipped", openai: "skipped", gemini: "skipped" };
+  const providerStatus = { tavily: "skipped", gemini: "skipped" };
   const warnings = [];
 
   if (tavilyKey) {
@@ -151,50 +140,6 @@ export const generateAnalysis = async ({ manualData = {}, scrapedData = {}, evid
     features: scrapedData?.features || [],
     benefits: scrapedData?.benefits || [],
   });
-
-  // If no OpenAI API key, provide heuristic fallback
-  if (!openAiKey) {
-    providerStatus.openai = "missing_key";
-    const fallback = {
-      productSummary: manualData.productName || "Analysis not available",
-      category: manualData.industry || null,
-      confidenceScore: null,
-      usp: null,
-      features: scrapedData?.features || [],
-      benefits: scrapedData?.benefits || [],
-      painPoints: [],
-      buyerPersonas: [],
-      targetUsers: (manualData.targetAudience || "").split(/,|;|\s+and\s+/).map((v) => v.trim()).filter(Boolean),
-      competitorTypes: [],
-      competitors: [],
-      marketingAngles: [],
-      pricingPosition: null,
-      marketMaturity: null,
-      seoOpportunities: [],
-      campaignIdeas: [],
-      recommendedModules: [],
-      dataSourcesUsed: [],
-      warnings: ["AI key not configured. No analysis generated."],
-      tam: null,
-      sam: null,
-      som: null,
-      cagr: null,
-      growthRate: null,
-      marketTrends: [],
-      growthOpportunities: [],
-      marketGaps: [],
-      competitorWeaknesses: [],
-      differentiationOpportunities: [],
-      bestChannels: [],
-      channelReasoning: null,
-      channelPriority: null,
-      channelExpectedOutcome: null,
-      executiveStory: null,
-      actionPlan: null,
-    };
-
-    return { message: "heuristic", structured: fallback, providerStatus, warnings };
-  }
 
   const analysisSchema = z.object({
     productSummary: z.string().nullable().optional(),
@@ -239,8 +184,7 @@ export const generateAnalysis = async ({ manualData = {}, scrapedData = {}, evid
       chatId: "system",
       prompt,
       systemPrompt: "You are a senior SaaS product marketing strategist. Analyze products and return JSON only.",
-      preferredProvider: 'openai',
-      model: 'gpt-4o',
+      preferredProvider: 'gemini',
       schema: analysisSchema
     });
 

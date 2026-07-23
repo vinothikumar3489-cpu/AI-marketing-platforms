@@ -37,15 +37,6 @@ const _keyConfigured = (() => {
   return true;
 })();
 
-if (SERPAPI_API_KEY) {
-  console.log('[SERPAPI DIAG]', {
-    keyPresent: true, keyLength: SERPAPI_API_KEY.length,
-    isPlaceholder: isPlaceholderKey(SERPAPI_API_KEY), configured: _keyConfigured
-  });
-} else {
-  console.log('[SERPAPI DIAG]', { keyPresent: false, rawEnv: typeof process.env.SERPAPI_API_KEY, rawLength: process.env.SERPAPI_API_KEY?.length || 0 });
-}
-
 function _keyDiagnostic() {
   if (!SERPAPI_API_KEY || !_keyConfigured) return { configured: false };
   return { configured: true, keyLength: SERPAPI_API_KEY.length };

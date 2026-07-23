@@ -144,7 +144,7 @@ export const analyzeProduct = async (req, res) => {
           painPoints: structured.painPoints || [],
         },
         status: "completed",
-        provider: analysisResult.message || analysisResult.providerStatus?.openai || "heuristic",
+        provider: analysisResult.message || "heuristic",
         fallbackUsed: analysisResult.message === "fallback" || analysisResult.message === "heuristic",
       },
       update: {

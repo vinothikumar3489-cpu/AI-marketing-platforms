@@ -7,7 +7,6 @@ export function getRedisConnection() {
 
   const REDIS_URL = process.env.REDIS_URL;
   if (!REDIS_URL) {
-    console.warn('⚠️ REDIS_URL not set — Redis unavailable. Background jobs disabled.');
     return null;
   }
 

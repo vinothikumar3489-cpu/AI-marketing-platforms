@@ -2,10 +2,6 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 
 const AI_PROVIDER_CONFIG = {
-  openai: {
-    envKey: 'OPENAI_API_KEY',
-    defaultModel: 'gpt-4o-mini',
-  },
   gemini: {
     envKey: 'GEMINI_API_KEY',
     defaultModel: 'gemini-1.5-flash',
@@ -50,9 +46,7 @@ export class AIOrchestrator {
     if (!apiKey) return null;
 
     try {
-      if (name === 'openai') {
-        this._providers[name] = { client: new OpenAI({ apiKey }), cfg };
-      } else if (name === 'gemini') {
+      if (name === 'gemini') {
         this._providers[name] = { client: new GoogleGenerativeAI(apiKey), cfg };
       } else if (['groq', 'cerebras', 'deepseek', 'openrouter'].includes(name)) {
         this._providers[name] = { client: new OpenAI({ apiKey, baseURL: cfg.baseURL }), cfg };
@@ -91,13 +85,13 @@ export class AIOrchestrator {
     chatId,
     prompt,
     systemPrompt,
-    preferredProvider = 'openai',
+    preferredProvider = 'gemini',
     model,
     schema = null,
   }) {
     const available = this.getAvailableProviders();
     if (available.length === 0) {
-      return { success: false, error: 'No AI providers configured. Set at least one of: OPENAI_API_KEY, GEMINI_API_KEY, GROQ_API_KEY, CEREBRAS_API_KEY, DEEPSEEK_API_KEY, OPENROUTER_API_KEY' };
+      return { success: false, error: 'No AI providers configured. Set at least one of: GEMINI_API_KEY, GROQ_API_KEY, CEREBRAS_API_KEY, DEEPSEEK_API_KEY, OPENROUTER_API_KEY' };
     }
 
     if (!available.includes(preferredProvider)) {
@@ -117,7 +111,7 @@ export class AIOrchestrator {
       if (preferredProvider === 'gemini') {
         result = await this._callGemini(provider.client, { prompt, systemPrompt, model: usedModel, schema });
       } else {
-        result = await this._callOpenAI(provider.client, { prompt, systemPrompt, model: usedModel, schema });
+        result = await this._callOpenAICompatible(provider.client, { prompt, systemPrompt, model: usedModel, schema });
       }
 
       return {
@@ -141,7 +135,7 @@ export class AIOrchestrator {
             if (fallback === 'gemini') {
               result = await this._callGemini(provider.client, { prompt, systemPrompt, model: fallbackModel, schema });
             } else {
-              result = await this._callOpenAI(provider.client, { prompt, systemPrompt, model: fallbackModel, schema });
+              result = await this._callOpenAICompatible(provider.client, { prompt, systemPrompt, model: fallbackModel, schema });
             }
             return {
               success: true,
@@ -159,9 +153,9 @@ export class AIOrchestrator {
     }
   }
 
-  async _callOpenAI(client, { prompt, systemPrompt, model, schema }) {
+  async _callOpenAICompatible(client, { prompt, systemPrompt, model, schema }) {
     const response = await client.chat.completions.create({
-      model: model || 'gpt-4o-mini',
+      model: model || 'gemini-1.5-flash',
       messages: [
         { role: 'system', content: systemPrompt || 'You are a helpful assistant.' },
         { role: 'user', content: prompt },
@@ -213,8 +207,8 @@ export async function callAI(prompt, options = {}) {
       chatId: 'system',
       prompt,
       systemPrompt,
-      preferredProvider: options.provider || 'openai',
-      model: options.model || 'gpt-4o-mini',
+      preferredProvider: options.provider || 'gemini',
+      model: options.model || 'gemini-1.5-flash',
       schema: null,
     });
     return { success: response.success, data: response.success ? response.data : null, provider: response.provider, error: response.error };

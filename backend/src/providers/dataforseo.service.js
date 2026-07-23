@@ -4,8 +4,6 @@ const DATAFORSEO_LOGIN = process.env.DATAFORSEO_LOGIN?.trim();
 const DATAFORSEO_PASSWORD = process.env.DATAFORSEO_PASSWORD?.trim();
 const DATAFORSEO_API_URL = 'https://api.dataforseo.com/v3';
 
-console.log("[DataForSEO] login loaded", !!DATAFORSEO_LOGIN);
-console.log("[DataForSEO] password loaded", !!DATAFORSEO_PASSWORD);
 
 let _dataforseoVerified = false;
 let _dataforseoAuthFailed = false;

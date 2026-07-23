@@ -22,10 +22,7 @@ export function getQueue(name) {
   if (queueRegistry[name]) return queueRegistry[name];
 
   const opts = getQueueOptions();
-  if (!opts) {
-    console.warn(`⚠️ Cannot create queue "${name}" — Redis not available`);
-    return null;
-  }
+  if (!opts) return null;
 
   try {
     const queue = new Queue(name, opts);

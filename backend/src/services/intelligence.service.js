@@ -16,8 +16,8 @@ export const analyzeProductIntelligence = async (productData, scrapedData) => {
       chatId: 'system',
       prompt,
       systemPrompt: "You are an AI analyst. Extract product summary, features, and targetAudience in JSON format.",
-      preferredProvider: 'openai',
-      model: 'gpt-4o-mini',
+      preferredProvider: 'gemini',
+      model: 'gemini-1.5-flash',
       schema
     });
     return response.data;

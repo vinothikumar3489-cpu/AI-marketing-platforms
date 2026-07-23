@@ -40,6 +40,7 @@ import { startScheduler, stopScheduler } from "./jobs/scheduler.js";
 import { startWorkers, stopWorkers } from "./jobs/worker.js";
 import { logBuildInfo, buildHeadersMiddleware, getBuildInfo } from "./utils/build-info.util.js";
 import { getAIProviderDiagnostics } from "./domains/ai/services/aiOrchestrator.service.js";
+import { isRedisAvailable } from "./jobs/queues.js";
 
 dotenv.config();
 
@@ -165,21 +166,25 @@ function printStartupReport() {
   }
 
   const optionalVars = [
-    'REDIS_URL', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY',
+    'REDIS_URL', 'GEMINI_API_KEY', 'GROQ_API_KEY',
     'CEREBRAS_API_KEY', 'DEEPSEEK_API_KEY', 'OPENROUTER_API_KEY',
     'FIRECRAWL_API_KEY', 'TAVILY_API_KEY', 'DATAFORSEO_LOGIN', 'DATAFORSEO_PASSWORD',
-    'SERPAPI_API_KEY', 'RESEND_API_KEY', 'BREVO_API_KEY',
+    'SERPAPI_API_KEY', 'BREVO_API_KEY',
   ];
   console.log('  [Optional]');
   for (const v of optionalVars) {
     const ok = !!process.env[v];
-    console.log(`    ${ok ? '✅' : '⚠️'} ${v}${ok ? '' : ' — not set (will use configured providers only)'}`);
+    console.log(`    ${ok ? '✅' : ''} ${v}${ok ? '' : ' — not set'}`);
+  }
+
+  if (!isRedisAvailable()) {
+    console.log('    Redis — not configured (queues, workers, scheduler disabled)');
   }
 
   console.log('  [AI Providers]');
   const aiDiagnostics = getAIProviderDiagnostics();
   for (const d of aiDiagnostics) {
-    console.log(`    ${d.enabled ? '✅' : '⚠️'} ${d.provider}${d.warning ? ' — ' + d.warning : ''} (default model: ${d.defaultModel})`);
+    console.log(`    ${d.enabled ? '✅' : ''} ${d.provider}${d.enabled ? '' : ' — not configured'} (model: ${d.defaultModel})`);
   }
 
   console.log('═══════════════════════════════════════');
@@ -332,13 +337,25 @@ app.get("/api/health", async (req, res) => {
   } catch {
     dbStatus = "error";
   }
+
+  const redisAvailable = isRedisAvailable();
+
   res.json({
     status: "ok",
     message: "Backend running successfully",
     environment: process.env.NODE_ENV || "development",
+    version: process.env.APP_COMMIT_SHA || 'unknown',
     database: dbStatus,
+    redis: redisAvailable ? 'connected' : 'not_configured',
+    queues: redisAvailable ? 'available' : 'disabled',
+    aiProviders: getAIProviderDiagnostics().map(p => ({ provider: p.provider, enabled: p.enabled })),
+    emailProvider: (() => {
+      if (process.env.BREVO_API_KEY) return { provider: 'brevo', configured: true };
+      if (process.env.SMTP_USER && process.env.SMTP_PASS) return { provider: 'gmail', configured: true };
+      if (process.env.SENDGRID_API_KEY) return { provider: 'sendgrid', configured: true };
+      return { provider: null, configured: false };
+    })(),
     timestamp: new Date().toISOString(),
-    commitSha: process.env.APP_COMMIT_SHA || 'unknown',
   });
 });
 

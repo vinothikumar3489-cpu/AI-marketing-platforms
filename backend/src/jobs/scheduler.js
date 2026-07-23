@@ -50,10 +50,7 @@ export async function checkScheduledWorkflows() {
 }
 
 export function startScheduler() {
-  if (!isRedisAvailable()) {
-    console.warn('⚠️ Redis not available — background scheduler disabled');
-    return;
-  }
+  if (!isRedisAvailable()) return;
   if (intervalId) return;
   intervalId = setInterval(checkScheduledWorkflows, 60 * 1000);
   console.log('[Scheduler] Background scheduler started.');

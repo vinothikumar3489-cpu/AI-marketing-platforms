@@ -8,7 +8,7 @@ export async function callLLMWithFallbacks(prompt, fallbackGenerator, fallbackAr
     return { ...result.data, provider: result.provider };
   }
 
-  errors.push("All AI providers failed (Gemini, Groq, OpenAI)");
+  errors.push("All AI providers failed (Gemini, Groq, Cerebras, DeepSeek, OpenRouter)");
   console.log("🛡️ [AI Orchestrator] All AI providers failed. Using local fallback generator.");
   if (typeof fallbackGenerator === "function") {
     const fallbackData = fallbackGenerator(...fallbackArgs);

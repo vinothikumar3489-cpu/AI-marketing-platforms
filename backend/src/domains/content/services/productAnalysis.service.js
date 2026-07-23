@@ -399,7 +399,7 @@ export async function generateProductAnalysis(manualData = {}, scrapedData = {})
   let analysisResult = null;
 
   try {
-    if (process.env.OPENAI_API_KEY && (scrapedData?.cleanedText || manualData.description)) {
+    if (scrapedData?.cleanedText || manualData.description) {
       const ai = await generateAnalysis({ manualData, scrapedData });
       analysisResult = ai.structured || null;
       // merge provider status and warnings into scrapedData for later persistence

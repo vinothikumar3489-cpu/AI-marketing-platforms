@@ -1,20 +1,20 @@
 export function getProviderHealth() {
   const hasGmail = !!(process.env.SMTP_USER && process.env.SMTP_PASS);
-  const hasResend = !!process.env.RESEND_API_KEY;
+  const hasResend = process.env.ENABLE_RESEND === 'true' && !!process.env.RESEND_API_KEY;
   const hasSendGrid = !!process.env.SENDGRID_API_KEY;
   const hasBrevo = !!process.env.BREVO_API_KEY;
 
   let emailProvider = null;
-  if (hasGmail) emailProvider = 'gmail';
+  if (hasBrevo) emailProvider = 'brevo';
+  else if (hasGmail) emailProvider = 'gmail';
   else if (hasSendGrid) emailProvider = 'sendgrid';
-  else if (hasBrevo) emailProvider = 'brevo';
   else if (hasResend) emailProvider = 'resend';
 
   return {
     email: {
       provider: emailProvider,
-      configured: hasGmail || hasResend || hasSendGrid || hasBrevo,
-      fromConfigured: !!process.env.RESEND_FROM_EMAIL || hasGmail,
+      configured: hasBrevo || hasGmail || hasSendGrid || hasResend,
+      fromConfigured: !!process.env.BREVO_SENDER_EMAIL || !!process.env.BREVO_FROM_EMAIL || hasGmail,
     },
     image: {
       pollinations: { configured: true },
