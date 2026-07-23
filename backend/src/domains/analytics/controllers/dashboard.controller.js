@@ -1,6 +1,10 @@
 import prisma from "../../../config/prisma.js";
 import { buildExecutiveDashboard } from "../../../services/executive-command-center.service.js";
-import { redisConnection as redis } from "../../../config/redis.js";
+import { getRedisConnection } from "../../../config/redis.js";
+
+function getRedis() {
+  return getRedisConnection();
+}
 
 /**
  * GET /api/dashboard/summary
@@ -11,7 +15,8 @@ export const getDashboardSummary = async (req, res) => {
 
   try {
     const cacheKey = `dashboard:summary:${userId}`;
-    const cachedData = await redis.get(cacheKey);
+    const redis = getRedis();
+    const cachedData = redis ? await redis.get(cacheKey) : null;
     
     if (cachedData) {
       console.log('⚡ [Dashboard] Returning cached summary for user:', userId);
@@ -315,7 +320,8 @@ export const getDashboardSummary = async (req, res) => {
     };
 
     // Cache the payload for 5 minutes (300 seconds)
-    await redis.set(cacheKey, JSON.stringify(responsePayload), 'EX', 300);
+    const redisClient = getRedis();
+    if (redisClient) await redisClient.set(cacheKey, JSON.stringify(responsePayload), 'EX', 300);
 
     return res.json(responsePayload);
 

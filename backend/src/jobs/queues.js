@@ -1,31 +1,52 @@
 import { Queue } from 'bullmq';
-import { redisConnection } from '../config/redis.js';
+import { getRedisConnection, isRedisAvailable } from '../config/redis.js';
 
-const queueOptions = {
-  connection: redisConnection,
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 5000,
+const queueRegistry = {};
+
+function getQueueOptions() {
+  const conn = getRedisConnection();
+  if (!conn) return null;
+
+  return {
+    connection: conn,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 5000 },
+      removeOnComplete: 100,
+      removeOnFail: 1000,
     },
-    removeOnComplete: 100,
-    removeOnFail: 1000,
-  }
-};
+  };
+}
 
-export const scrapingQueue = new Queue('ScrapingQueue', queueOptions);
-export const aiQueue = new Queue('AIQueue', queueOptions);
-export const emailQueue = new Queue('EmailQueue', queueOptions);
-export const crmQueue = new Queue('CRMQueue', queueOptions);
-export const reportQueue = new Queue('ReportQueue', queueOptions);
+export function getQueue(name) {
+  if (queueRegistry[name]) return queueRegistry[name];
+
+  const opts = getQueueOptions();
+  if (!opts) {
+    console.warn(`⚠️ Cannot create queue "${name}" — Redis not available`);
+    return null;
+  }
+
+  try {
+    const queue = new Queue(name, opts);
+    queueRegistry[name] = queue;
+    return queue;
+  } catch (err) {
+    console.warn(`⚠️ Failed to create queue "${name}":`, err.message);
+    return null;
+  }
+}
+
+export function getScrapingQueue() { return getQueue('ScrapingQueue'); }
+export function getAiQueue() { return getQueue('AIQueue'); }
+export function getEmailQueue() { return getQueue('EmailQueue'); }
+export function getCrmQueue() { return getQueue('CRMQueue'); }
+export function getReportQueue() { return getQueue('ReportQueue'); }
 
 export async function closeQueues() {
-  await Promise.all([
-    scrapingQueue.close(),
-    aiQueue.close(),
-    emailQueue.close(),
-    crmQueue.close(),
-    reportQueue.close()
-  ]);
+  const queues = Object.values(queueRegistry);
+  if (queues.length === 0) return;
+  await Promise.all(queues.map(q => q.close()));
 }
+
+export { isRedisAvailable };

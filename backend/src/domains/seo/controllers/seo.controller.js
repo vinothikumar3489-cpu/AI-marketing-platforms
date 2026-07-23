@@ -1,6 +1,6 @@
 import prisma from "../../../config/prisma.js";
 import { generateCompleteSeoIntelligence } from '../services/seoIntelligence.service.js';
-import { scrapingQueue } from '../../../jobs/queues.js';
+import { getScrapingQueue } from '../../../jobs/queues.js';
 import { buildSEOReport } from "../../../services/seo/seo-report-builder.service.js";
 import { getSEOProviderStatus, getCachedSEOProviderStatus, clearSEOCache, getCacheStats } from "../../../services/seo/seo-provider-router.service.js";
 import { getSearchConsoleStatus } from "../../../providers/googleSearchConsole.service.js";
@@ -35,7 +35,9 @@ export const runSeoHandler = async (req, res) => {
   }
 
   try {
-    const job = await scrapingQueue.add('seo-audit', { chatId, userId, websiteUrl });
+    const queue = getScrapingQueue();
+    if (!queue) return res.status(503).json({ success: false, error: 'Background jobs unavailable' });
+    const job = await queue.add('seo-audit', { chatId, userId, websiteUrl });
     
     return res.status(202).json({
       success: true,

@@ -1,5 +1,5 @@
 import prisma from '../config/prisma.js';
-import { crmQueue } from './queues.js';
+import { getCrmQueue, isRedisAvailable } from './queues.js';
 
 let intervalId = null;
 
@@ -9,19 +9,24 @@ export async function checkScheduledWorkflows() {
       where: {
         status: 'ACTIVE',
         triggerType: 'DATE_REACHED',
-      }
+      },
     });
+
+    const crmQueue = getCrmQueue();
+    if (!crmQueue) {
+      return;
+    }
 
     for (const workflow of workflows) {
       const config = workflow.triggerConfig || {};
-      
+
       if (config.targetDate) {
         const targetDate = new Date(config.targetDate);
         if (targetDate <= new Date()) {
           const idempotencyKey = `scheduled_${workflow.id}_${targetDate.toISOString()}`;
-          
+
           const existingExecution = await prisma.cRMWorkflowExecution.findFirst({
-            where: { workflowId: workflow.id, idempotencyKey }
+            where: { workflowId: workflow.id, idempotencyKey },
           });
 
           if (!existingExecution) {
@@ -29,10 +34,10 @@ export async function checkScheduledWorkflows() {
             await crmQueue.add('execute-workflow', {
               chatId: workflow.chatId,
               workflowId: workflow.id,
-              triggerContext: { 
-                isScheduled: true, 
+              triggerContext: {
+                isScheduled: true,
                 targetDate: config.targetDate,
-                idempotencyKey 
+                idempotencyKey,
               },
             });
           }
@@ -45,8 +50,11 @@ export async function checkScheduledWorkflows() {
 }
 
 export function startScheduler() {
+  if (!isRedisAvailable()) {
+    console.warn('⚠️ Redis not available — background scheduler disabled');
+    return;
+  }
   if (intervalId) return;
-  // Run every 60 seconds
   intervalId = setInterval(checkScheduledWorkflows, 60 * 1000);
   console.log('[Scheduler] Background scheduler started.');
 }

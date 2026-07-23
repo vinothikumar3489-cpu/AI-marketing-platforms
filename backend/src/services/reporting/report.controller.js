@@ -1,6 +1,6 @@
 import { buildReportData, generateExecutiveReport, generateGrowthReport, generateSeoReport } from "./report-builder.service.js";
 import prisma from "../../config/prisma.js";
-import { reportQueue } from "../../jobs/queues.js";
+import { getReportQueue } from "../../jobs/queues.js";
 
 export const exportExecutiveReportHandler = async (req, res) => {
   const { chatId, format } = req.params;
@@ -19,7 +19,9 @@ export const exportExecutiveReportHandler = async (req, res) => {
 
   const heavyFormats = ['pdf', 'docx', 'pptx'];
   if (heavyFormats.includes(format)) {
-    const job = await reportQueue.add('generate-report', {
+    const queue = getReportQueue();
+    if (!queue) return res.status(503).json({ success: false, error: 'Report generation unavailable' });
+    const job = await queue.add('generate-report', {
       chatId,
       userId,
       format,
@@ -53,7 +55,9 @@ export const exportGrowthReportHandler = async (req, res) => {
 
   const heavyFormats = ['pdf', 'docx', 'pptx'];
   if (heavyFormats.includes(format)) {
-    const job = await reportQueue.add('generate-report', {
+    const queue = getReportQueue();
+    if (!queue) return res.status(503).json({ success: false, error: 'Report generation unavailable' });
+    const job = await queue.add('generate-report', {
       chatId,
       userId,
       format,
@@ -87,7 +91,9 @@ export const exportSeoReportHandler = async (req, res) => {
 
   const heavyFormats = ['pdf', 'docx', 'pptx'];
   if (heavyFormats.includes(format)) {
-    const job = await reportQueue.add('generate-report', {
+    const queue = getReportQueue();
+    if (!queue) return res.status(503).json({ success: false, error: 'Report generation unavailable' });
+    const job = await queue.add('generate-report', {
       chatId,
       userId,
       format,
@@ -110,7 +116,9 @@ export const checkReportStatusHandler = async (req, res) => {
   const { jobId } = req.params;
   
   try {
-    const job = await reportQueue.getJob(jobId);
+    const queue = getReportQueue();
+    if (!queue) return res.status(503).json({ success: false, error: 'Queue unavailable' });
+    const job = await queue.getJob(jobId);
     if (!job) {
       return res.status(404).json({ success: false, error: 'Job not found' });
     }

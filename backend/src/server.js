@@ -36,9 +36,10 @@ import { crmRouter } from "./domains/crm/routes/crm.routes.js";
 import { salesCopilotRouter } from "./routes/sales-copilot.routes.js";
 import diagnosticsRouter from "./routes/diagnostics.routes.js";
 import { jobsRouter } from "./routes/jobs.routes.js";
-import "./jobs/worker.js";
 import { startScheduler, stopScheduler } from "./jobs/scheduler.js";
+import { startWorkers, stopWorkers } from "./jobs/worker.js";
 import { logBuildInfo, buildHeadersMiddleware, getBuildInfo } from "./utils/build-info.util.js";
+import { getAIProviderDiagnostics } from "./domains/ai/services/aiOrchestrator.service.js";
 
 dotenv.config();
 
@@ -147,6 +148,42 @@ async function startServer(app) {
       }
     });
   });
+}
+
+// Startup configuration report
+function printStartupReport() {
+  console.log('');
+  console.log('═══════════════════════════════════════');
+  console.log('     STARTUP CONFIGURATION REPORT');
+  console.log('═══════════════════════════════════════');
+
+  const requiredVars = ['DATABASE_URL', 'JWT_SECRET'];
+  console.log('  [Required]');
+  for (const v of requiredVars) {
+    const ok = !!process.env[v];
+    console.log(`    ${ok ? '✅' : '❌'} ${v}${ok ? '' : ' — MISSING'}`);
+  }
+
+  const optionalVars = [
+    'REDIS_URL', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY',
+    'CEREBRAS_API_KEY', 'DEEPSEEK_API_KEY', 'OPENROUTER_API_KEY',
+    'FIRECRAWL_API_KEY', 'TAVILY_API_KEY', 'DATAFORSEO_LOGIN', 'DATAFORSEO_PASSWORD',
+    'SERPAPI_API_KEY', 'RESEND_API_KEY', 'BREVO_API_KEY',
+  ];
+  console.log('  [Optional]');
+  for (const v of optionalVars) {
+    const ok = !!process.env[v];
+    console.log(`    ${ok ? '✅' : '⚠️'} ${v}${ok ? '' : ' — not set (will use configured providers only)'}`);
+  }
+
+  console.log('  [AI Providers]');
+  const aiDiagnostics = getAIProviderDiagnostics();
+  for (const d of aiDiagnostics) {
+    console.log(`    ${d.enabled ? '✅' : '⚠️'} ${d.provider}${d.warning ? ' — ' + d.warning : ''} (default model: ${d.defaultModel})`);
+  }
+
+  console.log('═══════════════════════════════════════');
+  console.log('');
 }
 
 // Trust proxy — required for rate limiting behind reverse proxies (e.g. Nginx, Render, Heroku)
@@ -384,6 +421,7 @@ let runningServer;
 function shutdownGracefully(signal) {
   console.log(`\n⚠️ ${signal} received, shutting down gracefully...`);
   stopScheduler();
+  stopWorkers();
   if (runningServer) {
     runningServer.close(() => {
       prisma.$disconnect();
@@ -404,7 +442,12 @@ process.on('SIGINT', () => shutdownGracefully('SIGINT'));
     // Log build information on startup
     await logBuildInfo();
     
+    printStartupReport();
+    
     runningServer = await startServer(app);
+    
+    // Start background workers after server is listening
+    await startWorkers();
     startScheduler();
   } catch (error) {
     console.error('❌ Failed to start backend server:', error.message);

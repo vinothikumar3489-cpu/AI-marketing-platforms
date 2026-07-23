@@ -1,13 +1,89 @@
-import { trackAiUsage } from './aiAnalytics.service.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
-import { getLatestEvidenceSnapshot } from '../../research/services/evidence.service.js';
 
-// This is the Centralized AI Orchestrator
+const AI_PROVIDER_CONFIG = {
+  openai: {
+    envKey: 'OPENAI_API_KEY',
+    defaultModel: 'gpt-4o-mini',
+  },
+  gemini: {
+    envKey: 'GEMINI_API_KEY',
+    defaultModel: 'gemini-1.5-flash',
+  },
+  groq: {
+    envKey: 'GROQ_API_KEY',
+    defaultModel: 'llama-3.3-70b-versatile',
+    baseURL: 'https://api.groq.com/openai/v1',
+  },
+  cerebras: {
+    envKey: 'CEREBRAS_API_KEY',
+    defaultModel: 'llama-3.3-70b',
+    baseURL: 'https://api.cerebras.ai/v1',
+  },
+  deepseek: {
+    envKey: 'DEEPSEEK_API_KEY',
+    defaultModel: 'deepseek-chat',
+    baseURL: 'https://api.deepseek.com/v1',
+  },
+  openrouter: {
+    envKey: 'OPENROUTER_API_KEY',
+    defaultModel: 'openrouter/auto',
+    baseURL: 'https://openrouter.ai/api/v1',
+  },
+};
+
+let instance = null;
+
 export class AIOrchestrator {
   constructor() {
-    this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    this._providers = {};
+    this._initialized = false;
+  }
+
+  _initProvider(name) {
+    if (this._providers[name]) return this._providers[name];
+
+    const cfg = AI_PROVIDER_CONFIG[name];
+    if (!cfg) return null;
+
+    const apiKey = process.env[cfg.envKey];
+    if (!apiKey) return null;
+
+    try {
+      if (name === 'openai') {
+        this._providers[name] = { client: new OpenAI({ apiKey }), cfg };
+      } else if (name === 'gemini') {
+        this._providers[name] = { client: new GoogleGenerativeAI(apiKey), cfg };
+      } else if (['groq', 'cerebras', 'deepseek', 'openrouter'].includes(name)) {
+        this._providers[name] = { client: new OpenAI({ apiKey, baseURL: cfg.baseURL }), cfg };
+      }
+    } catch {
+      return null;
+    }
+
+    return this._providers[name];
+  }
+
+  getAvailableProviders() {
+    return Object.keys(AI_PROVIDER_CONFIG).filter(p => {
+      const apiKey = process.env[AI_PROVIDER_CONFIG[p].envKey];
+      return !!apiKey;
+    });
+  }
+
+  getProviderDiagnostics() {
+    const diagnostics = [];
+    for (const [name, cfg] of Object.entries(AI_PROVIDER_CONFIG)) {
+      const apiKey = process.env[cfg.envKey];
+      diagnostics.push({
+        provider: name,
+        enabled: !!apiKey,
+        configured: !!apiKey,
+        warning: apiKey ? null : `Missing ${cfg.envKey}`,
+        defaultModel: cfg.defaultModel,
+      });
+    }
+    return diagnostics;
   }
 
   async generateCompletion({
@@ -16,145 +92,134 @@ export class AIOrchestrator {
     prompt,
     systemPrompt,
     preferredProvider = 'openai',
-    model = 'gpt-4o-mini',
-    schema = null, // Zod schema
+    model,
+    schema = null,
   }) {
-    let result = null;
-    let usedProvider = preferredProvider;
-    let usedModel = model;
-    let finalSystemPrompt = systemPrompt;
-
-    if (chatId && chatId !== 'system') {
-      const evidenceReq = await getLatestEvidenceSnapshot(chatId);
-      if (evidenceReq.success && evidenceReq.snapshot) {
-        finalSystemPrompt += `\n\n### CANONICAL EVIDENCE BASE ###\nDo NOT hallucinate data. Ground your response in the following verified evidence:\n${JSON.stringify({
-          website: evidenceReq.snapshot.websiteEvidence,
-          content: evidenceReq.snapshot.contentEvidence,
-          technical: evidenceReq.snapshot.technicalSeoEvidence
-        })}`;
-      }
+    const available = this.getAvailableProviders();
+    if (available.length === 0) {
+      return { success: false, error: 'No AI providers configured. Set at least one of: OPENAI_API_KEY, GEMINI_API_KEY, GROQ_API_KEY, CEREBRAS_API_KEY, DEEPSEEK_API_KEY, OPENROUTER_API_KEY' };
     }
+
+    if (!available.includes(preferredProvider)) {
+      preferredProvider = available[0];
+    }
+
+    const cfg = AI_PROVIDER_CONFIG[preferredProvider];
+    const usedModel = model || cfg.defaultModel;
 
     try {
-      if (preferredProvider === 'openai') {
-        result = await this._callOpenAI({ prompt, systemPrompt: finalSystemPrompt, model, schema });
-      } else if (preferredProvider === 'gemini') {
-        result = await this._callGemini({ prompt, systemPrompt: finalSystemPrompt, model, schema });
-      } else {
-        throw new Error(`Unsupported provider: ${preferredProvider}`);
+      const provider = this._initProvider(preferredProvider);
+      if (!provider) {
+        return { success: false, error: `Provider ${preferredProvider} failed to initialize` };
       }
+
+      let result;
+      if (preferredProvider === 'gemini') {
+        result = await this._callGemini(provider.client, { prompt, systemPrompt, model: usedModel, schema });
+      } else {
+        result = await this._callOpenAI(provider.client, { prompt, systemPrompt, model: usedModel, schema });
+      }
+
+      return {
+        success: true,
+        data: result.content,
+        provider: preferredProvider,
+        model: usedModel,
+        usage: result.usage,
+      };
     } catch (error) {
-      console.warn(`[AI Orchestrator] Provider ${preferredProvider} failed. Falling back...`, error.message);
-      // Fallback logic
-      usedProvider = preferredProvider === 'openai' ? 'gemini' : 'openai';
-      usedModel = usedProvider === 'openai' ? 'gpt-4o-mini' : 'gemini-1.5-flash';
-      
-      if (usedProvider === 'openai') {
-        result = await this._callOpenAI({ prompt, systemPrompt: finalSystemPrompt, model: usedModel, schema });
-      } else {
-        result = await this._callGemini({ prompt, systemPrompt: finalSystemPrompt, model: usedModel, schema });
-      }
-    }
-
-    // Validate with Zod if schema provided
-    let parsedData = result.content;
-    if (schema) {
-      try {
-        if (typeof result.content === 'string') {
-          // Attempt JSON parse
-          const jsonMatch = result.content.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-          if (jsonMatch) {
-            parsedData = JSON.parse(jsonMatch[0]);
+      console.warn(`[AI Orchestrator] Provider ${preferredProvider} failed:`, error.message);
+      const fallback = available.find(p => p !== preferredProvider);
+      if (fallback) {
+        console.log(`[AI Orchestrator] Falling back to ${fallback}`);
+        const fallbackCfg = AI_PROVIDER_CONFIG[fallback];
+        const fallbackModel = fallbackCfg.defaultModel;
+        try {
+          const provider = this._initProvider(fallback);
+          if (provider) {
+            let result;
+            if (fallback === 'gemini') {
+              result = await this._callGemini(provider.client, { prompt, systemPrompt, model: fallbackModel, schema });
+            } else {
+              result = await this._callOpenAI(provider.client, { prompt, systemPrompt, model: fallbackModel, schema });
+            }
+            return {
+              success: true,
+              data: result.content,
+              provider: fallback,
+              model: fallbackModel,
+              usage: result.usage,
+            };
           }
+        } catch (fallbackError) {
+          console.error(`[AI Orchestrator] Fallback ${fallback} also failed:`, fallbackError.message);
         }
-        parsedData = schema.parse(parsedData);
-      } catch (e) {
-        console.error('[AI Orchestrator] Zod Validation Failed', e);
-        throw new Error('AI output failed strict schema validation');
       }
+      return { success: false, error: `All AI providers failed. Last error: ${error.message}` };
     }
-
-    // Track usage asynchronously
-    trackAiUsage({
-      userId,
-      chatId,
-      provider: usedProvider,
-      model: usedModel,
-      promptTokens: result.usage.promptTokens,
-      completionTokens: result.usage.completionTokens
-    });
-
-    return {
-      success: true,
-      data: parsedData,
-      provider: usedProvider,
-      model: usedModel,
-      usage: result.usage
-    };
   }
 
-  async _callOpenAI({ prompt, systemPrompt, model, schema }) {
-    const response = await this.openai.chat.completions.create({
+  async _callOpenAI(client, { prompt, systemPrompt, model, schema }) {
+    const response = await client.chat.completions.create({
       model: model || 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt || 'You are a helpful assistant.' },
-        { role: 'user', content: prompt }
+        { role: 'user', content: prompt },
       ],
       response_format: schema ? { type: 'json_object' } : undefined,
     });
-    
     return {
       content: response.choices[0].message.content,
       usage: {
         promptTokens: response.usage?.prompt_tokens || 0,
-        completionTokens: response.usage?.completion_tokens || 0
-      }
+        completionTokens: response.usage?.completion_tokens || 0,
+      },
     };
   }
 
-  async _callGemini({ prompt, systemPrompt, model, schema }) {
-    const aiModel = this.genAI.getGenerativeModel({ model: model || 'gemini-1.5-flash' });
+  async _callGemini(client, { prompt, systemPrompt, model, schema }) {
+    const aiModel = client.getGenerativeModel({ model: model || 'gemini-1.5-flash' });
     const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
-    
     const result = await aiModel.generateContent(schema ? `${fullPrompt}\n\nRETURN ONLY VALID JSON MATCHING THIS TASK.` : fullPrompt);
     const response = await result.response;
-    
-    // Gemini token counting is approximate if not explicit
     return {
       content: response.text(),
       usage: {
         promptTokens: response.usageMetadata?.promptTokenCount || 0,
-        completionTokens: response.usageMetadata?.candidatesTokenCount || 0
-      }
+        completionTokens: response.usageMetadata?.candidatesTokenCount || 0,
+      },
     };
   }
 }
 
-export const aiOrchestrator = new AIOrchestrator();
-
-export function getAIProviderDiagnostics() {
-  return [
-    { provider: 'openai', configured: !!process.env.OPENAI_API_KEY, status: !!process.env.OPENAI_API_KEY ? 'AVAILABLE' : 'NOT_CONFIGURED', cooldownActive: false },
-    { provider: 'gemini', configured: !!process.env.GEMINI_API_KEY, status: !!process.env.GEMINI_API_KEY ? 'AVAILABLE' : 'NOT_CONFIGURED', cooldownActive: false }
-  ];
+export function getAIOrchestrator() {
+  if (!instance) {
+    instance = new AIOrchestrator();
+  }
+  return instance;
 }
 
-// Backward-compatible shim for legacy callAI imports
+export const aiOrchestrator = getAIOrchestrator();
+
+export function getAIProviderDiagnostics() {
+  return getAIOrchestrator().getProviderDiagnostics();
+}
+
 export async function callAI(prompt, options = {}) {
-  const systemPrompt = options.systemPrompt || "You are a helpful AI assistant. Output JSON if requested.";
+  const systemPrompt = options.systemPrompt || 'You are a helpful AI assistant. Output JSON if requested.';
   try {
-    const response = await aiOrchestrator.generateCompletion({
+    const response = await getAIOrchestrator().generateCompletion({
       userId: 'system',
       chatId: 'system',
       prompt,
       systemPrompt,
       preferredProvider: options.provider || 'openai',
       model: options.model || 'gpt-4o-mini',
-      schema: null // Legacy usually parsed JSON manually
+      schema: null,
     });
-    return { success: true, data: response.data, provider: response.provider };
+    return { success: response.success, data: response.success ? response.data : null, provider: response.provider, error: response.error };
   } catch (error) {
-    console.error("callAI shim failed:", error);
+    console.error('callAI shim failed:', error);
     return { success: false, error: error.message };
   }
 }

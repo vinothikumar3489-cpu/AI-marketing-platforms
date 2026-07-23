@@ -14,7 +14,7 @@ import {
   getWorkflowVersions,
   restoreWorkflowVersion,
 } from "../../../services/automation/crm-workflow.service.js";
-import { crmQueue } from "../../../jobs/queues.js";
+import { getCrmQueue } from "../../../jobs/queues.js";
 
 export async function handleCreateWorkflow(req, res) {
   try {
@@ -144,7 +144,9 @@ export async function handleExecuteWorkflow(req, res) {
     const context = req.body || {};
     context.userId = userId;
 
-    const job = await crmQueue.add('execute-workflow', {
+    const queue = getCrmQueue();
+    if (!queue) return res.status(503).json({ success: false, error: 'Background jobs unavailable' });
+    const job = await queue.add('execute-workflow', {
       chatId,
       workflowId,
       triggerContext: context,

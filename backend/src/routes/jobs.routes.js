@@ -1,5 +1,5 @@
 import express from 'express';
-import { aiQueue, scrapingQueue, emailQueue, crmQueue } from '../jobs/queues.js';
+import { getAiQueue, getScrapingQueue, getEmailQueue, getCrmQueue } from '../jobs/queues.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 
 export const jobsRouter = express.Router();
@@ -11,12 +11,14 @@ jobsRouter.get('/:queueName/:jobId/status', async (req, res) => {
   
   let queue;
   switch (queueName) {
-    case 'ai': queue = aiQueue; break;
-    case 'scraping': queue = scrapingQueue; break;
-    case 'email': queue = emailQueue; break;
-    case 'crm': queue = crmQueue; break;
+    case 'ai': queue = getAiQueue(); break;
+    case 'scraping': queue = getScrapingQueue(); break;
+    case 'email': queue = getEmailQueue(); break;
+    case 'crm': queue = getCrmQueue(); break;
     default: return res.status(400).json({ error: 'Invalid queue name' });
   }
+
+  if (!queue) return res.status(503).json({ error: 'Queue not available — Redis may be unavailable' });
 
   try {
     const job = await queue.getJob(jobId);

@@ -1,69 +1,107 @@
 import { Worker } from 'bullmq';
-import { redisConnection } from '../config/redis.js';
+import { getRedisConnection, isRedisAvailable } from '../config/redis.js';
 
-// Import handlers for specific tasks
-import { scrapeWebsite } from '../domains/research/services/scraper.service.js';
-import { generateCompleteSeoIntelligence } from '../domains/seo/services/seoIntelligence.service.js';
-import { executeWorkflow } from '../services/automation/crm-workflow.service.js';
-import { generateExecutiveReport, generateGrowthReport, generateSeoReport } from '../services/reporting/report-builder.service.js';
-import fs from 'fs';
-import path from 'path';
+let workers = [];
 
-const workerOptions = {
-  connection: redisConnection,
-  concurrency: 5,
-};
+export async function startWorkers() {
+  if (workers.length > 0) return;
 
-export const scrapingWorker = new Worker('ScrapingQueue', async (job) => {
-  console.log(`[ScrapingQueue] Processing job ${job.id} of type ${job.name}`);
-  
-  if (job.name === 'website-scrape') {
-    const result = await scrapeWebsite(job.data);
-    if (!result.success) throw new Error(result.error);
-    return result;
+  if (!isRedisAvailable()) {
+    console.warn('⚠️ Redis not available — BullMQ workers disabled');
+    return;
   }
-  
-  if (job.name === 'seo-audit') {
-    const result = await generateCompleteSeoIntelligence(job.data);
-    if (!result.success) throw new Error(result.error);
-    return result;
+
+  const connection = getRedisConnection();
+  if (!connection) {
+    console.warn('⚠️ Cannot start workers — no Redis connection');
+    return;
   }
-  
-  throw new Error(`Unknown job name: ${job.name}`);
-}, workerOptions);
 
-export const aiWorker = new Worker('AIQueue', async (job) => {
-  console.log(`[AIQueue] Processing job ${job.id}`);
-  // await handleAiJob(job.data);
-  return { status: 'success' };
-}, workerOptions);
+  const workerOptions = { connection, concurrency: 5 };
 
-export const emailWorker = new Worker('EmailQueue', async (job) => {
-  console.log(`[EmailQueue] Processing job ${job.id}`);
-  return { status: 'success' };
-}, workerOptions);
+  const workerDefs = [
+    { queue: 'ScrapingQueue', handler: createScrapingHandler() },
+    { queue: 'AIQueue', handler: createAIHandler() },
+    { queue: 'EmailQueue', handler: createEmailHandler() },
+    { queue: 'CRMQueue', handler: createCRMHandler() },
+    { queue: 'ReportQueue', handler: createReportHandler() },
+  ];
 
-export const crmWorker = new Worker('CRMQueue', async (job) => {
-  console.log(`[CRMQueue] Processing job ${job.id} of type ${job.name}`);
-  
-  if (job.name === 'execute-workflow') {
-    const { chatId, workflowId, triggerContext } = job.data;
+  for (const def of workerDefs) {
     try {
-      const result = await executeWorkflow(chatId, workflowId, triggerContext);
-      return result;
-    } catch (error) {
-      throw new Error(`Workflow execution failed: ${error.message}`);
+      const worker = new Worker(def.queue, def.handler, workerOptions);
+      worker.on('failed', (job, err) => {
+        console.error(`❌ [${def.queue}] Job ${job?.id} failed:`, err.message);
+      });
+      workers.push(worker);
+    } catch (err) {
+      console.warn(`⚠️ Failed to create worker for "${def.queue}":`, err.message);
     }
   }
 
-  throw new Error(`Unknown job name: ${job.name}`);
-}, workerOptions);
+  if (workers.length > 0) {
+    console.log(`✅ Started ${workers.length} BullMQ worker(s)`);
+  }
+}
 
-export const reportWorker = new Worker('ReportQueue', async (job) => {
-  console.log(`[ReportQueue] Processing job ${job.id} of type ${job.name}`);
-  const { chatId, userId, format, reportType } = job.data;
+function createScrapingHandler() {
+  return async (job) => {
+    console.log(`[ScrapingQueue] Processing job ${job.id} of type ${job.name}`);
 
-  try {
+    if (job.name === 'website-scrape') {
+      const { scrapeWebsite } = await import('../domains/research/services/scraper.service.js');
+      const result = await scrapeWebsite(job.data);
+      if (!result.success) throw new Error(result.error);
+      return result;
+    }
+
+    if (job.name === 'seo-audit') {
+      const { generateCompleteSeoIntelligence } = await import('../domains/seo/services/seoIntelligence.service.js');
+      const result = await generateCompleteSeoIntelligence(job.data);
+      if (!result.success) throw new Error(result.error);
+      return result;
+    }
+
+    throw new Error(`Unknown job name: ${job.name}`);
+  };
+}
+
+function createAIHandler() {
+  return async (job) => {
+    console.log(`[AIQueue] Processing job ${job.id}`);
+    return { status: 'success' };
+  };
+}
+
+function createEmailHandler() {
+  return async (job) => {
+    console.log(`[EmailQueue] Processing job ${job.id}`);
+    return { status: 'success' };
+  };
+}
+
+function createCRMHandler() {
+  return async (job) => {
+    console.log(`[CRMQueue] Processing job ${job.id} of type ${job.name}`);
+    if (job.name === 'execute-workflow') {
+      const { executeWorkflow } = await import('../services/automation/crm-workflow.service.js');
+      const { chatId, workflowId, triggerContext } = job.data;
+      const result = await executeWorkflow(chatId, workflowId, triggerContext);
+      return result;
+    }
+    throw new Error(`Unknown job name: ${job.name}`);
+  };
+}
+
+function createReportHandler() {
+  return async (job) => {
+    console.log(`[ReportQueue] Processing job ${job.id} of type ${job.name}`);
+    const { chatId, userId, format, reportType } = job.data;
+
+    const { generateExecutiveReport, generateGrowthReport, generateSeoReport } = await import('../services/reporting/report-builder.service.js');
+    const fs = await import('fs');
+    const path = await import('path');
+
     let buffer;
     if (reportType === 'executive') {
       buffer = await generateExecutiveReport(chatId, userId, format);
@@ -77,7 +115,6 @@ export const reportWorker = new Worker('ReportQueue', async (job) => {
 
     if (!Buffer.isBuffer(buffer)) buffer = Buffer.from(buffer);
 
-    // Save to local-assets/reports
     const reportsDir = path.join(process.cwd(), 'local-assets', 'reports');
     if (!fs.existsSync(reportsDir)) {
       fs.mkdirSync(reportsDir, { recursive: true });
@@ -87,29 +124,13 @@ export const reportWorker = new Worker('ReportQueue', async (job) => {
     const filePath = path.join(reportsDir, filename);
     fs.writeFileSync(filePath, buffer);
 
-    return { 
-      status: 'success', 
-      url: `/api/local-assets/reports/${filename}`,
-      filename
-    };
-  } catch (error) {
-    throw new Error(`Report generation failed: ${error.message}`);
-  }
-}, workerOptions);
+    return { status: 'success', url: `/api/local-assets/reports/${filename}`, filename };
+  };
+}
 
-// Error handling
-[scrapingWorker, aiWorker, emailWorker, crmWorker, reportWorker].forEach(worker => {
-  worker.on('failed', (job, err) => {
-    console.error(`❌ [${worker.name}] Job ${job?.id} failed:`, err.message);
-  });
-});
-
-export async function closeWorkers() {
-  await Promise.all([
-    scrapingWorker.close(),
-    aiWorker.close(),
-    emailWorker.close(),
-    crmWorker.close(),
-    reportWorker.close()
-  ]);
+export async function stopWorkers() {
+  if (workers.length === 0) return;
+  await Promise.all(workers.map(w => w.close()));
+  workers = [];
+  console.log('BullMQ workers stopped');
 }

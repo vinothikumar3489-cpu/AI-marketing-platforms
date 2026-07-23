@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { scrapeWebsite } from "../services/scraper.service.js";
-import { scrapingQueue } from "../../../jobs/queues.js";
+import { getScrapingQueue } from "../../../jobs/queues.js";
 
 const scrapeSchema = z.object({
   websiteUrl: z.string().url(),
@@ -14,7 +14,9 @@ export const scrapeWebsiteHandler = async (req, res) => {
 
   const { websiteUrl, productName, companyName } = parse.data;
   try {
-    const job = await scrapingQueue.add('website-scrape', { websiteUrl, productName, companyName });
+    const queue = getScrapingQueue();
+    if (!queue) return res.status(503).json({ success: false, error: 'Background jobs unavailable' });
+    const job = await queue.add('website-scrape', { websiteUrl, productName, companyName });
     return res.status(202).json({ 
       success: true, 
       message: "Scraping started in the background",

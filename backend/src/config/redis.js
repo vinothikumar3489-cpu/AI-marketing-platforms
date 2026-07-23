@@ -1,20 +1,47 @@
 import { Redis } from 'ioredis';
-import dotenv from 'dotenv';
 
-dotenv.config();
+let redisConnectionInstance = null;
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+export function getRedisConnection() {
+  if (redisConnectionInstance) return redisConnectionInstance;
 
-// Maintain a singleton connection pool
-export const redisConnection = new Redis(REDIS_URL, {
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
-});
+  const REDIS_URL = process.env.REDIS_URL;
+  if (!REDIS_URL) {
+    console.warn('⚠️ REDIS_URL not set — Redis unavailable. Background jobs disabled.');
+    return null;
+  }
 
-redisConnection.on('error', (err) => {
-  console.error('❌ Redis Connection Error:', err.message);
-});
+  try {
+    const redis = new Redis(REDIS_URL, {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+      lazyConnect: true,
+      retryStrategy(times) {
+        if (times > 10) {
+          console.error('❌ Redis max retries reached. Giving up.');
+          return null;
+        }
+        return Math.min(times * 200, 2000);
+      },
+    });
 
-redisConnection.on('ready', () => {
-  console.log('✅ Redis Connected');
-});
+    redis.on('error', (err) => {
+      console.error('❌ Redis Connection Error:', err.message);
+    });
+
+    redis.on('ready', () => {
+      console.log('✅ Redis Connected');
+    });
+
+    redisConnectionInstance = redis;
+    return redis;
+  } catch (err) {
+    console.warn('⚠️ Failed to create Redis connection:', err.message);
+    return null;
+  }
+}
+
+export function isRedisAvailable() {
+  const conn = getRedisConnection();
+  return conn !== null;
+}
