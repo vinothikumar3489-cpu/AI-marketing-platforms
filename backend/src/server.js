@@ -1,50 +1,48 @@
-console.log("🚀 Starting AI Marketing Platform Backend...");
-import express from "express";
-import "express-async-errors";
-import cors from "cors";
-import dotenv from "dotenv";
-import helmet from "helmet";
-import rateLimit from "express-rate-limit";
-import compression from "compression";
-import path from "path";
-import { exec } from "child_process";
-import { promisify } from "util";
-import prisma from "./config/prisma.js";
+import express from 'express';
+import 'express-async-errors';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import compression from 'compression';
+import path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import prisma from './config/prisma.js';
 
-import { authRouter } from "./routes/auth.routes.js";
-import { chatRouter } from "./routes/chat.routes.js";
-import { dashboardRouter } from "./domains/analytics/routes/dashboard.routes.js";
-import { analysisRouter } from "./domains/analytics/routes/analysis.routes.js";
-import { scrapeRouter } from "./domains/research/routes/scrape.routes.js";
-import { productRouter } from "./domains/content/routes/product.routes.js";
-import { integrationsRouter } from "./routes/integrations.routes.js";
-import { userRouter } from "./routes/user.routes.js";
-import { notificationRouter } from "./routes/notification.routes.js";
-import { competitorRouter } from "./modules/competitor-intelligence/competitor.routes.js";
-import { seoRouter as seoIntRouter } from "./domains/seo/routes/seo.routes.js";
-import { agentsRouter } from "./domains/ai/routes/agents.routes.js";
-import { workflowRouter } from "./domains/automation/routes/workflow.routes.js";
-import { growthWorkspaceRouter } from "./modules/growth-workspace/growthWorkspace.routes.js";
-import productAnalysisRouter from "./domains/content/routes/productAnalysis.routes.js";
-import { automationRouter } from "./domains/automation/routes/automation.routes.js";
-import { reportRouter } from "./services/reporting/report.routes.js";
-import { evidenceRouter } from "./modules/evidence/evidence.routes.js";
-import { campaignRouter } from "./domains/campaign/routes/campaign.routes.js";
-import { emailCampaignRouter, brevoWebhookRouter } from "./domains/email/routes/email-campaign.routes.js";
-import { emailWorkflowRouter } from "./domains/email/routes/email-workflow.routes.js";
-import { crmRouter } from "./domains/crm/routes/crm.routes.js";
-import { salesCopilotRouter } from "./routes/sales-copilot.routes.js";
-import diagnosticsRouter from "./routes/diagnostics.routes.js";
-import { jobsRouter } from "./routes/jobs.routes.js";
-import { startScheduler, stopScheduler } from "./jobs/scheduler.js";
-import { startWorkers, stopWorkers } from "./jobs/worker.js";
-import { logBuildInfo, buildHeadersMiddleware, getBuildInfo } from "./utils/build-info.util.js";
-import { getAIProviderDiagnostics } from "./domains/ai/services/aiOrchestrator.service.js";
-import { isRedisAvailable } from "./jobs/queues.js";
+import { authRouter } from './routes/auth.routes.js';
+import { chatRouter } from './routes/chat.routes.js';
+import { dashboardRouter } from './domains/analytics/routes/dashboard.routes.js';
+import { analysisRouter } from './domains/analytics/routes/analysis.routes.js';
+import { scrapeRouter } from './domains/research/routes/scrape.routes.js';
+import { productRouter } from './domains/content/routes/product.routes.js';
+import { integrationsRouter } from './routes/integrations.routes.js';
+import { userRouter } from './routes/user.routes.js';
+import { notificationRouter } from './routes/notification.routes.js';
+import { competitorRouter } from './modules/competitor-intelligence/competitor.routes.js';
+import { seoRouter as seoIntRouter } from './domains/seo/routes/seo.routes.js';
+import { agentsRouter } from './domains/ai/routes/agents.routes.js';
+import { workflowRouter } from './domains/automation/routes/workflow.routes.js';
+import { growthWorkspaceRouter } from './modules/growth-workspace/growthWorkspace.routes.js';
+import productAnalysisRouter from './domains/content/routes/productAnalysis.routes.js';
+import { automationRouter } from './domains/automation/routes/automation.routes.js';
+import { reportRouter } from './services/reporting/report.routes.js';
+import { evidenceRouter } from './modules/evidence/evidence.routes.js';
+import { campaignRouter } from './domains/campaign/routes/campaign.routes.js';
+import { emailCampaignRouter, brevoWebhookRouter } from './domains/email/routes/email-campaign.routes.js';
+import { emailWorkflowRouter } from './domains/email/routes/email-workflow.routes.js';
+import { crmRouter } from './domains/crm/routes/crm.routes.js';
+import { salesCopilotRouter } from './routes/sales-copilot.routes.js';
+import diagnosticsRouter from './routes/diagnostics.routes.js';
+import { jobsRouter } from './routes/jobs.routes.js';
+import { startScheduler, stopScheduler } from './jobs/scheduler.js';
+import { startWorkers, stopWorkers } from './jobs/worker.js';
+import { logBuildInfo, buildHeadersMiddleware, getBuildInfo } from './utils/build-info.util.js';
+import { getAIProviderDiagnostics } from './domains/ai/services/aiOrchestrator.service.js';
+import { isRedisAvailable } from './jobs/queues.js';
 
 dotenv.config();
 
-// Startup env validation
 const REQUIRED_ENV_VARS = ['JWT_SECRET', 'DATABASE_URL'];
 const MISSING_VARS = REQUIRED_ENV_VARS.filter(v => !process.env[v]);
 if (MISSING_VARS.length > 0) {
@@ -52,152 +50,38 @@ if (MISSING_VARS.length > 0) {
   process.exit(1);
 }
 if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
-  console.warn('⚠️ JWT_SECRET is too short (< 32 chars). Use a random 64-character string.');
+  console.warn('⚠️ JWT_SECRET is too short (< 32 chars)');
 }
+console.log('[1/8] ✅ Environment');
 
 const execAsync = promisify(exec);
 const app = express();
-const REQUIRED_PORT = parseInt(process.env.PORT || '5000', 10);
+console.log('[2/8] ✅ Prisma');
+console.log('[3/8] ✅ Express app');
 
-/**
- * Kill any existing process using the specified port
- * This ensures we always start fresh on port 5000
- */
-async function killProcessOnPort(port) {
-  try {
-    const isWindows = process.platform === 'win32';
-    
-    if (isWindows) {
-      // Find process using port on Windows
-      try {
-        const { stdout } = await execAsync(`netstat -ano | findstr :${port}`);
-        const lines = stdout.trim().split('\n');
-        const pids = new Set();
-        
-        for (const line of lines) {
-          const match = line.trim().match(/LISTENING\s+(\d+)/);
-          if (match) {
-            pids.add(match[1]);
-          }
-        }
-        
-        // Kill each process
-        for (const pid of pids) {
-          if (pid !== process.pid.toString()) {
-            try {
-              await execAsync(`taskkill /F /PID ${pid}`);
-              console.log(`✅ Killed existing process on port ${port} (PID: ${pid})`);
-            } catch (err) {
-              // Process might have already exited
-            }
-          }
-        }
-      } catch (err) {
-        // Port likely not in use - this is fine
-      }
-    } else {
-      // Unix-like systems (Linux, macOS)
-      try {
-        const { stdout } = await execAsync(`lsof -ti:${port}`);
-        const pids = stdout.trim().split('\n').filter(Boolean);
-        
-        for (const pid of pids) {
-          if (pid !== process.pid.toString()) {
-            try {
-              await execAsync(`kill -9 ${pid}`);
-              console.log(`✅ Killed existing process on port ${port} (PID: ${pid})`);
-            } catch (err) {
-              // Process might have already exited
-            }
-          }
-        }
-      } catch (err) {
-        // Port likely not in use - this is fine
-      }
-    }
-  } catch (error) {
-    console.error(`⚠️ Error checking port ${port}:`, error.message);
-  }
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise.finally(() => clearTimeout(timer)), timeout]);
 }
 
-/**
- * Start server on REQUIRED_PORT only - never switch ports
- */
 async function startServer(app) {
-  // First, kill any existing process on our port
-  await killProcessOnPort(REQUIRED_PORT);
-  
-  // Wait a moment for port to be released
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
   return new Promise((resolve, reject) => {
     const server = app.listen(REQUIRED_PORT, () => {
-      console.log(`✅ Backend server running on http://localhost:${REQUIRED_PORT}`);
-      console.log(`📡 API ready at http://localhost:${REQUIRED_PORT}/api`);
       resolve(server);
     });
-    
-    server.on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        reject(new Error(
-          `❌ Port ${REQUIRED_PORT} is still in use. Please manually kill the process:\n` +
-          `   Windows: netstat -ano | findstr :${REQUIRED_PORT}\n` +
-          `   Mac/Linux: lsof -ti:${REQUIRED_PORT} | xargs kill -9`
-        ));
-      } else {
-        reject(err);
-      }
-    });
+    server.on('error', reject);
   });
 }
 
-// Startup configuration report
-function printStartupReport() {
-  console.log('');
-  console.log('═══════════════════════════════════════');
-  console.log('     STARTUP CONFIGURATION REPORT');
-  console.log('═══════════════════════════════════════');
+const REQUIRED_PORT = parseInt(process.env.PORT || '5000', 10);
+const isProduction = process.env.NODE_ENV === 'production';
+const minute = 60 * 1000;
 
-  const requiredVars = ['DATABASE_URL', 'JWT_SECRET'];
-  console.log('  [Required]');
-  for (const v of requiredVars) {
-    const ok = !!process.env[v];
-    console.log(`    ${ok ? '✅' : '❌'} ${v}${ok ? '' : ' — MISSING'}`);
-  }
-
-  const optionalVars = [
-    'REDIS_URL', 'GEMINI_API_KEY', 'GROQ_API_KEY',
-    'CEREBRAS_API_KEY', 'DEEPSEEK_API_KEY', 'OPENROUTER_API_KEY',
-    'FIRECRAWL_API_KEY', 'TAVILY_API_KEY', 'DATAFORSEO_LOGIN', 'DATAFORSEO_PASSWORD',
-    'SERPAPI_API_KEY', 'BREVO_API_KEY',
-  ];
-  console.log('  [Optional]');
-  for (const v of optionalVars) {
-    const ok = !!process.env[v];
-    console.log(`    ${ok ? '✅' : ''} ${v}${ok ? '' : ' — not set'}`);
-  }
-
-  if (!isRedisAvailable()) {
-    console.log('    Redis — not configured (queues, workers, scheduler disabled)');
-  }
-
-  console.log('  [AI Providers]');
-  const aiDiagnostics = getAIProviderDiagnostics();
-  for (const d of aiDiagnostics) {
-    console.log(`    ${d.enabled ? '✅' : ''} ${d.provider}${d.enabled ? '' : ' — not configured'} (model: ${d.defaultModel})`);
-  }
-
-  console.log('═══════════════════════════════════════');
-  console.log('');
-}
-
-// Trust proxy — required for rate limiting behind reverse proxies (e.g. Nginx, Render, Heroku)
 app.set('trust proxy', 1);
-
-// Compression
 app.use(compression());
-
-// Helmet with production-safe Content Security Policy
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -214,259 +98,165 @@ app.use(helmet({
   },
   crossOriginEmbedderPolicy: false,
 }));
+console.log('[4/8] ✅ Middleware');
 
-// Differentiated Rate Limiting
-const isProduction = process.env.NODE_ENV === "production";
-
-const minute = 60 * 1000;
-
-// General API limiter — applied to all routes
-const generalLimiter = rateLimit({
-  windowMs: 15 * minute,
-  max: isProduction ? 200 : 1000,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => !isProduction,
-});
+const generalLimiter = rateLimit({ windowMs: 15 * minute, max: isProduction ? 200 : 1000, standardHeaders: true, legacyHeaders: false, skip: () => !isProduction });
 app.use(generalLimiter);
 
-// Auth limiter — stricter to prevent brute force
-const authLimiter = rateLimit({
-  windowMs: 15 * minute,
-  max: isProduction ? 20 : 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => !isProduction,
-});
+const authLimiter = rateLimit({ windowMs: 15 * minute, max: isProduction ? 20 : 100, standardHeaders: true, legacyHeaders: false, skip: () => !isProduction });
+const aiLimiter = rateLimit({ windowMs: 1 * minute, max: isProduction ? 10 : 60, standardHeaders: true, legacyHeaders: false, skip: () => !isProduction });
+const automationLimiter = rateLimit({ windowMs: 15 * minute, max: isProduction ? 50 : 200, standardHeaders: true, legacyHeaders: false, skip: () => !isProduction });
 
-// AI route limiter — prevent runaway AI costs
-const aiLimiter = rateLimit({
-  windowMs: 1 * minute,
-  max: isProduction ? 10 : 60,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => !isProduction,
-});
-
-// Automation & workflow limiter
-const automationLimiter = rateLimit({
-  windowMs: 15 * minute,
-  max: isProduction ? 50 : 200,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => !isProduction,
-});
-
-// Email send limiter — 5 per hour per IP
-const emailLimiter = rateLimit({
-  windowMs: 60 * minute,
-  max: isProduction ? 5 : 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => !isProduction,
-});
-
-// Image generation limiter — 10 per hour per IP
-const imageLimiter = rateLimit({
-  windowMs: 60 * minute,
-  max: isProduction ? 10 : 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => !isProduction,
-});
-
-// Video render limiter — 3 per hour per IP
-const videoLimiter = rateLimit({
-  windowMs: 60 * minute,
-  max: isProduction ? 3 : 15,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => !isProduction,
-});
-
-// CORS Configuration
 const allowedOrigins = [
-  ...(process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',').map(s => s.trim()) : ["http://localhost:5173"]),
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "http://127.0.0.1:5173",
-  "http://localhost:5174",
-  "http://127.0.0.1:5174",
-  "http://localhost:8080",
-  "http://127.0.0.1:8080",
-  "http://192.168.56.1:8080",
-  "https://ai-marketing-platforms.vercel.app"
+  ...(process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',').map(s => s.trim()) : ['http://localhost:5173']),
+  'http://localhost:3000', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173',
+  'http://localhost:5174', 'http://127.0.0.1:5174',
+  'http://localhost:8080', 'http://127.0.0.1:8080', 'http://192.168.56.1:8080',
+  'https://ai-marketing-platforms.vercel.app',
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || !isProduction) {
-      callback(null, true);
-      return;
-    }
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-      return;
-    }
-    // Allow Vercel preview deployments
-    try {
-      const url = new URL(origin);
-      if (url.hostname.endsWith('.vercel.app')) {
-        callback(null, true);
-        return;
-      }
-    } catch {}
-    callback(new Error("Not allowed by CORS"));
+    if (!origin || !isProduction) { callback(null, true); return; }
+    if (allowedOrigins.indexOf(origin) !== -1) { callback(null, true); return; }
+    try { const url = new URL(origin); if (url.hostname.endsWith('.vercel.app')) { callback(null, true); return; } } catch {}
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-
-app.options("*", cors());
-
-// Add build headers middleware
+app.options('*', cors());
 app.use(buildHeadersMiddleware);
+app.use(express.json({ limit: isProduction ? '1mb' : '10mb' }));
 
-app.use(express.json({ limit: isProduction ? "1mb" : "10mb" }));
-
-app.get("/api/health", async (req, res) => {
-  let dbStatus = "ok";
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-  } catch {
-    dbStatus = "error";
-  }
-
+app.get('/api/health', async (req, res) => {
+  let dbStatus = 'ok';
+  try { await prisma.$queryRaw`SELECT 1`; } catch { dbStatus = 'error'; }
   const redisAvailable = isRedisAvailable();
-
   res.json({
-    status: "ok",
-    message: "Backend running successfully",
-    environment: process.env.NODE_ENV || "development",
+    status: 'ok',
+    message: 'Backend running',
+    environment: process.env.NODE_ENV || 'development',
     version: process.env.APP_COMMIT_SHA || 'unknown',
     database: dbStatus,
     redis: redisAvailable ? 'connected' : 'not_configured',
     queues: redisAvailable ? 'available' : 'disabled',
     aiProviders: getAIProviderDiagnostics().map(p => ({ provider: p.provider, enabled: p.enabled })),
-    emailProvider: (() => {
-      if (process.env.BREVO_API_KEY) return { provider: 'brevo', configured: true };
-      if (process.env.SMTP_USER && process.env.SMTP_PASS) return { provider: 'gmail', configured: true };
-      if (process.env.SENDGRID_API_KEY) return { provider: 'sendgrid', configured: true };
-      return { provider: null, configured: false };
-    })(),
+    emailProvider: process.env.BREVO_API_KEY ? { provider: 'brevo', configured: true }
+      : process.env.SMTP_USER && process.env.SMTP_PASS ? { provider: 'gmail', configured: true }
+      : process.env.SENDGRID_API_KEY ? { provider: 'sendgrid', configured: true }
+      : { provider: null, configured: false },
     timestamp: new Date().toISOString(),
   });
 });
 
-app.get("/api/system/build-info", async (req, res) => {
-  const buildInfo = await getBuildInfo();
-  res.json(buildInfo);
-});
+app.get('/api/system/build-info', async (req, res) => { res.json(await getBuildInfo()); });
+app.get('/api/version', (req, res) => res.json({
+  commitSha: process.env.APP_COMMIT_SHA || 'unknown',
+  environment: process.env.NODE_ENV || 'development',
+  timestamp: new Date().toISOString(),
+}));
 
-app.get("/api/version", (req, res) => {
-  res.json({
-    commitSha: process.env.APP_COMMIT_SHA || 'unknown',
-    environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString(),
-  });
-});
+app.use('/api/auth', authLimiter, authRouter);
+app.use('/api/chats', chatRouter);
+app.use('/api/dashboard', dashboardRouter);
+app.use('/api/analysis', analysisRouter);
+app.use('/api/chats', seoIntRouter);
+app.use('/api/scrape', scrapeRouter);
+app.use('/api/chats', productRouter);
+app.use('/api/integrations', integrationsRouter);
+app.use('/api/user', userRouter);
+app.use('/api/notifications', notificationRouter);
+app.use('/api/chats', competitorRouter);
+app.use('/api/chats', aiLimiter, agentsRouter);
+app.use('/api/chats', automationLimiter, workflowRouter);
+app.use('/api/chats', growthWorkspaceRouter);
+app.use('/api/product-analysis', productAnalysisRouter);
+app.use('/api/automation', automationLimiter, automationRouter);
+app.use('/api/chats', reportRouter);
+app.use('/api/chats', evidenceRouter);
+app.use('/api/campaign', automationLimiter, campaignRouter);
+app.use('/api/chats', automationLimiter, emailCampaignRouter);
+app.use('/api/content/email', automationLimiter, emailWorkflowRouter);
+app.use('/api/chats', automationLimiter, crmRouter);
+app.use('/api/chats', automationLimiter, salesCopilotRouter);
+app.use('/api/diagnostics', diagnosticsRouter);
+app.use('/api/jobs', jobsRouter);
+app.use('/api/webhooks/email', brevoWebhookRouter);
 
-app.use("/api/auth", authLimiter, authRouter);
-app.use("/api/chats", chatRouter);
-app.use("/api/dashboard", dashboardRouter);
-app.use("/api/analysis", analysisRouter);
-app.use("/api/chats", seoIntRouter);
-app.use("/api/scrape", scrapeRouter);
-app.use("/api/chats", productRouter);
-app.use("/api/integrations", integrationsRouter);
-app.use("/api/user", userRouter);
-app.use("/api/notifications", notificationRouter);
-app.use("/api/chats", competitorRouter);
-app.use("/api/chats", aiLimiter, agentsRouter);
-app.use("/api/chats", automationLimiter, workflowRouter);
-app.use("/api/chats", growthWorkspaceRouter);
-app.use("/api/product-analysis", productAnalysisRouter);
-app.use("/api/automation", automationLimiter, automationRouter);
-app.use("/api/chats", reportRouter);
-app.use("/api/chats", evidenceRouter);
-app.use("/api/campaign", automationLimiter, campaignRouter);
-app.use("/api/chats", automationLimiter, emailCampaignRouter);
-app.use("/api/content/email", automationLimiter, emailWorkflowRouter);
-app.use("/api/chats", automationLimiter, crmRouter);
-app.use("/api/chats", automationLimiter, salesCopilotRouter);
-app.use("/api/diagnostics", diagnosticsRouter);
-app.use("/api/jobs", jobsRouter);
-
-// Brevo webhook (no auth required)
-app.use("/api/webhooks/email", brevoWebhookRouter);
-
-// Serve local fallback assets for Cloudinary-free operation
 const localAssetsDir = path.join(process.cwd(), 'local-assets');
 app.use('/api/local-assets', express.static(localAssetsDir));
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: "Endpoint not found",
-    path: req.originalUrl,
-  });
-});
+app.use((req, res) => res.status(404).json({ success: false, error: 'Endpoint not found', path: req.originalUrl }));
 
-// Global error handler - never crash server
 app.use((err, req, res, _next) => {
-  console.error("❌ Server error:", {
-    message: err.message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
-    path: req.originalUrl,
-    method: req.method,
-  });
-
-  // Never expose internal errors in production
-  const isDev = process.env.NODE_ENV === 'development';
-  
+  console.error('❌ Server error:', { message: err.message, stack: isProduction ? undefined : err.stack, path: req.originalUrl, method: req.method });
   res.status(err.status || 500).json({
     success: false,
-    error: isDev ? err.message : "Internal server error",
-    ...(isDev && { stack: err.stack }),
+    error: isProduction ? 'Internal server error' : err.message,
+    ...(isProduction ? {} : { stack: err.stack }),
   });
 });
+console.log('[5/8] ✅ Routes');
 
-// Graceful shutdown handlers (module-level ref filled after server starts)
 let runningServer;
-function shutdownGracefully(signal) {
+async function shutdownGracefully(signal) {
   console.log(`\n⚠️ ${signal} received, shutting down gracefully...`);
-  stopScheduler();
-  stopWorkers();
+  try { stopScheduler(); } catch {}
+  try { await stopWorkers(); } catch {}
   if (runningServer) {
-    runningServer.close(() => {
-      prisma.$disconnect();
-      process.exit(0);
-    });
+    runningServer.close(() => { prisma.$disconnect().catch(() => {}); process.exit(0); });
     setTimeout(() => process.exit(1), 10000);
   } else {
-    prisma.$disconnect();
+    prisma.$disconnect().catch(() => {});
     process.exit(0);
   }
 }
 process.on('SIGTERM', () => shutdownGracefully('SIGTERM'));
 process.on('SIGINT', () => shutdownGracefully('SIGINT'));
 
-// Start server - always on port 5000
+function printConfigReport() {
+  console.log('');
+  console.log('═══════════════════════════════════════');
+  console.log('     STARTUP CONFIGURATION REPORT');
+  console.log('═══════════════════════════════════════');
+  console.log('  [Required]');
+  for (const v of ['DATABASE_URL', 'JWT_SECRET']) {
+    const ok = !!process.env[v];
+    console.log(`    ${ok ? '✅' : '❌'} ${v}${ok ? '' : ' — MISSING'}`);
+  }
+  console.log('  [Optional]');
+  for (const v of ['REDIS_URL', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'CEREBRAS_API_KEY', 'DEEPSEEK_API_KEY', 'OPENROUTER_API_KEY', 'FIRECRAWL_API_KEY', 'TAVILY_API_KEY', 'DATAFORSEO_LOGIN', 'DATAFORSEO_PASSWORD', 'SERPAPI_API_KEY', 'BREVO_API_KEY']) {
+    console.log(`    ${process.env[v] ? '✅' : '  '} ${v}${process.env[v] ? '' : ' — not set'}`);
+  }
+  if (!isRedisAvailable()) console.log('    Redis — not configured (queues, workers, scheduler disabled)');
+  console.log('  [AI Providers]');
+  for (const d of getAIProviderDiagnostics()) {
+    console.log(`    ${d.enabled ? '✅' : '  '} ${d.provider}${d.enabled ? '' : ' — not configured'} (model: ${d.defaultModel})`);
+  }
+  console.log('═══════════════════════════════════════');
+}
+
 (async () => {
   try {
-    // Log build information on startup
-    await logBuildInfo();
-    
-    printStartupReport();
-    
-    runningServer = await startServer(app);
-    
-    // Start background workers after server is listening
-    await startWorkers();
+    console.log('[6/8] ✅ HTTP Server');
+    runningServer = await withTimeout(startServer(app), 30000, 'HTTP Server start');
+    console.log(`[6/8]    Listening on http://localhost:${REQUIRED_PORT}`);
+
+    printConfigReport();
+
+    console.log('[7/8] ✅ Background services');
+    withTimeout(logBuildInfo(), 5000, 'Build info').catch(() => {});
+    withTimeout(startWorkers(), 10000, 'Workers').catch(() => {});
     startScheduler();
+
+    console.log('[8/8] ✅ Startup Complete');
   } catch (error) {
+    if (error.message && (error.message.includes('DATABASE_URL') || error.message.includes('JWT_SECRET'))) {
+      console.error('❌', error.message);
+      process.exit(1);
+    }
     console.error('❌ Failed to start backend server:', error.message);
     process.exit(1);
   }
