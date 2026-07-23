@@ -145,14 +145,20 @@ export async function handleExecuteWorkflow(req, res) {
     context.userId = userId;
 
     const queue = getCrmQueue();
-    if (!queue) return res.status(503).json({ success: false, error: 'Background jobs unavailable' });
-    const job = await queue.add('execute-workflow', {
-      chatId,
-      workflowId,
-      triggerContext: context,
-    });
+    if (queue && process.env.REDIS_URL) {
+      try {
+        const job = await queue.add('execute-workflow', { chatId, workflowId, triggerContext: context });
+        console.log('[CRM WORKFLOW QUEUED]', { jobId: job.id, workflowId });
+        return res.json({ success: true, data: { jobId: job.id, message: "Workflow execution queued" } });
+      } catch (queueErr) {
+        console.warn('[CRM WORKFLOW QUEUE FAILED] falling back to sync:', queueErr.message);
+      }
+    } else {
+      console.log('[CRM WORKFLOW SYNC MODE] Redis unavailable, executing synchronously');
+    }
 
-    res.json({ success: true, data: { jobId: job.id, message: "Workflow execution queued" } });
+    const result = await executeWorkflow(chatId, workflowId, context);
+    res.json({ success: true, data: { result, message: "Workflow executed synchronously" } });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }

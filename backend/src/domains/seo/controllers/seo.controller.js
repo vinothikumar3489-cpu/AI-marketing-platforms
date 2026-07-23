@@ -34,19 +34,35 @@ export const runSeoHandler = async (req, res) => {
     });
   }
 
+  let chatRecord = chat;
+  if (!chatRecord && chatId) {
+    try { chatRecord = await prisma.chat.findUnique({ where: { id: chatId } }); } catch (e) {}
+  }
+
+  const queue = getScrapingQueue();
+  if (queue && process.env.REDIS_URL) {
+    try {
+      const job = await queue.add('seo-audit', { chatId, userId, websiteUrl });
+      console.log('[SEO QUEUED]', { jobId: job.id, chatId, websiteUrl });
+      return res.status(202).json({
+        success: true,
+        message: 'SEO Analysis started in the background.',
+        jobId: job.id,
+        statusUrl: `/api/jobs/scraping/${job.id}/status`
+      });
+    } catch (queueErr) {
+      console.warn('[SEO QUEUE FAILED] falling back to sync:', queueErr.message);
+    }
+  } else {
+    console.log('[SEO SYNC MODE] Redis unavailable, executing synchronously');
+  }
+
   try {
-    const queue = getScrapingQueue();
-    if (!queue) return res.status(503).json({ success: false, error: 'Background jobs unavailable' });
-    const job = await queue.add('seo-audit', { chatId, userId, websiteUrl });
-    
-    return res.status(202).json({
-      success: true,
-      message: 'SEO Analysis started in the background.',
-      jobId: job.id,
-      statusUrl: `/api/jobs/scraping/${job.id}/status`
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, error: error.message || 'Failed to start SEO background job' });
+    const result = await generateCompleteSeoIntelligence({ chatId, userId, websiteUrl, chat: chatRecord });
+    return res.json({ success: true, message: 'SEO Analysis completed.', ...result });
+  } catch (syncErr) {
+    console.error('[SEO SYNC FAILED]', syncErr);
+    return res.status(500).json({ success: false, error: syncErr.message || 'SEO Analysis failed' });
   }
 };
 

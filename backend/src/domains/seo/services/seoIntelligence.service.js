@@ -11,6 +11,7 @@ import { extractCandidatePhrases, validateKeyword, deduplicateKeywords, scoreKey
 import { discoverCompetitorsViaSerpAPI } from "../../../services/seo/competitor-pipeline.service.js";
 import { buildSEOReport } from "../../../services/seo/seo-report-builder.service.js";
 import { getSearchConsoleStatus } from "../../../providers/googleSearchConsole.service.js";
+import { callAI } from "../../ai/services/aiOrchestrator.service.js";
 
 const toNullableScore = (v) => {
   if (v === undefined || v === null) return null;
@@ -313,6 +314,57 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     keywordIntelligence = buildKeywordIntelligence(validatedKeywords, { data: [] }, identity);
     modules.searchEnrichment = { status: 'FAILED' };
   }
+
+  // == MODULE 7b: AI keyword fallback (if search enrichment returned 0 keywords) ==
+  if (!keywordIntelligence || keywordIntelligence.metadata.totalKeywords === 0) {
+    console.log('[SEO AI KEYWORD FALLBACK] No keywords from enrichment or crawl, calling AI for suggestions');
+    try {
+      const productName = identity?.productName || identity?.companyName || '';
+      const companyName = identity?.companyName || '';
+      const industry = identity?.industry || '';
+      if (productName || companyName) {
+        const aiPrompt = `Generate 20 relevant SEO keyword phrases for the following business. Return ONLY a JSON array of strings with no explanation.
+Product/Company: ${productName || companyName}${industry ? `\nIndustry: ${industry}` : ''}
+Include a mix of: short-tail keywords, long-tail keywords, question-based keywords, commercial-intent keywords, and informational keywords.`;
+        
+        const aiResult = await callAI(aiPrompt, { systemPrompt: 'You are an SEO keyword research expert. Return ONLY valid JSON.', provider: 'groq' });
+        let aiKeywords = [];
+        if (aiResult.success && aiResult.data) {
+          try {
+            const parsed = JSON.parse(aiResult.data);
+            if (Array.isArray(parsed)) {
+              aiKeywords = parsed.filter(k => typeof k === 'string' && k.length > 2).slice(0, 30);
+            }
+          } catch (parseErr) {
+            console.warn('[SEO AI KEYWORD FALLBACK] AI response not valid JSON array:', parseErr.message);
+          }
+        }
+        
+        if (aiKeywords.length > 0) {
+          const aiValidated = aiKeywords.map(k => ({
+            keyword: k, priority: 50, frequency: 1,
+            sources: ['ai_fallback'],
+            relevanceScore: scoreKeywordRelevance(k, productName, companyName, industry),
+            intent: classifyKeyword(k)
+          }));
+          keywordIntelligence = buildKeywordIntelligence(aiValidated, { data: [] }, identity);
+          warnings.push({ code: 'AI_KEYWORD_FALLBACK_USED', message: `Generated ${aiKeywords.length} keywords via AI fallback` });
+          console.log('[SEO AI KEYWORD FALLBACK SUCCESS]', { aiKeywordCount: aiKeywords.length });
+        } else {
+          console.warn('[SEO AI KEYWORD FALLBACK] AI returned no valid keywords');
+        }
+      }
+    } catch (aiErr) {
+      console.warn('[SEO AI KEYWORD FALLBACK ERROR]', aiErr.message);
+    }
+  }
+
+  console.log('[SEO FINAL KEYWORD STATE]', {
+    totalKeywords: keywordIntelligence?.metadata?.totalKeywords || 0,
+    primaryCount: keywordIntelligence?.primaryKeywords?.length || 0,
+    hasAutocomplete: !!keywordIntelligence?.autocompleteSuggestions,
+    metadataKeys: keywordIntelligence?.metadata ? Object.keys(keywordIntelligence.metadata) : []
+  });
 
   // == Score calculation with weighted renormalization ==
   const measuredModules = [];
