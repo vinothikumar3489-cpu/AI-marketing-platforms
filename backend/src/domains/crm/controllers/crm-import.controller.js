@@ -22,7 +22,8 @@ export async function handleUploadCsv(req, res) {
       return res.status(400).json({ success: false, error: "csvText or fileContent (base64) is required" });
     }
 
-    const result = await uploadAndParse(chatId, userId, content);
+    const fileBuffer = Buffer.from(content, "utf-8");
+    const result = await uploadAndParse(chatId, userId, "import.csv", fileBuffer);
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });

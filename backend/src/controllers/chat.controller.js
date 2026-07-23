@@ -2,12 +2,13 @@ import { z } from "zod";
 import prisma from "../config/prisma.js";
 
 export async function getChatIntelligenceReadiness({ userId, chatId }) {
-  const [productIntel, competitorIntel, campaignIntel, seoIntel, automationPlan] = await Promise.all([
+  const [productIntel, competitorIntel, campaignIntel, seoIntel, automationPlan, evidenceSnapshot] = await Promise.all([
     prisma.productIntelligence.findUnique({ where: { chatId } }),
     prisma.competitorIntelligence.findUnique({ where: { chatId } }),
     prisma.campaignIntelligence.findUnique({ where: { chatId } }),
     prisma.seoIntelligence.findUnique({ where: { chatId } }).catch(() => null),
     prisma.automationPlan.findUnique({ where: { chatId } }).catch(() => null),
+    prisma.evidenceSnapshot.findFirst({ where: { chatId }, orderBy: { createdAt: 'desc' } }).catch(() => null),
   ]);
 
   return {
@@ -17,6 +18,7 @@ export async function getChatIntelligenceReadiness({ userId, chatId }) {
     hasCampaignIntelligence: !!campaignIntel,
     hasSeoIntelligence: !!seoIntel,
     hasAutomationPlan: !!automationPlan,
+    hasEvidenceSnapshot: !!evidenceSnapshot,
     contentGenerationReady: !!productIntel,
     campaignGenerationReady: !!productIntel && !!(productIntel?.audienceIntelligence || competitorIntel),
     automationGenerationReady: !!productIntel && !!campaignIntel,

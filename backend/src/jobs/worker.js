@@ -68,8 +68,11 @@ function createAIHandler() {
 
 function createEmailHandler() {
   return async (job) => {
-    console.log(`[EmailQueue] Processing job ${job.id}`);
-    return { status: 'success' };
+    console.log(`[EmailQueue] Processing job ${job.id} of type ${job.name}`);
+    const { sendEmail } = await import('../services/providers/email/email-provider-registry.js');
+    const result = await sendEmail(job.data);
+    if (!result.success) throw new Error(result.error || 'Email send failed');
+    return result;
   };
 }
 

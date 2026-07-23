@@ -30,7 +30,7 @@ export async function updateContact(chatId, contactId, data) {
   const existing = await loadContactById(chatId, contactId);
   if (!existing) throw new Error("Contact not found or access denied");
 
-  const { data: filtered } = Object.fromEntries(
+  const filtered = Object.fromEntries(
     Object.entries(data).filter(([_, v]) => v !== undefined)
   );
   if (filtered.email !== undefined) filtered.email = normalizeEmail(filtered.email) ?? filtered.email;
@@ -102,7 +102,7 @@ export async function updateCompany(chatId, companyId, data) {
   const existing = await loadCompanyById(chatId, companyId);
   if (!existing) throw new Error("Company not found or access denied");
 
-  const { data: filtered } = Object.fromEntries(
+  const filtered = Object.fromEntries(
     Object.entries(data).filter(([_, v]) => v !== undefined)
   );
 
@@ -192,7 +192,7 @@ export async function updateDeal(chatId, dealId, data) {
   const existing = await loadDealById(chatId, dealId);
   if (!existing) throw new Error("Deal not found or access denied");
 
-  const { data: filtered } = Object.fromEntries(
+  const filtered = Object.fromEntries(
     Object.entries(data).filter(([_, v]) => v !== undefined)
   );
 

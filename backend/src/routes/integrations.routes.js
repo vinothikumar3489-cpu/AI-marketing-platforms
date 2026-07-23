@@ -5,6 +5,11 @@ import { getHealth, sendEmail, generatePosterImage, renderVideoHandler, getVideo
 
 export const integrationsRouter = express.Router();
 
+// Brevo webhook endpoint (NO auth - public endpoint for Brevo)
+integrationsRouter.post("/webhooks/brevo", handleBrevoWebhook);
+
+integrationsRouter.use(requireAuth);
+
 const isProduction = process.env.NODE_ENV === "production";
 const minute = 60 * 1000;
 
@@ -31,11 +36,6 @@ const videoLimiter = rateLimit({
   legacyHeaders: false,
   skip: () => !isProduction,
 });
-
-integrationsRouter.use(requireAuth);
-
-// Brevo webhook endpoint (no auth required - public endpoint for Brevo)
-integrationsRouter.post("/webhooks/brevo", handleBrevoWebhook);
 
 // Provider health check
 integrationsRouter.get("/health", getHealth);
