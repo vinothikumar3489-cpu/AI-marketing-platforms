@@ -351,10 +351,8 @@ function ContentGeneratorPanel({
         <button
           onClick={handleGenerate}
           disabled={loading || !selectedChatId}
-          style={{
-            ...S.btn(C.brand), padding: '8px 20px', opacity: loading ? 0.6 : 1,
-            cursor: loading ? 'not-allowed' : 'pointer',
-          }}
+          className="primary-btn"
+          style={{ padding: '10px 24px', opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
         >
           {loading ? <><Loader2 className="spin" size={14} /> Generating...</> : <><Sparkles size={14} /> Generate</>}
         </button>
@@ -613,7 +611,7 @@ function EmailRenderer({ content, onCopy, selectedChatId, onAddToCampaign }: { c
       <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
         <CopyButton text={rendered} onCopy={onCopy} />
         {content._assetId && selectedChatId && onAddToCampaign && (
-          <button onClick={() => onAddToCampaign(content._assetId)} style={{ ...S.smallButton, background: `${C.purple}15`, color: C.purple, border: `1px solid ${C.purple}30` }}>
+          <button onClick={() => onAddToCampaign(content._assetId)} className="primary-btn small">
             <Mail size={12} /> Add to Email Campaign
           </button>
         )}
@@ -689,7 +687,7 @@ function VideoScriptRenderer({ content, onCopy }: { content: any; onCopy: (text:
 function CopyButton({ text, onCopy }: { text: string; onCopy: (text: string) => void }) {
   return (
     <div style={{ marginTop: '8px', display: 'flex', gap: '4px' }}>
-      <button onClick={() => onCopy(text)} style={S.btn(C.accent)}><Copy size={12} /> Copy</button>
+      <button onClick={() => onCopy(text)} className="primary-btn small"><Copy size={12} /> Copy</button>
     </div>
   );
 }
@@ -860,7 +858,7 @@ function AssetDetailPanel({ asset, onClose, onRegenerate }: { asset: any; onClos
       </div>
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-        <button onClick={() => onRegenerate(asset)} style={S.btn(C.brand)}><RefreshCw size={12} /> Regenerate</button>
+        <button onClick={() => onRegenerate(asset)} className="primary-btn small"><RefreshCw size={12} /> Regenerate</button>
       </div>
 
       <div>

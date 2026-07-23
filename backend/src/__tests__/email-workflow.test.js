@@ -15,9 +15,9 @@ import {
   saveDeliveryRecord,
   updateDeliveryStatus,
   getDeliveryStatus
-} from '../services/persistence/email-persistence.service.js';
-import { validateEmail, validateForSending } from '../services/execution/email-validator.service.js';
-import { generateEmailHtmlTemplate, generatePlainTextFromEmailData } from '../services/execution/email-html-generator.service.js';
+} from "../services/persistence/email-persistence.service.js";
+import { validateEmail, validateForSending } from "../services/email/email-validator.service.js";
+import { generateEmailHtmlTemplate, generatePlainTextFromEmailData } from "../services/email/email-html-generator.service.js";
 import { 
   sendTransactionalEmail,
   sendTestEmail,

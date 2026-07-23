@@ -1,4 +1,4 @@
-import { getSerpCompetitors } from '../serpapi.service.js';
+import { getSerpCompetitors } from "../serpapi.service.js";
 
 const EXCLUDED_DOMAINS = new Set([
   'reddit.com', 'youtube.com', 'wikipedia.org', 'medium.com', 'quora.com',

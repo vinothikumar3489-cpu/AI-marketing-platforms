@@ -1,1 +1,1 @@
-export { sendTestEmail, checkEmailProvider, maskEmail } from './email/email-provider-interface.js';
+export { sendTestEmail, checkEmailProvider, maskEmail } from "../providers/email/email-provider-interface.js";

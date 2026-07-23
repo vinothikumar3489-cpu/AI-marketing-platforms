@@ -16,6 +16,7 @@ import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
 import ExecutiveStoryPage from './pages/ExecutiveStoryPage';
 import ContentStudioPage from './pages/ContentStudioPage';
+import EmailBuilderPage from './pages/EmailBuilderPage';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="executive-story" element={<ErrorBoundary resetKey={resetKey}><ExecutiveStoryPage /></ErrorBoundary>} />
         <Route path="automation-center" element={<ErrorBoundary resetKey={resetKey}><AutomationCenterPage /></ErrorBoundary>} />
         <Route path="content-studio" element={<ErrorBoundary resetKey={resetKey}><ContentStudioPage /></ErrorBoundary>} />
+        <Route path="email-builder" element={<ErrorBoundary resetKey={resetKey}><EmailBuilderPage /></ErrorBoundary>} />
         <Route path="chat-history" element={<ErrorBoundary resetKey={resetKey}><ChatHistoryPage /></ErrorBoundary>} />
         <Route path="profile" element={<ErrorBoundary resetKey={resetKey}><ProfilePage /></ErrorBoundary>} />
         <Route path="settings" element={<ErrorBoundary resetKey={resetKey}><SettingsPage /></ErrorBoundary>} />

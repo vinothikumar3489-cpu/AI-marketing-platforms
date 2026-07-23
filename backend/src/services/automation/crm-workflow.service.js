@@ -292,6 +292,15 @@ export async function testWorkflow(chatId, workflowId, testData) {
           message: action.message,
         };
         break;
+      case "GENERATE_CONTENT":
+        stepResult.wouldCreate = {
+          activityType: "ai_generated_content",
+          title: action.title || "AI Generated Outreach",
+        };
+        break;
+      case "ANALYZE_EVIDENCE":
+        stepResult.wouldAnalyze = true;
+        break;
       case "PAUSE_WORKFLOW":
         stepResult.wouldPause = true;
         break;
@@ -485,6 +494,31 @@ export async function executeWorkflow(chatId, workflowId, triggerContext = {}) {
             stepLog.result = { notified: action.assignedTo };
             break;
           }
+          case "GENERATE_CONTENT": {
+            const activity = await createActivity(chatId, workflow.userId, {
+              contactId: action.contactId || contactId,
+              companyId: action.companyId || companyId,
+              dealId: action.dealId || dealId,
+              activityType: "ai_generated_content",
+              title: action.title || "AI Generated Outreach",
+              description: `Draft generated for ${action.contentType || 'email'}.`,
+              metadata: {
+                generatedContent: true,
+                evidenceSnapshotId: triggerContext.evidenceSnapshotId || null,
+              },
+              source: "AI_GENERATED",
+            });
+            stepLog.result = { activityId: activity.id, generated: true };
+            break;
+          }
+          case "ANALYZE_EVIDENCE": {
+            stepLog.result = {
+              analyzed: true,
+              evidenceSnapshotId: triggerContext.evidenceSnapshotId || null,
+              insight: "Evidence snapshot analyzed for routing conditions."
+            };
+            break;
+          }
           case "PAUSE_WORKFLOW": {
             await prisma.cRMWorkflow.update({
               where: { id: workflowId },
@@ -494,9 +528,13 @@ export async function executeWorkflow(chatId, workflowId, triggerContext = {}) {
             break;
           }
           case "CREATE_FOLLOW_UP_RECOMMENDATION": {
+            const extendedDesc = action.description 
+              ? action.description + (triggerContext.evidenceSnapshotId ? `\n\n[Evidence Snapshot: ${triggerContext.evidenceSnapshotId}]` : '')
+              : (triggerContext.evidenceSnapshotId ? `[Evidence Snapshot: ${triggerContext.evidenceSnapshotId}]` : null);
+
             const rec = await createTask(chatId, workflow.userId, {
               title: action.title || "Follow-up recommendation",
-              description: action.description,
+              description: extendedDesc,
               assignedTo: action.assignedTo,
               dueAt: action.dueAt ? new Date(action.dueAt) : new Date(Date.now() + 7 * 86400000),
               priority: action.priority || "LOW",

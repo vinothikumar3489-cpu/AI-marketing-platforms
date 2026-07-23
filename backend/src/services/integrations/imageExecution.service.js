@@ -1,8 +1,8 @@
 import axios from 'axios';
 import sharp from 'sharp';
-import { uploadBuffer } from './storage.service.js';
-import { buildPosterContent } from './posterContentBuilder.js';
-import { containsPlaceholder } from '../../utils/ai-response-validator.js';
+import { uploadBuffer } from "./storage.service.js";
+import { buildPosterContent } from "./posterContentBuilder.js";
+import { containsPlaceholder } from "../../utils/ai-response-validator.js";
 
 const POSTER_WIDTH = 1080;
 const POSTER_HEIGHT = 1080;

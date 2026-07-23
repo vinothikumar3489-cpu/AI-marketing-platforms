@@ -1,7 +1,7 @@
-import { getKeywordMetrics, isDataForSEOConfigured } from '../dataforseo.service.js';
-import { isValidKeyword } from '../../utils/text.util.js';
-import { asArray } from '../../utils/text.util.js';
-import { logEvidenceError } from '../../utils/evidence-logger.js';
+import { getKeywordMetrics, isDataForSEOConfigured } from "../../providers/dataforseo.service.js";
+import { isValidKeyword } from "../../utils/text.util.js";
+import { asArray } from "../../utils/text.util.js";
+import { logEvidenceError } from "../../utils/evidence-logger.js";
 
 // ============================================
 // KEYWORD INTELLIGENCE ENGINE

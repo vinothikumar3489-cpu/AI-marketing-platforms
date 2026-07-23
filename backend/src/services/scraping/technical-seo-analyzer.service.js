@@ -1,5 +1,5 @@
 import fetch from 'node-fetch';
-import { getDesktopAndMobilePageSpeed, isPageSpeedConfigured } from '../pagespeed.service.js';
+import { getDesktopAndMobilePageSpeed, isPageSpeedConfigured } from "../../providers/pagespeed.service.js";
 
 // ============================================
 // TECHNICAL SEO ANALYZER

@@ -10,8 +10,8 @@
  * - Reports
  */
 
-import { prisma } from '../../config/prisma.js';
-import { preferNonEmptyArray, preferDefinedValue, extractDomainFromUrl } from '../../utils/merge-utilities.util.js';
+import { prisma } from "../../config/prisma.js";
+import { preferNonEmptyArray, preferDefinedValue, extractDomainFromUrl } from "../../utils/merge-utilities.util.js";
 
 /**
  * Get validated competitors for a chat

@@ -3,7 +3,7 @@
  * Fully safe - handles null/undefined inputs gracefully.
  * PART 18: Enhanced subdomain handling for accurate identity derivation
  */
-import { sanitizeText } from './text.util.js';
+import { sanitizeText } from "./text.util.js";
 
 function extractHostname(url) {
   if (!url || typeof url !== 'string') return '';

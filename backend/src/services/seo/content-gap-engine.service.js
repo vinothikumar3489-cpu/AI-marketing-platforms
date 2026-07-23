@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
-import { isDataForSEOConfigured } from '../dataforseo.service.js';
-import { asArray, isValidKeyword } from '../../utils/text.util.js';
+import { isDataForSEOConfigured } from "../../providers/dataforseo.service.js";
+import { asArray, isValidKeyword } from "../../utils/text.util.js";
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 

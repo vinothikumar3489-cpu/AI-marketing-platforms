@@ -253,7 +253,7 @@ export function TaskManager({ actions, onActionUpdate }: { actions: StoredAction
     <div style={{ display: 'grid', gap: '14px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: '12px', color: C.muted }}>{actions.length} total tasks</div>
-        <button onClick={() => setNewTaskOpen(true)} style={S.btn(C.excellent)}>
+        <button onClick={() => setNewTaskOpen(true)} className="success-btn small">
           <Plus size={14} /> New Task
         </button>
       </div>
@@ -270,8 +270,8 @@ export function TaskManager({ actions, onActionUpdate }: { actions: StoredAction
             <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Description" rows={2} style={{ ...S.input, gridColumn: '1 / -1', resize: 'vertical' }} />
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-            <button onClick={handleAdd} style={S.btn(C.excellent)}><Plus size={14} /> Add Task</button>
-            <button onClick={() => setNewTaskOpen(false)} style={S.btn(C.dim)}>Cancel</button>
+            <button onClick={handleAdd} className="success-btn small"><Plus size={14} /> Add Task</button>
+            <button onClick={() => setNewTaskOpen(false)} className="ghost-btn small">Cancel</button>
           </div>
         </div>
       )}
@@ -441,7 +441,7 @@ export function TeamCollaboration({ actions, onActionUpdate }: { actions: Stored
             </div>
             <div style={{ display: 'flex', gap: '8px', marginTop: '12px', paddingTop: '10px', borderTop: `1px solid ${C.border}` }}>
               <input value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Add a comment... (use @name to mention)" style={{ ...S.input, flex: 1 }} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComment(); } }} />
-              <button onClick={handleAddComment} disabled={!commentText.trim()} style={S.btn(C.accent)}>
+              <button onClick={handleAddComment} disabled={!commentText.trim()} className="primary-btn small">
                 <Send size={14} /> Send
               </button>
             </div>
@@ -495,9 +495,9 @@ export function ApprovalWorkflow({ actions, onActionUpdate }: { actions: StoredA
       <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
         {a.approvalStatus === 'pending' || a.approvalStatus === 'needs-review' ? (
           <>
-            <button onClick={() => handleApprove(a.id)} style={S.btn(C.excellent)}><ThumbsUp size={12} /> Approve</button>
-            <button onClick={() => handleReject(a.id)} style={S.btn(C.critical)}><ThumbsDown size={12} /> Reject</button>
-            <button onClick={() => handleNeedsReview(a.id)} style={S.btn(C.needsImprovement)}><HelpCircle size={12} /> Needs Review</button>
+            <button onClick={() => handleApprove(a.id)} className="success-btn small"><ThumbsUp size={12} /> Approve</button>
+            <button onClick={() => handleReject(a.id)} className="danger-btn small"><ThumbsDown size={12} /> Reject</button>
+            <button onClick={() => handleNeedsReview(a.id)} className="warning-btn small"><HelpCircle size={12} /> Needs Review</button>
             <input value={selectedId === a.id ? notes : ''} onChange={e => { setSelectedId(a.id); setNotes(e.target.value); }} placeholder="Add reason..." style={{ ...S.input, flex: 1, minWidth: '150px', fontSize: '11px' }} />
           </>
         ) : (
@@ -570,7 +570,7 @@ export function ExecutiveNotifications({ notifications, onMarkRead, onMarkAllRea
         <div style={{ fontSize: '12px', color: C.muted, display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Bell size={14} /> {unread > 0 ? <span style={{ color: C.critical, fontWeight: 600 }}>{unread} unread</span> : 'All caught up'}
         </div>
-        {unread > 0 && <button onClick={onMarkAllRead} style={S.btn(C.dim)}><CheckCheck size={12} /> Mark all read</button>}
+        {unread > 0 && <button onClick={onMarkAllRead} className="ghost-btn small"><CheckCheck size={12} /> Mark all read</button>}
       </div>
       <div style={{ display: 'grid', gap: '4px', maxHeight: '400px', overflow: 'auto' }}>
         {notifications.length === 0 && <div style={{ textAlign: 'center', padding: '30px', color: C.muted, fontSize: '12px' }}>No notifications yet.</div>}
@@ -621,7 +621,7 @@ export function BusinessCalendar({ events, onEventClick }: { events: CalendarEve
     return (
       <div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
-          <button onClick={() => setViewMode('list')} style={S.btn(C.accent)}><List size={14} /> List View</button>
+          <button onClick={() => setViewMode('list')} className="primary-btn small"><List size={14} /> List View</button>
           <div style={{ flex: 1 }} />
           {['all', 'campaign', 'milestone', 'seo', 'content', 'meeting'].map(t => (
             <button key={t} onClick={() => setFilter(t)} style={{ ...S.btn(filter === t ? typeColors[t] || C.accent : C.dim), fontSize: '10px' }}>
@@ -652,7 +652,7 @@ export function BusinessCalendar({ events, onEventClick }: { events: CalendarEve
   return (
     <div>
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
-        <button onClick={() => setViewMode('calendar')} style={S.btn(C.accent)}><CalendarDays size={14} /> Calendar View</button>
+        <button onClick={() => setViewMode('calendar')} className="primary-btn small"><CalendarDays size={14} /> Calendar View</button>
         <div style={{ flex: 1 }} />
         {['all', 'campaign', 'milestone', 'seo', 'content', 'meeting'].map(t => (
           <button key={t} onClick={() => setFilter(t)} style={{ ...S.btn(filter === t ? typeColors[t] || C.accent : C.dim), fontSize: '10px' }}>
@@ -705,7 +705,7 @@ export function KpiTracking({ kpis, onKpiUpdate }: { kpis: KpiData[]; onKpiUpdat
         <input type="number" value={newForm.current} onChange={e => setNewForm({...newForm, current: Number(e.target.value)})} placeholder="Current" style={{ ...S.input, width: '80px' }} />
         <input type="number" value={newForm.target} onChange={e => setNewForm({...newForm, target: Number(e.target.value)})} placeholder="Target" style={{ ...S.input, width: '80px' }} />
         <input value={newForm.owner} onChange={e => setNewForm({...newForm, owner: e.target.value})} placeholder="Owner" style={{ ...S.input, width: '120px' }} />
-        <button onClick={handleAdd} style={S.btn(C.excellent)}><Plus size={14} /> Add KPI</button>
+        <button onClick={handleAdd} className="success-btn small"><Plus size={14} /> Add KPI</button>
       </div>
       <div style={S.grid4}>
         {kpis.map(k => {
@@ -819,7 +819,7 @@ export function VersionHistory({ versions, currentVersion, onSelectVersion }: {
                 ))}
               </div>
             )}
-            <button onClick={(e) => { e.stopPropagation(); setCompareId(compareId === v.id ? null : v.id); }} style={S.btn(C.accent)}>
+            <button onClick={(e) => { e.stopPropagation(); setCompareId(compareId === v.id ? null : v.id); }} className="primary-btn small">
               <BarChart2 size={12} /> {compareId === v.id ? 'Hide' : 'Compare'}
             </button>
           </div>
@@ -982,9 +982,9 @@ export function EnterpriseReportLibrary({ reports, onDownload, onPreview }: {
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={10} /> {new Date(r.date).toLocaleDateString()}</span>
               </div>
               <div style={{ display: 'flex', gap: '6px' }}>
-                <button onClick={() => onPreview?.(r)} style={S.btn(C.accent)}><Eye size={12} /> Preview</button>
-                <button onClick={() => onDownload?.(r, 'pdf')} style={S.btn(C.excellent)}><Download size={12} /> PDF</button>
-                <button onClick={() => onDownload?.(r, 'docx')} style={S.btn(C.good)}><FileText size={12} /> DOCX</button>
+                <button onClick={() => onPreview?.(r)} className="primary-btn small"><Eye size={12} /> Preview</button>
+                <button onClick={() => onDownload?.(r, 'pdf')} className="success-btn small"><Download size={12} /> PDF</button>
+                <button onClick={() => onDownload?.(r, 'docx')} className="success-btn small"><FileText size={12} /> DOCX</button>
               </div>
             </div>
           ))}
@@ -1031,7 +1031,7 @@ export function SmartRecommendations({ recommendations, onApply }: {
                 <span style={S.tag(sourceColors[r.source] || C.dim)}>{renderSafeValue(r.source)}</span>
                 <span style={S.tag(r.impact === 'high' ? C.critical : r.impact === 'medium' ? C.needsImprovement : C.good)}>{renderSafeValue(r.impact)}</span>
                 <ConfidenceBadge value={r.confidence} size="sm" />
-                <button onClick={() => onApply?.(r)} style={S.btn(C.excellent)}><Plus size={12} /> Apply</button>
+                <button onClick={() => onApply?.(r)} className="success-btn small"><Plus size={12} /> Apply</button>
               </div>
             </div>
           ))}

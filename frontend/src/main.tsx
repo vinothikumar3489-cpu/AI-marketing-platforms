@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './styles.css';
 import { AuthProvider } from './context/AuthContext';
+import { Toaster } from 'sonner';
 
 // Log frontend build info on startup
 console.log('[FRONTEND BUILD INFO]', {
@@ -18,6 +19,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <AuthProvider>
         <App />
+        <Toaster theme="dark" position="top-right" richColors />
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>

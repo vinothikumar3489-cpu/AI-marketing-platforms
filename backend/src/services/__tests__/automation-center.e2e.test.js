@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { generateCampaignIntelligence } from '../automation/campaign-intelligence.service.js';
-import { normalizeSeoForExecution } from '../normalizers/seo-intelligence.normalizer.js';
+import { generateCampaignIntelligence } from "../automation/campaign-intelligence.service.js";
+import { normalizeSeoForExecution } from "../normalizers/seo-intelligence.normalizer.js";
 import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
 
 describe('Automation Centre End-to-End', () => {

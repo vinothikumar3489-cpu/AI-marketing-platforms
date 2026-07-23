@@ -1,7 +1,7 @@
 
 import { prisma } from "../../config/prisma.js";
-import { researchCompetitors } from "../../services/tavily.service.js";
-import { callAI } from "./aiRouter.service.js";
+import { researchCompetitors } from "../../providers/tavily.service.js";
+import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
 
 function buildPrompt(inputData, researchData) {
   const { productName, industry, targetCountry, targetAudience, businessStage } = inputData;

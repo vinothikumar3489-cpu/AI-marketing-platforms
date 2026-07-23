@@ -1,6 +1,6 @@
 import { getLatestEvidenceSnapshot } from '../../modules/evidence/evidence.service.js';
-import { getSeoIntelligenceForChat } from '../loaders/seo-intelligence.loader.js';
-import { getProductIntelligenceForChat } from '../loaders/product-intelligence.loader.js';
+import { getSeoIntelligenceForChat } from "../loaders/seo-intelligence.loader.js";
+import { getProductIntelligenceForChat } from "../loaders/product-intelligence.loader.js";
 import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
 
 // Build a partial checks object, defaulting all known checks to false
@@ -179,6 +179,7 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
     contextId: `ctx_${chatId}_${Date.now()}`,
     chatId: sourced(chatId, 'chat', 'id'),
     userId: sourced(userId, 'chat', 'userId'),
+    evidenceSnapshotId: evidenceSnapshot?.id || null,
 
     company: {
       name: sourcedOpt(productIdentity.companyName || chat.title || raw.website?.title || null, productIdentity.companyName ? 'productIdentity' : 'chat', 'name'),

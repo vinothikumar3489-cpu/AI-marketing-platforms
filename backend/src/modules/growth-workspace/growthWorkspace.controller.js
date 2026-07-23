@@ -1,4 +1,4 @@
-import { runFullGrowthAnalysis, getGrowthWorkspaceResults } from './growthWorkspace.service.js';
+import { runFullGrowthAnalysis, getGrowthWorkspaceResults } from "./growthWorkspace.service.js";
 
 export const runFullAnalysisHandler = async (req, res) => {
   const { chatId } = req.params;

@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { isDataForSEOConfigured, isDataForSEOAvailable, getDataForSEOStatus } from '../services/dataforseo.service.js';
-import { getAIProviderDiagnostics } from '../ai/services/aiRouter.service.js';
-import { requireAuth } from '../middleware/auth.middleware.js';
+import { isDataForSEOConfigured, isDataForSEOAvailable, getDataForSEOStatus } from "../providers/dataforseo.service.js";
+import { getAIProviderDiagnostics } from "../domains/ai/services/aiOrchestrator.service.js";
+import { requireAuth } from "../middleware/auth.middleware.js";
 
 const diagnosticsRouter = Router();
 

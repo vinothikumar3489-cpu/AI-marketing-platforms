@@ -1,5 +1,5 @@
-import { researchCompetitors } from '../tavily.service.js';
-import { getSerpCompetitors, normalizeSerpCompetitors, getKeywordMetrics, isDataForSEOConfigured } from '../dataforseo.service.js';
+import { researchCompetitors } from "../../providers/tavily.service.js";
+import { getSerpCompetitors, normalizeSerpCompetitors, getKeywordMetrics, isDataForSEOConfigured } from "../../providers/dataforseo.service.js";
 
 function isGenericIndustry(industry) {
   if (!industry) return true;

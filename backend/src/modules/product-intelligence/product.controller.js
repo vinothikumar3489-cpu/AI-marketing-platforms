@@ -1,6 +1,6 @@
 
-import { runProductAnalysisForPI, runAudienceAnalysis, getProductIntelligence } from './product.service.js';
-import { prisma } from '../../config/prisma.js';
+import { runProductAnalysisForPI, runAudienceAnalysis, getProductIntelligence } from "./product.service.js";
+import { prisma } from "../../config/prisma.js";
 
 export const runProductHandler = async (req, res) => {
   const { chatId } = req.params; const userId = req.user?.id; const input = req.body || {};

@@ -1,4 +1,4 @@
-import { prisma } from '../../config/prisma.js';
+import { prisma } from "../../config/prisma.js";
 import { collectWebsiteEvidence } from "./websiteEvidence.service.js";
 import { collectRobotsEvidence } from "./robotsEvidence.service.js";
 import { collectSitemapEvidence } from "./sitemapEvidence.service.js";

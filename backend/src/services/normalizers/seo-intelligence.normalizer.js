@@ -4,8 +4,8 @@
  * Used by Content Brief, Content Studio, Campaign Intelligence, Automation Plan, Email Automation, CRM
  */
 
-import { asArray, takeArray } from './array-helpers.js';
-import { isLowQualityKeyword } from '../../services/execution/keyword-quality.filter.js';
+import { asArray, takeArray } from "./array-helpers.js";
+import { isLowQualityKeyword } from "../execution/keyword-quality.filter.js";
 
 /**
  * Extract keyword text from various object shapes

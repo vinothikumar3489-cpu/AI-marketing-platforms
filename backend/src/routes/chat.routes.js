@@ -1,7 +1,7 @@
 import express from "express";
 import { createChat, listChats, getChat, getFullChat, getFullResults, getEvidenceReadiness, updateChat, deleteChat, clearHistory } from "../controllers/chat.controller.js";
 import { addMessage, getMessages } from "../controllers/message.controller.js";
-import { generateCampaignPlan, getCampaignPlan, getCampaignStatus } from "../controllers/campaign.controller.js";
+import { generateCampaignPlan, getCampaignPlan, getCampaignStatus } from "../domains/campaign/controllers/campaign.controller.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 
 export const chatRouter = express.Router();

@@ -1,4 +1,4 @@
-import { buildSeoViewModel } from './seo-view-model.service.js';
+import { buildSeoViewModel } from "./seo-view-model.service.js";
 
 function esc(val) {
   if (val === null || val === undefined) return 'Data unavailable';

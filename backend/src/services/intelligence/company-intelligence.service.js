@@ -1,5 +1,5 @@
-import { researchCompetitors } from '../tavily.service.js';
-import { getSerpCompetitors, getKeywordMetrics } from '../dataforseo.service.js';
+import { researchCompetitors } from "../../providers/tavily.service.js";
+import { getSerpCompetitors, getKeywordMetrics } from "../../providers/dataforseo.service.js";
 
 export async function collectCompanyIntelligence({ websiteUrl, productName, companyName, industry, scrapedData, scrapedWithExtraction }) {
   const company = {

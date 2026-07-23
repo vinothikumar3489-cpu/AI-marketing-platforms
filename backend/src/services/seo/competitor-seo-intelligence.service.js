@@ -1,8 +1,8 @@
 import fetch from 'node-fetch';
-import { getSerpCompetitors, normalizeSerpCompetitors, separateCompetitorsByType, isDataForSEOConfigured, getDomainData } from '../dataforseo.service.js';
-import { getValidatedCompetitorsForChat } from '../competitors/shared-competitor.service.js';
-import { researchCompetitors } from '../tavily.service.js';
-import { asArray } from '../../utils/text.util.js';
+import { getSerpCompetitors, normalizeSerpCompetitors, separateCompetitorsByType, isDataForSEOConfigured, getDomainData } from "../../providers/dataforseo.service.js";
+import { getValidatedCompetitorsForChat } from "../competitors/shared-competitor.service.js";
+import { researchCompetitors } from "../../providers/tavily.service.js";
+import { asArray } from "../../utils/text.util.js";
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;

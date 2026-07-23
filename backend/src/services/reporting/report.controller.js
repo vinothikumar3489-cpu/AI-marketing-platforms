@@ -1,5 +1,6 @@
-import { buildReportData, generateExecutiveReport, generateGrowthReport, generateSeoReport } from './report-builder.service.js';
-import { prisma } from '../../config/prisma.js';
+import { buildReportData, generateExecutiveReport, generateGrowthReport, generateSeoReport } from "./report-builder.service.js";
+import { prisma } from "../../config/prisma.js";
+import { reportQueue } from "../../jobs/queues.js";
 
 export const exportExecutiveReportHandler = async (req, res) => {
   const { chatId, format } = req.params;
@@ -14,6 +15,17 @@ export const exportExecutiveReportHandler = async (req, res) => {
   const validFormats = ['pdf', 'docx', 'pptx', 'json', 'csv', 'markdown'];
   if (!validFormats.includes(format)) {
     return res.status(400).json({ success: false, error: `Unsupported format: ${format}. Supported: ${validFormats.join(', ')}` });
+  }
+
+  const heavyFormats = ['pdf', 'docx', 'pptx'];
+  if (heavyFormats.includes(format)) {
+    const job = await reportQueue.add('generate-report', {
+      chatId,
+      userId,
+      format,
+      reportType: 'executive'
+    });
+    return res.json({ success: true, jobId: job.id, message: "Report generation started" });
   }
 
   try {
@@ -39,6 +51,17 @@ export const exportGrowthReportHandler = async (req, res) => {
     return res.status(400).json({ success: false, error: `Unsupported format: ${format}. Supported: ${validFormats.join(', ')}` });
   }
 
+  const heavyFormats = ['pdf', 'docx', 'pptx'];
+  if (heavyFormats.includes(format)) {
+    const job = await reportQueue.add('generate-report', {
+      chatId,
+      userId,
+      format,
+      reportType: 'growth'
+    });
+    return res.json({ success: true, jobId: job.id, message: "Report generation started" });
+  }
+
   try {
     let buffer = await generateGrowthReport(chatId, userId, format);
     if (!Buffer.isBuffer(buffer)) buffer = Buffer.from(buffer);
@@ -62,6 +85,17 @@ export const exportSeoReportHandler = async (req, res) => {
     return res.status(400).json({ success: false, error: `Unsupported format: ${format}. Supported: ${validFormats.join(', ')}` });
   }
 
+  const heavyFormats = ['pdf', 'docx', 'pptx'];
+  if (heavyFormats.includes(format)) {
+    const job = await reportQueue.add('generate-report', {
+      chatId,
+      userId,
+      format,
+      reportType: 'seo'
+    });
+    return res.json({ success: true, jobId: job.id, message: "Report generation started" });
+  }
+
   try {
     let buffer = await generateSeoReport(chatId, userId, format);
     if (!Buffer.isBuffer(buffer)) buffer = Buffer.from(buffer);
@@ -69,6 +103,28 @@ export const exportSeoReportHandler = async (req, res) => {
   } catch (error) {
     console.error('[Report Controller] Error:', error);
     return res.status(500).json({ success: false, error: error.message || 'Report generation failed' });
+  }
+};
+
+export const checkReportStatusHandler = async (req, res) => {
+  const { jobId } = req.params;
+  
+  try {
+    const job = await reportQueue.getJob(jobId);
+    if (!job) {
+      return res.status(404).json({ success: false, error: 'Job not found' });
+    }
+    
+    const state = await job.getState();
+    if (state === 'completed') {
+      return res.json({ success: true, status: state, url: job.returnvalue?.url });
+    } else if (state === 'failed') {
+      return res.json({ success: false, status: state, error: job.failedReason });
+    } else {
+      return res.json({ success: true, status: state });
+    }
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
 

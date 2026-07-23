@@ -1,5 +1,5 @@
-import { researchCompetitors } from '../tavily.service.js';
-import { getKeywordMetrics, getKeywordSuggestions, isDataForSEOConfigured } from '../dataforseo.service.js';
+import { researchCompetitors } from "../../providers/tavily.service.js";
+import { getKeywordMetrics, getKeywordSuggestions, isDataForSEOConfigured } from "../../providers/dataforseo.service.js";
 
 const INDUSTRY_TO_MARKET_QUERIES = {
   'social media': ['competitors', 'alternatives', 'social media platforms', 'social networking apps', 'creator platforms'],

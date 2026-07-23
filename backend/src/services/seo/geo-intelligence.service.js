@@ -1,4 +1,4 @@
-import { asArray } from '../../utils/text.util.js';
+import { asArray } from "../../utils/text.util.js";
 import fetch from 'node-fetch';
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;

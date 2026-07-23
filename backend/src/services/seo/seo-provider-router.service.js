@@ -1,8 +1,8 @@
-import { isSerpAPIConfigured, isSerpAPIAvailable, getSerpAPIStatus, getCachedSerpAPIStatus, getSerpAPIDiagnostic, googleSearch, googleAutocomplete, googleTrends, getSerpCompetitors, searchOpportunityScore, comprehensiveSearch } from '../serpapi.service.js';
+import { isSerpAPIConfigured, isSerpAPIAvailable, getSerpAPIStatus, getCachedSerpAPIStatus, getSerpAPIDiagnostic, googleSearch, googleAutocomplete, googleTrends, getSerpCompetitors, searchOpportunityScore, comprehensiveSearch } from "../serpapi.service.js";
 import {
   isDataForSEOConfigured, isDataForSEOAvailable, getDataForSEOStatus, getKeywordMetrics, getKeywordSuggestions,
   getSerpResults, getSerpCompetitors as dfsGetSerpCompetitors, getDomainData, getBacklinksSummary
-} from '../dataforseo.service.js';
+} from "../../providers/dataforseo.service.js";
 
 const SEO_PROVIDER_DATAFORSEO_ENABLED = process.env.SEO_PROVIDER_DATAFORSEO_ENABLED !== 'false';
 const SEO_CACHE_TTL = 24 * 60 * 60 * 1000;

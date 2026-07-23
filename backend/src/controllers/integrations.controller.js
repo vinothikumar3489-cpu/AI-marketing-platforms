@@ -1,11 +1,11 @@
-import { sendTestEmail, checkEmailProvider } from '../services/integrations/email/email-service-legacy.js';
-import { checkStorageProvider, testCloudinaryConnection } from '../services/integrations/storage.service.js';
-import { generateImage } from '../services/integrations/imageExecution.service.js';
-import { renderVideo, getVideoStatus } from '../services/integrations/videoExecution.service.js';
-import { getProviderHealth } from '../services/integrations/providerConfig.service.js';
-import { checkImageProviders, testPollinationsConnection, testFalConnection } from '../services/integrations/image.service.js';
-import { checkVideoProvider, testShotstackConnection, testCreatomateConnection } from '../services/integrations/video.service.js';
-import { prisma } from '../config/prisma.js';
+import { sendTestEmail, checkEmailProvider } from "../services/providers/email/email-service-legacy.js";
+import { checkStorageProvider, testCloudinaryConnection } from "../services/integrations/storage.service.js";
+import { generateImage } from "../services/integrations/imageExecution.service.js";
+import { renderVideo, getVideoStatus } from "../services/integrations/videoExecution.service.js";
+import { getProviderHealth } from "../services/integrations/providerConfig.service.js";
+import { checkImageProviders, testPollinationsConnection, testFalConnection } from "../services/integrations/image.service.js";
+import { checkVideoProvider, testShotstackConnection, testCreatomateConnection } from "../services/integrations/video.service.js";
+import { prisma } from "../config/prisma.js";
 
 export async function getHealth(req, res) {
   try {

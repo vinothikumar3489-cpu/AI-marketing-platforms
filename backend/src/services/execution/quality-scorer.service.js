@@ -6,7 +6,7 @@
  */
 
 import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
-import { validateEmailCopyDTO } from '../../dto/email-copy.dto.js';
+import { validateEmailCopyDTO } from "../../dto/email-copy.dto.js";
 
 const INVALID_PRODUCT_IDENTITIES = new Set([
   'unknown product', 'unknown company', 'unknown',

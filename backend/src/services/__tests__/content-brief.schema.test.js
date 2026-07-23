@@ -2,7 +2,7 @@
  * Tests for Content Brief schema validation
  */
 
-import { validateContentBrief } from '../validators/content-brief.schema.js';
+import { validateContentBrief } from "../validators/content-brief.schema.js";
 
 describe('Content Brief Schema Validation', () => {
   describe('validateContentBrief', () => {

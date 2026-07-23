@@ -1,11 +1,11 @@
 import { getLatestEvidenceSnapshot } from '../../modules/evidence/evidence.service.js';
-import { asArray, takeArray } from '../normalizers/array-helpers.js';
-import { normalizeSeoForExecution } from '../normalizers/seo-intelligence.normalizer.js';
-import { normalizeProductIntelligence, normalizeFeatures, normalizeBenefits, featureToText, benefitToText } from '../normalizers/product-intelligence.normalizer.js';
-import { getSeoIntelligenceForChat } from '../loaders/seo-intelligence.loader.js';
-import { getProductIntelligenceForChat } from '../loaders/product-intelligence.loader.js';
+import { asArray, takeArray } from "../normalizers/array-helpers.js";
+import { normalizeSeoForExecution } from "../normalizers/seo-intelligence.normalizer.js";
+import { normalizeProductIntelligence, normalizeFeatures, normalizeBenefits, featureToText, benefitToText } from "../normalizers/product-intelligence.normalizer.js";
+import { getSeoIntelligenceForChat } from "../loaders/seo-intelligence.loader.js";
+import { getProductIntelligenceForChat } from "../loaders/product-intelligence.loader.js";
 import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
-import { validateContentBrief } from '../validators/content-brief.schema.js';
+import { validateContentBrief } from "../validators/content-brief.schema.js";
 
 /**
  * Canonical ContentBrief — shared input for every content generator.

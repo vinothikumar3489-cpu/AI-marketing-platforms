@@ -1,6 +1,6 @@
 import express from 'express';
-import { requireAuth } from '../../middleware/auth.middleware.js';
-import { runFullAnalysisHandler, getResultsHandler, getStatusHandler } from './growthWorkspace.controller.js';
+import { requireAuth } from "../../middleware/auth.middleware.js";
+import { runFullAnalysisHandler, getResultsHandler, getStatusHandler } from "./growthWorkspace.controller.js";
 
 export const growthWorkspaceRouter = express.Router();
 

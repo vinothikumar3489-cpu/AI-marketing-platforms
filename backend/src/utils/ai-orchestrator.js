@@ -1,4 +1,4 @@
-import { callAI } from "../ai/services/aiRouter.service.js";
+import { callAI } from "../domains/ai/services/aiOrchestrator.service.js";
 
 export async function callLLMWithFallbacks(prompt, fallbackGenerator, fallbackArgs = []) {
   const errors = [];

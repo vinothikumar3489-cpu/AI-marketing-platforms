@@ -2,7 +2,7 @@
  * Tests for SEO Intelligence normalizer
  */
 
-import { normalizeSeoForExecution } from '../normalizers/seo-intelligence.normalizer.js';
+import { normalizeSeoForExecution } from "../normalizers/seo-intelligence.normalizer.js";
 
 describe('SEO Intelligence Normalizer', () => {
   describe('normalizeSeoForExecution', () => {

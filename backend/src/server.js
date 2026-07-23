@@ -13,28 +13,31 @@ import { prisma } from "./config/prisma.js";
 
 import { authRouter } from "./routes/auth.routes.js";
 import { chatRouter } from "./routes/chat.routes.js";
-import { dashboardRouter } from "./routes/dashboard.routes.js";
-import { analysisRouter } from "./routes/analysis.routes.js";
-import { scrapeRouter } from "./routes/scrape.routes.js";
-import { productRouter } from "./routes/product.routes.js";
+import { dashboardRouter } from "./domains/analytics/routes/dashboard.routes.js";
+import { analysisRouter } from "./domains/analytics/routes/analysis.routes.js";
+import { scrapeRouter } from "./domains/research/routes/scrape.routes.js";
+import { productRouter } from "./domains/content/routes/product.routes.js";
 import { integrationsRouter } from "./routes/integrations.routes.js";
 import { userRouter } from "./routes/user.routes.js";
 import { notificationRouter } from "./routes/notification.routes.js";
 import { competitorRouter } from "./modules/competitor-intelligence/competitor.routes.js";
-import { seoRouter as seoIntRouter } from "./modules/seo-intelligence/seo.routes.js";
-import { agentsRouter } from "./modules/ai-agents/agents.routes.js";
-import { workflowRouter } from "./modules/ai-workflow/workflow.routes.js";
+import { seoRouter as seoIntRouter } from "./domains/seo/routes/seo.routes.js";
+import { agentsRouter } from "./domains/ai/routes/agents.routes.js";
+import { workflowRouter } from "./domains/automation/routes/workflow.routes.js";
 import { growthWorkspaceRouter } from "./modules/growth-workspace/growthWorkspace.routes.js";
-import productAnalysisRouter from "./routes/productAnalysis.routes.js";
-import { automationRouter } from "./routes/automation.routes.js";
+import productAnalysisRouter from "./domains/content/routes/productAnalysis.routes.js";
+import { automationRouter } from "./domains/automation/routes/automation.routes.js";
 import { reportRouter } from "./services/reporting/report.routes.js";
 import { evidenceRouter } from "./modules/evidence/evidence.routes.js";
-import { campaignRouter } from "./routes/campaign.routes.js";
-import { emailCampaignRouter, brevoWebhookRouter } from "./routes/email-campaign.routes.js";
-import { emailWorkflowRouter } from "./routes/email-workflow.routes.js";
-import { crmRouter } from "./routes/crm.routes.js";
+import { campaignRouter } from "./domains/campaign/routes/campaign.routes.js";
+import { emailCampaignRouter, brevoWebhookRouter } from "./domains/email/routes/email-campaign.routes.js";
+import { emailWorkflowRouter } from "./domains/email/routes/email-workflow.routes.js";
+import { crmRouter } from "./domains/crm/routes/crm.routes.js";
 import { salesCopilotRouter } from "./routes/sales-copilot.routes.js";
 import diagnosticsRouter from "./routes/diagnostics.routes.js";
+import { jobsRouter } from "./routes/jobs.routes.js";
+import "./jobs/worker.js";
+import { startScheduler, stopScheduler } from "./jobs/scheduler.js";
 import { logBuildInfo, buildHeadersMiddleware, getBuildInfo } from "./utils/build-info.util.js";
 
 dotenv.config();
@@ -339,6 +342,7 @@ app.use("/api/content/email", automationLimiter, emailWorkflowRouter);
 app.use("/api/chats", automationLimiter, crmRouter);
 app.use("/api/chats", automationLimiter, salesCopilotRouter);
 app.use("/api/diagnostics", diagnosticsRouter);
+app.use("/api/jobs", jobsRouter);
 
 // Brevo webhook (no auth required)
 app.use("/api/webhooks/email", brevoWebhookRouter);
@@ -379,6 +383,7 @@ app.use((err, req, res, _next) => {
 let runningServer;
 function shutdownGracefully(signal) {
   console.log(`\n⚠️ ${signal} received, shutting down gracefully...`);
+  stopScheduler();
   if (runningServer) {
     runningServer.close(() => {
       prisma.$disconnect();
@@ -400,6 +405,7 @@ process.on('SIGINT', () => shutdownGracefully('SIGINT'));
     await logBuildInfo();
     
     runningServer = await startServer(app);
+    startScheduler();
   } catch (error) {
     console.error('❌ Failed to start backend server:', error.message);
     process.exit(1);

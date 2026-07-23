@@ -2,7 +2,7 @@
  * Tests for array-helpers normalizer
  */
 
-import { asArray, takeArray, safeMap, safeFilter, safeLength } from '../normalizers/array-helpers.js';
+import { asArray, takeArray, safeMap, safeFilter, safeLength } from "../normalizers/array-helpers.js";
 
 describe('Array Helpers', () => {
   describe('asArray', () => {

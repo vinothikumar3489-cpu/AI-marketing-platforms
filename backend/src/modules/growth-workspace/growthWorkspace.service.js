@@ -1,6 +1,5 @@
-import { prisma } from '../../config/prisma.js';
+import { prisma } from "../../config/prisma.js";
 import fetch from 'node-fetch';
-import { scrapeWebsite } from '../../services/scraping/unified-scraper.service.js';
 import { 
   generateProductFallback, 
   generateMarketFallback, 
@@ -10,10 +9,9 @@ import {
   generatePositioningFallback, 
   generateCampaignFallback,
   generateChannelFallback 
-} from './fallback.generators.js';
-import { callAI } from '../../ai/services/aiRouter.service.js';
-import { deriveWebsiteIdentity } from '../../utils/seo-identity.util.js';
-import { collectResearchData } from '../../services/intelligence/research-orchestrator.service.js';
+} from "./fallback.generators.js";
+import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
+import { deriveWebsiteIdentity } from "../../utils/seo-identity.util.js";
 import {
   validateProductAnalysis,
   validateMarketDiscovery,
@@ -23,18 +21,18 @@ import {
   validatePositioningEngine,
   validateCampaignGenerator,
   validateChannelRecommendation
-} from '../../utils/ai-response-validator.js';
-import { collectBusinessIntelligence, synthesizeWithAI } from '../../services/intelligence/business-intelligence.service.js';
-import { generateExecutiveStory } from '../../services/intelligence/executive-story.service.js';
-import { generateActionPlan } from '../../services/intelligence/action-plan.service.js';
+} from "../../utils/ai-response-validator.js";
+import { collectBusinessIntelligence, synthesizeWithAI } from "../../services/intelligence/business-intelligence.service.js";
+import { generateExecutiveStory } from "../../services/intelligence/executive-story.service.js";
+import { generateActionPlan } from "../../services/intelligence/action-plan.service.js";
 import {
   logCompanyCollected, logTechnologyCollected, logPricingCollected,
   logCompetitorsCollected, logMarketCollected, logAudienceCollected,
   logStrategyGenerated, logReportGenerated
-} from '../../services/intelligence/business-intelligence-logger.js';
+} from "../../services/intelligence/business-intelligence-logger.js";
 import { getLatestEvidenceSnapshot, saveEvidenceSnapshot } from '../evidence/evidence.service.js';
-import { buildGrowthWorkspaceDataFromEvidence, buildEvidenceContext } from '../evidence/evidence.normalizer.js';
-import { NOT_ENOUGH_EVIDENCE } from '../../utils/evidence-level.util.js';
+import { buildGrowthWorkspaceDataFromEvidence, buildEvidenceContext } from "../evidence/evidence.normalizer.js";
+import { NOT_ENOUGH_EVIDENCE } from "../../utils/evidence-level.util.js";
 
 
 
@@ -175,57 +173,27 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
   let websiteData = null;
 
   try {
-    // Step 0: Collect research data using orchestrator (single source of truth)
-    let researchData = null;
-    if (input.websiteUrl) {
-      console.log('🔍 [Growth Workspace] Collecting research data via orchestrator:', input.websiteUrl);
-      try {
-        researchData = await collectResearchData({
-          websiteUrl: input.websiteUrl,
-          productName: input.productName || '',
-          companyName: input.companyName || ''
-        });
-        console.log('✅ [Growth Workspace] Research data collected:', {
-          hasWebsite: !!researchData.websiteContent,
-          hasTechnical: !!researchData.technical,
-          competitorsCount: researchData.competitors.length,
-          keywordsCount: researchData.keywords.length
-        });
-      } catch (researchError) {
-        console.log('⚠️ [Growth Workspace] Research orchestrator failed, falling back to direct scrape:', researchError.message);
+    // Step 0: Ensure we have evidence data
+    let researchData = { keywords: [], competitors: [] };
+    
+    if (evidenceSnapshot) {
+      websiteData = {
+        text: evidenceSnapshot.contentEvidence?.cleanedText || evidenceSnapshot.rawEvidence?.rawMarkdown || '',
+        html: evidenceSnapshot.rawEvidence?.rawHtml || '',
+        metadata: {
+          title: evidenceSnapshot.websiteEvidence?.title || '',
+          description: evidenceSnapshot.websiteEvidence?.metaDescription || ''
+        },
+        title: evidenceSnapshot.websiteEvidence?.title || ''
+      };
+      
+      console.log('✅ [Growth Workspace] Using website content from EvidenceSnapshot');
+      
+      if (!input.description && websiteData.metadata?.description) {
+        input.description = websiteData.metadata.description;
       }
-    }
-
-    // Step 1: Scrape website if not already done by orchestrator
-    if (input.websiteUrl && !researchData?.websiteContent) {
-      console.log('🔍 [Growth Workspace] Scraping website (fallback):', input.websiteUrl);
-      try {
-        const scrapeResult = await scrapeWebsite(input.websiteUrl, {
-          timeout: 20000,
-          extractSchema: true
-        });
-        
-        if (scrapeResult.success) {
-          websiteData = scrapeResult.data;
-          console.log('✅ [Growth Workspace] Website scraped successfully:', {
-            titleLength: websiteData.metadata?.title?.length,
-            contentLength: websiteData.text?.length,
-            hasDescription: !!websiteData.metadata?.description
-          });
-          
-          // Enrich input with scraped data if description is missing
-          if (!input.description && websiteData.metadata?.description) {
-            input.description = websiteData.metadata.description;
-          }
-        } else {
-          console.log('⚠️ [Growth Workspace] Website scraping failed, continuing without scraped data');
-        }
-      } catch (scrapeError) {
-        console.log('⚠️ [Growth Workspace] Scraping error:', scrapeError.message);
-      }
-    } else if (researchData?.websiteContent) {
-      websiteData = researchData.websiteContent;
-      console.log('✅ [Growth Workspace] Using website content from orchestrator');
+    } else {
+      console.log('⚠️ [Growth Workspace] No EvidenceSnapshot found, continuing without websiteData');
     }
 
     // Limit scraped content size to prevent 429 token limits
@@ -257,6 +225,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     let biWarnings = [];
     try {
       businessIntelligence = await collectBusinessIntelligence({
+        chatId: validChatId,
         websiteUrl: input.websiteUrl,
         productName: input.productName || '',
         companyName: input.companyName || '',

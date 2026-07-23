@@ -1,7 +1,7 @@
 
 import { prisma } from "../../config/prisma.js";
-import { scrapeWebsite } from "../../services/scraper.service.js";
-import { generateProductAnalysis } from "./aiRouter.service.js";
+import { scrapeWebsite } from "../../domains/research/services/scraper.service.js";
+import { generateProductAnalysis } from "../../domains/ai/services/aiOrchestrator.service.js";
 
 export const runProductAnalysis = async (userId, chatId, inputData) => {
   const { productName, websiteUrl, description, targetMarket } = inputData;

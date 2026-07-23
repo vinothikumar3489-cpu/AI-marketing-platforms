@@ -1,15 +1,15 @@
-import { generatePdf } from './pdf-generator.service.js';
-import { generateDocx } from './docx-generator.service.js';
-import { generatePptx } from './pptx-generator.service.js';
-import { buildExecutiveReportHtml, buildGrowthReportHtml, buildSeoReportHtml } from './report-templates.service.js';
+import { generatePdf } from "./pdf-generator.service.js";
+import { generateDocx } from "./docx-generator.service.js";
+import { generatePptx } from "./pptx-generator.service.js";
+import { buildExecutiveReportHtml, buildGrowthReportHtml, buildSeoReportHtml } from "./report-templates.service.js";
 import {
   generateBarChartSvg, generatePieChartSvg, generateRadarChartSvg, generateTrendChartSvg,
   generateCompetitorComparisonChart, generateChannelAllocationChart,
   generateKeywordDistributionChart, generateMarketShareChart,
   generateGrowthMatrixChart, generateScoreRadarChart
-} from './chart-generator.service.js';
-import { prisma } from '../../config/prisma.js';
-import { buildSeoViewModel } from './seo-view-model.service.js';
+} from "./chart-generator.service.js";
+import { prisma } from "../../config/prisma.js";
+import { buildSeoViewModel } from "./seo-view-model.service.js";
 
 export async function buildReportData(chatId, userId) {
   console.log('[Report] Building report data for chat:', chatId);

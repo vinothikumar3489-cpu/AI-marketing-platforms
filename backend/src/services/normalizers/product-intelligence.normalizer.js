@@ -3,7 +3,7 @@
  * Normalizes product features and benefits from various shapes into canonical format
  */
 
-import { asArray, safeMap } from './array-helpers.js';
+import { asArray, safeMap } from "./array-helpers.js";
 
 /**
  * Inference status enum for tracking data source confidence

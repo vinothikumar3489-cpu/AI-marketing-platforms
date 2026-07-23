@@ -1,6 +1,6 @@
 
-import { prisma } from '../../config/prisma.js';
-import { generateAudienceIntelligence } from '../../ai/services/audienceIntelligence.service.js';
+import { prisma } from "../../config/prisma.js";
+import { generateAudienceIntelligence } from "../../ai/services/audienceIntelligence.service.js";
 
 export async function runProductAnalysisForPI({ chatId, userId, input } = {}) {
   // Keep original implementation for now
