@@ -1,4 +1,4 @@
-import { prisma } from "../../../config/prisma.js";
+import prisma from "../../../config/prisma.js";
 import { callAI } from "../../ai/services/aiOrchestrator.service.js";
 import { generateAutomationPlanStep, getAutomationPlanStatus } from "./automation.adapter.js";
 

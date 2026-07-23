@@ -113,7 +113,7 @@ async function testAll() {
   console.log('\n--- Test: Sending blocked before approval ---');
   try {
     const { sendCampaignEmails } = await import('../src/services/automation/email-campaign.service.js');
-    const { prisma } = await import('../src/config/prisma.js');
+    const { default: prisma } = await import('../src/config/prisma.js');
     
     // Find a non-approved campaign or test with a fake ID
     try {
@@ -177,7 +177,7 @@ async function testAll() {
   // --- Test 8: Duplicate log-level blocking ---
   console.log('\n--- Test: Log-level duplicate detection ---');
   try {
-    const { prisma } = await import('../src/config/prisma.js');
+    const { default: prisma } = await import('../src/config/prisma.js');
     // Test the logic: query for existing sent log
     const existingLog = await prisma.emailCampaignLog.findFirst({
       where: { action: { in: ['sent', 'test_sent', 'send_failed'] } },

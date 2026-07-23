@@ -1,4 +1,4 @@
-import { prisma } from "../../../config/prisma.js";
+import prisma from "../../../config/prisma.js";
 import { buildExecutiveDashboard } from "../../../services/executive-command-center.service.js";
 import { redisConnection as redis } from "../../../config/redis.js";
 

@@ -8,7 +8,7 @@ import {
   generateKeywordDistributionChart, generateMarketShareChart,
   generateGrowthMatrixChart, generateScoreRadarChart
 } from "./chart-generator.service.js";
-import { prisma } from "../../config/prisma.js";
+import prisma from "../../config/prisma.js";
 import { buildSeoViewModel } from "./seo-view-model.service.js";
 
 export async function buildReportData(chatId, userId) {

@@ -1,5 +1,5 @@
 import { buildReportData, generateExecutiveReport, generateGrowthReport, generateSeoReport } from "./report-builder.service.js";
-import { prisma } from "../../config/prisma.js";
+import prisma from "../../config/prisma.js";
 import { reportQueue } from "../../jobs/queues.js";
 
 export const exportExecutiveReportHandler = async (req, res) => {

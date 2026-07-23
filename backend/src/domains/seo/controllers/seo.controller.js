@@ -1,4 +1,4 @@
-import { prisma } from "../../../config/prisma.js";
+import prisma from "../../../config/prisma.js";
 import { generateCompleteSeoIntelligence } from '../services/seoIntelligence.service.js';
 import { scrapingQueue } from '../../../jobs/queues.js';
 import { buildSEOReport } from "../../../services/seo/seo-report-builder.service.js";

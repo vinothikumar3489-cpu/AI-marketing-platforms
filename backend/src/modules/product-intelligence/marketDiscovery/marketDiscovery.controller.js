@@ -1,6 +1,6 @@
 
 import { runMarketDiscovery } from "./marketDiscovery.service.js";
-import { prisma } from "../../../config/prisma.js";
+import prisma from "../../../config/prisma.js";
 
 export const runMarketDiscoveryHandler = async (req, res) => {
   const { chatId } = req.params;

@@ -5,7 +5,7 @@ import { renderVideo, getVideoStatus } from "../services/integrations/videoExecu
 import { getProviderHealth } from "../services/integrations/providerConfig.service.js";
 import { checkImageProviders, testPollinationsConnection, testFalConnection } from "../services/integrations/image.service.js";
 import { checkVideoProvider, testShotstackConnection, testCreatomateConnection } from "../services/integrations/video.service.js";
-import { prisma } from "../config/prisma.js";
+import prisma from "../config/prisma.js";
 
 export async function getHealth(req, res) {
   try {

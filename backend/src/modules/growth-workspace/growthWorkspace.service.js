@@ -1,4 +1,4 @@
-import { prisma } from "../../config/prisma.js";
+import prisma from "../../config/prisma.js";
 import fetch from 'node-fetch';
 import { 
   generateProductFallback, 

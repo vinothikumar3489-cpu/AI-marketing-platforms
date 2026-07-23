@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
-import { prisma } from "../config/prisma.js";
+import prisma from "../config/prisma.js";
 
 const registerSchema = z.object({
   name: z.string().trim().min(1),

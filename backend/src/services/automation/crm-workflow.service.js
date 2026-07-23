@@ -1,4 +1,4 @@
-import { prisma } from "../../config/prisma.js";
+import prisma from "../../config/prisma.js";
 import { validateOwnership } from "./crm-data.service.js";
 import { createTask, createActivity } from "./crm-task-activity.service.js";
 import { moveDealStage } from "./crm-pipeline.service.js";

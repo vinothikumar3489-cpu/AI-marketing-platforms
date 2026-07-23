@@ -1,4 +1,4 @@
-import { prisma } from "../../config/prisma.js";
+import prisma from "../../config/prisma.js";
 import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
 import { sendEmail, getEmailProviderHealth } from "../providers/email/index.js";
 import { getLatestEvidenceSnapshot } from "../../modules/evidence/evidence.service.js";

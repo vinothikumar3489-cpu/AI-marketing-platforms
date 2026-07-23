@@ -1,5 +1,5 @@
 
-import { prisma } from "../../config/prisma.js";
+import prisma from "../../config/prisma.js";
 import { researchCompetitors } from "../../providers/tavily.service.js";
 import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
 

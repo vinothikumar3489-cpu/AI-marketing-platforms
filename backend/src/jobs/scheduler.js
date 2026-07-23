@@ -1,4 +1,4 @@
-import { prisma } from '../config/prisma.js';
+import prisma from '../config/prisma.js';
 import { crmQueue } from './queues.js';
 
 let intervalId = null;

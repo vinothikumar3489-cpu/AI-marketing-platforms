@@ -1,4 +1,4 @@
-import { prisma } from '../../../config/prisma.js';
+import prisma from '../../../config/prisma.js';
 
 /**
  * Creates an immutable Evidence Snapshot in the database.

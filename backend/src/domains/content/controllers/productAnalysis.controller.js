@@ -1,6 +1,6 @@
 
 import { z } from "zod";
-import { prisma } from "../../../config/prisma.js";
+import prisma from "../../../config/prisma.js";
 import { runProductAnalysis } from '../../../ai/services/productAnalysis.service.js';
 
 const ProductAnalysisRequestSchema = z.object({

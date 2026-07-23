@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { prisma } from "../config/prisma.js";
+import prisma from "../config/prisma.js";
 
 export async function getChatIntelligenceReadiness({ userId, chatId }) {
   const [productIntel, competitorIntel, campaignIntel, seoIntel, automationPlan] = await Promise.all([

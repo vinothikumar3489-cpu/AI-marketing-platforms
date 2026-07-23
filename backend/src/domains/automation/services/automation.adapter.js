@@ -1,4 +1,4 @@
-import { prisma } from "../../../config/prisma.js";
+import prisma from "../../../config/prisma.js";
 import { generateAutomationPlanWithAI, sanitizeAutomationPlanData } from "./automation.service.js";
 
 export async function generateAutomationPlanStep({ chatId, userId }) {

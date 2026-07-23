@@ -1,4 +1,4 @@
-import { prisma } from "../../../config/prisma.js";
+import prisma from "../../../config/prisma.js";
 import { buildEvidenceContext } from "../../../services/execution/evidence-context-builder.service.js";
 import { generateCampaignIntelligence } from "../../../services/automation/campaign-intelligence.service.js";
 import { getSeoIntelligenceForChat } from "../../../services/loaders/seo-intelligence.loader.js";

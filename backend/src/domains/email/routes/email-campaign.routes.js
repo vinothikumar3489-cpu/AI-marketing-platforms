@@ -1,7 +1,7 @@
 import express from 'express';
 import { requireAuth } from "../../../middleware/auth.middleware.js";
 import { generateEmailCampaign, sendCampaignEmail, scheduleCampaign, approveCampaign, createRecurringCampaign, listAudienceSegments, createAudienceSegment } from '../../../services/email/email-campaign-generator.service.js';
-import { prisma } from "../../../config/prisma.js";
+import prisma from "../../../config/prisma.js";
 
 export const emailCampaignRouter = express.Router();
 emailCampaignRouter.use(requireAuth);

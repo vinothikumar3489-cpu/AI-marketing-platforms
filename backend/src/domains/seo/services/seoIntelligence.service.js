@@ -1,4 +1,4 @@
-import { prisma } from "../../../config/prisma.js";
+import prisma from "../../../config/prisma.js";
 import { getLatestEvidenceSnapshot } from "../../research/services/evidence.service.js";
 import { deriveWebsiteIdentity } from "../../../utils/seo-identity.util.js";
 import {

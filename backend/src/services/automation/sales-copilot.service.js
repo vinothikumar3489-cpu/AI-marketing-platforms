@@ -1,4 +1,4 @@
-import { prisma } from "../../config/prisma.js";
+import prisma from "../../config/prisma.js";
 import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
 import { validateOwnership, loadDealById, loadContactById, loadCompanyById } from "./crm-data.service.js";
 

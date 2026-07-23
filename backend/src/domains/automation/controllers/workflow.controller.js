@@ -1,5 +1,5 @@
 import { generateCompleteSolution, executeWorkflowStep, startWorkflow, getWorkflowStatus } from "../services/workflow.service.js";
-import { prisma } from "../../../config/prisma.js";
+import prisma from "../../../config/prisma.js";
 
 export const generateSolutionHandler = async (req, res) => {
   const { chatId } = req.params;

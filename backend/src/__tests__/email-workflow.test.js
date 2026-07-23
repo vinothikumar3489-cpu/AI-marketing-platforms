@@ -66,7 +66,7 @@ describe('Email Persistence Service', () => {
       approvalStatus: 'DRAFT',
     };
 
-    const { prisma } = await import('../config/prisma.js');
+    const { default: prisma } = await import('../config/prisma.js');
     prisma.emailTemplate.findFirst.mockResolvedValue(null);
     prisma.emailTemplate.create.mockResolvedValue(mockTemplate);
 
@@ -93,7 +93,7 @@ describe('Email Persistence Service', () => {
       approvalStatus: 'DRAFT',
     };
 
-    const { prisma } = await import('../config/prisma.js');
+    const { default: prisma } = await import('../config/prisma.js');
     prisma.emailTemplate.findFirst.mockResolvedValue(mockTemplate);
     prisma.emailTemplate.update.mockResolvedValue(mockTemplate);
 
@@ -117,7 +117,7 @@ describe('Email Persistence Service', () => {
       approvalStatus: 'DRAFT',
     };
 
-    const { prisma } = await import('../config/prisma.js');
+    const { default: prisma } = await import('../config/prisma.js');
     prisma.emailTemplate.findFirst.mockResolvedValue(mockTemplate);
     prisma.emailTemplate.update.mockResolvedValue({
       ...mockTemplate,
@@ -138,7 +138,7 @@ describe('Email Persistence Service', () => {
       approvalStatus: 'DRAFT',
     };
 
-    const { prisma } = await import('../config/prisma.js');
+    const { default: prisma } = await import('../config/prisma.js');
     prisma.emailTemplate.findFirst.mockResolvedValue(mockTemplate);
     prisma.emailTemplate.update.mockResolvedValue(mockTemplate);
 
@@ -160,7 +160,7 @@ describe('Email Persistence Service', () => {
       approvalStatus: 'APPROVED',
     };
 
-    const { prisma } = await import('../config/prisma.js');
+    const { default: prisma } = await import('../config/prisma.js');
     prisma.emailTemplate.findFirst.mockResolvedValue(mockTemplate);
 
     const result = await deleteEmailTemplate('template-1', 'user-1');
@@ -177,7 +177,7 @@ describe('Email Persistence Service', () => {
       status: 'QUEUED',
     };
 
-    const { prisma } = await import('../config/prisma.js');
+    const { default: prisma } = await import('../config/prisma.js');
     prisma.emailDelivery.create.mockResolvedValue(mockDelivery);
 
     const result = await saveDeliveryRecord('template-1', 'recipient-1', {
@@ -430,7 +430,7 @@ describe('Email Workflow Integration', () => {
     expect(plainText).toContain('Test Subject');
 
     // Mock save
-    const { prisma } = await import('../config/prisma.js');
+    const { default: prisma } = await import('../config/prisma.js');
     prisma.emailTemplate.findFirst.mockResolvedValue(null);
     prisma.emailTemplate.create.mockResolvedValue({
       id: 'template-1',

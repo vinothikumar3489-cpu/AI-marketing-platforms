@@ -9,7 +9,7 @@ import compression from "compression";
 import path from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
-import { prisma } from "./config/prisma.js";
+import prisma from "./config/prisma.js";
 
 import { authRouter } from "./routes/auth.routes.js";
 import { chatRouter } from "./routes/chat.routes.js";

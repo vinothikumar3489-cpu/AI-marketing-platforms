@@ -1,6 +1,6 @@
 
 import { runAIAssistant } from "../services/agents.service.js";
-import { prisma } from "../../../config/prisma.js";
+import prisma from "../../../config/prisma.js";
 
 export const runAgentHandler = async (req, res) => {
   const { chatId } = req.params;

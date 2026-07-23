@@ -19,7 +19,7 @@ import {
   getDeliveryStatus
 } from "../../../services/persistence/email-persistence.service.js";
 import { replacePersonalizationVariables } from "../../../dto/email-copy.dto.js";
-import { prisma } from "../../../config/prisma.js";
+import prisma from "../../../config/prisma.js";
 
 /**
  * Generate email content

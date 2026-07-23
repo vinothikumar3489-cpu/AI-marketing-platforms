@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { prisma } from "../../../config/prisma.js";
+import prisma from "../../../config/prisma.js";
 import { scrapeWebsite } from "../../research/services/scraper.service.js";
 import { analyzeProductIntelligence } from "../../../services/intelligence.service.js";
 

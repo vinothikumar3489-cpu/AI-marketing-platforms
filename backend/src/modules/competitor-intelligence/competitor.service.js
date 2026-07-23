@@ -1,5 +1,5 @@
 
-import { prisma } from "../../config/prisma.js";
+import prisma from "../../config/prisma.js";
 import { generateCompetitorAnalysis } from "../../ai/services/competitorAnalysis.service.js";
 
 export async function runCompetitorAnalysis({ chatId, userId, input } = {}) {
