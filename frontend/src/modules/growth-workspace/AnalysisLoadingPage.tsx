@@ -40,6 +40,9 @@ const STAGE_DESCRIPTIONS = [
   'Preparing dashboard with all completed analysis modules',
 ];
 
+const MAX_POLL_TIME = 600;
+const POLL_INTERVAL = 3000;
+
 export function AnalysisLoadingPage({ chatId, onComplete, onError, onRetry }: LoadingPageProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [totalSteps] = useState(12);
@@ -48,10 +51,17 @@ export function AnalysisLoadingPage({ chatId, onComplete, onError, onRetry }: Lo
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
+  const [maxWaitExceeded, setMaxWaitExceeded] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setElapsed(prev => prev + 1);
+      setElapsed(prev => {
+        const next = prev + 1;
+        if (next > MAX_POLL_TIME) {
+          setMaxWaitExceeded(true);
+        }
+        return next;
+      });
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -60,9 +70,10 @@ export function AnalysisLoadingPage({ chatId, onComplete, onError, onRetry }: Lo
     if (finished || error) return;
     
     let cancelled = false;
-    let retryCount = 0;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function pollStatus() {
+      if (cancelled) return;
       try {
         const res = await api.get(`/api/chats/${chatId}/growth-workspace/status`);
         
@@ -82,13 +93,6 @@ export function AnalysisLoadingPage({ chatId, onComplete, onError, onRetry }: Lo
           const stageIndex = Math.min(res.currentStep - 1, STAGE_NAMES.length - 1);
           setCurrentStage(res.stage || STAGE_NAMES[stageIndex]);
           setCompletedSteps(res.completedSteps || []);
-          retryCount = 0;
-        }
-        
-        if (res.status === 'not_started') {
-          if (retryCount < 20) {
-            retryCount++;
-          }
         }
         
         if (res.status === 'error') {
@@ -97,9 +101,7 @@ export function AnalysisLoadingPage({ chatId, onComplete, onError, onRetry }: Lo
           return;
         }
       } catch (err: any) {
-        if (!cancelled && retryCount < 10) {
-          retryCount++;
-        } else if (!cancelled) {
+        if (!cancelled) {
           setError('Status check failed: ' + (err.message || 'Connection error'));
           onError('Status check failed. Please check your connection.');
           return;
@@ -107,17 +109,42 @@ export function AnalysisLoadingPage({ chatId, onComplete, onError, onRetry }: Lo
       }
       
       if (!cancelled && !finished) {
-        setTimeout(pollStatus, 3000);
+        pollTimer = setTimeout(pollStatus, POLL_INTERVAL);
       }
     }
 
-    const initialDelay = setTimeout(pollStatus, 2000);
+    pollTimer = setTimeout(pollStatus, 2000);
     
     return () => {
       cancelled = true;
-      clearTimeout(initialDelay);
+      if (pollTimer) clearTimeout(pollTimer);
     };
   }, [chatId, finished, error, onComplete, onError]);
+
+  if (maxWaitExceeded && !error && !finished) {
+    return (
+      <Card className="bg-white/5 border-white/10">
+        <CardContent className="py-12 px-6">
+          <div className="flex flex-col items-center text-center space-y-4">
+            <Clock className="w-12 h-12 text-yellow-400" />
+            <h3 className="text-lg font-semibold text-yellow-300">Analysis Taking Longer Than Expected</h3>
+            <p className="text-sm text-muted-foreground max-w-md">
+              The analysis has been running for over {Math.floor(MAX_POLL_TIME / 60)} minutes. 
+              This can happen when AI providers are slow to respond. You can wait longer or retry.
+            </p>
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
+              >
+                Retry Analysis
+              </button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);

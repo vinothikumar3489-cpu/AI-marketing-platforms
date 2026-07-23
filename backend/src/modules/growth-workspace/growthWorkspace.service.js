@@ -295,7 +295,6 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     }
 
     // Step 2: Market Discovery
-    await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Market Discovery...');
     steps[1].status = 'running';
     try {
@@ -319,7 +318,6 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     }
 
     // Step 3: Audience Intelligence
-    await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Audience Intelligence...');
     steps[2].status = 'running';
     try {
@@ -343,7 +341,6 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     }
 
     // Step 4: Competitor Analysis
-    await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Competitor Analysis...');
     steps[3].status = 'running';
     try {
@@ -368,7 +365,6 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     }
 
     // Step 5: Intent Prediction
-    await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Intent Prediction...');
     steps[4].status = 'running';
     try {
@@ -392,7 +388,6 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     }
 
     // Step 6: Positioning Engine
-    await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Positioning Engine...');
     steps[5].status = 'running';
     try {
@@ -416,7 +411,6 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     }
 
     // Step 7: Campaign Generator
-    await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Campaign Generator...');
     steps[6].status = 'running';
     try {
@@ -441,7 +435,6 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     }
 
     // Step 8: Channel Recommendation
-    await new Promise(resolve => setTimeout(resolve, 4000));
     console.log('✨ [Growth Workspace] Running Channel Recommendation...');
     steps[7].status = 'running';
     try {
@@ -1452,7 +1445,7 @@ async function runCampaignGenerator(input, allResults) {
     return arr.filter(Boolean);
   }
 
-  const productFeatures = safeArray(allResults?.product?.features);
+  const productFeatures = allResults?.product?.features ? safeArray(allResults.product.features) : safeArray(allResults?.product?.keyFeatures);
   const featuresText = productFeatures.length > 0
     ? productFeatures.map(f => `- ${safeText(f, 'name', 'title', 'value')}: ${safeText(f, 'description', 'benefit', 'impact', 'value')}`).join('\n')
     : 'No verified features available';
@@ -1593,11 +1586,21 @@ CRITICAL INSTRUCTION: Do NOT invent budget allocations or ROI percentages. Retur
 
 async function callBestAI(prompt, maxTokens = 2000, moduleName = 'unknown', fallbackData = null) {
   console.log(`🚀 [AI][${moduleName}] Calling AI...`);
-  const result = await callAI(prompt);
-  if (result.success && result.data) {
-    return { ...result.data, provider: result.provider };
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${moduleName} timed out after 120s`)), 120000);
+  });
+  try {
+    const result = await Promise.race([callAI(prompt), timeout]);
+    clearTimeout(timer);
+    if (result.success && result.data) {
+      return { ...result.data, provider: result.provider };
+    }
+    console.log(`[AI][${moduleName}] AI returned no data, using fallback.`);
+  } catch (err) {
+    clearTimeout(timer);
+    console.warn(`[AI][${moduleName}] failed: ${err.message}`);
   }
-  console.log(`🗑️ [AI][${moduleName}] All providers failed, using rule-based fallback.`);
   if (fallbackData) {
     return { ...fallbackData, provider: 'fallback' };
   }
