@@ -1,10 +1,13 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 
+const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+
 const AI_PROVIDER_CONFIG = {
   gemini: {
     envKey: 'GEMINI_API_KEY',
-    defaultModel: 'gemini-1.5-flash',
+    defaultModel: GEMINI_MODELS[0],
+    modelFallbacks: GEMINI_MODELS,
   },
   groq: {
     envKey: 'GROQ_API_KEY',
@@ -99,58 +102,56 @@ export class AIOrchestrator {
     }
 
     const cfg = AI_PROVIDER_CONFIG[preferredProvider];
+    const modelsToTry = preferredProvider === 'gemini' ? GEMINI_MODELS : [model || cfg.defaultModel];
     const usedModel = model || cfg.defaultModel;
 
-    try {
-      const provider = this._initProvider(preferredProvider);
-      if (!provider) {
-        return { success: false, error: `Provider ${preferredProvider} failed to initialize` };
+    const tryProvider = async (providerName, modelName) => {
+      const pcfg = AI_PROVIDER_CONFIG[providerName];
+      const prov = this._initProvider(providerName);
+      if (!prov) return null;
+      if (providerName === 'gemini') {
+        return await this._callGemini(prov.client, { prompt, systemPrompt, model: modelName, schema });
       }
+      return await this._callOpenAICompatible(prov.client, { prompt, systemPrompt, model: modelName, schema });
+    };
 
-      let result;
-      if (preferredProvider === 'gemini') {
-        result = await this._callGemini(provider.client, { prompt, systemPrompt, model: usedModel, schema });
-      } else {
-        result = await this._callOpenAICompatible(provider.client, { prompt, systemPrompt, model: usedModel, schema });
+    let lastError;
+    for (const modelName of modelsToTry) {
+      try {
+        const result = await tryProvider(preferredProvider, modelName);
+        return {
+          success: true,
+          data: result.content,
+          provider: preferredProvider,
+          model: modelName,
+          usage: result.usage,
+        };
+      } catch (error) {
+        lastError = error;
+        console.warn(`[AI Orchestrator] ${preferredProvider}/${modelName} failed:`, error.message);
       }
-
-      return {
-        success: true,
-        data: result.content,
-        provider: preferredProvider,
-        model: usedModel,
-        usage: result.usage,
-      };
-    } catch (error) {
-      console.warn(`[AI Orchestrator] Provider ${preferredProvider} failed:`, error.message);
-      const fallback = available.find(p => p !== preferredProvider);
-      if (fallback) {
-        console.log(`[AI Orchestrator] Falling back to ${fallback}`);
-        const fallbackCfg = AI_PROVIDER_CONFIG[fallback];
-        const fallbackModel = fallbackCfg.defaultModel;
-        try {
-          const provider = this._initProvider(fallback);
-          if (provider) {
-            let result;
-            if (fallback === 'gemini') {
-              result = await this._callGemini(provider.client, { prompt, systemPrompt, model: fallbackModel, schema });
-            } else {
-              result = await this._callOpenAICompatible(provider.client, { prompt, systemPrompt, model: fallbackModel, schema });
-            }
-            return {
-              success: true,
-              data: result.content,
-              provider: fallback,
-              model: fallbackModel,
-              usage: result.usage,
-            };
-          }
-        } catch (fallbackError) {
-          console.error(`[AI Orchestrator] Fallback ${fallback} also failed:`, fallbackError.message);
-        }
-      }
-      return { success: false, error: `All AI providers failed. Last error: ${error.message}` };
     }
+
+    console.warn(`[AI Orchestrator] Provider ${preferredProvider} failed on all models, falling back`);
+    const fallbacks = available.filter(p => p !== preferredProvider);
+    for (const fallback of fallbacks) {
+      try {
+        const fallbackCfg = AI_PROVIDER_CONFIG[fallback];
+        const result = await tryProvider(fallback, fallbackCfg.defaultModel);
+        console.log(`[AI Orchestrator] Fell back to ${fallback}/${fallbackCfg.defaultModel}`);
+        return {
+          success: true,
+          data: result.content,
+          provider: fallback,
+          model: fallbackCfg.defaultModel,
+          usage: result.usage,
+        };
+      } catch (fbError) {
+        console.warn(`[AI Orchestrator] Fallback ${fallback} also failed:`, fbError.message);
+        lastError = fbError;
+      }
+    }
+    return { success: false, error: `All AI providers failed. Last error: ${lastError?.message || 'Unknown'}` };
   }
 
   async _callOpenAICompatible(client, { prompt, systemPrompt, model, schema }) {
@@ -202,13 +203,14 @@ export function getAIProviderDiagnostics() {
 export async function callAI(prompt, options = {}) {
   const systemPrompt = options.systemPrompt || 'You are a helpful AI assistant. Output JSON if requested.';
   try {
+    const preferredProvider = options.provider || 'groq';
     const response = await getAIOrchestrator().generateCompletion({
       userId: 'system',
       chatId: 'system',
       prompt,
       systemPrompt,
-      preferredProvider: options.provider || 'gemini',
-      model: options.model || 'gemini-1.5-flash',
+      preferredProvider,
+      model: options.model || undefined,
       schema: null,
     });
     return { success: response.success, data: response.success ? response.data : null, provider: response.provider, error: response.error };

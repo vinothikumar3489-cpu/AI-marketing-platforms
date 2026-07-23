@@ -148,6 +148,7 @@ export const getStatusHandler = async (req, res) => {
         'Loading website evidence',
         'Analysing product',
         'Discovering market signals',
+        'Analysing SEO',
         'Building audience intelligence',
         'Validating competitors',
         'Creating positioning',
@@ -158,28 +159,31 @@ export const getStatusHandler = async (req, res) => {
         'Finalising dashboard'
       ];
 
-      const currentStepIndex = runningStep >= 0 ? Math.min(runningStep + 3, 11) : completedSteps.length;
+      const currentStepIndex = runningStep >= 0 ? Math.min(runningStep + 3, 12) : completedSteps.length;
       
       return res.json({
         status: 'running',
         currentStep: currentStepIndex + 1,
-        totalSteps: 12,
-        stage: stageNames[Math.min(currentStepIndex, 11)] || 'Processing',
+        totalSteps: 13,
+        stage: stageNames[Math.min(currentStepIndex, 12)] || 'Processing',
         startedAt: null,
         completedSteps,
+        diagnostics: result.steps?.flatMap(s => s.diagnostics || []) || [],
         error: null
       });
     }
 
+    const totalStepsCount = result.steps?.length || 9;
     const completedCount = result.steps?.filter(s => s.status === 'completed').length || 0;
     
     return res.json({
-      status: completedCount >= 8 ? 'completed' : 'partial',
-      currentStep: 12,
-      totalSteps: 12,
+      status: completedCount >= totalStepsCount ? 'completed' : 'partial',
+      currentStep: totalStepsCount,
+      totalSteps: totalStepsCount,
       stage: 'Complete',
       startedAt: null,
       completedSteps: result.steps?.filter(s => s.status === 'completed').map(s => s.label) || [],
+      diagnostics: result.steps?.flatMap(s => s.diagnostics || []) || [],
       error: null
     });
 

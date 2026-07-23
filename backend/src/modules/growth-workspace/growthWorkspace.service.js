@@ -30,9 +30,10 @@ import {
   logCompetitorsCollected, logMarketCollected, logAudienceCollected,
   logStrategyGenerated, logReportGenerated
 } from "../../services/intelligence/business-intelligence-logger.js";
-import { getLatestEvidenceSnapshot, saveEvidenceSnapshot } from '../evidence/evidence.service.js';
+import { getLatestEvidenceSnapshot, saveEvidenceSnapshot, collectEvidence } from '../evidence/evidence.service.js';
 import { buildGrowthWorkspaceDataFromEvidence, buildEvidenceContext } from "../evidence/evidence.normalizer.js";
 import { NOT_ENOUGH_EVIDENCE } from "../../utils/evidence-level.util.js";
+import { generateCompleteSeoIntelligence } from "../../domains/seo/services/seoIntelligence.service.js";
 
 
 
@@ -134,7 +135,35 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
   let evidenceContext = '';
   try {
     evidenceSnapshot = await getLatestEvidenceSnapshot({ chatId: validChatId, userId });
-    if (evidenceSnapshot) {
+  } catch (evErr) {
+    console.log('[Growth Workspace] Evidence load error:', evErr.message);
+  }
+
+  // Auto-trigger evidence collection if none exists
+  if (!evidenceSnapshot && input.websiteUrl) {
+    try {
+      console.log('[Growth Workspace] No evidence found — auto-triggering collection for', input.websiteUrl);
+      const collected = await collectEvidence(input.websiteUrl, { companyName: input.companyName || input.productName });
+      if (collected.success && collected.evidence) {
+        const saved = await saveEvidenceSnapshot({
+          chatId: validChatId, userId,
+          websiteUrl: input.websiteUrl,
+          companyName: input.companyName || input.productName,
+          evidence: collected.evidence,
+          sourcesCollected: collected.sourcesCollected || []
+        });
+        if (saved) {
+          evidenceSnapshot = saved;
+          console.log('[Growth Workspace] Auto-collected evidence saved, sources:', collected.sourcesCollected?.length || 0);
+        }
+      }
+    } catch (autoEvErr) {
+      console.warn('[Growth Workspace] Auto-evidence collection failed (non-fatal):', autoEvErr.message);
+    }
+  }
+
+  if (evidenceSnapshot) {
+    try {
       const parsedEvidence = {
         website: evidenceSnapshot.websiteEvidence,
         openGraph: evidenceSnapshot.contentEvidence?.openGraph || null,
@@ -151,20 +180,21 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
         sourcesCollected: evidenceSnapshot.sourceSummary?.sourcesCollected?.length || 0,
         completenessScore: evidenceGrowthData?.sourceSummary?.completenessScore || 0,
       });
+    } catch (evErr) {
+      console.log('[Growth Workspace] Evidence parse skipped:', evErr.message);
     }
-  } catch (evErr) {
-    console.log('[Growth Workspace] Evidence load skipped:', evErr.message);
   }
 
   const steps = [
-    { key: 'product', label: 'Product Analysis', status: 'pending' },
-    { key: 'market', label: 'Market Discovery', status: 'pending' },
-    { key: 'audience', label: 'Audience Intelligence', status: 'pending' },
-    { key: 'competitor', label: 'Competitor Analysis', status: 'pending' },
-    { key: 'intent', label: 'Intent Prediction', status: 'pending' },
-    { key: 'positioning', label: 'Positioning Engine', status: 'pending' },
-    { key: 'campaign', label: 'Campaign Generator', status: 'pending' },
-    { key: 'channel', label: 'Channel Recommendation', status: 'pending' }
+    { key: 'product', label: 'Product Analysis', status: 'pending', diagnostics: [] },
+    { key: 'market', label: 'Market Discovery', status: 'pending', diagnostics: [] },
+    { key: 'seo', label: 'SEO Intelligence', status: 'pending', diagnostics: [] },
+    { key: 'audience', label: 'Audience Intelligence', status: 'pending', diagnostics: [] },
+    { key: 'competitor', label: 'Competitor Analysis', status: 'pending', diagnostics: [] },
+    { key: 'intent', label: 'Intent Prediction', status: 'pending', diagnostics: [] },
+    { key: 'positioning', label: 'Positioning Engine', status: 'pending', diagnostics: [] },
+    { key: 'campaign', label: 'Campaign Generator', status: 'pending', diagnostics: [] },
+    { key: 'channel', label: 'Channel Recommendation', status: 'pending', diagnostics: [] }
   ];
 
   let results = {};
@@ -271,195 +301,138 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       biWarnings.push(`Business Intelligence collection error: ${biError.message}`);
     }
 
-    // Step 1: Product Analysis (evidence-backed)
-    console.log('✨ [Growth Workspace] Running Product Analysis...');
-    steps[0].status = 'running';
-    try {
-      const rawResult = await runProductAnalysis(input, websiteData, evidenceGrowthData);
-      results.product = validateProductAnalysis(rawResult, input);
-      steps[0].status = 'completed';
-      steps[0].provider = results.product.provider || 'groq';
-      steps[0].confidenceScore = results.product.confidenceScore ?? null;
-      console.log('✅ [Growth Workspace] Product Analysis complete & validated:', {
-        hasUSP: !!results.product.usp,
-        featuresCount: results.product.features?.length || 0,
-        provider: results.product.provider
-      });
-    } catch (error) {
-      console.log('⚠️ [Growth Workspace] Product Analysis failed:', error.message);
-      warnings.push(`Product Analysis fallback: ${error.message}`);
-      results.product = generateProductFallback(input, websiteData);
-      steps[0].status = 'PARTIAL';
-      steps[0].provider = results.product.provider || 'fallback_unavailable';
-      steps[0].confidenceScore = results.product.confidenceScore ?? null;
+    function runStep(stepIndex, label, runner, validator, fallbackFn, key) {
+      const step = steps[stepIndex];
+      step.status = 'running';
+      step.diagnostics = [{ ts: new Date().toISOString(), msg: `Starting ${label}...` }];
+      console.log(`[GW] Running ${label}...`);
+      return runner()
+        .then(async rawResult => {
+          const validated = validator(rawResult, input);
+          results[key] = validated;
+          step.status = 'completed';
+          step.provider = validated.provider || 'groq';
+          step.confidenceScore = validated.confidenceScore ?? null;
+          step.diagnostics.push({ ts: new Date().toISOString(), msg: `${label} completed via ${step.provider}`, provider: step.provider });
+          console.log(`[GW] ${label} complete`, { provider: step.provider });
+        })
+        .catch(error => {
+          step.status = 'PARTIAL';
+          step.provider = 'fallback';
+          step.confidenceScore = null;
+          step.diagnostics.push({ ts: new Date().toISOString(), msg: `${label} failed: ${error.message}. Using fallback.` });
+          warnings.push(`${label} fallback: ${error.message}`);
+          results[key] = fallbackFn ? fallbackFn(input, results) : { provider: 'fallback' };
+          console.warn(`[GW] ${label} failed, fallback used:`, error.message);
+        });
     }
 
-    // Step 2: Market Discovery
-    console.log('✨ [Growth Workspace] Running Market Discovery...');
-    steps[1].status = 'running';
-    try {
-      const rawResult = await runMarketDiscovery(input, results.product);
-      results.market = validateMarketDiscovery(rawResult, input);
-      steps[1].status = 'completed';
-      steps[1].provider = results.market.provider || 'groq';
-      steps[1].confidenceScore = results.market.confidenceScore ?? null;
-      console.log('✅ [Growth Workspace] Market Discovery complete & validated:', {
-        trendsCount: results.market.marketTrends?.length || 0,
-        opportunitiesCount: results.market.opportunities?.length || 0,
-        provider: results.market.provider
-      });
-    } catch (error) {
-      console.log('⚠️ [Growth Workspace] Market Discovery failed:', error.message);
-      warnings.push(`Market Discovery fallback: ${error.message}`);
-      results.market = generateMarketFallback(input, results.product);
-      steps[1].status = 'PARTIAL';
-      steps[1].provider = results.market.provider || 'fallback_unavailable';
-      steps[1].confidenceScore = results.market.confidenceScore ?? null;
-    }
+    const stepRunners = [
+      // Step 0: Product Analysis
+      () => runStep(0, 'Product Analysis',
+        () => runProductAnalysis(input, websiteData, evidenceGrowthData),
+        validateProductAnalysis,
+        () => generateProductFallback(input, websiteData),
+        'product'
+      ),
+      // Step 1: Market Discovery
+      () => runStep(1, 'Market Discovery',
+        () => runMarketDiscovery(input, results.product || {}),
+        validateMarketDiscovery,
+        () => generateMarketFallback(input, results.product || {}),
+        'market'
+      ),
+      // Step 2: SEO Intelligence (NEW — between market and audience)
+      () => runStep(2, 'SEO Intelligence',
+        async () => {
+          const seoResult = await generateCompleteSeoIntelligence({
+            chatId: validChatId, userId,
+            websiteUrl: input.websiteUrl,
+            chat
+          });
+          return {
+            ...(seoResult.data || seoResult || {}),
+            provider: seoResult.provider || 'groq',
+            confidenceScore: seoResult.data?.overallScore != null ? Math.min(100, Math.round(seoResult.data.overallScore * 0.8)) : null
+          };
+        },
+        (raw) => {
+          if (!raw || typeof raw !== 'object') return { keywords: [], competitors: [], seoScore: null, provider: 'fallback', confidenceScore: null };
+          return {
+            keywords: raw.keywordIntelligence?.primaryKeywords || raw.topicCandidates || [],
+            keywordOpportunities: raw.keywordIntelligence || null,
+            competitors: raw.competitorIntelligence?.competitors || [],
+            competitorProfiles: raw.competitorIntelligence?.competitorProfiles || [],
+            contentGaps: raw.contentGapAnalysis?.contentGaps || [],
+            blogIdeas: raw.blogIntelligence?.blogIdeas || [],
+            technicalAudit: raw.technicalAudit || null,
+            pageSpeed: raw.pageSpeed || null,
+            seoScore: raw.overallScore ?? null,
+            scoreConfidence: raw.scoreConfidence || null,
+            seoReport: raw.seoReport || null,
+            provider: raw.provider || 'groq',
+            confidenceScore: raw.overallScore != null ? Math.min(100, Math.round(raw.overallScore * 0.8)) : null,
+            warnings: raw.warnings || []
+          };
+        },
+        () => ({ seoScore: null, keywords: [], competitors: [], contentGaps: [], provider: 'fallback', confidenceScore: null }),
+        'seo'
+      ),
+      // Step 3: Audience Intelligence (uses product + SEO keyword context)
+      () => runStep(3, 'Audience Intelligence',
+        () => runAudienceIntelligence(input, { ...results.product, ...(results.seo ? { seoKeywords: results.seo.keywords } : {}) }),
+        validateAudienceIntelligence,
+        () => generateAudienceFallback(input, results.product || {}),
+        'audience'
+      ),
+      // Step 4: Competitor Analysis (uses SEO competitors)
+      () => runStep(4, 'Competitor Analysis',
+        () => {
+          const seoCompetitors = (results.seo?.competitors || []).map(c => ({ name: c.name, domain: c.domain || c.website }));
+          return runCompetitorAnalysis(input, results.product || {}, seoCompetitors);
+        },
+        validateCompetitorAnalysis,
+        () => generateCompetitorFallback(input, results.product || {}, results.seo?.competitors || []),
+        'competitor'
+      ),
+      // Step 5: Intent Prediction
+      () => runStep(5, 'Intent Prediction',
+        () => runIntentPrediction(input, results.audience || {}),
+        validateIntentPrediction,
+        () => generateIntentFallback(input, results.audience || {}),
+        'intent'
+      ),
+      // Step 6: Positioning Engine
+      () => runStep(6, 'Positioning Engine',
+        () => runPositioningEngine(input, results.product || {}, results.competitor || {}),
+        validatePositioningEngine,
+        () => generatePositioningFallback(input, results.product || {}, results.competitor || {}),
+        'positioning'
+      ),
+      // Step 7: Campaign Generator
+      () => runStep(7, 'Campaign Generator',
+        () => runCampaignGenerator(input, results),
+        validateCampaignGenerator,
+        () => generateCampaignFallback(input, websiteData, results),
+        'campaign'
+      ),
+      // Step 8: Channel Recommendation
+      () => runStep(8, 'Channel Recommendation',
+        () => runChannelRecommendation(input, results.audience || {}, results.campaign || {}),
+        validateChannelRecommendation,
+        () => generateChannelFallback(input, results.audience || {}, results.campaign || {}),
+        'channel'
+      ),
+    ];
 
-    // Step 3: Audience Intelligence
-    console.log('✨ [Growth Workspace] Running Audience Intelligence...');
-    steps[2].status = 'running';
-    try {
-      const rawResult = await runAudienceIntelligence(input, results.product);
-      results.audience = validateAudienceIntelligence(rawResult, input);
-      steps[2].status = 'completed';
-      steps[2].provider = results.audience.provider || 'groq';
-      steps[2].confidenceScore = results.audience.confidenceScore ?? null;
-      console.log('✅ [Growth Workspace] Audience Intelligence complete & validated:', {
-        personasCount: results.audience.buyerPersonas?.length || 0,
-        channelsCount: results.audience.bestChannels?.length || 0,
-        provider: results.audience.provider
-      });
-    } catch (error) {
-      console.log('⚠️ [Growth Workspace] Audience Intelligence failed:', error.message);
-      warnings.push(`Audience Intelligence fallback: ${error.message}`);
-      results.audience = generateAudienceFallback(input, results.product);
-      steps[2].status = 'PARTIAL';
-      steps[2].provider = results.audience.provider || 'fallback_unavailable';
-      steps[2].confidenceScore = results.audience.confidenceScore ?? null;
-    }
-
-    // Step 4: Competitor Analysis
-    console.log('✨ [Growth Workspace] Running Competitor Analysis...');
-    steps[3].status = 'running';
-    try {
-      const rawResult = await runCompetitorAnalysis(input, results.product, researchData?.competitors || []);
-      results.competitor = validateCompetitorAnalysis(rawResult, input);
-      steps[3].status = 'completed';
-      steps[3].provider = results.competitor.provider || 'groq';
-      steps[3].confidenceScore = results.competitor.confidenceScore ?? null;
-      console.log('✅ [Growth Workspace] Competitor Analysis complete & validated:', {
-        competitorsCount: results.competitor.directCompetitors?.length || 0,
-        gapsCount: results.competitor.marketGaps?.length || 0,
-        provider: results.competitor.provider,
-        orchestratorCompetitorsUsed: researchData?.competitors?.length || 0
-      });
-    } catch (error) {
-      console.log('⚠️ [Growth Workspace] Competitor Analysis failed:', error.message);
-      warnings.push(`Competitor Analysis fallback: ${error.message}`);
-      results.competitor = generateCompetitorFallback(input, results.product, researchData?.competitors || []);
-      steps[3].status = 'PARTIAL';
-      steps[3].provider = results.competitor.provider || 'fallback_unavailable';
-      steps[3].confidenceScore = results.competitor.confidenceScore ?? null;
-    }
-
-    // Step 5: Intent Prediction
-    console.log('✨ [Growth Workspace] Running Intent Prediction...');
-    steps[4].status = 'running';
-    try {
-      const rawResult = await runIntentPrediction(input, results.audience);
-      results.intent = validateIntentPrediction(rawResult, input);
-      steps[4].status = 'completed';
-      steps[4].provider = results.intent.provider || 'groq';
-      steps[4].confidenceScore = results.intent.confidenceScore ?? null;
-      console.log('✅ [Growth Workspace] Intent Prediction complete & validated:', {
-        hotSegmentsCount: results.intent.hotSegments?.length || 0,
-        signalsCount: results.intent.buyingSignals?.length || 0,
-        provider: results.intent.provider
-      });
-    } catch (error) {
-      console.log('⚠️ [Growth Workspace] Intent Prediction failed:', error.message);
-      warnings.push(`Intent Prediction fallback: ${error.message}`);
-      results.intent = generateIntentFallback(input, results.audience);
-      steps[4].status = 'PARTIAL';
-      steps[4].provider = results.intent.provider || 'fallback_unavailable';
-      steps[4].confidenceScore = results.intent.confidenceScore ?? null;
-    }
-
-    // Step 6: Positioning Engine
-    console.log('✨ [Growth Workspace] Running Positioning Engine...');
-    steps[5].status = 'running';
-    try {
-      const rawResult = await runPositioningEngine(input, results.product, results.competitor);
-      results.positioning = validatePositioningEngine(rawResult, input);
-      steps[5].status = 'completed';
-      steps[5].provider = results.positioning.provider || 'groq';
-      steps[5].confidenceScore = results.positioning.confidenceScore ?? null;
-      console.log('✅ [Growth Workspace] Positioning Engine complete & validated:', {
-        hasStatement: !!results.positioning.positioningStatement,
-        pillarsCount: results.positioning.messagingPillars?.length || 0,
-        provider: results.positioning.provider
-      });
-    } catch (error) {
-      console.log('⚠️ [Growth Workspace] Positioning Engine failed:', error.message);
-      warnings.push(`Positioning Engine fallback: ${error.message}`);
-      results.positioning = generatePositioningFallback(input, results.product, results.competitor);
-      steps[5].status = 'PARTIAL';
-      steps[5].provider = results.positioning.provider || 'fallback_unavailable';
-      steps[5].confidenceScore = results.positioning.confidenceScore ?? null;
-    }
-
-    // Step 7: Campaign Generator
-    console.log('✨ [Growth Workspace] Running Campaign Generator...');
-    steps[6].status = 'running';
-    try {
-      const rawResult = await runCampaignGenerator(input, results);
-      results.campaign = validateCampaignGenerator(rawResult, input);
-      steps[6].status = 'completed';
-      steps[6].provider = results.campaign.provider || 'groq';
-      steps[6].confidenceScore = results.campaign.confidenceScore ?? null;
-      console.log('✅ [Growth Workspace] Campaign Generator complete & validated:', {
-        anglesCount: results.campaign.creativeAngles?.length || 0,
-        hooksCount: results.campaign.copyHooks?.length || 0,
-        hasActionPlan: !!(results.campaign.actionPlan?.sevenDay?.length || results.campaign.actionPlan?.thirtyDay?.length),
-        provider: results.campaign.provider
-      });
-    } catch (error) {
-      console.log('⚠️ [Growth Workspace] Campaign Generator failed:', error.message);
-      warnings.push(`Campaign Generator fallback: ${error.message}`);
-      results.campaign = generateCampaignFallback(input, websiteData, results);
-      steps[6].status = 'PARTIAL';
-      steps[6].provider = results.campaign.provider || 'fallback_unavailable';
-      steps[6].confidenceScore = results.campaign.confidenceScore ?? null;
-    }
-
-    // Step 8: Channel Recommendation
-    console.log('✨ [Growth Workspace] Running Channel Recommendation...');
-    steps[7].status = 'running';
-    try {
-      const rawResult = await runChannelRecommendation(input, results.audience, results.campaign);
-      results.channel = validateChannelRecommendation(rawResult, input);
-      steps[7].status = 'completed';
-      steps[7].provider = results.channel.provider || 'groq';
-      steps[7].confidenceScore = results.channel.confidenceScore ?? null;
-      console.log('✅ [Growth Workspace] Channel Recommendation complete & validated:', {
-        channelsCount: results.channel.recommendedChannels?.length || 0,
-        primaryChannel: results.channel.primaryChannel,
-        provider: results.channel.provider
-      });
-    } catch (error) {
-      console.log('⚠️ [Growth Workspace] Channel Recommendation failed:', error.message);
-      warnings.push(`Channel Recommendation fallback: ${error.message}`);
-      results.channel = generateChannelFallback(input, results.audience, results.campaign);
-      steps[7].status = 'PARTIAL';
-      steps[7].provider = results.channel.provider || 'fallback_unavailable';
-      steps[7].confidenceScore = results.channel.confidenceScore ?? null;
+    for (const runner of stepRunners) {
+      await runner();
     }
 
     const partialSteps = steps.filter(s => s.status === 'PARTIAL').length;
     const completedSteps = steps.filter(s => s.status === 'completed').length;
-    overallStatus = partialSteps > 0 && completedSteps > 0 ? 'PARTIAL' : completedSteps === 8 ? 'completed' : 'PARTIAL';
+    const totalSteps = steps.length;
+    overallStatus = partialSteps > 0 && completedSteps > 0 ? 'PARTIAL' : completedSteps === totalSteps ? 'completed' : 'PARTIAL';
 
     // Persist partial results incrementally to survive later-stage failures
     try {
@@ -552,6 +525,10 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
           baseScore = Math.min(100, Math.round(realCompetitors.length * 15 + (moduleData.marketGaps?.length || 0) * 10));
           detailBreakdown.push(`competitors:${realCompetitors.length}`);
         }
+      }
+      if (moduleKey === 'seo' && moduleData?.seoScore != null) {
+        baseScore = Math.min(100, moduleData.seoScore);
+        detailBreakdown.push(`seoScore:${moduleData.seoScore}`);
       }
       if (moduleKey === 'campaign' || moduleKey === 'channel') {
         const angles = (moduleData.creativeAngles || []).filter(a => a.value && !a.value.includes('Angle'));
@@ -672,6 +649,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     const dimensionConfig = {
       productFitScore: { key: 'product', label: 'Product Evidence' },
       marketOpportunityScore: { key: 'market', label: 'Market Opportunity' },
+      seoReadinessScore: { key: 'seo', label: 'SEO Readiness' },
       audienceClarityScore: { key: 'audience', label: 'Audience Clarity' },
       competitiveDefensibilityScore: { key: 'competitor', label: 'Competitive Position' },
       campaignReadinessScore: { key: 'campaign', label: 'Campaign Readiness' },
@@ -759,6 +737,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       overallGrowthScore,
       productFitScore: rawScores.productFitScore,
       marketOpportunityScore: rawScores.marketOpportunityScore,
+      seoReadinessScore: rawScores.seoReadinessScore,
       audienceClarityScore: rawScores.audienceClarityScore,
       competitiveDefensibilityScore: rawScores.competitiveDefensibilityScore,
       campaignReadinessScore: rawScores.campaignReadinessScore,
@@ -779,7 +758,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       primaryRiskStatus: risk.status,
       immediateAction: action.text,
       immediateActionStatus: action.status,
-      sourceModules: ['Product Analysis', 'Market Discovery', 'Audience Intelligence', 'Competitor Analysis', 'Intent Prediction', 'Positioning Engine', 'Campaign Generator', 'Channel Recommendation'],
+      sourceModules: ['Product Analysis', 'Market Discovery', 'SEO Intelligence', 'Audience Intelligence', 'Competitor Analysis', 'Intent Prediction', 'Positioning Engine', 'Campaign Generator', 'Channel Recommendation'],
     };
 
     console.log('[Growth Summary]', {
@@ -1053,7 +1032,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
         chatId: validChatId,
         role: 'assistant',
         content: `Full growth analysis completed for ${input.productName}. Growth Score: ${overallGrowthScore}/100`,
-        analysisData: { summary: { overallGrowthScore, stepsCompleted: 8 } }
+        analysisData: { summary: { overallGrowthScore, stepsCompleted: completedSteps } }
       }
     });
 
@@ -1090,7 +1069,8 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
         nextAction: null,
         completedSteps: steps.filter(s => s.status === 'completed').length,
         progress: Math.round((steps.filter(s => s.status === 'completed').length / steps.length) * 100)
-      }
+      },
+      diagnostics: steps.map(s => ({ key: s.key, label: s.label, status: s.status, provider: s.provider, diagnostics: s.diagnostics }))
     };
 
   } catch (error) {
@@ -1585,7 +1565,7 @@ CRITICAL INSTRUCTION: Do NOT invent budget allocations or ROI percentages. Retur
 
 
 async function callBestAI(prompt, maxTokens = 2000, moduleName = 'unknown', fallbackData = null) {
-  console.log(`🚀 [AI][${moduleName}] Calling AI...`);
+  console.log(`[GW][AI][${moduleName}] Calling AI...`);
   let timer;
   const timeout = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error(`${moduleName} timed out after 120s`)), 120000);
@@ -1594,9 +1574,20 @@ async function callBestAI(prompt, maxTokens = 2000, moduleName = 'unknown', fall
     const result = await Promise.race([callAI(prompt), timeout]);
     clearTimeout(timer);
     if (result.success && result.data) {
-      return { ...result.data, provider: result.provider };
+      let parsed = result.data;
+      if (typeof parsed === 'string') {
+        const match = parsed.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+        if (match) {
+          try { parsed = JSON.parse(match[0]); } catch { parsed = null; }
+        } else {
+          parsed = null;
+        }
+      }
+      if (parsed && typeof parsed === 'object') {
+        return { ...parsed, provider: result.provider };
+      }
     }
-    console.log(`[AI][${moduleName}] AI returned no data, using fallback.`);
+    console.log(`[AI][${moduleName}] AI returned no parseable data, using fallback.`);
   } catch (err) {
     clearTimeout(timer);
     console.warn(`[AI][${moduleName}] failed: ${err.message}`);
@@ -1670,18 +1661,32 @@ export async function getGrowthWorkspaceResults({ chatId, userId }) {
       }
     }
 
-    const steps = [
-      { key: 'product', label: 'Product Analysis', status: results.product ? 'completed' : 'pending', provider: results.product?.provider, confidenceScore: results.product?.confidenceScore },
-      { key: 'market', label: 'Market Discovery', status: results.market ? 'completed' : 'pending', provider: results.market?.provider, confidenceScore: results.market?.confidenceScore },
-      { key: 'audience', label: 'Audience Intelligence', status: results.audience ? 'completed' : 'pending', provider: results.audience?.provider, confidenceScore: results.audience?.confidenceScore },
-      { key: 'competitor', label: 'Competitor Analysis', status: results.competitor ? 'completed' : 'pending', provider: results.competitor?.provider, confidenceScore: results.competitor?.confidenceScore },
-      { key: 'intent', label: 'Intent Prediction', status: results.intent ? 'completed' : 'pending', provider: results.intent?.provider, confidenceScore: results.intent?.confidenceScore },
-      { key: 'positioning', label: 'Positioning Engine', status: results.positioning ? 'completed' : 'pending', provider: results.positioning?.provider, confidenceScore: results.positioning?.confidenceScore },
-      { key: 'campaign', label: 'Campaign Generator', status: results.campaign ? 'completed' : 'pending', provider: results.campaign?.provider, confidenceScore: results.campaign?.confidenceScore },
-      { key: 'channel', label: 'Channel Recommendation', status: results.channel ? 'completed' : 'pending', provider: results.channel?.provider, confidenceScore: results.channel?.confidenceScore }
+    function buildStep(key, label) {
+      const live = steps.find(s => s.key === key);
+      return {
+        key, label,
+        status: results[key] ? (live?.status || 'completed') : 'pending',
+        provider: results[key]?.provider || live?.provider,
+        confidenceScore: results[key]?.confidenceScore ?? live?.confidenceScore ?? null,
+        diagnostics: live?.diagnostics || []
+      };
+    }
+
+    const resultSteps = [
+      buildStep('product', 'Product Analysis'),
+      buildStep('market', 'Market Discovery'),
+      buildStep('seo', 'SEO Intelligence'),
+      buildStep('audience', 'Audience Intelligence'),
+      buildStep('competitor', 'Competitor Analysis'),
+      buildStep('intent', 'Intent Prediction'),
+      buildStep('positioning', 'Positioning Engine'),
+      buildStep('campaign', 'Campaign Generator'),
+      buildStep('channel', 'Channel Recommendation'),
     ];
+    const steps = resultSteps;
 
     const completedSteps = steps.filter(s => s.status === 'completed').length;
+    const totalSteps = steps.length;
     const evidenceScore = results.evidence?.sourceSummary?.completenessScore || null;
     const overallGrowthScore = evidenceScore || null;
 
@@ -1704,7 +1709,7 @@ export async function getGrowthWorkspaceResults({ chatId, userId }) {
         topRisk: results.market?.marketRisks?.[0] || null,
         nextAction: results.campaign?.nextActions?.[0] || results.campaign?.campaignIdeas?.[0] || null,
         completedSteps,
-        progress: Math.round((completedSteps / 8) * 100)
+        progress: Math.round((completedSteps / totalSteps) * 100)
       }
     };
 
@@ -1726,16 +1731,28 @@ function enforceGrowthQualityFilters(results) {
 
   const market = results.market;
   if (market) {
-    // Remove TAM/SAM/SOM fields entirely - they are always invented
-    delete market.tam;
-    delete market.sam;
-    delete market.som;
-    delete market.cagr;
-    // If demandScore exists and looks made up, null it
+    // Replace TAM/SAM/SOM with explanation instead of deleting
+    if (market.tam && market.tam !== 'Unknown') {
+      market.tam = market.tam;
+      market._tamNote = 'Estimated — not verified from financial reports';
+    } else {
+      delete market.tam;
+    }
+    if (market.sam && market.sam !== 'Unknown') {
+      market.sam = market.sam;
+      market._samNote = 'Estimated — derived from TAM and audience segment';
+    } else {
+      delete market.sam;
+    }
+    if (market.som && market.som !== 'Unknown') {
+      market.som = market.som;
+      market._somNote = 'Estimated — based on stage-adjusted projection';
+    } else {
+      delete market.som;
+    }
     if (market.demandScore != null && (market.demandScore < 0 || market.demandScore > 100)) {
       market.demandScore = null;
     }
-    // If no growthSignals, set empty array
     if (!market.growthSignals) {
       market.growthSignals = [];
     }
@@ -1748,7 +1765,13 @@ function enforceGrowthQualityFilters(results) {
       const name = p.name.toLowerCase();
       if (name === 'target persona' || name === 'target user' || name === 'persona name') return false;
       return (p.goals && p.goals.length > 0) || (p.painPoints && p.painPoints.length > 0) || (p.demographics && p.demographics.length > 10);
-    });
+    }).map(p => ({
+      ...p,
+      _evidenceNote: p.name ? 'AI-inferred persona based on industry patterns' : 'Placeholder — replace with verified data'
+    }));
+    if (audience.buyerPersonas.length === 0) {
+      audience._note = 'No verified personas — AI was unable to derive specific audience profiles from available data';
+    }
   }
 
   ['channel', 'campaign'].forEach(area => {
@@ -1756,12 +1779,11 @@ function enforceGrowthQualityFilters(results) {
     if (!data) return;
     if (data.recommendedChannels && Array.isArray(data.recommendedChannels)) {
       data.recommendedChannels = data.recommendedChannels.map(ch => {
-        // Remove invented budget/ROI fields
         const clean = { ...ch };
-        delete clean.budgetAllocation;
-        delete clean.expectedRoi;
-        delete clean.roi;
-        delete clean.budgetSplit;
+        if (clean.budgetAllocation) { clean._budgetNote = 'Estimated — not verified'; delete clean.budgetAllocation; }
+        if (clean.expectedRoi) { clean._roiNote = 'Removed — ROI cannot be verified'; delete clean.expectedRoi; }
+        if (clean.roi) { clean._roiNote = 'Removed — ROI cannot be verified'; delete clean.roi; }
+        if (clean.budgetSplit) { clean._budgetNote = 'Estimated — not verified'; delete clean.budgetSplit; }
         return clean;
       });
     }
@@ -1770,18 +1792,22 @@ function enforceGrowthQualityFilters(results) {
     }
   });
 
-  // Remove invented percentages from campaign items
   if (results.campaign?.actionPlan) {
     ['day7', 'day30', 'day60', 'day90', 'day180', 'day365', 'sevenDay', 'thirtyDay', 'sixtyDay', 'ninetyDay'].forEach(key => {
       if (results.campaign.actionPlan[key]) {
         results.campaign.actionPlan[key] = results.campaign.actionPlan[key].map(item => {
-          if (item.roi) delete item.roi;
-          if (item.expectedGain) delete item.expectedGain;
-          if (item.expectedKPI && item.expectedKPI.includes('%')) delete item.expectedKPI;
+          if (item.roi) { item._roiNote = 'Removed — ROI cannot be verified'; delete item.roi; }
+          if (item.expectedGain) { item._gainNote = 'Estimated — not verified'; delete item.expectedGain; }
+          if (item.expectedKPI && item.expectedKPI.includes('%')) { item._kpiNote = 'Percentage removed — use absolute values'; delete item.expectedKPI; }
           return item;
         });
       }
     });
+  }
+
+  const seo = results.seo;
+  if (seo && seo.seoScore == null) {
+    seo._note = 'SEO analysis completed but no score was calculated (insufficient data sources)';
   }
 
   return results;
@@ -1802,6 +1828,7 @@ function labelResultSources(results, evidenceGrowthData) {
   const moduleEvidenceMap = {
     product: evidenceFeatures > 0 || evidenceSchemas > 0,
     market: evidenceGrowthSignals > 0,
+    seo: (results.seo?.seoScore != null) || (results.seo?.keywords?.length > 0),
     audience: false,
     competitor: false,
     intent: false,
@@ -1945,6 +1972,23 @@ function normalizeGrowthResults(results, input) {
     };
   }
   
+  // Normalize SEO Intelligence
+  if (results.seo || results.seoIntelligence) {
+    const data = results.seo || results.seoIntelligence;
+    normalized.seo = {
+      seoScore: data.seoScore ?? null,
+      keywords: ensureArray(data.keywords || data.keywordOpportunities?.primaryKeywords || []),
+      keywordOpportunities: data.keywordOpportunities || null,
+      seoCompetitors: ensureArray(data.competitors || data.competitorProfiles || []),
+      contentGaps: ensureArray(data.contentGaps || []),
+      blogIdeas: ensureArray(data.blogIdeas || []),
+      technicalAudit: data.technicalAudit || null,
+      pageSpeed: data.pageSpeed || null,
+      scoreConfidence: data.scoreConfidence || null,
+      provider: ensureString(data.provider, 'unknown')
+    };
+  }
+
   // Normalize Channel Recommendation
   if (results.channel || results.channelRecommendation) {
     const data = results.channel || results.channelRecommendation;

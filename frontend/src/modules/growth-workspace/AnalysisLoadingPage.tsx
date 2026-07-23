@@ -15,6 +15,7 @@ const STAGE_NAMES = [
   'Loading website evidence',
   'Analysing product',
   'Discovering market signals',
+  'Analysing SEO',
   'Building audience intelligence',
   'Validating competitors',
   'Creating positioning',
@@ -30,8 +31,9 @@ const STAGE_DESCRIPTIONS = [
   'Fetching and parsing website content, meta tags, and structure',
   'Extracting product features, benefits, and positioning from evidence',
   'Identifying market trends, signals, and growth indicators',
+  'Analysing SEO readiness, keywords, content gaps, and competitors via SERP',
   'Building audience segments based on content and behavioral signals',
-  'Cross-referencing competitors from multiple data sources',
+  'Cross-referencing competitors from SEO data and multiple sources',
   'Developing evidence-backed positioning and messaging',
   'Creating campaign strategies aligned with audience and goals',
   'Analysing channel fit and audience-platform alignment',
@@ -45,7 +47,7 @@ const POLL_INTERVAL = 3000;
 
 export function AnalysisLoadingPage({ chatId, onComplete, onError, onRetry }: LoadingPageProps) {
   const [currentStep, setCurrentStep] = useState(1);
-  const [totalSteps] = useState(12);
+  const [totalSteps] = useState(13);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [currentStage, setCurrentStage] = useState(STAGE_NAMES[0]);
   const [elapsed, setElapsed] = useState(0);
