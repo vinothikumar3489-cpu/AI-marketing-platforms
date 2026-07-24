@@ -169,8 +169,8 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
   }
 
   // Validate legacy SEO — if only generic SEO topics without product data, reject
-  const seoKeywords = seoInfo?.keywordOpportunities || seoInfo?.keywordIntelligence?.primaryKeywords || [];
-  const hasValidSeo = Array.isArray(seoKeywords) && seoKeywords.length > 0;
+  const rawSeoKeywords = seoInfo?.keywordOpportunities || seoInfo?.keywordIntelligence?.primaryKeywords || [];
+  const hasValidSeo = Array.isArray(rawSeoKeywords) && rawSeoKeywords.length > 0;
   if (!productIdentity.productName && !productAnalysis?.usp && !websiteRaw?.featuresText?.length && !audienceData?.primaryAudience && hasValidSeo) {
     return { rejected: true, reason: 'Only legacy SEO topics available — no product identity or evidence. Run Growth Workspace first.', code: 'LEGACY_SEO_ONLY' };
   }
@@ -183,7 +183,7 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
   const blog = seoInfo?.blogIntelligenceRecord || {};
   const execSeo = seoInfo?.executiveDashboard || {};
 
-  const seoKeywords = ki.primaryKeywords || seoInfo?.keywordOpportunities || [];
+  const normalizedSeoKeywords = ki.primaryKeywords || seoInfo?.keywordOpportunities || [];
 
   const context = {
     contextId: `ctx_${chatId}_${Date.now()}`,
@@ -255,7 +255,7 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
 
     // 9. Keywords & Clusters
     keywords: {
-      primary: sourcedOpt(ki.primaryKeywords || seoKeywords || null, 'seoIntelligence', 'primaryKeywords'),
+      primary: sourcedOpt(ki.primaryKeywords || normalizedSeoKeywords || null, 'seoIntelligence', 'primaryKeywords'),
       secondary: sourcedOpt(ki.secondaryKeywords || null, 'seoIntelligence', 'secondaryKeywords'),
       longTail: sourcedOpt(ki.longTailKeywords || null, 'seoIntelligence', 'longTailKeywords'),
       question: sourcedOpt(ki.questionKeywords || null, 'seoIntelligence', 'questionKeywords'),

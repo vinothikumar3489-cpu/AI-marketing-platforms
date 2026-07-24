@@ -55,7 +55,7 @@ export async function saveEmailDraft(userId, chatId, emailData) {
         }
       });
     }
-
+    const templateData = {
       name: subject || 'Untitled Template',
       userId,
       chatId,
@@ -95,6 +95,7 @@ export async function saveEmailDraft(userId, chatId, emailData) {
         unsubscribeText,
         recipient
       }
+    };
 
     if (template) {
       // Update existing draft
