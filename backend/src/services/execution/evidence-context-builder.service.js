@@ -2,6 +2,8 @@ import { getLatestEvidenceSnapshot } from '../../modules/evidence/evidence.servi
 import { getSeoIntelligenceForChat } from "../loaders/seo-intelligence.loader.js";
 import { getProductIntelligenceForChat } from "../loaders/product-intelligence.loader.js";
 import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
+import { normalizeSeoForExecution } from "../normalizers/seo-intelligence.normalizer.js";
+import { normalizeProductForContentStudio } from "../normalizers/product-intelligence.normalizer.js";
 
 // Build a partial checks object, defaulting all known checks to false
 function emptyChecks(partial = {}) {
@@ -169,8 +171,9 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
   }
 
   // Validate legacy SEO — if only generic SEO topics without product data, reject
-  const rawSeoKeywords = seoInfo?.keywordOpportunities || seoInfo?.keywordIntelligence?.primaryKeywords || [];
-  const hasValidSeo = Array.isArray(rawSeoKeywords) && rawSeoKeywords.length > 0;
+  const normalizedSeoExecution = normalizeSeoForExecution(seoInfo);
+  const rawSeoKeywords = normalizedSeoExecution.keywords;
+  const hasValidSeo = rawSeoKeywords.length > 0;
   if (!productIdentity.productName && !productAnalysis?.usp && !websiteRaw?.featuresText?.length && !audienceData?.primaryAudience && hasValidSeo) {
     return { rejected: true, reason: 'Only legacy SEO topics available — no product identity or evidence. Run Growth Workspace first.', code: 'LEGACY_SEO_ONLY' };
   }
@@ -183,7 +186,9 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
   const blog = seoInfo?.blogIntelligenceRecord || {};
   const execSeo = seoInfo?.executiveDashboard || {};
 
-  const normalizedSeoKeywords = ki.primaryKeywords || seoInfo?.keywordOpportunities || [];
+  const normalizedSeoKeywords = normalizedSeoExecution.primaryKeywords.length > 0
+    ? normalizedSeoExecution.primaryKeywords
+    : normalizedSeoExecution.keywords;
 
   const context = {
     contextId: `ctx_${chatId}_${Date.now()}`,
@@ -207,12 +212,15 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
       category: sourcedOpt(productAnalysis.category || null, 'productIntelligence', 'category'),
     },
 
-    // 3. Features & Benefits & USP
-    features: sourcedOpt(productAnalysis.features || raw.website?.featuresText || null, 'productIntelligence', 'features'),
-    benefits: sourcedOpt(productAnalysis.benefits || null, 'productIntelligence', 'benefits'),
-    usp: sourcedOpt(productAnalysis.usp || null, 'productIntelligence', 'usp'),
-    pricing: sourcedOpt(productAnalysis.pricing || null, 'productIntelligence', 'pricing'),
-    useCases: sourcedOpt(productAnalysis.useCases || null, 'productIntelligence', 'useCases'),
+    // 3. Features & Benefits & USP (use comprehensive normalizer)
+    const normalizedProduct = normalizeProductForContentStudio(productIntel, { website: websiteRaw, usp: productAnalysis.usp, summary: productAnalysis.summary || productAnalysis.productSummary });
+    features: sourcedOpt(normalizedProduct.features.length > 0 ? normalizedProduct.features : null, 'productIntelligence', 'features'),
+    benefits: sourcedOpt(normalizedProduct.benefits.length > 0 ? normalizedProduct.benefits : null, 'productIntelligence', 'benefits'),
+    usp: sourcedOpt(normalizedProduct.usp || productAnalysis.usp || null, 'productIntelligence', 'usp'),
+    pricing: sourcedOpt(normalizedProduct.pricing || productAnalysis.pricing || null, 'productIntelligence', 'pricing'),
+    useCases: sourcedOpt(normalizedProduct.useCases.length > 0 ? normalizedProduct.useCases : null, 'productIntelligence', 'useCases'),
+    capabilities: sourcedOpt(normalizedProduct.capabilities.length > 0 ? normalizedProduct.capabilities : null, 'productIntelligence', 'capabilities'),
+    integrations: sourcedOpt(normalizedProduct.integrations.length > 0 ? normalizedProduct.integrations : null, 'productIntelligence', 'integrations'),
 
     // 4. Website
     website: {
@@ -227,8 +235,8 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
     audience: {
       primary: sourcedOpt(audienceData.primaryAudience || null, 'productIntelligence', 'primaryAudience'),
       personas: sourcedOpt(audienceData.buyerPersonas || null, 'productIntelligence', 'buyerPersonas'),
-      painPoints: sourcedOpt(audienceData.painPoints || null, 'productIntelligence', 'painPoints'),
-      customerSegments: sourcedOpt(productAnalysis.customerSegments || null, 'productIntelligence', 'customerSegments'),
+      painPoints: sourcedOpt(normalizedProduct.painPoints.length > 0 ? normalizedProduct.painPoints : audienceData.painPoints || null, 'productIntelligence', 'painPoints'),
+      customerSegments: sourcedOpt(normalizedProduct.targetAudience.length > 0 ? normalizedProduct.targetAudience : productAnalysis.customerSegments || null, 'productIntelligence', 'customerSegments'),
     },
 
     // 6. Competitors (Semantic validated)
@@ -253,13 +261,13 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
       performance: sourcedOpt(seoInfo?.technicalAudit?.performance || null, 'seoIntelligence', 'performance'),
     },
 
-    // 9. Keywords & Clusters
+    // 9. Keywords & Clusters — use normalized SEO data
     keywords: {
-      primary: sourcedOpt(ki.primaryKeywords || normalizedSeoKeywords || null, 'seoIntelligence', 'primaryKeywords'),
-      secondary: sourcedOpt(ki.secondaryKeywords || null, 'seoIntelligence', 'secondaryKeywords'),
-      longTail: sourcedOpt(ki.longTailKeywords || null, 'seoIntelligence', 'longTailKeywords'),
-      question: sourcedOpt(ki.questionKeywords || null, 'seoIntelligence', 'questionKeywords'),
-      geo: sourcedOpt(ki.geoKeywords || null, 'seoIntelligence', 'geoKeywords'),
+      primary: sourcedOpt(normalizedSeoExecution.primaryKeywords.length > 0 ? normalizedSeoExecution.primaryKeywords : normalizedSeoExecution.keywords, 'seoIntelligence', 'primaryKeywords'),
+      secondary: sourcedOpt(normalizedSeoExecution.secondaryKeywords, 'seoIntelligence', 'secondaryKeywords'),
+      longTail: sourcedOpt(normalizedSeoExecution.longTailKeywords, 'seoIntelligence', 'longTailKeywords'),
+      question: sourcedOpt(normalizedSeoExecution.questionKeywords, 'seoIntelligence', 'questionKeywords'),
+      geo: sourcedOpt(ki.geoKeywords, 'seoIntelligence', 'geoKeywords'),
     },
     clusters: sourcedOpt(ki.clusters || null, 'seoIntelligence', 'clusters'),
 

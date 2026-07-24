@@ -55,7 +55,9 @@ export async function saveContentAsset(prisma, { userId, chatId, contentType, br
   const version = existing ? (existing.assetContent?.version || 0) + 1 : 1;
 
   // Extract SEO keywords from evidence snapshot for storage
-  const seoKeywords = evidenceSnapshot?.keywords || evidenceSnapshot?.verifiedKeywords || [];
+  // Normalize: ensure we always have an array, never an object (crash prevention)
+  const rawSeoKeywords = evidenceSnapshot?.keywords || evidenceSnapshot?.verifiedKeywords || [];
+  const seoKeywords = Array.isArray(rawSeoKeywords) ? rawSeoKeywords : [];
   const seoScore = qualityScore?.checks?.seoAlignment?.detail || null;
 
   // Extract brief summary for quick reference
@@ -110,7 +112,7 @@ export async function saveContentAsset(prisma, { userId, chatId, contentType, br
         },
         briefSnapshot: briefSummary,
         evidenceSnapshot: evidenceSummary,
-        seoKeywords: seoKeywords.slice(0, 10).map(k => typeof k === 'string' ? k : k.keyword),
+        seoKeywords: Array.isArray(seoKeywords) ? seoKeywords.slice(0, 10).map(k => typeof k === 'string' ? k : (k?.keyword || k?.phrase || '')) : [],
         seoScore,
         version,
         prevVersionId: existing?.id || null,

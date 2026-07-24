@@ -1,19 +1,18 @@
 /**
  * Product Intelligence Normalizer
  * Normalizes product features and benefits from various shapes into canonical format
+ * Extended for Content Studio — extracts Features, Benefits, Use Cases, Integrations,
+ * Pricing, CTA, Pain Points, Industries, Target Audience, Capabilities.
+ * All inferred fields are marked with AI_INFERRED status.
  */
 
 import { asArray, safeMap } from "./array-helpers.js";
+import { InferenceStatus } from "../../shared/schemas/enums.js";
 
 /**
  * Inference status enum for tracking data source confidence
  */
-const INFERENCE_STATUS = {
-  EVIDENCE_BACKED: 'EVIDENCE_BACKED',
-  AI_INFERRED: 'AI_INFERRED',
-  USER_PROVIDED: 'USER_PROVIDED',
-  NOT_MEASURED: 'NOT_MEASURED'
-};
+const INFERENCE_STATUS = InferenceStatus;
 
 /**
  * Extract feature name from various object shapes
@@ -282,11 +281,312 @@ export function normalizeProductIntelligence(productIntel) {
   };
 }
 
+/**
+ * Comprehensive product normalization for Content Studio
+ * Extracts all known product fields and derives missing ones with AI_INFERRED marking
+ */
+export function normalizeProductForContentStudio(productIntel, extraContext = {}) {
+  if (!productIntel || typeof productIntel !== 'object') {
+    return {
+      features: [],
+      benefits: [],
+      useCases: [],
+      integrations: [],
+      pricing: null,
+      cta: [],
+      painPoints: [],
+      industries: [],
+      targetAudience: [],
+      capabilities: [],
+      usp: null,
+      summary: null,
+      warnings: ['Product intelligence not available'],
+    };
+  }
+
+  const pa = productIntel.productAnalysis || {};
+  const website = extraContext.website || {};
+  const audienceData = productIntel.audienceIntelligence || {};
+  const warnings = [];
+  const derivedFrom = [];
+
+  // --- Extract summary ---
+  const summary = pa.summary || pa.productSummary || extraContext.summary || null;
+
+  // --- Extract USP ---
+  const usp = pa.usp || extraContext.usp || null;
+
+  // --- Extract Features (with derivation fallback) ---
+  const rawFeatures = normalizeFeatures(
+    productIntel.features
+    || pa.features
+    || pa.keyFeatures
+    || pa.capabilities
+    || pa.productFeatures
+    || pa.differentiators
+    || pa.jobsToBeDone
+    || pa.details?.features
+    || pa.summary?.features
+    || pa.productDNA?.features
+    || website.featuresText
+    || website.features
+    || []
+  );
+  const hasExplicitFeatures = rawFeatures.length > 0;
+  let features = rawFeatures;
+
+  if (features.length === 0) {
+    const derived = deriveFeatures(summary, usp, pa, website);
+    features = derived.map(f => ({
+      ...f,
+      inferenceStatus: InferenceStatus.AI_INFERRED,
+    }));
+    if (features.length > 0) {
+      derivedFrom.push('summary, USP, or website content');
+      warnings.push(`Features derived from ${derivedFrom[derivedFrom.length - 1]} — mark as AI_INFERRED`);
+    }
+  }
+
+  // --- Extract Benefits ---
+  const rawBenefits = normalizeBenefits(
+    productIntel.benefits
+    || pa.benefits
+    || pa.coreBenefits
+    || pa.valuePropositions
+    || pa.advantages
+    || pa.valueProposition
+    || pa.details?.benefits
+    || pa.summary?.benefits
+    || website.benefits
+    || []
+  );
+  const hasExplicitBenefits = rawBenefits.length > 0;
+  let benefits = rawBenefits;
+
+  if (benefits.length === 0 && features.length > 0) {
+    benefits = features
+      .filter(f => f.benefit)
+      .map(f => ({
+        text: f.benefit,
+        evidence: null,
+        inferenceStatus: f.inferenceStatus || InferenceStatus.EVIDENCE_BACKED,
+      }));
+    if (benefits.length > 0) {
+      warnings.push('Benefits derived from feature benefits');
+    }
+  }
+
+  // --- Extract Use Cases ---
+  const rawUseCases = asArray(pa.useCases || pa.useCases || pa.jobsToBeDone || pa.details?.useCases || []);
+  const useCases = rawUseCases.map(u => {
+    if (typeof u === 'string') return { scenario: u, solution: null, outcome: null };
+    return {
+      scenario: u.scenario || u.useCase || u.name || u.title || '',
+      solution: u.solution || u.description || null,
+      outcome: u.outcome || u.result || null,
+    };
+  }).filter(u => u.scenario);
+
+  // --- Extract Integrations ---
+  const rawIntegrations = asArray(
+    pa.integrations
+    || pa.technologyStack
+    || productIntel.integrations
+    || website.technologyHints
+    || website.technologyStack
+    || []
+  );
+  const integrations = rawIntegrations.map(i => {
+    if (typeof i === 'string') return { name: i, category: null };
+    return {
+      name: i.name || i.tool || i.platform || i.technology || '',
+      category: i.category || i.type || null,
+    };
+  }).filter(i => i.name);
+
+  // --- Extract Pricing ---
+  const pricing = pa.pricing || pa.pricingModel || pa.businessModel || null;
+
+  // --- Extract CTA ---
+  const rawCta = asArray(
+    pa.cta
+    || website.ctaTexts
+    || pa.ctaText
+    || []
+  );
+  const cta = rawCta.map(c => {
+    if (typeof c === 'string') return { text: c, url: null };
+    if (typeof c === 'object') {
+      return {
+        text: c.text || c.label || c.cta || '',
+        url: c.url || c.destination || null,
+      };
+    }
+    return { text: String(c), url: null };
+  }).filter(c => c.text);
+
+  // --- Extract Pain Points ---
+  const rawPainPoints = asArray(
+    audienceData.painPoints
+    || pa.painPoints
+    || pa.problemsSolved
+    || pa.challenges
+    || pa.details?.painPoints
+    || []
+  );
+  const painPoints = rawPainPoints.map(p => {
+    if (typeof p === 'string') return p;
+    return p.text || p.painPoint || p.description || p.name || '';
+  }).filter(Boolean);
+
+  // --- Extract Industries ---
+  const rawIndustries = asArray(
+    pa.industries
+    || productIntel.industries
+    || (pa.industry ? [pa.industry] : [])
+  );
+  const industries = rawIndustries.map(i => {
+    if (typeof i === 'string') return i;
+    return i.name || i.industry || '';
+  }).filter(Boolean);
+
+  // --- Extract Target Audience ---
+  const rawAudience = asArray(
+    audienceData.primaryAudience
+    || audienceData.buyerPersonas
+    || pa.targetAudience
+    || productIntel.targetAudience
+    || pa.customerSegments
+    || pa.idealCustomerProfile
+    || []
+  );
+  const targetAudience = rawAudience.map(a => {
+    if (typeof a === 'string') return { name: a, role: null, description: null };
+    if (typeof a === 'object') {
+      return {
+        name: a.name || a.audience || a.title || a.role || '',
+        role: a.role || a.jobTitle || null,
+        description: a.description || a.summary || null,
+      };
+    }
+    return { name: String(a), role: null, description: null };
+  }).filter(a => a.name);
+
+  // --- Extract Capabilities ---
+  const rawCapabilities = asArray(
+    pa.capabilities
+    || pa.keyFeatures
+    || pa.productFeatures
+    || []
+  );
+  const capabilities = rawCapabilities.map(c => {
+    if (typeof c === 'string') return { name: c, description: null };
+    return {
+      name: c.name || c.title || c.feature || c.capability || '',
+      description: c.description || c.details || null,
+    };
+  }).filter(c => c.name);
+
+  // --- Add warnings ---
+  if (features.length === 0) warnings.push('No features available');
+  if (benefits.length === 0) warnings.push('No benefits available');
+  if (useCases.length === 0) warnings.push('No use cases available');
+  if (pricing === null) warnings.push('No pricing information available');
+  if (painPoints.length === 0) warnings.push('No pain points available');
+  if (industries.length === 0) warnings.push('No industry information available');
+  if (targetAudience.length === 0) warnings.push('No target audience defined');
+
+  return {
+    summary,
+    usp,
+    features,
+    benefits,
+    useCases,
+    integrations,
+    pricing,
+    cta,
+    painPoints,
+    industries,
+    targetAudience,
+    capabilities,
+    warnings,
+    _derivedFrom: derivedFrom.length > 0 ? derivedFrom : null,
+    _hasExplicitFeatures: hasExplicitFeatures,
+    _hasExplicitBenefits: hasExplicitBenefits,
+  };
+}
+
+/**
+ * Derive features from summary, USP, headings, metadata, website content
+ * Returns inferred feature objects marked for AI_INFERRED status
+ */
+function deriveFeatures(summary, usp, productAnalysis, website) {
+  const derived = [];
+  const textToParse = [
+    summary || '',
+    usp || '',
+    productAnalysis.description || '',
+    productAnalysis.productSummary || '',
+    website.title || '',
+    website.metaDescription || '',
+    website.heroText || '',
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  if (!textToParse) return derived;
+
+  const capabilityPatterns = [
+    { name: 'Automation & Workflow', keywords: ['automate', 'workflow', 'streamline', 'efficiency', 'optimize'] },
+    { name: 'Analytics & Insights', keywords: ['analytics', 'insight', 'report', 'dashboard', 'metric', 'measure', 'track'] },
+    { name: 'AI & Intelligence', keywords: ['ai', 'artificial intelligence', 'machine learning', 'ml', 'intelligent', 'smart'] },
+    { name: 'Integration & Connectivity', keywords: ['integrate', 'connect', 'api', 'sync', 'embed'] },
+    { name: 'Content Management', keywords: ['content', 'manage', 'organize', 'create', 'publish'] },
+    { name: 'Collaboration', keywords: ['collaborate', 'team', 'share', 'communicate', 'coordinate'] },
+    { name: 'Security & Compliance', keywords: ['security', 'secure', 'compliance', 'gdpr', 'encrypt', 'privacy'] },
+    { name: 'Reporting & Visualization', keywords: ['report', 'visualize', 'chart', 'graph', 'dashboard'] },
+    { name: 'Personalization', keywords: ['personalize', 'customize', 'tailor', 'adaptive', 'recommend'] },
+    { name: 'Real-time Processing', keywords: ['real-time', 'realtime', 'live', 'instant', 'immediate'] },
+    { name: 'Scalability', keywords: ['scale', 'scalable', 'enterprise', 'grow', 'expand'] },
+    { name: 'Search & Discovery', keywords: ['search', 'discover', 'find', 'explore', 'navigate'] },
+    { name: 'Automation Rules Engine', keywords: ['rule', 'trigger', 'condition', 'automation', 'if this then that'] },
+    { name: 'Template & Library', keywords: ['template', 'library', 'asset', 'repository', 'blueprint'] },
+  ];
+
+  capabilityPatterns.forEach(({ name, keywords }) => {
+    const matched = keywords.some(k => textToParse.includes(k));
+    if (matched) {
+      derived.push({
+        name,
+        description: null,
+        benefit: null,
+        evidence: null,
+        inferenceStatus: InferenceStatus.AI_INFERRED,
+      });
+    }
+  });
+
+  // If no patterns matched, create a generic derived feature from summary
+  if (derived.length === 0 && summary) {
+    const words = summary.split(/\s+/).filter(w => w.length > 4).slice(0, 3);
+    if (words.length > 0) {
+      derived.push({
+        name: words.join(' ') + ' capability',
+        description: summary.substring(0, 200),
+        benefit: null,
+        evidence: null,
+        inferenceStatus: InferenceStatus.AI_INFERRED,
+      });
+    }
+  }
+
+  return derived;
+}
+
 export default {
   normalizeProductIntelligence,
   normalizeFeatures,
   normalizeBenefits,
   featureToText,
   benefitToText,
+  normalizeProductForContentStudio,
   INFERENCE_STATUS
 };

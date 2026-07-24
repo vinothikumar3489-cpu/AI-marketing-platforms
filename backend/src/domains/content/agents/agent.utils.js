@@ -67,22 +67,30 @@ export function getProductName(brief) { return brief.product?.name || brief.prod
 export function getPersonaName(brief) { return brief.targetPersonas?.[0]?.name || brief.targetPersonas?.[0]?.role || 'users'; }
 export function getKeyword(brief, idx) { return brief.verifiedKeywords?.[idx]?.keyword || brief.verifiedKeywords?.[idx] || ''; }
 
-export function buildProductEvidenceContext(brief) {
+export function buildProductEvidenceContext(brief, normalizedEvidence) {
   const product = brief.product || {};
   const company = brief.company || {};
   const personas = brief.targetPersonas || [];
   const persona = personas[0] || {};
   const keywords = (brief.verifiedKeywords || []).slice(0, 10);
+  const features = (product.features || []).slice(0, 6);
+  const benefits = (product.benefits || []).slice(0, 6);
+  
+  // Use normalizedEvidence if available (safe array, never raw objects)
+  const normalizedKw = normalizedEvidence?.keywords;
+  const evidenceKeywords = Array.isArray(normalizedKw) && normalizedKw.length > 0
+    ? normalizedKw.slice(0, 10).map(k => typeof k === 'string' ? k : (k?.keyword || k?.phrase || '')).filter(Boolean)
+    : keywords.map(k => k.keyword).filter(Boolean);
   return `PRODUCT CONTEXT:
 Identity: ${product.name || company.name || 'Unknown'}
 Summary: ${product.summary || 'N/A'}
 USP: ${product.usp || 'N/A'}
-Features: ${(product.features || []).slice(0, 6).map(f => typeof f === 'string' ? f : f.name || f.feature || f).filter(Boolean).join(', ') || 'N/A'}
-Benefits: ${(product.benefits || []).slice(0, 6).map(b => typeof b === 'string' ? b : b.text || b.benefit || b.description || b).filter(Boolean).join(', ') || 'N/A'}
+Features: ${features.map(f => typeof f === 'string' ? f : f.name || f.feature || f).filter(Boolean).join(', ') || 'N/A'}
+Benefits: ${benefits.map(b => typeof b === 'string' ? b : b.text || b.benefit || b.description || b).filter(Boolean).join(', ') || 'N/A'}
 Industry: ${company.industry || 'N/A'}
 Target Persona: ${persona.name || persona.role || 'N/A'}
 Pain Points: ${(persona.painPoints || brief.painPoints || []).slice(0, 5).join('; ') || 'N/A'}
-SEO Keywords: ${keywords.map(k => k.keyword).filter(Boolean).join(', ') || 'N/A'}
+SEO Keywords: ${evidenceKeywords.join(', ') || 'N/A'}
 Competitors: ${(brief.validatedCompetitors || []).slice(0, 5).map(c => c.name).filter(Boolean).join(', ') || 'N/A'}
 Tone: ${brief.tone || 'professional'}
 Missing evidence: ${(brief.limitations || []).join('; ') || 'None identified'}`;

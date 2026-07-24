@@ -1,9 +1,9 @@
 import { callAI } from "../../../domains/ai/services/aiOrchestrator.service.js";
 import { buildEvidenceSection, buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getKeyword, getEvidenceForTrend, FALLBACK_FAILURE } from "./agent.utils.js";
 
-export async function generateBlogArticle(brief, aiFunction = callAI) {
+export async function generateBlogArticle(brief, aiFunction = callAI, normalizedEvidence) {
   const evidence = buildEvidenceSection(brief);
-  const productContext = buildProductEvidenceContext(brief);
+  const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
@@ -45,7 +45,7 @@ Return valid JSON:
   return FALLBACK_FAILURE;
 }
 
-export async function generateFAQ(brief, aiFunction = callAI) {
+export async function generateFAQ(brief, aiFunction = callAI, normalizedEvidence) {
   const evidence = buildEvidenceSection(brief);
   const productContext = buildProductEvidenceContext(brief);
   const productName = getProductName(brief);

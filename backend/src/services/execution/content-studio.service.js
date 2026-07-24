@@ -13,6 +13,7 @@ import { resolveProductIdentity } from '../resolvers/product-identity.resolver.j
 import { createStableHash } from "../../utils/stable-hash.js";
 import { CONTENT_TYPES, CONTENT_TYPES_LIST } from "../../constants/content-types.js";
 import { EMAIL_WORD_COUNT_LIMITS, validateEmailCopyDTO, createEmptyEmailCopyDTO } from "../../dto/email-copy.dto.js";
+import { normalizeSeoForExecution } from "../normalizers/seo-intelligence.normalizer.js";
 
 export { CONTENT_TYPES, CONTENT_TYPES_LIST } from "../../constants/content-types.js";
 
@@ -52,7 +53,7 @@ const INVALID_PRODUCT_LABELS = new Set([
 
 
 
-async function generateEmailCopy(brief, aiFunction = callAI) {
+async function generateEmailCopy(brief, aiFunction = callAI, normalizedEvidence) {
   // PART 4: Use normalized product identity
   const productIdentity = brief?.productIdentity || {};
   const displayName = productIdentity.displayName || brief?.product?.name || brief?.product?.brandName || brief?.company?.name || 'this solution';
@@ -116,6 +117,7 @@ REQUIREMENTS:
 - painPoint: 1-2 sentences describing the specific problem
 - solution: 2-3 sentences on how ${displayName} solves it
 - benefits: Array of 3-5 key benefits
+- features: Array of 2-4 key features
 - bodyParagraphs: Array of 2-4 paragraphs that form the email body
 - socialProof: Social proof or testimonials (if available from evidence)
 - primaryCta: Object with label (CTA button text) and url (use provided CTA URL)
@@ -125,6 +127,7 @@ REQUIREMENTS:
 - postscript: Optional P.S. line reinforcing key benefit
 - complianceFooter: Compliance footer with legal information
 - unsubscribeText: Unsubscribe text and link
+- variables: Array of personalization variable names used (e.g., firstName, companyName)
 - html: Responsive HTML version of the email (inline styles, ready to send)
 - plainText: Plain text version of the email
 - evidenceUsed: Array of evidence fields referenced from context
@@ -142,6 +145,7 @@ Return valid JSON:
   "painPoint": "string",
   "solution": "string",
   "benefits": ["string"],
+  "features": ["string"],
   "bodyParagraphs": ["string"],
   "socialProof": "string",
   "primaryCta": { "label": "string", "url": "string" },
@@ -153,6 +157,7 @@ Return valid JSON:
   "unsubscribeText": "string",
   "html": "string",
   "plainText": "string",
+  "variables": ["personalization variable names used"],
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
 }`;
@@ -162,6 +167,7 @@ Return valid JSON:
     if (result.success && result.data) {
       const data = result.data;
       const benefits = Array.isArray(data.benefits) ? data.benefits : [];
+      const features = Array.isArray(data.features) ? data.features : [];
       const bodyParagraphs = Array.isArray(data.bodyParagraphs) ? data.bodyParagraphs : [];
       const subjectAlternatives = Array.isArray(data.subjectAlternatives) ? data.subjectAlternatives : [];
 
@@ -208,6 +214,7 @@ Return valid JSON:
         painPoint: data.painPoint || '',
         solution: data.solution || '',
         benefits,
+        features,
         bodyParagraphs,
         socialProof: data.socialProof || '',
         primaryCta,
@@ -219,6 +226,7 @@ Return valid JSON:
         unsubscribeText: data.unsubscribeText || 'Unsubscribe',
         html: data.html || '',
         plainText: data.plainText || '',
+        variables: Array.isArray(data.variables) ? data.variables : [],
         evidenceUsed: data.evidenceUsed || [],
         quality: {
           score: validationResult.valid ? 1 : 0.5,
@@ -283,6 +291,11 @@ function generateEmailCopyFallback(displayName, internalName, brandName, domain,
       `Cost-effective solution`,
       `Easy implementation and adoption`
     ],
+    features: [
+      `Advanced ${goal.toLowerCase()} capabilities`,
+      `Intuitive ${tone.toLowerCase()} interface`,
+      `Seamless integration`
+    ],
     bodyParagraphs: [
       `${displayName} is designed specifically for ${persona} who need to overcome ${painPoint}. Our platform combines advanced features with intuitive design to deliver measurable results.`,
       `With ${displayName}, you gain access to powerful tools that help you ${goal.toLowerCase()}. Our solution has been tested and refined based on feedback from professionals like you.`,
@@ -301,6 +314,7 @@ function generateEmailCopyFallback(displayName, internalName, brandName, domain,
     unsubscribeText: 'Unsubscribe',
     html: generateFallbackHtml(displayName, sender, ctaUrl),
     plainText: generateFallbackPlainText(displayName, sender, ctaUrl),
+    variables: ['firstName', 'lastName', 'companyName'],
     evidenceUsed: [],
     quality: {
       score: 0.5,
@@ -413,6 +427,40 @@ Unsubscribe: [unsubscribe link]`;
 
 
 
+/**
+ * Build normalized evidence for generators — safe array wrapper
+ * Prevents runtime crashes by normalizing raw SEO objects to flat arrays
+ */
+function buildNormalizedEvidence(brief, evidenceContext) {
+  const rawKeywords = brief.verifiedKeywords || [];
+  const safeKeywords = Array.isArray(rawKeywords) ? rawKeywords : [];
+  const rawSeoContext = evidenceContext?.seo || {};
+  const contextKeywords = rawSeoContext.keywords || rawSeoContext.primary || [];
+  const combinedKeywords = [
+    ...safeKeywords,
+    ...(Array.isArray(contextKeywords) ? contextKeywords : [])
+  ];
+  const seen = new Set();
+  const deduplicated = combinedKeywords.filter(k => {
+    const key = typeof k === 'string' ? k : (k?.keyword || k?.phrase || '');
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return {
+    keywords: deduplicated.slice(0, 30),
+    primaryKeywords: Array.isArray(rawSeoContext.primary) ? rawSeoContext.primary.slice(0, 10) : [],
+    features: Array.isArray(brief.product?.features) ? brief.product.features : [],
+    benefits: Array.isArray(brief.product?.benefits) ? brief.product.benefits : [],
+    painPoints: Array.isArray(brief.painPoints) ? brief.painPoints : [],
+    competitors: Array.isArray(brief.validatedCompetitors) ? brief.validatedCompetitors : [],
+    contentGaps: Array.isArray(brief.contentGaps) ? brief.contentGaps : [],
+    topicIdeas: Array.isArray(brief.topicIdeas) ? brief.topicIdeas : [],
+    evidenceSnapshotId: evidenceContext?.evidenceSnapshotId || null,
+  };
+}
+
 const GENERATORS = {
   linkedin_post: generateLinkedInPost,
   instagram_post: generateInstagramPost,
@@ -467,9 +515,12 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
     };
   }
 
+  // Build normalizedEvidence from SEO context — safe array, never raw objects
+  const normalizedEvidence = buildNormalizedEvidence(brief, evidenceContext);
+
   // PART 6: Use passed AI function from generationContext for provider routing, testing, and logging
   const aiFunction = callAiFn || callAI;
-  const result = await generator(brief, aiFunction);
+  const result = await generator(brief, aiFunction, normalizedEvidence);
 
   if (!result) {
     return {
@@ -674,6 +725,8 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
   const opening = sanitizeText(emailData.opening || (emailData.sections && emailData.sections.openingHook) || '');
   const bodyParagraphs = Array.isArray(emailData.bodyParagraphs) ? emailData.bodyParagraphs : [];
   const bulletPoints = Array.isArray(emailData.bulletPoints) ? emailData.bulletPoints : [];
+  const features = Array.isArray(emailData.features) ? emailData.features : [];
+  const variables = Array.isArray(emailData.variables) ? emailData.variables : [];
   const ctaText = sanitizeText(emailData.ctaText || (emailData.primaryCta && emailData.primaryCta.label) || '');
   const ctaUrl = emailData.ctaUrl || (emailData.primaryCta && emailData.primaryCta.destination) || '#';
   const closing = sanitizeText(emailData.closing || '');
@@ -692,6 +745,14 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
       <tr>
         <td style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; padding: 0 0 8px 0; vertical-align: top; width: 20px;">•</td>
         <td style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; padding: 0 0 8px 0;">${sanitizeText(b)}</td>
+      </tr>`).join('\n      ')}
+    </table>` : ''}
+    ${features.length > 0 ? `
+    <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 16px 0;">
+      ${features.map(f => `
+      <tr>
+        <td style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; padding: 0 0 8px 0; vertical-align: top; width: 20px;">✦</td>
+        <td style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; padding: 0 0 8px 0;">${sanitizeText(f)}</td>
       </tr>`).join('\n      ')}
     </table>` : ''}
     ${ctaText ? `
@@ -820,7 +881,7 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
       unsubscribe: unsubscribeHtml,
     },
     subjectOptions: Array.isArray(emailData.subjectOptions) ? emailData.subjectOptions : (emailData._rawSubjectOptions ? JSON.parse(emailData._rawSubjectOptions) : []),
-    personalizationVariables: Array.isArray(emailData.personalizationVariables) ? emailData.personalizationVariables : (
+    personalizationVariables: variables.length > 0 ? variables.map(v => ({ name: v, description: `Personalization field: ${v}`, example: '' })) : (
       Array.isArray(emailData.personalizationFields) ? emailData.personalizationFields.map(f => ({ name: f, description: `Personalization field: ${f}`, example: '' })) : []
     ),
     _emailType: emailData.emailType || null,
