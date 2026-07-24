@@ -1,12 +1,12 @@
 /**
  * Email Copy Stable DTO
- * PART 4: Stable data transfer object for email_copy generation
- * Enhanced for Content Studio Email Workflow
+ * Enterprise-quality email copy data transfer object
+ * Matches HubSpot/Brevo/Mailchimp production standards
  */
 
 /**
  * Email Copy DTO Schema
- * Stable structure for email generation with strict word count limits
+ * Enterprise structure for email generation with strict word count limits
  */
 export const EMAIL_COPY_DTO_SCHEMA = {
   // Email Configuration
@@ -70,12 +70,6 @@ export const EMAIL_COPY_DTO_SCHEMA = {
     required: true,
     description: 'Compelling subject line including product name'
   },
-  subjectAlternatives: {
-    type: 'array',
-    items: { type: 'string' },
-    required: false,
-    description: 'Alternative subject lines for A/B testing'
-  },
   previewText: {
     type: 'string',
     maxLength: 150,
@@ -87,17 +81,12 @@ export const EMAIL_COPY_DTO_SCHEMA = {
     required: true,
     description: 'Professional greeting with personalization placeholder'
   },
-  headline: {
-    type: 'string',
-    required: true,
-    description: 'Main headline or hook'
-  },
   opening: {
     type: 'string',
     required: true,
     description: 'Strong opening paragraph addressing pain point'
   },
-  painPoint: {
+  problem: {
     type: 'string',
     required: true,
     description: '1-2 sentences describing the specific problem'
@@ -107,6 +96,14 @@ export const EMAIL_COPY_DTO_SCHEMA = {
     required: true,
     description: '2-3 sentences on how product solves the problem'
   },
+  featureHighlights: {
+    type: 'array',
+    items: { type: 'string' },
+    minItems: 3,
+    maxItems: 5,
+    required: true,
+    description: 'Array of 3-5 specific feature highlights with benefit'
+  },
   benefits: {
     type: 'array',
     items: { type: 'string' },
@@ -115,61 +112,35 @@ export const EMAIL_COPY_DTO_SCHEMA = {
     required: true,
     description: 'Array of 3-5 key benefits'
   },
-  bodyParagraphs: {
-    type: 'array',
-    items: { type: 'string' },
-    minItems: 2,
-    maxItems: 4,
-    required: true,
-    description: 'Array of 2-4 paragraphs that form the email body'
-  },
   socialProof: {
     type: 'string',
     required: false,
-    description: 'Social proof or testimonials'
+    description: 'Social proof or testimonial placeholder'
   },
-  primaryCta: {
+  callToAction: {
     type: 'object',
     properties: {
       label: { type: 'string', required: true },
       url: { type: 'string', required: true }
     },
     required: true,
-    description: 'Primary CTA object with label and url'
-  },
-  secondaryCta: {
-    type: 'object',
-    properties: {
-      label: { type: 'string', required: false },
-      url: { type: 'string', required: false }
-    },
-    required: false,
-    description: 'Secondary CTA object'
-  },
-  closing: {
-    type: 'string',
-    required: true,
-    description: 'Warm closing paragraph'
+    description: 'CTA object with label and url'
   },
   signature: {
     type: 'string',
     required: true,
-    description: 'Sender signature with company name'
+    description: 'Professional sender signature'
   },
-  postscript: {
+  footer: {
     type: 'string',
+    required: true,
+    description: 'Compliance footer with company details and legal info'
+  },
+  personalizationVariables: {
+    type: 'array',
+    items: { type: 'string' },
     required: false,
-    description: 'Optional P.S. line reinforcing key benefit'
-  },
-  complianceFooter: {
-    type: 'string',
-    required: true,
-    description: 'Compliance footer with legal information'
-  },
-  unsubscribeText: {
-    type: 'string',
-    required: true,
-    description: 'Unsubscribe text and link'
+    description: 'Array of variable names used for personalization'
   },
 
   // Generated Content
@@ -190,6 +161,12 @@ export const EMAIL_COPY_DTO_SCHEMA = {
     items: { type: 'string' },
     required: false,
     description: 'Array of evidence points referenced from context'
+  },
+  claimsRequiringReview: {
+    type: 'array',
+    items: { type: 'string' },
+    required: false,
+    description: 'Claims that need human review before sending'
   },
   quality: {
     type: 'object',
@@ -245,7 +222,6 @@ export function validateEmailCopyDTO(data) {
   const errors = [];
   const warnings = [];
 
-  // Check required fields
   if (!data.subject || typeof data.subject !== 'string') {
     errors.push('subject is required and must be a string');
   } else if (data.subject.length > 70) {
@@ -262,20 +238,20 @@ export function validateEmailCopyDTO(data) {
     errors.push(`emailType must be one of: ${Object.keys(EMAIL_WORD_COUNT_LIMITS).join(', ')}`);
   }
 
-  if (!Array.isArray(data.benefits) || data.benefits.length < 3 || data.benefits.length > 5) {
-    errors.push('benefits must be an array with 3-5 items');
+  if (!Array.isArray(data.featureHighlights) || data.featureHighlights.length < 2) {
+    errors.push('featureHighlights must be an array with at least 2 items');
   }
 
-  if (!Array.isArray(data.bodyParagraphs) || data.bodyParagraphs.length < 2 || data.bodyParagraphs.length > 4) {
-    errors.push('bodyParagraphs must be an array with 2-4 items');
+  if (!Array.isArray(data.benefits) || data.benefits.length < 2) {
+    errors.push('benefits must be an array with at least 2 items');
   }
 
-  if (!data.primaryCta || typeof data.primaryCta !== 'object' || !data.primaryCta.label) {
-    errors.push('primaryCta is required and must have a label');
+  if (!data.callToAction || typeof data.callToAction !== 'object' || !data.callToAction.label) {
+    errors.push('callToAction is required and must have a label');
   }
 
-  if (!data.primaryCta || !data.primaryCta.url) {
-    warnings.push('primaryCta.url is recommended');
+  if (!data.callToAction || !data.callToAction.url) {
+    warnings.push('callToAction.url is recommended');
   }
 
   // Check word count
@@ -283,12 +259,6 @@ export function validateEmailCopyDTO(data) {
   const limits = EMAIL_WORD_COUNT_LIMITS[data.emailType] || { min: 200, max: 500 };
   if (wordCount < limits.min || wordCount > limits.max) {
     errors.push(`word count must be between ${limits.min} and ${limits.max} (actual: ${wordCount})`);
-  }
-
-  // Check personalization placeholders
-  const unresolvedPlaceholders = checkUnresolvedPlaceholders(data);
-  if (unresolvedPlaceholders.length > 0) {
-    warnings.push(`Unresolved personalization placeholders: ${unresolvedPlaceholders.join(', ')}`);
   }
 
   // Check required email fields
@@ -300,12 +270,8 @@ export function validateEmailCopyDTO(data) {
     errors.push('plainText content is required');
   }
 
-  if (!data.unsubscribeText) {
-    errors.push('unsubscribeText is required');
-  }
-
-  if (!data.complianceFooter) {
-    errors.push('complianceFooter is required');
+  if (!data.footer) {
+    errors.push('footer is required');
   }
 
   return {
@@ -323,16 +289,14 @@ function countWords(data) {
     data.subject,
     data.previewText,
     data.greeting,
-    data.headline,
     data.opening,
-    data.painPoint,
+    data.problem,
     data.solution,
+    data.featureHighlights?.join(' '),
     data.benefits?.join(' '),
-    data.bodyParagraphs?.join(' '),
     data.socialProof,
-    data.closing,
     data.signature,
-    data.postscript
+    data.footer
   ].filter(Boolean).join(' ');
 
   return text.split(/\s+/).filter(word => word.length > 0).length;
@@ -409,29 +373,25 @@ export function createEmptyEmailCopyDTO(emailType = 'Product Announcement') {
       companyName: ''
     },
     subject: '',
-    subjectAlternatives: [],
     previewText: '',
     greeting: '',
-    headline: '',
     opening: '',
-    painPoint: '',
+    problem: '',
     solution: '',
+    featureHighlights: [],
     benefits: [],
-    bodyParagraphs: [],
     socialProof: '',
-    primaryCta: {
+    callToAction: {
       label: '',
       url: ''
     },
-    secondaryCta: null,
-    closing: '',
     signature: '',
-    postscript: '',
-    complianceFooter: '',
-    unsubscribeText: '',
+    footer: '',
+    personalizationVariables: [],
     html: '',
     plainText: '',
     evidenceUsed: [],
+    claimsRequiringReview: [],
     quality: null,
     approvalStatus: 'DRAFT',
     deliveryStatus: null

@@ -1,7 +1,7 @@
 import { getLatestEvidenceSnapshot } from '../../modules/evidence/evidence.service.js';
 import { asArray, takeArray } from "../normalizers/array-helpers.js";
 import { normalizeSeoForExecution } from "../normalizers/seo-intelligence.normalizer.js";
-import { normalizeProductIntelligence, normalizeFeatures, normalizeBenefits, featureToText, benefitToText } from "../normalizers/product-intelligence.normalizer.js";
+import { normalizeProductForContentStudio, normalizeFeatures, normalizeBenefits, featureToText, benefitToText } from "../normalizers/product-intelligence.normalizer.js";
 import { getSeoIntelligenceForChat } from "../loaders/seo-intelligence.loader.js";
 import { getProductIntelligenceForChat } from "../loaders/product-intelligence.loader.js";
 import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
@@ -104,48 +104,19 @@ export async function buildContentBrief(prisma, userId, chatId) {
     };
   }
 
-  // PART 2: Normalize product features and benefits
-  const normalizedProduct = normalizeProductIntelligence(productIntel);
+  // PART 2: Normalize product features and benefits using comprehensive normalizer
+  const normalizedProduct = normalizeProductForContentStudio(productIntel, { website, usp: productAnalysis.usp, summary: productAnalysis.summary || productAnalysis.productSummary });
   console.info("[Content Brief] Product normalized", {
     featuresCount: normalizedProduct.features.length,
     benefitsCount: normalizedProduct.benefits.length,
+    useCasesCount: normalizedProduct.useCases.length,
+    integrationsCount: normalizedProduct.integrations.length,
+    capabilitiesCount: normalizedProduct.capabilities.length,
+    painPointsCount: normalizedProduct.painPoints.length,
+    industriesCount: normalizedProduct.industries.length,
+    hasDerived: !!normalizedProduct._derivedFrom,
     warnings: normalizedProduct.warnings
   });
-
-  // PART 2b: Derive conservative capabilities from summary/USP when no features exist
-  const derivedFeatures = [];
-  const hasExplicitFeatures = normalizedProduct.features.length > 0
-    || (productAnalysis.features && productAnalysis.features.length > 0)
-    || (productAnalysis.capabilities && productAnalysis.capabilities.length > 0)
-    || (website.featuresText && website.featuresText.length > 0);
-  if (!hasExplicitFeatures) {
-    const summary = productAnalysis.summary || productAnalysis.productSummary || '';
-    const usp = productAnalysis.usp || '';
-    const textToParse = (summary + ' ' + usp).toLowerCase();
-    const capabilityPatterns = [
-      { name: 'Video trend tracking', keywords: ['trend', 'viral', 'video', 'short-form'] },
-      { name: 'Creator monitoring', keywords: ['creator', 'influencer', 'content creator'] },
-      { name: 'Competitor monitoring', keywords: ['competitor', 'competitive', 'compete'] },
-      { name: 'Platform analytics', keywords: ['analytics', 'insight', 'data', 'measure'] },
-      { name: 'Content discovery', keywords: ['discover', 'find', 'content research', 'content planning'] },
-      { name: 'Social listening', keywords: ['listen', 'social listening', 'monitor'] },
-    ];
-    capabilityPatterns.forEach(({ name, keywords }) => {
-      const matched = keywords.some(k => textToParse.includes(k));
-      if (matched) {
-        derivedFeatures.push({
-          name,
-          description: null,
-          benefit: null,
-          evidence: null,
-          inferenceStatus: InferenceStatus.AI_INFERRED,
-        });
-      }
-    });
-    if (derivedFeatures.length > 0) {
-      console.info('[Content Brief] Derived capabilities from summary/USP:', derivedFeatures.map(f => f.name));
-    }
-  }
 
   // PART 5: Filter low-quality SEO keywords
   const LOW_QUALITY_KEYWORDS = new Set([
@@ -178,8 +149,8 @@ export async function buildContentBrief(prisma, userId, chatId) {
     product: {
       name: productIdentity.productName,
       brandName: productIdentity.brandName,
-      summary: productAnalysis.summary || productAnalysis.productSummary || null,
-      features: derivedFeatures.length > 0 ? derivedFeatures : (normalizedProduct.features.length > 0
+      summary: normalizedProduct.summary || productAnalysis.summary || productAnalysis.productSummary || null,
+      features: normalizedProduct.features.length > 0
         ? normalizedProduct.features
         : normalizeFeatures(takeArray(
             productAnalysis.features
@@ -188,7 +159,7 @@ export async function buildContentBrief(prisma, userId, chatId) {
             || productAnalysis.productFeatures
             || productAnalysis.differentiators
             || website.featuresText
-            || [], 15))),
+            || [], 15)),
       benefits: normalizedProduct.benefits.length > 0
         ? normalizedProduct.benefits
         : normalizeBenefits(takeArray(
@@ -197,7 +168,11 @@ export async function buildContentBrief(prisma, userId, chatId) {
             || productAnalysis.valuePropositions
             || productAnalysis.advantages
             || [], 10)),
-      usp: productAnalysis.usp || null,
+      useCases: normalizedProduct.useCases,
+      integrations: normalizedProduct.integrations,
+      pricing: normalizedProduct.pricing,
+      capabilities: normalizedProduct.capabilities,
+      usp: normalizedProduct.usp || productAnalysis.usp || null,
     },
     website: {
       title: website.title || null,

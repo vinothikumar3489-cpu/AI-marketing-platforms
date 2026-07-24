@@ -54,45 +54,37 @@ const INVALID_PRODUCT_LABELS = new Set([
 
 
 async function generateEmailCopy(brief, aiFunction = callAI, normalizedEvidence) {
-  // PART 4: Use normalized product identity
   const productIdentity = brief?.productIdentity || {};
   const displayName = productIdentity.displayName || brief?.product?.name || brief?.product?.brandName || brief?.company?.name || 'this solution';
   const internalName = productIdentity.internalName || '';
   const brandName = productIdentity.brandName || brief?.product?.brandName || '';
   const domain = productIdentity.domain || '';
-  const productContext = buildProductEvidenceContext(brief);
+  const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
 
-  // Enhanced email workflow configuration
   const emailType = brief?.emailType || 'Product Announcement';
   const goal = brief?.goal || 'Product Adoption';
   const tone = brief?.tone || 'Professional';
   const audience = brief?.audience || persona;
   const language = brief?.language || 'en';
-  
-  // Sender information from brief or defaults
+
   const sender = {
     name: brief?.senderName || brandName || displayName,
     email: brief?.senderEmail || `noreply@${domain || 'example.com'}`,
     replyTo: brief?.replyToEmail || brief?.senderEmail || `noreply@${domain || 'example.com'}`
   };
 
-  // Recipient information for personalization
-  const recipient = brief?.recipient || {
-    email: '',
-    firstName: '',
-    lastName: '',
-    companyName: ''
-  };
-
-  // CTA URL from brief
+  const recipient = brief?.recipient || { email: '', firstName: '', lastName: '', companyName: '' };
   const ctaUrl = brief?.ctaUrl || brief?.websiteUrl || `https://${domain || 'example.com'}`;
-
-  // PART 4: Use stable word count limits from DTO
   const wc = EMAIL_WORD_COUNT_LIMITS[emailType] || EMAIL_WORD_COUNT_LIMITS['Product Announcement'];
 
-  const prompt = `You are a professional email copywriter. Generate a ${emailType} email for ${displayName}.
+  const features = Array.isArray(brief?.product?.features) ? brief.product.features.slice(0, 5) : [];
+  const benefits = Array.isArray(brief?.product?.benefits) ? brief.product.benefits.slice(0, 5) : [];
+  const featureTexts = features.map(f => typeof f === 'string' ? f : (f.name || f.feature || '')).filter(Boolean);
+  const benefitTexts = benefits.map(b => typeof b === 'string' ? b : (b.text || b.benefit || '')).filter(Boolean);
+
+  const prompt = `You are an enterprise email copywriter for ${displayName}. Write a ${emailType} email comparable to HubSpot, Brevo, and Mailchimp quality standards.
 
 ${productContext}
 
@@ -102,62 +94,49 @@ EMAIL CONFIGURATION:
 - Tone: ${tone}
 - Audience: ${audience}
 - Language: ${language}
-- Sender: ${sender.name} (${sender.email})
+- Sender: ${sender.name}
 - CTA URL: ${ctaUrl}
+- Key Features: ${featureTexts.join(', ') || 'N/A'}
+- Key Benefits: ${benefitTexts.join(', ') || 'N/A'}
 
 REQUIREMENTS:
 - Word count: ${wc.min}-${wc.max} words total
-- Use product name "${displayName}" consistently (NOT internal name "${internalName}")
+- Use "${displayName}" consistently (NOT "${internalName}")
 - subject: Compelling subject line, max 70 chars, include product name
-- subjectAlternatives: Array of 2-3 alternative subject lines for A/B testing
 - previewText: Compelling preview text, max 150 chars
-- greeting: Professional greeting with personalization placeholder (e.g., "Hi {{firstName}},")
-- headline: Main headline or hook that captures attention
-- opening: Strong opening paragraph addressing the pain point
-- painPoint: 1-2 sentences describing the specific problem
-- solution: 2-3 sentences on how ${displayName} solves it
+- greeting: Professional greeting with personalization (e.g., "Hi {{firstName}},")
+- opening: Strong opening paragraph addressing pain point "${painPoint}"
+- problem: 1-2 sentences describing the specific problem ${persona} faces
+- solution: 2-3 sentences on how ${displayName} solves it with specific features
+- featureHighlights: Array of 3-5 specific feature highlights with benefit
 - benefits: Array of 3-5 key benefits
-- features: Array of 2-4 key features
-- bodyParagraphs: Array of 2-4 paragraphs that form the email body
-- socialProof: Social proof or testimonials (if available from evidence)
-- primaryCta: Object with label (CTA button text) and url (use provided CTA URL)
-- secondaryCta: Optional secondary CTA object
-- closing: Warm closing paragraph
-- signature: Sender signature with company name
-- postscript: Optional P.S. line reinforcing key benefit
-- complianceFooter: Compliance footer with legal information
-- unsubscribeText: Unsubscribe text and link
-- variables: Array of personalization variable names used (e.g., firstName, companyName)
-- html: Responsive HTML version of the email (inline styles, ready to send)
-- plainText: Plain text version of the email
-- evidenceUsed: Array of evidence fields referenced from context
+- socialProof: Social proof or testimonial placeholder (e.g., "Join 10,000+ teams")
+- callToAction: Object with label (button text) and url
+- signature: Professional sender signature
+- footer: Compliance footer with company details and legal info
+- personalizationVariables: Array of variable names used (firstName, companyName, etc.)
+- html: Responsive HTML version with inline styles, ready to send
+- plainText: Plain text version
 
-Do NOT use: fake stats, testimonials (unless in evidence), ROI claims, invented data, superlatives, competitor bashing, generic placeholders like "our product" or "the platform".
+Do NOT use: fake stats, invented testimonials, ROI claims, competitor bashing, generic placeholders.
 
 Return valid JSON:
 {
-  "subject": "string",
-  "subjectAlternatives": ["string"],
-  "previewText": "string",
-  "greeting": "string",
-  "headline": "string",
-  "opening": "string",
-  "painPoint": "string",
-  "solution": "string",
+  "subject": "string — max 70 chars",
+  "previewText": "string — max 150 chars",
+  "greeting": "string — with {{firstName}}",
+  "opening": "string — strong opening",
+  "problem": "string — specific problem",
+  "solution": "string — how ${displayName} solves it",
+  "featureHighlights": ["string"],
   "benefits": ["string"],
-  "features": ["string"],
-  "bodyParagraphs": ["string"],
   "socialProof": "string",
-  "primaryCta": { "label": "string", "url": "string" },
-  "secondaryCta": { "label": "string", "url": "string" } or null,
-  "closing": "string",
+  "callToAction": { "label": "string", "url": "string" },
   "signature": "string",
-  "postscript": "string",
-  "complianceFooter": "string",
-  "unsubscribeText": "string",
-  "html": "string",
+  "footer": "string",
+  "personalizationVariables": ["string"],
+  "html": "string — responsive HTML",
   "plainText": "string",
-  "variables": ["personalization variable names used"],
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
 }`;
@@ -166,28 +145,19 @@ Return valid JSON:
     const result = await aiFunction(prompt);
     if (result.success && result.data) {
       const data = result.data;
+      const featureHighlights = Array.isArray(data.featureHighlights) ? data.featureHighlights : [];
       const benefits = Array.isArray(data.benefits) ? data.benefits : [];
-      const features = Array.isArray(data.features) ? data.features : [];
-      const bodyParagraphs = Array.isArray(data.bodyParagraphs) ? data.bodyParagraphs : [];
-      const subjectAlternatives = Array.isArray(data.subjectAlternatives) ? data.subjectAlternatives : [];
+      const personalizationVariables = Array.isArray(data.personalizationVariables) ? data.personalizationVariables : [];
 
-      // PART 4: Validate against DTO schema
       const validationResult = validateEmailCopyDTO(data);
       if (!validationResult.valid) {
         console.warn('[Email Copy] DTO validation failed:', validationResult.errors);
-        // Continue with best-effort data but log warnings
       }
 
-      // Ensure CTA URL is set from brief
-      const primaryCta = {
-        label: data.primaryCta?.label || 'Learn More',
-        url: data.primaryCta?.url || ctaUrl
+      const callToAction = {
+        label: data.callToAction?.label || data.primaryCta?.label || 'Get Started',
+        url: data.callToAction?.url || data.primaryCta?.url || ctaUrl
       };
-
-      const secondaryCta = data.secondaryCta ? {
-        label: data.secondaryCta.label,
-        url: data.secondaryCta.url || ctaUrl
-      } : null;
 
       return {
         id: `email_${Date.now()}`,
@@ -199,34 +169,22 @@ Return valid JSON:
         language,
         sender,
         recipient,
-        productIdentity: {
-          internalName,
-          displayName,
-          brandName,
-          domain,
-        },
+        productIdentity: { internalName, displayName, brandName, domain },
         subject: data.subject || `${displayName}: ${goal}`,
-        subjectAlternatives,
         previewText: data.previewText || `Discover how ${displayName} can help you`,
         greeting: data.greeting || 'Hi {{firstName}},',
-        headline: data.headline || `Transform Your Experience with ${displayName}`,
         opening: data.opening || '',
-        painPoint: data.painPoint || '',
+        problem: data.problem || data.painPoint || '',
         solution: data.solution || '',
+        featureHighlights,
         benefits,
-        features,
-        bodyParagraphs,
         socialProof: data.socialProof || '',
-        primaryCta,
-        secondaryCta,
-        closing: data.closing || '',
+        callToAction,
         signature: data.signature || sender.name,
-        postscript: data.postscript || '',
-        complianceFooter: data.complianceFooter || `© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
-        unsubscribeText: data.unsubscribeText || 'Unsubscribe',
+        footer: data.footer || data.complianceFooter || `© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
+        personalizationVariables,
         html: data.html || '',
         plainText: data.plainText || '',
-        variables: Array.isArray(data.variables) ? data.variables : [],
         evidenceUsed: data.evidenceUsed || [],
         quality: {
           score: validationResult.valid ? 1 : 0.5,
@@ -261,29 +219,19 @@ function generateEmailCopyFallback(displayName, internalName, brandName, domain,
     audience,
     language: 'en',
     sender,
-    recipient: {
-      email: '',
-      firstName: '',
-      lastName: '',
-      companyName: ''
-    },
-    productIdentity: {
-      internalName,
-      displayName,
-      brandName,
-      domain,
-    },
+    recipient: { email: '', firstName: '', lastName: '', companyName: '' },
+    productIdentity: { internalName, displayName, brandName, domain },
     subject: `${displayName}: A Solution for ${persona}`,
-    subjectAlternatives: [
-      `Discover ${displayName} for ${persona}`,
-      `${goal} with ${displayName}`
-    ],
     previewText: `Learn how ${displayName} can help ${persona} overcome ${painPoint}`,
     greeting: 'Hi {{firstName}},',
-    headline: `Transform Your Experience with ${displayName}`,
     opening: `As a ${persona}, you understand the challenge of ${painPoint}.`,
-    painPoint: painPoint || 'Many professionals struggle with inefficient workflows and limited visibility.',
+    problem: painPoint || 'Many professionals struggle with inefficient workflows and limited visibility.',
     solution: `${displayName} provides a comprehensive solution that addresses these challenges directly.`,
+    featureHighlights: [
+      `Advanced ${goal.toLowerCase()} capabilities`,
+      `Intuitive ${tone.toLowerCase()} interface`,
+      `Seamless integration with existing tools`
+    ],
     benefits: [
       `Streamlined workflows for ${persona}`,
       `Enhanced visibility and control`,
@@ -291,30 +239,13 @@ function generateEmailCopyFallback(displayName, internalName, brandName, domain,
       `Cost-effective solution`,
       `Easy implementation and adoption`
     ],
-    features: [
-      `Advanced ${goal.toLowerCase()} capabilities`,
-      `Intuitive ${tone.toLowerCase()} interface`,
-      `Seamless integration`
-    ],
-    bodyParagraphs: [
-      `${displayName} is designed specifically for ${persona} who need to overcome ${painPoint}. Our platform combines advanced features with intuitive design to deliver measurable results.`,
-      `With ${displayName}, you gain access to powerful tools that help you ${goal.toLowerCase()}. Our solution has been tested and refined based on feedback from professionals like you.`,
-      `Get started today and see the difference ${displayName} can make for your workflow.`
-    ],
     socialProof: '',
-    primaryCta: {
-      label: 'Get Started',
-      url: ctaUrl
-    },
-    secondaryCta: null,
-    closing: `We're excited to help you achieve your goals with ${displayName}.`,
+    callToAction: { label: 'Get Started', url: ctaUrl },
     signature: sender.name,
-    postscript: `P.S. Start your journey with ${displayName} today and see immediate results.`,
-    complianceFooter: `© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
-    unsubscribeText: 'Unsubscribe',
+    footer: `© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
+    personalizationVariables: ['firstName', 'lastName', 'companyName'],
     html: generateFallbackHtml(displayName, sender, ctaUrl),
     plainText: generateFallbackPlainText(displayName, sender, ctaUrl),
-    variables: ['firstName', 'lastName', 'companyName'],
     evidenceUsed: [],
     quality: {
       score: 0.5,
