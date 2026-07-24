@@ -1049,10 +1049,17 @@ export const generateContentItem = async (req, res) => {
       console.error("[Content Studio] Schema rejected", {
         chatId, userId, effectiveType,
         errors: meta.schemaErrors,
+        missingFields: meta.missingFields,
       });
-      return res.status(422).json({
-        success: false, error: userMessage, code: "SCHEMA_REJECTED",
-        retryable: true, stage: "VALIDATION", details: errorDetails,
+      return res.status(200).json({
+        success: false,
+        error: userMessage,
+        code: "SCHEMA_REJECTED",
+        retryable: true,
+        stage: "VALIDATION",
+        details: errorDetails,
+        missingFields: meta.missingFields || [],
+        issues: meta.issues || meta.schemaErrors || [],
       });
     }
 

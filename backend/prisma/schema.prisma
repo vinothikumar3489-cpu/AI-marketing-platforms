@@ -237,6 +237,14 @@ model ProductAnalysis {
   aiWarnings          Json?
   warnings            Json?
   source              String?
+  useCases            Json?
+  customerSegments    Json?
+  testimonials        Json?
+  caseStudies         Json?
+  technologyStack     Json?
+  schemaOrg           Json?
+  faq                 Json?
+  resources           Json?
   // Custom fields for our new flow
   provider            String?
   fallbackUsed        Boolean? @default(false)

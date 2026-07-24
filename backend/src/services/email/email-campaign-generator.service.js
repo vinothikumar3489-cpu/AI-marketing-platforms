@@ -638,6 +638,7 @@ export async function generateEmailCampaign({ chatId, userId, planId, campaignPl
         campaignPlanId: planId || campaignPlanId,
         name: `${context.productName || 'Product'} - ${new Date().toLocaleDateString()}`,
         status: 'draft',
+        approvalStatus: 'DRAFT',
         sequenceItems: {
           create: [{
             sequenceOrder: 1,
@@ -658,6 +659,7 @@ export async function generateEmailCampaign({ chatId, userId, planId, campaignPl
       },
       update: {
         status: 'draft',
+        approvalStatus: 'DRAFT',
         updatedAt: new Date()
       }
     });
@@ -719,8 +721,14 @@ function generateFallbackEmail(context) {
 
 export async function sendCampaignEmail({ campaignId, itemId, recipientEmail, recipientName, companyName }) {
   try {
-    const item = await prisma.emailSequenceItem.findUnique({ where: { id: itemId } });
+    const item = await prisma.emailSequenceItem.findUnique({ 
+      where: { id: itemId },
+      include: { campaign: true }
+    });
     if (!item) throw new Error('Email item not found');
+    if (item.campaign && item.campaign.approvalStatus !== 'APPROVED') {
+      throw new Error('Campaign must be approved before sending');
+    }
 
     const personalizedBody = (item.emailBodyText || '')
       .replace(/{{firstName}}/g, recipientName || 'there')
@@ -771,7 +779,7 @@ export async function approveCampaign(campaignId) {
   try {
     const campaign = await prisma.emailCampaign.update({
       where: { id: campaignId },
-      data: { status: 'approved', approvedAt: new Date() }
+      data: { status: 'approved', approvalStatus: 'APPROVED', approvedAt: new Date() }
     });
     return { success: true, data: campaign };
   } catch (error) {

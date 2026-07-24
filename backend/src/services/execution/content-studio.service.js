@@ -504,6 +504,8 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
         generatedAt: new Date().toISOString(),
         provider: repairedResult._provider || 'content_studio_ai',
         schemaErrors: schemaValidation.errors,
+        missingFields: schemaValidation.missingFields || [],
+        issues: schemaValidation.issues || [],
       },
     };
   }

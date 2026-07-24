@@ -3,6 +3,7 @@ import { getSerpCompetitors, normalizeSerpCompetitors, separateCompetitorsByType
 import { getValidatedCompetitorsForChat } from "../competitors/shared-competitor.service.js";
 import { researchCompetitors } from "../../providers/tavily.service.js";
 import { asArray } from "../../utils/text.util.js";
+import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
@@ -50,6 +51,10 @@ export async function generateCompetitorSeoIntelligence({
     
     // Filter self-links and bad competitors even for orchestrator-sourced data
     let competitors = filterAllCompetitors(rawCompetitors, identity);
+
+    // Semantic Validation
+    console.log('🧠 [Competitor SEO] Step 1.5: Semantically validating competitors...');
+    competitors = await semanticallyValidateCompetitors(competitors, identity);
 
     // Step 2: Build competitor SEO profiles
     console.log('📊 [Competitor SEO] Step 2: Building competitor profiles...');
@@ -601,6 +606,50 @@ async function discoverCompetitors({ productName, industry, websiteUrl, keywordI
 
   console.log('⚠️ [Discovery] No verified competitors available');
   return [];
+}
+
+async function semanticallyValidateCompetitors(competitors, identity) {
+  if (!competitors || competitors.length === 0) return [];
+  
+  const prompt = `You are a strict market researcher. I have a list of potential competitors for my product. 
+My product identity:
+- Product Name: ${identity.productName || identity.brandName || "Unknown"}
+- Industry: ${identity.industry || identity.category || "Unknown"}
+- Target Audience: ${identity.targetAudience || "Unknown"}
+
+Here is the list of scraped domains/competitors:
+${JSON.stringify(competitors.map(c => ({ domain: c.domain || c.website, title: c.title, description: c.description })), null, 2)}
+
+Filter out any domains that are clearly NOT direct or indirect business competitors (e.g., completely different industry, different business model, or irrelevant).
+Return a JSON array of objects with the exact keys:
+[
+  {
+    "domain": "competitordomain.com",
+    "isCompetitor": true,
+    "aiReasoning": "Why this was kept or rejected"
+  }
+]
+Return ONLY the JSON array.`;
+
+  try {
+    const aiResult = await callAI(prompt, { provider: 'gemini' });
+    if (aiResult.success && aiResult.data && Array.isArray(aiResult.data)) {
+      const validDomains = new Set(aiResult.data.filter(c => c.isCompetitor).map(c => c.domain.toLowerCase()));
+      const filtered = competitors.filter(c => validDomains.has((c.domain || extractDomain(c.website) || '').toLowerCase()));
+      console.log(`✅ [Competitor SEO] Semantic validation kept ${filtered.length} out of ${competitors.length} competitors.`);
+      
+      // Attach the reasoning to the kept competitors
+      filtered.forEach(c => {
+        const d = (c.domain || extractDomain(c.website) || '').toLowerCase();
+        const reasoningObj = aiResult.data.find(r => r.domain.toLowerCase() === d);
+        if (reasoningObj) c.aiReasoning = reasoningObj.aiReasoning;
+      });
+      return filtered.length > 0 ? filtered : competitors.slice(0, 5); // fallback if all rejected
+    }
+  } catch (err) {
+    console.warn(`⚠️ [Competitor SEO] Semantic validation failed, falling back to all competitors`, err);
+  }
+  return competitors;
 }
 
 function extractDomain(url) {

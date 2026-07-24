@@ -777,7 +777,38 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     
     let growthExecutiveStory;
     try {
-      if (synthesizedIntel) {
+      // Validate prerequisite modules for Executive Story
+      const missingModules = [];
+      if (!normalizedResults.research) missingModules.push('Research');
+      if (!normalizedResults.product || Object.keys(normalizedResults.product).length === 0) missingModules.push('Product');
+      if (!normalizedResults.seo || Object.keys(normalizedResults.seo).length === 0) missingModules.push('SEO');
+      if (!normalizedResults.competitor || Object.keys(normalizedResults.competitor).length === 0) missingModules.push('Competitors');
+
+      if (missingModules.length > 0) {
+        console.warn(`[Growth Workspace] Skipping Executive Story generation. Missing prerequisite modules: ${missingModules.join(', ')}`);
+        warnings.push({
+          code: 'MISSING_PREREQUISITES',
+          message: `Executive Story generation skipped. Missing prerequisite modules: ${missingModules.join(', ')}.`
+        });
+        growthExecutiveStory = {
+          executiveSummary: {
+            title: `Enterprise Business Intelligence Report: ${formattedCompanyName}`,
+            company: formattedCompanyName,
+            industry: input.industry || 'Not specified',
+            assessmentDate: new Date().toISOString().split('T')[0],
+            methodology: 'Analysis pending prerequisite modules',
+            confidenceLevel: 'None',
+            evidenceSourcesUsed: 0,
+            dataGaps: missingModules.length,
+            reportType: 'Enterprise Business Intelligence 2.0',
+            version: '2.0.0',
+            missingModules
+          },
+          companyOverview: { name: formattedCompanyName, domain: '' },
+          evidenceReferences: { totalSources: 0, dataQuality: 'Unavailable', confidence: 0 },
+          _error: `Missing prerequisites: ${missingModules.join(', ')}`
+        };
+      } else if (synthesizedIntel) {
         growthExecutiveStory = generateExecutiveStory(synthesizedIntel);
         growthExecutiveStory.companyOverview.website = input.websiteUrl || '';
         growthExecutiveStory.evidenceReferences = {

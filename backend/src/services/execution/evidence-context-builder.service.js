@@ -175,100 +175,132 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
     return { rejected: true, reason: 'Only legacy SEO topics available — no product identity or evidence. Run Growth Workspace first.', code: 'LEGACY_SEO_ONLY' };
   }
 
+  const ki = seoInfo?.keywordIntelligence || seoInfo?.keywordIntelligenceRecord || {};
+  const csg = seoInfo?.competitorSeoRecord || {};
+  const gap = seoInfo?.contentGapRecord || {};
+  const tech = seoInfo?.technicalAuditDetail || {};
+  const geo = seoInfo?.geoIntelligenceRecord || seoInfo?.geoIntelligence || {};
+  const blog = seoInfo?.blogIntelligenceRecord || {};
+  const execSeo = seoInfo?.executiveDashboard || {};
+
+  const seoKeywords = ki.primaryKeywords || seoInfo?.keywordOpportunities || [];
+
   const context = {
     contextId: `ctx_${chatId}_${Date.now()}`,
     chatId: sourced(chatId, 'chat', 'id'),
     userId: sourced(userId, 'chat', 'userId'),
     evidenceSnapshotId: evidenceSnapshot?.id || null,
 
+    // 1. Company
     company: {
       name: sourcedOpt(productIdentity.companyName || chat.title || raw.website?.title || null, productIdentity.companyName ? 'productIdentity' : 'chat', 'name'),
-      productName: sourcedOpt(productIdentity.productName, 'productIdentity', 'productName'),
-      brandName: sourcedOpt(productIdentity.brandName, 'productIdentity', 'brandName'),
       websiteUrl: sourcedOpt(productIdentity.websiteUrl || chat.websiteUrl || raw.website?.url || null, productIdentity.websiteUrl ? 'productIdentity' : 'chat', 'websiteUrl'),
       domain: sourcedOpt(productIdentity.domain, 'productIdentity', 'domain'),
       industry: sourcedOpt(productAnalysis.industry || null, 'productIntelligence', 'industry'),
     },
 
+    // 2. Product
     product: {
       name: sourcedOpt(productIdentity.productName, 'productIdentity', 'productName'),
       brandName: sourcedOpt(productIdentity.brandName, 'productIdentity', 'brandName'),
-      usp: sourcedOpt(productAnalysis.usp || null, 'productIntelligence', 'usp'),
-      description: sourcedOpt(productAnalysis.description || null, 'productIntelligence', 'description'),
-      features: sourcedOpt(
-        (raw.website?.featuresText || productAnalysis.features || []).length > 0
-          ? (raw.website?.featuresText || productAnalysis.features || [])
-          : null,
-        raw.website?.featuresText?.length ? 'evidenceSnapshot' : 'productIntelligence',
-        'features'
-      ),
-      benefits: sourcedOpt(productAnalysis.benefits?.length ? productAnalysis.benefits : null, 'productIntelligence', 'benefits'),
-      targetAudience: sourcedOpt(audienceData.primaryAudience || productAnalysis.targetAudience || null, audienceData.primaryAudience ? 'productIntelligence' : 'productIntelligence', 'targetAudience'),
-      industry: sourcedOpt(productAnalysis.industry || null, 'productIntelligence', 'industry'),
+      description: sourcedOpt(productAnalysis.description || productAnalysis.productSummary || null, 'productIntelligence', 'description'),
+      category: sourcedOpt(productAnalysis.category || null, 'productIntelligence', 'category'),
     },
 
+    // 3. Features & Benefits & USP
+    features: sourcedOpt(productAnalysis.features || raw.website?.featuresText || null, 'productIntelligence', 'features'),
+    benefits: sourcedOpt(productAnalysis.benefits || null, 'productIntelligence', 'benefits'),
+    usp: sourcedOpt(productAnalysis.usp || null, 'productIntelligence', 'usp'),
+    pricing: sourcedOpt(productAnalysis.pricing || null, 'productIntelligence', 'pricing'),
+    useCases: sourcedOpt(productAnalysis.useCases || null, 'productIntelligence', 'useCases'),
+
+    // 4. Website
     website: {
       title: sourcedOpt(raw.website?.title || null, 'evidenceSnapshot', 'title'),
       metaDescription: sourcedOpt(raw.website?.metaDescription || null, 'evidenceSnapshot', 'metaDescription'),
       heroText: sourcedOpt(raw.website?.heroText || null, 'evidenceSnapshot', 'heroText'),
-      ctaTexts: sourcedOpt(raw.website?.ctaTexts?.length ? raw.website.ctaTexts : null, 'evidenceSnapshot', 'ctaTexts'),
-      featuresText: sourcedOpt(raw.website?.featuresText?.length ? raw.website.featuresText : null, 'evidenceSnapshot', 'featuresText'),
-      pageTypes: raw.website?.pageTypes || null,
-      technologyHints: sourcedOpt(raw.website?.technologyHints?.length ? raw.website.technologyHints : null, 'evidenceSnapshot', 'technologyHints'),
+      ctaTexts: sourcedOpt(raw.website?.ctaTexts || null, 'evidenceSnapshot', 'ctaTexts'),
+      technologyStack: sourcedOpt(raw.website?.technologyHints || productAnalysis.technologyStack || null, 'evidenceSnapshot', 'technologyStack'),
     },
 
-    audience: audienceData?.primaryAudience || audienceData?.buyerPersonas?.length
-      ? {
-          primary: sourcedOpt(audienceData.primaryAudience || null, 'productIntelligence', 'primaryAudience'),
-          personas: sourcedOpt(audienceData.buyerPersonas?.length ? audienceData.buyerPersonas : null, 'productIntelligence', 'buyerPersonas'),
-          painPoints: sourcedOpt(audienceData.painPoints?.length ? audienceData.painPoints : null, 'productIntelligence', 'painPoints'),
-          goals: sourcedOpt(audienceData.goals?.length ? audienceData.goals : null, 'productIntelligence', 'goals'),
-        }
-      : null,
+    // 5. Audience
+    audience: {
+      primary: sourcedOpt(audienceData.primaryAudience || null, 'productIntelligence', 'primaryAudience'),
+      personas: sourcedOpt(audienceData.buyerPersonas || null, 'productIntelligence', 'buyerPersonas'),
+      painPoints: sourcedOpt(audienceData.painPoints || null, 'productIntelligence', 'painPoints'),
+      customerSegments: sourcedOpt(productAnalysis.customerSegments || null, 'productIntelligence', 'customerSegments'),
+    },
 
-    competitors: competitorData?.competitors?.length
-      ? {
-          list: sourcedOpt(competitorData.competitors, 'competitorIntelligence', 'competitors'),
-          strengths: sourcedOpt(competitorData.strengths?.length ? competitorData.strengths : null, 'competitorIntelligence', 'strengths'),
-          weaknesses: sourcedOpt(competitorData.weaknesses?.length ? competitorData.weaknesses : null, 'competitorIntelligence', 'weaknesses'),
-        }
-      : null,
+    // 6. Competitors (Semantic validated)
+    competitors: {
+      list: sourcedOpt(competitorData.competitors || csg.competitors || null, 'competitorIntelligence', 'competitors'),
+      strengths: sourcedOpt(competitorData.strengths || null, 'competitorIntelligence', 'strengths'),
+      weaknesses: sourcedOpt(competitorData.weaknesses || null, 'competitorIntelligence', 'weaknesses'),
+      positioning: sourcedOpt(competitorIntel?.positioningEngine || null, 'competitorIntelligence', 'positioning'),
+    },
 
-    seo: seoInfo || raw.website?.metaDescription
-      ? {
-          issues: sourcedOpt(seoInfo.technicalIssues?.length ? seoInfo.technicalIssues : null, 'seoIntelligence', 'technicalIssues'),
-          contentOpportunities: sourcedOpt(seoInfo.contentOpportunities?.length ? seoInfo.contentOpportunities : null, 'seoIntelligence', 'contentOpportunities'),
-          keywords: sourcedOpt(seoKeywords?.length ? seoKeywords.slice(0, 20) : null, 'seoIntelligence', 'keywords'),
-          contentGaps: sourcedOpt(seoInfo.contentGaps?.length ? seoInfo.contentGaps : null, 'seoIntelligence', 'contentGaps'),
-          blogIdeas: sourcedOpt(seoInfo.blogIdeas?.length ? seoInfo.blogIdeas : null, 'seoIntelligence', 'blogIdeas'),
-        }
-      : null,
+    // 7. SEO
+    seo: {
+      score: sourcedOpt(seoInfo?.seoScore || null, 'seoIntelligence', 'score'),
+      visibility: sourcedOpt(geo.aiVisibilityScore || null, 'seoIntelligence', 'visibility'),
+    },
 
-    channels: channelData?.recommendedChannels?.length
-      ? channelData.recommendedChannels.map((ch, i) => ({
-          channel: ch.channel || ch.name,
-          priority: ch.priority || 'medium',
-          reason: ch.reason || null,
-          evidence: 'channel_recommendation',
-          source: 'campaignIntelligence',
-          index: i,
-        }))
-      : [],
+    // 8. Technical Audit
+    technicalAudit: {
+      criticalIssues: sourcedOpt(tech.criticalIssues || seoInfo?.technicalIssues || null, 'seoIntelligence', 'criticalIssues'),
+      highIssues: sourcedOpt(tech.highIssues || null, 'seoIntelligence', 'highIssues'),
+      recommendations: sourcedOpt(tech.recommendations || seoInfo?.actionPlan?.recommendations || null, 'seoIntelligence', 'recommendations'),
+      performance: sourcedOpt(seoInfo?.technicalAudit?.performance || null, 'seoIntelligence', 'performance'),
+    },
 
-    growth: growthWs
-      ? {
-          overallScore: sourcedOpt(growthWs.overallGrowthScore ?? null, 'growthWorkspace', 'overallGrowthScore'),
-          actionPlan: growthWs.day7Actions?.length || growthWs.day30Actions?.length
-            ? {
-                day7: growthWs.day7Actions || [],
-                day30: growthWs.day30Actions || [],
-                day60: growthWs.day60Actions || [],
-                day90: growthWs.day90Actions || [],
-              }
-            : null,
-        }
-      : null,
+    // 9. Keywords & Clusters
+    keywords: {
+      primary: sourcedOpt(ki.primaryKeywords || seoKeywords || null, 'seoIntelligence', 'primaryKeywords'),
+      secondary: sourcedOpt(ki.secondaryKeywords || null, 'seoIntelligence', 'secondaryKeywords'),
+      longTail: sourcedOpt(ki.longTailKeywords || null, 'seoIntelligence', 'longTailKeywords'),
+      question: sourcedOpt(ki.questionKeywords || null, 'seoIntelligence', 'questionKeywords'),
+      geo: sourcedOpt(ki.geoKeywords || null, 'seoIntelligence', 'geoKeywords'),
+    },
+    clusters: sourcedOpt(ki.clusters || null, 'seoIntelligence', 'clusters'),
 
+    // 10. Content Gaps
+    contentGaps: {
+      missingContent: sourcedOpt(gap.contentGaps || seoInfo?.contentGaps || null, 'seoIntelligence', 'contentGaps'),
+      landingPages: sourcedOpt(gap.landingPageIdeas || null, 'seoIntelligence', 'landingPages'),
+      faqOpportunities: sourcedOpt(gap.faqOpportunities || null, 'seoIntelligence', 'faqOpportunities'),
+      blogIdeas: sourcedOpt(blog.blogIdeas || seoInfo?.blogIdeas || null, 'seoIntelligence', 'blogIdeas'),
+    },
+
+    // 11. Market Research
+    marketResearch: {
+      marketRisks: sourcedOpt(marketData.marketRisks || null, 'productIntelligence', 'marketRisks'),
+      growthOpportunities: sourcedOpt(marketData.growthOpportunities || null, 'productIntelligence', 'growthOpportunities'),
+    },
+
+    // 12. Campaign
+    campaign: {
+      channels: channelData?.recommendedChannels?.length
+        ? channelData.recommendedChannels.map((ch, i) => ({
+            channel: ch.channel || ch.name,
+            priority: ch.priority || 'medium',
+            reason: ch.reason || null,
+            evidence: 'channel_recommendation',
+            source: 'campaignIntelligence',
+            index: i,
+          }))
+        : [],
+      executiveStory: sourcedOpt(campaignIntel?.executiveStory || null, 'campaignIntelligence', 'executiveStory'),
+      actionPlan: sourcedOpt(campaignIntel?.actionPlan || null, 'campaignIntelligence', 'actionPlan'),
+    },
+
+    // 13. Brand Voice
+    brandVoice: sourcedOpt(productAnalysis.brandVoice || campaignIntel?.campaignGenerator?.brandVoice || null, 'campaignIntelligence', 'brandVoice'),
+
+    // 14. Confidence & Sources
+    confidence: {
+      product: sourcedOpt(productAnalysis.confidenceScore || 0, 'productIntelligence', 'confidenceScore'),
+      seo: sourcedOpt(seoInfo?.scoreBreakdown?.overallScore || 0, 'seoIntelligence', 'score'),
+    },
     sourceRegistry,
     sourceSummary: {
       sourcesCollected: Object.entries(sourceRegistry).filter(([, v]) => v.exists).map(([k]) => k),

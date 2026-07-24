@@ -30,9 +30,9 @@ export async function sendTestEmail({ recipientEmail, subject, body, senderName,
 
   const result = await sendEmail({
     to: recipientValidation.email,
-    subject: subject.trim(),
-    html: body.replace(/\n/g, '<br/>'),
-    text: body,
+    subject: (subject || 'Test Email').trim(),
+    html: (body || '').replace(/\n/g, '<br/>'),
+    text: body || '',
     senderName,
     tags: ['test-email'],
   });

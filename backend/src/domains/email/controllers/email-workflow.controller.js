@@ -291,15 +291,15 @@ export async function sendTestEmailHandler(req, res) {
 
     // Apply personalization
     const personalizedHtml = replacePersonalizationVariables(
-      template.htmlContent,
-      template.recipients[0],
+      template.htmlContent || template.emailBodyHtml,
+      template.recipients?.[0],
       template,
       template.productIdentity?.displayName
     );
 
     const personalizedPlainText = replacePersonalizationVariables(
-      template.plainTextContent,
-      template.recipients[0],
+      template.plainTextContent || template.emailBodyText,
+      template.recipients?.[0],
       template,
       template.productIdentity?.displayName
     );
@@ -376,30 +376,18 @@ export async function sendEmailNow(req, res) {
       return res.status(400).json({ success: false, error: 'Email validation failed', blockingIssues: validation.blockingIssues });
     }
 
-    // Ensure recipient exists
-    let recipient = template.recipients[0];
-    if (!recipient || recipient.email !== recipientEmail) {
-      // Create or update recipient
-      recipient = await prisma.emailRecipient.upsert({
-        where: { id: recipient?.id || '' },
-        update: { email: recipientEmail },
-        create: {
-          emailTemplateId: templateId,
-          email: recipientEmail
-        }
-      });
-    }
+    let recipient = template.recipients?.[0] || { email: recipientEmail, id: 'temp-recipient' };
 
     // Apply personalization
     const personalizedHtml = replacePersonalizationVariables(
-      template.htmlContent,
+      template.htmlContent || template.emailBodyHtml,
       recipient,
       template,
       template.productIdentity?.displayName
     );
 
     const personalizedPlainText = replacePersonalizationVariables(
-      template.plainTextContent,
+      template.plainTextContent || template.emailBodyText,
       recipient,
       template,
       template.productIdentity?.displayName
@@ -423,11 +411,6 @@ export async function sendEmailNow(req, res) {
     });
 
     if (result.success) {
-      // Save delivery record
-      await saveDeliveryRecord(templateId, recipient.id, {
-        brevoMessageId: result.providerMessageId,
-        status: 'QUEUED'
-      });
 
       // Log the send
       await prisma.automationLog.create({

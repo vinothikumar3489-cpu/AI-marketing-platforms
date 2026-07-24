@@ -1642,7 +1642,6 @@ function generateExecutiveStory(seoData, executiveOverview = {}) {
   // Use verified scores from executiveOverview, not raw scoreBreakdown
   const hasVerifiedScores = executiveOverview.overallSeoScore?.value !== null;
   
-  // Company Overview
   const companyOverview = {
     companyName,
     domain,
@@ -1650,6 +1649,33 @@ function generateExecutiveStory(seoData, executiveOverview = {}) {
     analysisDate: new Date().toISOString(),
     dataSources: []
   };
+
+  const missingModules = [];
+  if (!seoData.technicalAudit || Object.keys(seoData.technicalAudit).length === 0) missingModules.push('Technical Audit');
+  if (!seoData.competitorIntelligence || Object.keys(seoData.competitorIntelligence).length === 0) missingModules.push('Competitors');
+  if (!seoData.keywordIntelligence || Object.keys(seoData.keywordIntelligence).length === 0) missingModules.push('Research');
+
+  if (missingModules.length > 0) {
+    console.warn(`[SEO Exec Story] Skipping full story generation. Missing prerequisites: ${missingModules.join(', ')}`);
+    return {
+      _error: `Missing prerequisite modules: ${missingModules.join(', ')}`,
+      missingModules,
+      executiveSummary: {
+        title: `Enterprise SEO Intelligence Report: ${companyName}`,
+        company: companyName,
+        industry,
+        assessmentDate: new Date().toISOString(),
+        methodology: 'Analysis pending prerequisite modules',
+        confidenceLevel: 'None',
+        evidenceSourcesUsed: 0,
+        dataGaps: missingModules.length,
+        reportType: 'Enterprise SEO Intelligence',
+        version: '2.0.0',
+        missingModules
+      },
+      companyOverview
+    };
+  }
 
   if (technicalAudit.auditData) companyOverview.dataSources.push('Technical Audit');
   if (keywordIntel.primaryKeywords) companyOverview.dataSources.push('Keyword Intelligence');

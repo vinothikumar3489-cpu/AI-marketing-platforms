@@ -56,48 +56,28 @@ export async function saveEmailDraft(userId, chatId, emailData) {
       });
     }
 
-    const templateData = {
+      name: subject || 'Untitled Template',
       userId,
       chatId,
-      contentAssetId,
-      emailType,
-      goal,
-      tone,
-      audience,
-      language,
+      category: emailType,
+      subjectLine: subject,
+      previewText,
+      emailBodyText: plainText,
+      emailBodyHtml: html,
       senderName: sender?.name,
       senderEmail: sender?.email,
       replyToEmail: sender?.replyTo,
-      subject,
-      subjectAlternatives,
-      previewText,
-      greeting,
-      headline,
-      opening,
-      painPoint,
-      solution,
-      benefits,
-      bodyParagraphs,
-      socialProof,
-      primaryCta,
-      secondaryCta,
-      closing,
-      signature,
-      postscript,
-      complianceFooter,
-      unsubscribeText,
-      htmlContent: html,
-      plainTextContent: plainText,
-      structuredContent: {
-        emailType,
+      personalizationFields: {
+        evidenceUsed,
+        quality,
+        approvalStatus: 'DRAFT',
+        version: 1,
+        contentAssetId,
         goal,
         tone,
         audience,
-        sender,
-        recipient,
-        subject,
+        language,
         subjectAlternatives,
-        previewText,
         greeting,
         headline,
         opening,
@@ -113,14 +93,8 @@ export async function saveEmailDraft(userId, chatId, emailData) {
         postscript,
         complianceFooter,
         unsubscribeText,
-        evidenceUsed,
-        quality
-      },
-      evidenceUsed,
-      quality,
-      approvalStatus: 'DRAFT',
-      version: 1
-    };
+        recipient
+      }
 
     if (template) {
       // Update existing draft
@@ -135,27 +109,7 @@ export async function saveEmailDraft(userId, chatId, emailData) {
       });
     }
 
-    // Save recipient if provided
-    if (recipient && recipient.email) {
-      await prisma.emailRecipient.upsert({
-        where: {
-          id: recipient.id || ''
-        },
-        update: {
-          email: recipient.email,
-          firstName: recipient.firstName,
-          lastName: recipient.lastName,
-          companyName: recipient.companyName
-        },
-        create: {
-          emailTemplateId: template.id,
-          email: recipient.email,
-          firstName: recipient.firstName,
-          lastName: recipient.lastName,
-          companyName: recipient.companyName
-        }
-      });
-    }
+    // Remove recipient upsert since EmailRecipient does not exist in schema
 
     return {
       success: true,
@@ -224,44 +178,25 @@ export async function updateEmailTemplate(templateId, userId, emailData) {
     const template = await prisma.emailTemplate.update({
       where: { id: templateId },
       data: {
-        emailType,
-        goal,
-        tone,
-        audience,
-        language,
+        name: subject || existing.name || 'Untitled Template',
+        category: emailType,
+        subjectLine: subject,
+        previewText,
+        emailBodyText: plainText,
+        emailBodyHtml: html,
         senderName: sender?.name,
         senderEmail: sender?.email,
         replyToEmail: sender?.replyTo,
-        subject,
-        subjectAlternatives,
-        previewText,
-        greeting,
-        headline,
-        opening,
-        painPoint,
-        solution,
-        benefits,
-        bodyParagraphs,
-        socialProof,
-        primaryCta,
-        secondaryCta,
-        closing,
-        signature,
-        postscript,
-        complianceFooter,
-        unsubscribeText,
-        htmlContent: html,
-        plainTextContent: plainText,
-        structuredContent: {
-          emailType,
+        personalizationFields: {
+          evidenceUsed,
+          quality,
+          approvalStatus: (existing.personalizationFields && existing.personalizationFields.approvalStatus) || 'DRAFT',
+          version: ((existing.personalizationFields && existing.personalizationFields.version) || 1) + 1,
           goal,
           tone,
           audience,
-          sender,
-          recipient,
-          subject,
+          language,
           subjectAlternatives,
-          previewText,
           greeting,
           headline,
           opening,
@@ -277,43 +212,12 @@ export async function updateEmailTemplate(templateId, userId, emailData) {
           postscript,
           complianceFooter,
           unsubscribeText,
-          evidenceUsed,
-          quality
-        },
-        evidenceUsed,
-        quality,
-        version: existing.version + 1
+          recipient
+        }
       }
     });
 
-    // Update recipient if provided
-    if (recipient && recipient.email) {
-      const existingRecipient = await prisma.emailRecipient.findFirst({
-        where: { emailTemplateId: templateId }
-      });
-
-      if (existingRecipient) {
-        await prisma.emailRecipient.update({
-          where: { id: existingRecipient.id },
-          data: {
-            email: recipient.email,
-            firstName: recipient.firstName,
-            lastName: recipient.lastName,
-            companyName: recipient.companyName
-          }
-        });
-      } else {
-        await prisma.emailRecipient.create({
-          data: {
-            emailTemplateId: templateId,
-            email: recipient.email,
-            firstName: recipient.firstName,
-            lastName: recipient.lastName,
-            companyName: recipient.companyName
-          }
-        });
-      }
-    }
+    // Remove recipient update since EmailRecipient does not exist in schema
 
     return {
       success: true,
@@ -425,11 +329,7 @@ export async function rejectEmailTemplate(templateId, userId, reason) {
 export async function getEmailTemplate(templateId, userId) {
   try {
     const template = await prisma.emailTemplate.findFirst({
-      where: { id: templateId, userId },
-      include: {
-        recipients: true,
-        deliveries: true
-      }
+      where: { id: templateId, userId }
     });
 
     if (!template) {
@@ -469,13 +369,6 @@ export async function listEmailTemplates(userId, chatId, filters = {}) {
 
     const templates = await prisma.emailTemplate.findMany({
       where,
-      include: {
-        recipients: true,
-        deliveries: {
-          orderBy: { createdAt: 'desc' },
-          take: 1
-        }
-      },
       orderBy: { createdAt: 'desc' }
     });
 

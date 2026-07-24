@@ -6,7 +6,8 @@ function ensureArray(value) { return Array.isArray(value) ? value.filter(Boolean
 
 function featureToMarketing(feature) {
   if (!feature) return "";
-  const lower = feature.toLowerCase();
+  const str = typeof feature === 'string' ? feature : (feature.value || feature.name || "");
+  const lower = str.toLowerCase();
   const conversions = {
     "ai": "AI-powered insights",
     "builder": "easy-to-use builder",
@@ -31,7 +32,8 @@ function featureToMarketing(feature) {
 
 function inferBuyerPersonas(manualData = {}, scrapedData = {}) {
   const personas = [];
-  const targetUsers = (manualData.targetAudience || "").split(/,|;|\s+and\s+/).map((part) => part.trim()).filter(Boolean);
+  const audStr = typeof manualData.targetAudience === 'string' ? manualData.targetAudience : (manualData.targetAudience?.value || "");
+  const targetUsers = audStr.split(/,|;|\s+and\s+/).map((part) => part.trim()).filter(Boolean);
 
   const normalized = targetUsers.map((value) => value.toLowerCase());
   if (normalized.some((v) => v.includes("student") || v.includes("graduate"))) {
@@ -66,7 +68,7 @@ function inferMarketMaturity(manualData = {}, scrapedData = {}) {
 }
 
 function ensurePainPoints(painPoints = [], manualData = {}, scrapedData = {}) {
-  const normalized = ensureArray(painPoints).filter(Boolean);
+  const normalized = ensureArray(painPoints).map(p => typeof p === 'string' ? p : p.value).filter(Boolean);
   const fallback = [];
 
   if (normalized.length > 0) return normalized;
@@ -180,7 +182,8 @@ function extractPainPoints(manualData = {}, scrapedData = {}) {
 
   const benefits = uniq(scrapedData?.benefits || []).slice(0, 4);
   for (const benefit of benefits) {
-    const normalized = benefit.toLowerCase();
+    const val = typeof benefit === 'string' ? benefit : benefit.value || "";
+    const normalized = val.toLowerCase();
     if (normalized.includes("save time") || normalized.includes("faster")) {
       painPoints.push("Inefficient workflows that waste time");
     } else if (normalized.includes("reduce cost") || normalized.includes("pricing")) {
@@ -214,10 +217,11 @@ function deduplicateUsers(users) {
   const seen = new Set();
   
   for (const user of users) {
-    const lower = user.toLowerCase().trim();
+    const val = typeof user === 'string' ? user : user.value || "";
+    const lower = val.toLowerCase().trim();
     
     // Normalize similar variations
-    let normalized_user = user;
+    let normalized_user = val;
     if (lower.includes("student")) normalized_user = "Students";
     else if (lower.includes("working professional") || lower.includes("professional")) normalized_user = "Working professionals";
     else if (lower.includes("enterprise")) normalized_user = "Enterprise teams";
@@ -429,6 +433,14 @@ export async function generateProductAnalysis(manualData = {}, scrapedData = {})
   const category = analysisResult?.category || manualData.industry || "General Technology";
   const usp = ensureArray(analysisResult?.usp || [extractUSP(manualData, scrapedData)]);
   const productSummary = analysisResult?.productSummary || extractSummary(manualData, scrapedData);
+  const useCases = ensureArray(analysisResult?.useCases || []);
+  const customerSegments = ensureArray(analysisResult?.customerSegments || []);
+  const testimonials = ensureArray(analysisResult?.testimonials || []);
+  const caseStudies = ensureArray(analysisResult?.caseStudies || []);
+  const technologyStack = ensureArray(analysisResult?.technologyStack || []);
+  const schemaOrg = ensureArray(analysisResult?.schemaOrg || []);
+  const faq = ensureArray(analysisResult?.faq || []);
+  const resources = ensureArray(analysisResult?.resources || []);
 
   let confidenceScore = analysisResult?.confidenceScore ?? calculateConfidenceScore(manualData, scrapedData);
   if ((!benefits || benefits.length === 0) || (!painPoints || painPoints.length === 0)) {
@@ -470,6 +482,14 @@ export async function generateProductAnalysis(manualData = {}, scrapedData = {})
     marketingAngles,
     pricingPosition,
     marketMaturity,
+    useCases,
+    customerSegments,
+    testimonials,
+    caseStudies,
+    technologyStack,
+    schemaOrg,
+    faq,
+    resources,
     confidenceScore,
     dataSourcesUsed: uniq(dataSourcesUsed),
     warnings,

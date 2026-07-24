@@ -1,6 +1,7 @@
 import prisma from "../../../config/prisma.js";
 import { generateCompleteSeoIntelligence as orchestratorGenerateSeo } from "../../../services/seo/seo-orchestrator.service.js";
 import { logEvidenceInfo, logEvidenceError } from "../../../utils/evidence-logger.js";
+import { generateExecutiveDashboard } from "../../../services/seo/executive-dashboard-generator.service.js";
 
 const toNullableScore = (v) => {
   if (v === undefined || v === null) return null;
@@ -31,11 +32,11 @@ async function generateCompleteSeoIntelligence({ chatId, userId, websiteUrl, cha
 
   const identity = modules?.crawl?.identity || {};
 
-  const keywordIntelligence = report?.keywordIntelligence || null;
-  const competitorIntelligence = report?.competitorIntelligence || null;
-  const contentGapIntelligence = report?.contentGapIntelligence || null;
-  const geoIntelligence = report?.geoIntelligence || null;
-  const blogIntelligence = report?.blogIntelligence || null;
+  const keywordIntelligence = modules?.keywordIntelligence?.data || null;
+  const competitorIntelligence = modules?.competitorIntelligence?.data || null;
+  const contentGapIntelligence = modules?.contentGapIntelligence?.data || null;
+  const geoIntelligence = modules?.geoIntelligence?.data || null;
+  const blogIntelligence = modules?.blogIntelligence?.data || null;
 
   const technicalAuditModule = modules?.technicalSeo || {};
   const pageSpeedModule = technicalAuditModule.data?.pageSpeed || null;
@@ -320,7 +321,104 @@ async function saveSEOData({ chatId, userId, identity, websiteUrl, technicalAudi
         }
       });
     }
+
+    if (geoIntelligence) {
+      const numericScore = (v) => (v != null && typeof v === 'number' ? v : null);
+      await tx.geoIntelligenceRecord.upsert({
+        where: { seoIntelligenceId: savedId },
+        create: {
+          seoIntelligenceId: savedId,
+          aiVisibilityScore: numericScore(geoIntelligence.aiVisibilityScore),
+          chatGptScore: numericScore(geoIntelligence.chatGptScore),
+          geminiScore: numericScore(geoIntelligence.geminiScore),
+          claudeScore: numericScore(geoIntelligence.claudeScore),
+          perplexityScore: numericScore(geoIntelligence.perplexityScore),
+          googleAiOverviewScore: numericScore(geoIntelligence.googleAiOverviewScore),
+          entityCoverageScore: numericScore(geoIntelligence.entityCoverageScore),
+          knowledgeGraphReadinessScore: numericScore(geoIntelligence.knowledgeGraphReadinessScore),
+          citationReadinessScore: numericScore(geoIntelligence.citationReadinessScore),
+          answerabilityScore: numericScore(geoIntelligence.answerabilityScore),
+          topicalAuthorityScore: numericScore(geoIntelligence.topicalAuthorityScore),
+          entities: geoIntelligence.entities || [],
+          knowledgeGraphEntities: geoIntelligence.knowledgeGraphEntities || [],
+          citationOpportunities: geoIntelligence.citationOpportunities || [],
+          faqOpportunities: geoIntelligence.faqOpportunities || [],
+          aiContentOpportunities: geoIntelligence.aiContentOpportunities || [],
+          trustSignals: geoIntelligence.trustSignals || {},
+          recommendations: geoIntelligence.recommendations || {}
+        },
+        update: {
+          aiVisibilityScore: numericScore(geoIntelligence.aiVisibilityScore),
+          chatGptScore: numericScore(geoIntelligence.chatGptScore),
+          geminiScore: numericScore(geoIntelligence.geminiScore),
+          claudeScore: numericScore(geoIntelligence.claudeScore),
+          perplexityScore: numericScore(geoIntelligence.perplexityScore),
+          googleAiOverviewScore: numericScore(geoIntelligence.googleAiOverviewScore),
+          entityCoverageScore: numericScore(geoIntelligence.entityCoverageScore),
+          knowledgeGraphReadinessScore: numericScore(geoIntelligence.knowledgeGraphReadinessScore),
+          citationReadinessScore: numericScore(geoIntelligence.citationReadinessScore),
+          answerabilityScore: numericScore(geoIntelligence.answerabilityScore),
+          topicalAuthorityScore: numericScore(geoIntelligence.topicalAuthorityScore),
+          entities: geoIntelligence.entities || [],
+          knowledgeGraphEntities: geoIntelligence.knowledgeGraphEntities || [],
+          citationOpportunities: geoIntelligence.citationOpportunities || [],
+          faqOpportunities: geoIntelligence.faqOpportunities || [],
+          aiContentOpportunities: geoIntelligence.aiContentOpportunities || [],
+          trustSignals: geoIntelligence.trustSignals || {},
+          recommendations: geoIntelligence.recommendations || {},
+          updatedAt: new Date()
+        }
+      });
+    }
+
+    if (blogIntelligence) {
+      await tx.blogIntelligenceRecord.upsert({
+        where: { seoIntelligenceId: savedId },
+        create: {
+          seoIntelligenceId: savedId,
+          blogIdeas: blogIntelligence.blogIdeas || [],
+          blogClusters: blogIntelligence.blogClusters || [],
+          blogBriefs: blogIntelligence.blogBriefs || [],
+          publishingCalendar: blogIntelligence.publishingCalendar || {},
+          summary: blogIntelligence.summary || { totalIdeas: 0, totalClusters: 0, highPriorityIdeas: 0 },
+          metadata: blogIntelligence.metadata || null
+        },
+        update: {
+          blogIdeas: blogIntelligence.blogIdeas || [],
+          blogClusters: blogIntelligence.blogClusters || [],
+          blogBriefs: blogIntelligence.blogBriefs || [],
+          publishingCalendar: blogIntelligence.publishingCalendar || {},
+          summary: blogIntelligence.summary || { totalIdeas: 0, totalClusters: 0, highPriorityIdeas: 0 },
+          metadata: blogIntelligence.metadata || null,
+          updatedAt: new Date()
+        }
+      });
+    }
   });
+
+  try {
+    await generateExecutiveDashboard({
+      seoIntelligenceId: savedId,
+      chatId,
+      userId,
+      seoData: {
+        technicalAudit,
+        keywordIntelligence,
+        competitorIntelligence,
+        geoIntelligence,
+        blogIntelligence,
+        contentGapIntelligence,
+        scoreBreakdown: {
+          overallScore: toNullableScore(overallScore)
+        },
+        identity: { websiteUrl, domain: identity?.domain, companyName: identity?.companyName, productName: identity?.productName }
+      }
+    });
+    logEvidenceInfo('seo.persist', 'Executive Dashboard generated and saved', { seoIntelligenceId: savedId });
+  } catch (e) {
+    logEvidenceError('seo.persist', chatId, e);
+    console.error('[SEO Exec Dashboard Save Error]', e);
+  }
 
   return savedId;
 }

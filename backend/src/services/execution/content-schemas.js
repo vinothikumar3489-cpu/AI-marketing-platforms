@@ -392,8 +392,12 @@ export function validateContentOutput(raw, assetType) {
     return { valid: true, data: result.data };
   }
 
-  const errors = result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`);
-  return { valid: false, errors, raw: normalized };
+  const issues = result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`);
+  const missingFields = result.error.issues
+    .filter(i => i.code === 'invalid_type' && i.received === 'undefined' || (i.message.toLowerCase().includes('required')))
+    .map(i => i.path.join('.'));
+
+  return { valid: false, errors: issues, missingFields, issues, raw: normalized };
 }
 
 /** Attempt repair of common AI output issues */
