@@ -72,15 +72,15 @@ export async function generateContentGapIntelligence({
 
     // Step 5: Identify missing FAQ pages
     console.log('❓ [Content Gap] Step 5: Identifying FAQ opportunities...');
-    const faqGaps = identifyFaqOpportunities(keywordIntelligence, geoIntelligence, existingPages);
+    const faqGaps = identifyFaqOpportunities(keywordIntelligence, geoIntelligence, existingPages, productName);
 
     // Step 6: Identify missing comparison pages (using filtered competitors)
     console.log('⚖️ [Content Gap] Step 6: Identifying comparison page opportunities...');
-    const comparisonGaps = identifyComparisonOpportunities(keywordIntelligence, filteredCompetitorIntelligence, existingPages);
+    const comparisonGaps = identifyComparisonOpportunities(keywordIntelligence, filteredCompetitorIntelligence, existingPages, productName);
 
     // Step 7: Identify missing resource/blog pages
     console.log('📚 [Content Gap] Step 7: Identifying resource page opportunities...');
-    const resourceGaps = identifyResourceOpportunities(keywordIntelligence, existingPages);
+    const resourceGaps = identifyResourceOpportunities(keywordIntelligence, existingPages, productName);
 
     // Compile all gaps with proper structure
     const allGaps = [
@@ -413,18 +413,19 @@ function identifyMissingServicePages(websiteData, keywordIntelligence, productNa
 // FAQ OPPORTUNITIES
 // ============================================
 
-function identifyFaqOpportunities(keywordIntelligence, geoIntelligence, existingPages) {
+function identifyFaqOpportunities(keywordIntelligence, geoIntelligence, existingPages, productName) {
   const gaps = [];
+  const safeGeo = geoIntelligence || {};
   
   // Only generate FAQ pages if we have question keywords or GEO data
-  const questionKeywords = keywordIntelligence.primaryKeywords?.filter(kw => {
+  const questionKeywords = (keywordIntelligence.primaryKeywords || []).filter(kw => {
     const keyword = kw.keyword || kw;
     return keyword.startsWith('how') || keyword.startsWith('what') || 
            keyword.startsWith('why') || keyword.startsWith('when') ||
            keyword.includes('?');
-  }) || [];
+  });
 
-  const geoQuestions = geoIntelligence.geoKeywords || [];
+  const geoQuestions = safeGeo.geoKeywords || [];
 
   if (questionKeywords.length === 0 && geoQuestions.length === 0) {
     return gaps;
@@ -484,11 +485,11 @@ function identifyFaqOpportunities(keywordIntelligence, geoIntelligence, existing
 // COMPARISON OPPORTUNITIES
 // ============================================
 
-function identifyComparisonOpportunities(keywordIntelligence, competitorIntelligence, existingPages) {
+function identifyComparisonOpportunities(keywordIntelligence, competitorIntelligence, existingPages, productName) {
   const gaps = [];
   
   // Only generate comparison pages if we have comparison keywords or competitors
-  const comparisonKeywords = keywordIntelligence.primaryKeywords?.filter(kw => {
+  const comparisonKeywords = (keywordIntelligence.primaryKeywords || []).filter(kw => {
     const keyword = kw.keyword || kw;
     return keyword.includes('vs') || keyword.includes('versus') || 
            keyword.includes('alternative') || keyword.includes('comparison');
@@ -528,11 +529,11 @@ function identifyComparisonOpportunities(keywordIntelligence, competitorIntellig
 // RESOURCE OPPORTUNITIES
 // ============================================
 
-function identifyResourceOpportunities(keywordIntelligence, existingPages) {
+function identifyResourceOpportunities(keywordIntelligence, existingPages, productName) {
   const gaps = [];
   
   // Only generate resource pages if we have informational keywords
-  const resourceKeywords = keywordIntelligence.primaryKeywords?.filter(kw => {
+  const resourceKeywords = (keywordIntelligence.primaryKeywords || []).filter(kw => {
     const keyword = kw.keyword || kw;
     const intent = kw.intent || 'informational';
     return intent === 'informational' && keyword.length > 5 && 

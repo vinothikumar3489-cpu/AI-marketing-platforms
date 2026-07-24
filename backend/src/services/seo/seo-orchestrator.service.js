@@ -81,16 +81,18 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     return await generateKeywordIntelligence({
       websiteData,
       identity,
-      seoIntelligence: null,
+      seoIntelligence: {},
       orchestratorKeywords: researchData.keywords || []
     });
   });
   modules.keywordIntelligence = keywordIntelligence;
 
+  const kiData = keywordIntelligence.data || {};
+
   const competitorIntelligence = await runModule('competitorIntelligence', async () => {
     return await generateCompetitorSeoIntelligence({
-      keywordIntelligence: keywordIntelligence.data || {},
-      geoIntelligence: null,
+      keywordIntelligence: kiData,
+      geoIntelligence: {},
       websiteData,
       identity,
       orchestratorCompetitors: researchData.competitors || []
@@ -98,12 +100,15 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
   });
   modules.competitorIntelligence = competitorIntelligence;
 
+  const ciData = competitorIntelligence.data || {};
+  const techData = techAudit.data || {};
+
   const contentGapIntelligence = await runModule('contentGapIntelligence', async () => {
     return await generateContentGapIntelligence({
       websiteData,
-      keywordIntelligence: keywordIntelligence.data || {},
-      geoIntelligence: null,
-      competitorIntelligence: competitorIntelligence.data || {},
+      keywordIntelligence: kiData,
+      geoIntelligence: {},
+      competitorIntelligence: ciData,
       identity
     });
   });
@@ -112,17 +117,19 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
   const geoIntelligence = await runModule('geoIntelligence', async () => {
     return await generateGeoIntelligence({
       websiteData,
-      technicalAudit: techAudit.data || null,
+      technicalAudit: techData,
       identity
     });
   });
   modules.geoIntelligence = geoIntelligence;
 
+  const geoData = geoIntelligence.data || {};
+
   const blogIntelligence = await runModule('blogIntelligence', async () => {
     return await generateBlogIntelligence({
-      keywordIntelligence: keywordIntelligence.data || {},
-      competitorIntelligence: competitorIntelligence.data || {},
-      geoIntelligence: geoIntelligence.data || {},
+      keywordIntelligence: kiData,
+      competitorIntelligence: ciData,
+      geoIntelligence: geoData,
       identity,
       orchestratorData: {}
     });

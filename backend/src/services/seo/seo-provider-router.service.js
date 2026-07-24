@@ -191,6 +191,33 @@ async function withTimeout(promise, ms, label) {
   return Promise.race([promise.finally(() => clearTimeout(timer)), timeout]);
 }
 
+let _dataforseoReconnecting = false;
+
+async function ensureDataForSEOReady() {
+  if (isDataForSEOConfigured()) {
+    const connStatus = getDataForSEOConnectionStatus();
+    if (connStatus.connected) return true;
+    if (_dataforseoReconnecting) return false;
+    _dataforseoReconnecting = true;
+    try {
+      console.log('[SEO PROVIDER] Attempting DataForSEO reconnection...');
+      const result = await verifyDataForSEO();
+      if (result.success) {
+        console.log('[SEO PROVIDER] DataForSEO reconnection successful');
+        return true;
+      }
+      console.warn('[SEO PROVIDER] DataForSEO reconnection failed:', result.error);
+      return false;
+    } catch (e) {
+      console.warn('[SEO PROVIDER] DataForSEO reconnection error:', e.message);
+      return false;
+    } finally {
+      _dataforseoReconnecting = false;
+    }
+  }
+  return false;
+}
+
 export async function withProviderFallback(operation, options = {}) {
   const { useCache = true, cachePrefix = 'seo', cacheArgs = [], forceRefresh = false, timeout = 30000 } = options;
   const cacheKeyStr = cachePrefix ? cacheKey(cachePrefix, ...cacheArgs) : null;
@@ -202,32 +229,43 @@ export async function withProviderFallback(operation, options = {}) {
     }
   }
 
-  if (isSerpAPIConfigured() && isSerpAPIAvailable()) {
-    try {
-      const result = await withTimeout(operation('serpapi'), timeout, `SerpAPI ${cachePrefix}`);
-      if (result && result.success !== false) {
-        const enriched = { ...result, provider: 'SerpAPI', confidence: result.confidence || 100, retrievedAt: new Date().toISOString(), status: 'measured' };
-        if (useCache && cacheKeyStr) setCache(cacheKeyStr, enriched);
-        return enriched;
+  let serpapiAttempted = false;
+  let dfsAttempted = false;
+
+  if (isSerpAPIConfigured()) {
+    serpapiAttempted = true;
+    if (isSerpAPIAvailable()) {
+      try {
+        const result = await withTimeout(operation('serpapi'), timeout, `SerpAPI ${cachePrefix}`);
+        if (result && result.success !== false) {
+          const enriched = { ...result, provider: 'SerpAPI', confidence: result.confidence || 100, retrievedAt: new Date().toISOString(), status: 'measured' };
+          if (useCache && cacheKeyStr) setCache(cacheKeyStr, enriched);
+          return enriched;
+        }
+        console.log('[SEO PROVIDER FALLBACK]', { from: 'SerpAPI', reason: 'operation returned unsuccessful', operation: cachePrefix });
+      } catch (e) {
+        console.warn('[SEO PROVIDER FALLBACK]', { from: 'SerpAPI', reason: e.message, operation: cachePrefix });
       }
-      console.log('[SEO PROVIDER FALLBACK]', { from: 'SerpAPI', reason: 'operation returned unsuccessful', operation: cachePrefix });
-    } catch (e) {
-      console.warn('[SEO PROVIDER FALLBACK]', { from: 'SerpAPI', reason: e.message, operation: cachePrefix });
+    } else {
+      console.log('[SEO PROVIDER] SerpAPI configured but not available, skipping');
     }
   }
 
-  const dfsConnected = getDataForSEOConnectionStatus().connected;
-  if (SEO_PROVIDER_DATAFORSEO_ENABLED && isDataForSEOConfigured() && dfsConnected) {
-    try {
-      const result = await withTimeout(operation('dataforseo'), timeout, `DataForSEO ${cachePrefix}`);
-      if (result && result.success !== false) {
-        const enriched = { ...result, provider: 'DataForSEO', confidence: result.confidence || 100, retrievedAt: new Date().toISOString(), status: 'measured' };
-        if (useCache && cacheKeyStr) setCache(cacheKeyStr, enriched);
-        return enriched;
+  if (SEO_PROVIDER_DATAFORSEO_ENABLED && isDataForSEOConfigured()) {
+    const dfsReady = await ensureDataForSEOReady();
+    if (dfsReady) {
+      dfsAttempted = true;
+      try {
+        const result = await withTimeout(operation('dataforseo'), timeout, `DataForSEO ${cachePrefix}`);
+        if (result && result.success !== false) {
+          const enriched = { ...result, provider: 'DataForSEO', confidence: result.confidence || 100, retrievedAt: new Date().toISOString(), status: 'measured' };
+          if (useCache && cacheKeyStr) setCache(cacheKeyStr, enriched);
+          return enriched;
+        }
+        console.log('[SEO PROVIDER FALLBACK]', { from: 'DataForSEO', reason: 'operation returned unsuccessful', operation: cachePrefix });
+      } catch (e) {
+        console.warn('[SEO PROVIDER FALLBACK]', { from: 'DataForSEO', reason: e.message, operation: cachePrefix });
       }
-      console.log('[SEO PROVIDER FALLBACK]', { from: 'DataForSEO', reason: 'operation returned unsuccessful', operation: cachePrefix });
-    } catch (e) {
-      console.warn('[SEO PROVIDER FALLBACK]', { from: 'DataForSEO', reason: e.message, operation: cachePrefix });
     }
   }
 
@@ -241,6 +279,7 @@ export async function withProviderFallback(operation, options = {}) {
   return {
     success: false, error: 'All providers unavailable',
     provider: null, confidence: 0,
+    serpapiAttempted, dfsAttempted,
     retrievedAt: new Date().toISOString(), status: 'unavailable'
   };
 }

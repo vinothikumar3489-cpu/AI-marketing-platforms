@@ -408,11 +408,142 @@ export function repairAIOutput(raw, assetType) {
       if (!repaired.sections) repaired.sections = [{ heading: 'Overview', body: repaired.article, keyTakeaways: [] }];
       delete repaired.article;
     }
+    if (repaired.content && !repaired.sections) {
+      repaired.sections = [{ heading: 'Content', body: repaired.content, keyTakeaways: [] }];
+      delete repaired.content;
+    }
+    if (repaired.body) {
+      if (!repaired.introduction) repaired.introduction = repaired.body.substring(0, 200);
+      if (!repaired.sections) repaired.sections = [{ heading: 'Overview', body: repaired.body, keyTakeaways: [] }];
+      if (!repaired.conclusion) repaired.conclusion = repaired.body.substring(0, 150);
+      delete repaired.body;
+    }
+    repaired.headline = repaired.headline || repaired.metaTitle || 'Untitled Article';
+    repaired.introduction = repaired.introduction || (repaired.headline ? `An overview of ${repaired.headline.toLowerCase()}.` : 'Introduction to this topic.');
+    if (!repaired.sections || repaired.sections.length === 0) {
+      repaired.sections = [{ heading: 'Overview', body: 'Content not available.', keyTakeaways: [] }];
+    }
+    repaired.conclusion = repaired.conclusion || 'This concludes the article. Reach out to learn more.';
+    repaired.evidenceUsed = repaired.evidenceUsed || [];
+    repaired.claimsRequiringReview = repaired.claimsRequiringReview || [];
   }
 
   if (assetType === 'faq_page') {
     if (repaired.faqItems && !repaired.faqs) { repaired.faqs = repaired.faqItems; delete repaired.faqItems; }
     if (repaired.title && !repaired.headline) { repaired.headline = repaired.title; delete repaired.title; }
+    if (repaired.questions && !repaired.faqs) {
+      repaired.faqs = repaired.questions.map(q => typeof q === 'string' ? { question: q, answer: '' } : q);
+      delete repaired.questions;
+    }
+    repaired.headline = repaired.headline || 'Frequently Asked Questions';
+    repaired.introduction = repaired.introduction || 'Find answers to common questions.';
+    if (!repaired.faqs || repaired.faqs.length === 0) {
+      repaired.faqs = [{ question: 'What is this about?', answer: 'Please contact us for more information.' }];
+    }
+  }
+
+  if (assetType === 'linkedin_post') {
+    repaired.hook = repaired.hook || repaired.headline || repaired.title || 'Check this out';
+    repaired.body = repaired.body || repaired.content || repaired.text || '';
+    if (repaired.content && !repaired.body) { repaired.body = repaired.content; delete repaired.content; }
+    if (repaired.text && !repaired.body) { repaired.body = repaired.text; delete repaired.text; }
+    repaired.body = repaired.body || (repaired.hook ? `Learn more about ${repaired.hook.toLowerCase()}.` : 'Read on for insights.');
+    repaired.cta = repaired.cta || repaired.callToAction || 'Learn more';
+    repaired.audience = repaired.audience || 'Professionals in the industry';
+    repaired.angle = repaired.angle || 'informational';
+    repaired.hashtags = repaired.hashtags || [];
+  }
+
+  if (assetType === 'instagram_post') {
+    repaired.hook = repaired.hook || repaired.headline || 'Check this out';
+    repaired.caption = repaired.caption || repaired.body || repaired.content || '';
+    repaired.cta = repaired.cta || 'Learn more';
+    repaired.hashtags = repaired.hashtags || [];
+    repaired.audience = repaired.audience || 'General audience';
+    repaired.angle = repaired.angle || 'informational';
+  }
+
+  if (assetType === 'twitter_post' || assetType === 'x_post') {
+    repaired.post = repaired.post || repaired.content || repaired.text || repaired.body || '';
+    if (repaired.content && !repaired.post) { repaired.post = repaired.content; delete repaired.content; }
+    if (repaired.body && !repaired.post) { repaired.post = repaired.body; delete repaired.body; }
+    repaired.post = repaired.post || 'Check this out';
+    repaired.hashtags = repaired.hashtags || [];
+    repaired.audience = repaired.audience || 'General audience';
+    repaired.angle = repaired.angle || 'informational';
+  }
+
+  if (assetType === 'facebook_post') {
+    repaired.body = repaired.body || repaired.content || repaired.text || '';
+    if (repaired.content && !repaired.body) { repaired.body = repaired.content; delete repaired.content; }
+    if (repaired.text && !repaired.body) { repaired.body = repaired.text; delete repaired.text; }
+    repaired.body = repaired.body || 'Check this out';
+    repaired.audience = repaired.audience || 'General audience';
+    repaired.angle = repaired.angle || 'informational';
+  }
+
+  if (assetType === 'youtube_description') {
+    repaired.title = repaired.title || repaired.headline || 'Video';
+    repaired.openingHook = repaired.openingHook || repaired.introduction || 'Watch this video to learn more.';
+    repaired.description = repaired.description || repaired.body || repaired.content || '';
+    repaired.chapters = repaired.chapters || [];
+    repaired.cta = repaired.cta || 'Subscribe for more';
+    repaired.hashtags = repaired.hashtags || [];
+    repaired.keywords = repaired.keywords || [];
+  }
+
+  if (assetType === 'landing_page') {
+    repaired.headline = repaired.headline || repaired.title || 'Welcome';
+    repaired.painPoints = repaired.painPoints || [];
+    if (!repaired.features || repaired.features.length === 0) {
+      repaired.features = [{ icon: 'star', title: 'Feature', description: 'Description of the feature.' }];
+    }
+    repaired.socialProof = repaired.socialProof || [];
+    repaired.seoKeywords = repaired.seoKeywords || [];
+  }
+
+  if (assetType === 'email_copy' || assetType.startsWith('email_')) {
+    repaired.subject = repaired.subject || repaired.subjectLine || 'Update';
+    if (repaired.subjectLine && !repaired.subject) { repaired.subject = repaired.subjectLine; delete repaired.subjectLine; }
+    repaired.previewText = repaired.previewText || '';
+    repaired.greeting = repaired.greeting || 'Hi there,';
+    repaired.opening = repaired.opening || repaired.introduction || 'We wanted to share an update with you.';
+    if (!repaired.bodyParagraphs || repaired.bodyParagraphs.length === 0) {
+      if (repaired.body) { repaired.bodyParagraphs = [repaired.body]; delete repaired.body; }
+      else if (repaired.content) { repaired.bodyParagraphs = [repaired.content]; delete repaired.content; }
+      else { repaired.bodyParagraphs = ['Check out what we have to offer.']; }
+    }
+    repaired.ctaText = repaired.ctaText || repaired.cta || 'Learn More';
+    if (repaired.cta && !repaired.ctaText) { repaired.ctaText = repaired.cta; delete repaired.cta; }
+    repaired.closing = repaired.closing || 'Best regards,';
+    repaired.signature = repaired.signature || 'The Team';
+  }
+
+  if (assetType === 'comparison_page') {
+    repaired.headline = repaired.headline || repaired.title || 'Comparison';
+    repaired.introduction = repaired.introduction || 'Compare options to find the best fit.';
+    repaired.competitorWeaknesses = repaired.competitorWeaknesses || [];
+  }
+
+  if (assetType === 'feature_announcement') {
+    repaired.headline = repaired.headline || repaired.title || 'Announcement';
+    repaired.body = repaired.body || repaired.content || '';
+    repaired.benefits = repaired.benefits || [];
+  }
+
+  if (assetType === 'whitepaper') {
+    repaired.title = repaired.title || repaired.headline || 'Whitepaper';
+    repaired.sections = repaired.sections || [];
+    repaired.references = repaired.references || [];
+  }
+
+  if (assetType === 'creative_brief') {
+    repaired.supportingMessages = repaired.supportingMessages || [];
+    repaired.deliverables = repaired.deliverables || [];
+    repaired.mandatoryElements = repaired.mandatoryElements || [];
+    repaired.prohibitedClaims = repaired.prohibitedClaims || [];
+    repaired.brandSignals = repaired.brandSignals || [];
+    repaired.evidenceLimitations = repaired.evidenceLimitations || [];
   }
 
   return repaired;
