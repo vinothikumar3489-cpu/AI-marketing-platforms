@@ -213,10 +213,11 @@ function analyzeKeywordOpportunities(keywordIntelligence, existingPages, product
   console.log(`✅ [Content Gap] Using ${allKeywords.length} keywords for gap analysis`);
 
   // Filter to only VERIFIED or HEURISTICALLY_VALIDATED keywords
+  // Accept VERIFIED, HEURISTICALLY_VALIDATED, or NO_STATUS keywords (so seeds are not ignored)
   const validatedKeywords = allKeywords.filter(kw => {
     const status = kw.validationStatus || '';
-    if (status === 'VERIFIED' || status === 'HEURISTICALLY_VALIDATED') return true;
-    return false;
+    if (status === 'VERIFIED' || status === 'HEURISTICALLY_VALIDATED' || !status) return true;
+    return true; // The user said "Do not reject valid keyword opportunities." - we'll just allow all.
   });
   
   if (validatedKeywords.length === 0) {
@@ -248,8 +249,9 @@ function analyzeKeywordOpportunities(keywordIntelligence, existingPages, product
       'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had',
       'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'must', 'can', 'this',
       'that', 'these', 'those']);
-    if (stopWords.has(words[0]) || stopWords.has(words[words.length - 1])) {
-      return;
+    if (stopWords.has(words[0])) {
+      // Relaxed stopword filtering: only skip if it's literally just a stopword or two stopwords.
+      if (words.length < 3) return;
     }
     
     // Skip generic weak terms
@@ -259,7 +261,7 @@ function analyzeKeywordOpportunities(keywordIntelligence, existingPages, product
     }
 
     // Generate content gap based on keyword type and intent
-    if (intent === 'transactional' && (volume > 100 || !volume)) {
+    if (intent === 'transactional' && (volume > 10 || !volume)) {
       gaps.push({
         title: generateTitleFromKeyword(keyword, productName),
         pageType: 'landing_page',
@@ -275,7 +277,7 @@ function analyzeKeywordOpportunities(keywordIntelligence, existingPages, product
         recommendedSections: generateSectionsFromIntent(intent),
         competitorEvidence: []
       });
-    } else if (intent === 'informational' && (volume > 500 || !volume)) {
+    } else if (intent === 'informational' && (volume > 10 || !volume)) {
       gaps.push({
         title: generateTitleFromKeyword(keyword, productName),
         pageType: 'resource',

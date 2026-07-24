@@ -39,42 +39,50 @@ function providerError(status) {
 }
 
 describe('aiRouter - provider fallback chain', () => {
-  it('returns groq result on first provider success', async () => {
-    mock.method(global, 'fetch', () => Promise.resolve(groqOkResponse({ msg: 'ok' })));
+  let mod;
+  before(async () => {
+    mod = await import('../src/domains/ai/services/aiOrchestrator.service.js');
+  });
 
-    const { callAI } = await import('../src/ai/services/aiRouter.service.js');
-    const result = await callAI('test');
+  it('returns groq result on first provider success', async () => {
+    const orchestrator = mod.getAIOrchestrator();
+    mock.method(orchestrator, '_callOpenAICompatible', () => Promise.resolve({ content: JSON.stringify({ msg: 'ok' }), usage: {} }));
+    
+    const result = await mod.callAI('test');
     assert.equal(result.success, true);
     assert.equal(result.provider, 'groq');
-    assert.deepEqual(result.data, { msg: 'ok' });
+    assert.deepEqual(JSON.parse(result.data), { msg: 'ok' });
 
     mock.restoreAll();
   });
 
   it('falls through all providers when all return 500', async () => {
-    mock.method(global, 'fetch', () => Promise.resolve(providerError(500)));
+    const orchestrator = mod.getAIOrchestrator();
+    mock.method(orchestrator, '_callOpenAICompatible', () => Promise.reject(new Error('500')));
+    mock.method(orchestrator, '_callGemini', () => Promise.reject(new Error('500')));
 
-    const { callAI } = await import('../src/ai/services/aiRouter.service.js');
-    const result = await callAI('test');
+    const result = await mod.callAI('test');
     assert.equal(result.success, false);
-    assert.equal(result.diagnostics.length, 4);
+    // diagnostics is no longer returned in callAI. Check error message.
+    assert.ok(result.error.includes('All AI providers failed'));
 
     mock.restoreAll();
   });
 
-  it('recovers from Groq 429 to Gemini', async () => {
-    let callCount = 0;
-    mock.method(global, 'fetch', () => {
-      callCount++;
-      if (callCount === 1) return Promise.resolve(providerError(429));
-      return Promise.resolve(geminiOkResponse({ msg: 'gemini-ok' }));
+  it('recovers from Groq error to Gemini', async () => {
+    const orchestrator = mod.getAIOrchestrator();
+    let groqCalls = 0;
+    mock.method(orchestrator, '_callOpenAICompatible', () => {
+      groqCalls++;
+      return Promise.reject(new Error('429'));
     });
+    mock.method(orchestrator, '_callGemini', () => Promise.resolve({ content: JSON.stringify({ msg: 'gemini-ok' }), usage: {} }));
 
-    const { callAI } = await import('../src/ai/services/aiRouter.service.js');
-    const result = await callAI('test');
+    const result = await mod.callAI('test');
     assert.equal(result.success, true);
+    // Depending on the fallback chain, it might hit cerebras, deepseek, openrouter before gemini, but eventually hits gemini.
     assert.equal(result.provider, 'gemini');
-    assert.deepEqual(result.data, { msg: 'gemini-ok' });
+    assert.deepEqual(JSON.parse(result.data), { msg: 'gemini-ok' });
 
     mock.restoreAll();
   });

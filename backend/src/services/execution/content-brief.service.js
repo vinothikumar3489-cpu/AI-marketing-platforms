@@ -6,6 +6,7 @@ import { getSeoIntelligenceForChat } from "../loaders/seo-intelligence.loader.js
 import { getProductIntelligenceForChat } from "../loaders/product-intelligence.loader.js";
 import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
 import { validateContentBrief } from "../validators/content-brief.schema.js";
+import { InferenceStatus } from '../../shared/schemas/enums.js';
 
 /**
  * Canonical ContentBrief — shared input for every content generator.
@@ -137,7 +138,7 @@ export async function buildContentBrief(prisma, userId, chatId) {
           description: null,
           benefit: null,
           evidence: null,
-          inferenceStatus: 'AI_INFERRED_FROM_EVIDENCE',
+          inferenceStatus: InferenceStatus.AI_INFERRED,
         });
       }
     });

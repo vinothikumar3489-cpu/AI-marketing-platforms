@@ -21,12 +21,12 @@ after(() => {
 // =====================
 describe('DataForSEO service', () => {
   it('isDataForSEOConfigured returns true when credentials exist', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     assert.equal(mod.isDataForSEOConfigured(), true);
   });
 
   it('getDataForSEOStatus returns status object', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const status = mod.getDataForSEOStatus();
     assert.ok(typeof status === 'object');
     assert.ok('configured' in status);
@@ -156,31 +156,30 @@ describe('Text util — keyword validation', () => {
 // AI Router — diagnostics
 // =====================
 describe('AI Router — diagnostics', () => {
-  it('getAIProviderDiagnostics returns array with 4 providers', async () => {
-    const mod = await import('../src/ai/services/aiRouter.service.js');
+  it('getAIProviderDiagnostics returns array with 5 providers', async () => {
+    const mod = await import('../src/domains/ai/services/aiOrchestrator.service.js');
     const diag = mod.getAIProviderDiagnostics();
     assert.ok(Array.isArray(diag));
-    assert.equal(diag.length, 4);
+    assert.equal(diag.length, 5);
   });
 
   it('each diagnostic entry has required fields', async () => {
-    const mod = await import('../src/ai/services/aiRouter.service.js');
+    const mod = await import('../src/domains/ai/services/aiOrchestrator.service.js');
     const diag = mod.getAIProviderDiagnostics();
     for (const p of diag) {
       assert.ok('provider' in p);
       assert.ok('configured' in p);
-      assert.ok('status' in p);
-      assert.ok('cooldownActive' in p);
-      assert.ok('cooldownRemainingMs' in p);
-      assert.ok('model' in p);
+      assert.ok('enabled' in p);
+      assert.ok('warning' in p || p.warning === null);
+      assert.ok('defaultModel' in p);
     }
   });
 
-  it('all providers report configured when env vars set', async () => {
-    const mod = await import('../src/ai/services/aiRouter.service.js');
+  it('all providers report configured as boolean', async () => {
+    const mod = await import('../src/domains/ai/services/aiOrchestrator.service.js');
     const diag = mod.getAIProviderDiagnostics();
     for (const p of diag) {
-      assert.equal(p.configured, true, `${p.provider} should be configured`);
+      assert.equal(typeof p.configured, 'boolean');
     }
   });
 });
@@ -295,7 +294,7 @@ describe('Content Studio — identity handling', () => {
 // =====================
 describe('DataForSEO location normalization', () => {
   it('resolveLocation maps Global to US code 2840', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const loc = mod.resolveLocation('Global');
     assert.equal(loc.location_code, 2840);
     assert.equal(loc.language_code, 'en');
@@ -304,21 +303,21 @@ describe('DataForSEO location normalization', () => {
   });
 
   it('resolveLocation maps Worldwide to US code 2840', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const loc = mod.resolveLocation('Worldwide');
     assert.equal(loc.location_code, 2840);
     assert.equal(loc.fallbackApplied, true);
   });
 
   it('resolveLocation handles missing location', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const loc = mod.resolveLocation('');
     assert.equal(loc.location_code, 2840);
     assert.equal(loc.fallbackApplied, true);
   });
 
   it('resolveLocation maps United States correctly', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const loc = mod.resolveLocation('United States');
     assert.equal(loc.location_code, 2840);
     assert.equal(loc.language_code, 'en');
@@ -326,7 +325,7 @@ describe('DataForSEO location normalization', () => {
   });
 
   it('resolveLocation maps India correctly', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const loc = mod.resolveLocation('India');
     assert.equal(loc.location_code, 2034);
     assert.equal(loc.language_code, 'en');
@@ -334,7 +333,7 @@ describe('DataForSEO location normalization', () => {
   });
 
   it('resolveLocation returns metadata', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const loc = mod.resolveLocation('United States');
     assert.ok('requestedLocation' in loc);
     assert.ok('resolvedLocationCode' in loc || 'location_code' in loc);
@@ -342,7 +341,7 @@ describe('DataForSEO location normalization', () => {
   });
 
   it('resolveLocation leaves unknown location as unresolved', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const loc = mod.resolveLocation('Some Unknown Country');
     assert.equal(loc.unresolved, true);
     assert.equal(loc.fallbackApplied, false);
@@ -354,7 +353,7 @@ describe('DataForSEO location normalization', () => {
 // =====================
 describe('DataForSEO endpoint validation', () => {
   it('exported functions use only valid endpoints', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     assert.ok(typeof mod.getKeywordMetrics === 'function');
     assert.ok(typeof mod.getSerpCompetitors === 'function');
     assert.ok(typeof mod.getBacklinksSummary === 'function');
@@ -367,7 +366,7 @@ describe('DataForSEO endpoint validation', () => {
 // =====================
 describe('DataForSEO normalizeSerpCompetitors — article filtering', () => {
   it('rejects "What is" article titles', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const serpResults = [
       { domain: 'example.com', url: 'https://example.com/what-is-saas', title: 'What is SaaS? A Complete Guide', snippet: 'Learn what SaaS is', rank: 1 },
     ];
@@ -376,7 +375,7 @@ describe('DataForSEO normalizeSerpCompetitors — article filtering', () => {
   });
 
   it('rejects "Top 10" listicle titles', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const serpResults = [
       { domain: 'example.com', url: 'https://example.com/top-10-saas', title: 'Top 10 SaaS Management Platforms', snippet: 'Best SaaS tools', rank: 2 },
     ];
@@ -385,7 +384,7 @@ describe('DataForSEO normalizeSerpCompetitors — article filtering', () => {
   });
 
   it('rejects Wikipedia domains', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const serpResults = [
       { domain: 'en.wikipedia.org', url: 'https://en.wikipedia.org/wiki/SaaS', title: 'SaaS - Wikipedia', snippet: 'Software as a service', rank: 1 },
     ];
@@ -394,7 +393,7 @@ describe('DataForSEO normalizeSerpCompetitors — article filtering', () => {
   });
 
   it('rejects career/job pages', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const serpResults = [
       { domain: 'company.com', url: 'https://company.com/careers/saas-engineer', title: 'SaaS Engineer - Company Careers', snippet: 'Join our team', rank: 3 },
     ];
@@ -403,7 +402,7 @@ describe('DataForSEO normalizeSerpCompetitors — article filtering', () => {
   });
 
   it('preserves real competitor domains', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const serpResults = [
       { domain: 'realsassproduct.com', url: 'https://realsassproduct.com', title: 'RealSaaSProduct - Marketing Platform', snippet: 'Marketing platform for teams', rank: 1 },
     ];

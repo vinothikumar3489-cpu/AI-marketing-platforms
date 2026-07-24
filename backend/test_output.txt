@@ -1,0 +1,883 @@
+TAP version 13
+# [AI Orchestrator] groq/llama-3.3-70b-versatile failed: 500
+# [AI Orchestrator] Provider groq failed on all models, falling back
+# [AI Orchestrator] Fallback gemini also failed: 500
+# [AI Orchestrator] Fallback cerebras also failed: 500
+# [AI Orchestrator] Fallback openrouter also failed: 500
+# [AI Orchestrator] groq/llama-3.3-70b-versatile failed: 429
+# [AI Orchestrator] Fell back to gemini/gemini-2.0-flash
+# [AI Orchestrator] Provider groq failed on all models, falling back
+# Subtest: aiRouter - provider fallback chain
+    # Subtest: returns groq result on first provider success
+    ok 1 - returns groq result on first provider success
+      ---
+      duration_ms: 6.1314
+      type: 'test'
+      ...
+    # Subtest: falls through all providers when all return 500
+    ok 2 - falls through all providers when all return 500
+      ---
+      duration_ms: 2.7842
+      type: 'test'
+      ...
+    # Subtest: recovers from Groq error to Gemini
+    ok 3 - recovers from Groq error to Gemini
+      ---
+      duration_ms: 0.9295
+      type: 'test'
+      ...
+    1..3
+ok 1 - aiRouter - provider fallback chain
+  ---
+  duration_ms: 187.8502
+  type: 'suite'
+  ...
+# Subtest: Priority 1 — Growth Route Restoration
+    # Subtest: ProjectContext exports CreateChatReason type with valid reasons
+    ok 1 - ProjectContext exports CreateChatReason type with valid reasons
+      ---
+      duration_ms: 2.7372
+      type: 'test'
+      ...
+    # Subtest: ProjectContext has fullResultsByChat cache
+    ok 2 - ProjectContext has fullResultsByChat cache
+      ---
+      duration_ms: 0.7331
+      type: 'test'
+      ...
+    # Subtest: GrowthWorkspacePage derives viewStatus from cache
+    ok 3 - GrowthWorkspacePage derives viewStatus from cache
+      ---
+      duration_ms: 2.0378
+      type: 'test'
+      ...
+    1..3
+ok 2 - Priority 1 — Growth Route Restoration
+  ---
+  duration_ms: 6.5888
+  type: 'suite'
+  ...
+# Subtest: Priority 2 — Canonical Identity Resolver
+    # Subtest: identity resolver exports resolveProductIdentity function
+    ok 1 - identity resolver exports resolveProductIdentity function
+      ---
+      duration_ms: 2.7349
+      type: 'test'
+      ...
+    # Subtest: identity resolver returns fieldConfidence in output
+    ok 2 - identity resolver returns fieldConfidence in output
+      ---
+      duration_ms: 2.0189
+      type: 'test'
+      ...
+    # Subtest: identity resolver returns aliases array
+    ok 3 - identity resolver returns aliases array
+      ---
+      duration_ms: 0.6936
+      type: 'test'
+      ...
+    # Subtest: identity resolver can produce conflicts when sources disagree
+    ok 4 - identity resolver can produce conflicts when sources disagree
+      ---
+      duration_ms: 0.5949
+      type: 'test'
+      ...
+    1..4
+ok 3 - Priority 2 — Canonical Identity Resolver
+  ---
+  duration_ms: 6.6129
+  type: 'suite'
+  ...
+# Subtest: Priority 3 — SEO Filtering
+    # Subtest: keyword-quality filter has expanded LOW_QUALITY_KEYWORDS set
+    ok 1 - keyword-quality filter has expanded LOW_QUALITY_KEYWORDS set
+      ---
+      duration_ms: 2.8015
+      type: 'test'
+      ...
+    # Subtest: normalizeSerpCompetitors rejects articles, careers, wikipedia, support, login, same-domain
+    ok 2 - normalizeSerpCompetitors rejects articles, careers, wikipedia, support, login, same-domain
+      ---
+      duration_ms: 81.2761
+      type: 'test'
+      ...
+    # Subtest: separateCompetitorsByType properly classifies
+    ok 3 - separateCompetitorsByType properly classifies
+      ---
+      duration_ms: 1.0756
+      type: 'test'
+      ...
+    # Subtest: normalizeSerpCompetitors excludes self-target-domain
+    ok 4 - normalizeSerpCompetitors excludes self-target-domain
+      ---
+      duration_ms: 0.7738
+      type: 'test'
+      ...
+    1..4
+ok 4 - Priority 3 — SEO Filtering
+  ---
+  duration_ms: 86.5193
+  type: 'suite'
+  ...
+# Subtest: Priority 4 — Growth Scoring
+    # Subtest: growthWorkspace labels results with _dataSource
+    ok 1 - growthWorkspace labels results with _dataSource
+      ---
+      duration_ms: 1.1932
+      type: 'test'
+      ...
+    # Subtest: calculateSubScore returns evidenceSource and penalty
+    ok 2 - calculateSubScore returns evidenceSource and penalty
+      ---
+      duration_ms: 0.8359
+      type: 'test'
+      ...
+    # Subtest: growth summary includes dimensionScores with evidenceSource per dimension
+    ok 3 - growth summary includes dimensionScores with evidenceSource per dimension
+      ---
+      duration_ms: 0.8242
+      type: 'test'
+      ...
+    1..3
+ok 5 - Priority 4 — Growth Scoring
+  ---
+  duration_ms: 3.0965
+  type: 'suite'
+  ...
+# Subtest: Priority 5 — Campaign Intelligence
+    # Subtest: campaign prompt does NOT hardcode 6 funnel stages
+    ok 1 - campaign prompt does NOT hardcode 6 funnel stages
+      ---
+      duration_ms: 2.5861
+      type: 'test'
+      ...
+    # Subtest: campaign consistency validator does not require awareness/interest/consideration
+    ok 2 - campaign consistency validator does not require awareness/interest/consideration
+      ---
+      duration_ms: 0.3737
+      type: 'test'
+      ...
+    # Subtest: campaign prompt instructs no fabricated KPIs
+    ok 3 - campaign prompt instructs no fabricated KPIs
+      ---
+      duration_ms: 0.4823
+      type: 'test'
+      ...
+    1..3
+ok 6 - Priority 5 — Campaign Intelligence
+  ---
+  duration_ms: 3.6139
+  type: 'suite'
+  ...
+# Subtest: Priority 6 — Content Studio
+    # Subtest: renderEmailHtmlTemplate exports a function
+    ok 1 - renderEmailHtmlTemplate exports a function
+      ---
+      duration_ms: 197.4678
+      type: 'test'
+      ...
+    # Subtest: renderEmailHtmlTemplate returns HTML with preheader, header, body, footer, unsubscribe
+    ok 2 - renderEmailHtmlTemplate returns HTML with preheader, header, body, footer, unsubscribe
+      ---
+      duration_ms: 3.212
+      type: 'test'
+      ...
+    # Subtest: renderEmailHtmlTemplate handles null unsubscribe gracefully
+    ok 3 - renderEmailHtmlTemplate handles null unsubscribe gracefully
+      ---
+      duration_ms: 0.4503
+      type: 'test'
+      ...
+    # Subtest: withApprovalStatus returns content with _approvalStatus
+    ok 4 - withApprovalStatus returns content with _approvalStatus
+      ---
+      duration_ms: 0.3622
+      type: 'test'
+      ...
+    # Subtest: APPROVAL_STATUSES has all required states
+    ok 5 - APPROVAL_STATUSES has all required states
+      ---
+      duration_ms: 0.2899
+      type: 'test'
+      ...
+    1..5
+ok 7 - Priority 6 — Content Studio
+  ---
+  duration_ms: 202.0438
+  type: 'suite'
+  ...
+# Subtest: All module exports — contract validation
+    # Subtest: content-studio exports all 20 content generators plus new functions
+    ok 1 - content-studio exports all 20 content generators plus new functions
+      ---
+      duration_ms: 0.4969
+      type: 'test'
+      ...
+    # Subtest: dataforseo exports all key service functions
+    ok 2 - dataforseo exports all key service functions
+      ---
+      duration_ms: 0.1779
+      type: 'test'
+      ...
+    # Subtest: campaign-intelligence exports generateCampaignIntelligence
+    ok 3 - campaign-intelligence exports generateCampaignIntelligence
+      ---
+      duration_ms: 6.577
+      type: 'test'
+      ...
+    1..3
+ok 8 - All module exports — contract validation
+  ---
+  duration_ms: 7.4381
+  type: 'suite'
+  ...
+# Subtest: Priority 21 — Multi-Product Campaign Differentiation
+    # Subtest: generates distinct campaign fingerprints for different products
+    ok 1 - generates distinct campaign fingerprints for different products
+      ---
+      duration_ms: 1.5146
+      type: 'test'
+      ...
+    # Subtest: campaign prompt does not hardcode 90-day skeleton for any product
+    ok 2 - campaign prompt does not hardcode 90-day skeleton for any product
+      ---
+      duration_ms: 0.3665
+      type: 'test'
+      ...
+    # Subtest: version 3 exports transitionApprovalStatus and previewEmail
+    ok 3 - version 3 exports transitionApprovalStatus and previewEmail
+      ---
+      duration_ms: 2.987
+      type: 'test'
+      ...
+    # Subtest: content-asset exports verifyAssetPersistence
+    ok 4 - content-asset exports verifyAssetPersistence
+      ---
+      duration_ms: 1.5227
+      type: 'test'
+      ...
+    # Subtest: quality-scorer has contentCompleteness and platformSpecificQuality checks
+    ok 5 - quality-scorer has contentCompleteness and platformSpecificQuality checks
+      ---
+      duration_ms: 2.373
+      type: 'test'
+      ...
+    # Subtest: brevo provider has idempotent send functions
+    ok 6 - brevo provider has idempotent send functions
+      ---
+      duration_ms: 5.8484
+      type: 'test'
+      ...
+    # Subtest: shared-competitor validates against articles and knowledge domains
+    ok 7 - shared-competitor validates against articles and knowledge domains
+      ---
+      duration_ms: 60.3448
+      type: 'test'
+      ...
+    # Subtest: keyword pipeline returns candidates with phrase, sourceUrl, validationStatus
+    ok 8 - keyword pipeline returns candidates with phrase, sourceUrl, validationStatus
+      ---
+      duration_ms: 21.631
+      type: 'test'
+      ...
+    1..8
+ok 9 - Priority 21 — Multi-Product Campaign Differentiation
+  ---
+  duration_ms: 97.0487
+  type: 'suite'
+  ...
+# 📝 [Blog Intelligence] Starting blog analysis... { newsCount: 0, marketCount: 0 }
+# 📝 [Blog Intelligence] Filtered competitors for blog analysis: { total: 0, filtered: 0, excluded: 0 }
+# 💡 [Blog Intelligence] Step 1: Generating blog ideas from real data...
+# 💡 [Blog Ideas] Generating blog titles from real data...
+# ✅ [Blog Ideas] Using 1 keywords for blog generation
+# ⚠️ [Blog Ideas] No validated keywords (VERIFIED/HEURISTICALLY_VALIDATED) available
+# 🗂️ [Blog Intelligence] Step 2: Creating blog clusters...
+# 🗂️ [Blog Clusters] Creating clusters...
+# 📋 [Blog Intelligence] Step 3: Generating blog briefs...
+# 📋 [Blog Briefs] Generating briefs...
+# 📅 [Blog Intelligence] Step 4: Creating publishing calendar...
+# 📅 [Calendar] Creating publishing calendar...
+# ✅ [Blog Intelligence] Analysis complete: {
+#   totalIdeas: 0,
+#   clusters: 0,
+#   message: 'Real blog opportunities unavailable until valid keyword/SERP data is available.'
+# }
+# Subtest: DataForSEO service
+    # Subtest: isDataForSEOConfigured returns true when credentials exist
+    ok 1 - isDataForSEOConfigured returns true when credentials exist
+      ---
+      duration_ms: 79.257
+      type: 'test'
+      ...
+    # Subtest: getDataForSEOStatus returns status object
+    ok 2 - getDataForSEOStatus returns status object
+      ---
+      duration_ms: 2.0029
+      type: 'test'
+      ...
+    1..2
+ok 10 - DataForSEO service
+  ---
+  duration_ms: 82.7972
+  type: 'suite'
+  ...
+# Subtest: Fallback generators — no fabricated data
+    # Subtest: generateProductFallback returns inferred values when no context
+    ok 1 - generateProductFallback returns inferred values when no context
+      ---
+      duration_ms: 4.1419
+      type: 'test'
+      ...
+    # Subtest: generateMarketFallback returns inferred values
+    ok 2 - generateMarketFallback returns inferred values
+      ---
+      duration_ms: 1.1934
+      type: 'test'
+      ...
+    # Subtest: generateAudienceFallback returns inferred values
+    ok 3 - generateAudienceFallback returns inferred values
+      ---
+      duration_ms: 1.0038
+      type: 'test'
+      ...
+    # Subtest: generateCompetitorFallback returns competitors even with empty input
+    ok 4 - generateCompetitorFallback returns competitors even with empty input
+      ---
+      duration_ms: 1.0444
+      type: 'test'
+      ...
+    # Subtest: generateIntentFallback returns inferred intent segments
+    ok 5 - generateIntentFallback returns inferred intent segments
+      ---
+      duration_ms: 0.6322
+      type: 'test'
+      ...
+    # Subtest: generatePositioningFallback returns inferred positioning
+    ok 6 - generatePositioningFallback returns inferred positioning
+      ---
+      duration_ms: 0.8035
+      type: 'test'
+      ...
+    # Subtest: generateCampaignFallback returns GENERATED status with inferred angles
+    ok 7 - generateCampaignFallback returns GENERATED status with inferred angles
+      ---
+      duration_ms: 1.0736
+      type: 'test'
+      ...
+    # Subtest: generateChannelFallback returns inferred primary channel
+    ok 8 - generateChannelFallback returns inferred primary channel
+      ---
+      duration_ms: 0.6098
+      type: 'test'
+      ...
+    1..8
+ok 11 - Fallback generators — no fabricated data
+  ---
+  duration_ms: 11.8952
+  type: 'suite'
+  ...
+# Subtest: Text util — keyword validation
+    # Subtest: isValidKeyword rejects navigation/generic single-word tokens
+    ok 1 - isValidKeyword rejects navigation/generic single-word tokens
+      ---
+      duration_ms: 2.6934
+      type: 'test'
+      ...
+    # Subtest: isValidKeyword accepts valid multi-word keywords
+    ok 2 - isValidKeyword accepts valid multi-word keywords
+      ---
+      duration_ms: 0.3682
+      type: 'test'
+      ...
+    # Subtest: isValidKeyword rejects single-character keywords
+    ok 3 - isValidKeyword rejects single-character keywords
+      ---
+      duration_ms: 0.2513
+      type: 'test'
+      ...
+    # Subtest: normalizeSeoKeywords includes validationStatus in output
+    ok 4 - normalizeSeoKeywords includes validationStatus in output
+      ---
+      duration_ms: 0.7884
+      type: 'test'
+      ...
+    # Subtest: normalizeSeoKeywords passes through validationStatus
+    ok 5 - normalizeSeoKeywords passes through validationStatus
+      ---
+      duration_ms: 0.2797
+      type: 'test'
+      ...
+    1..5
+ok 12 - Text util — keyword validation
+  ---
+  duration_ms: 4.7928
+  type: 'suite'
+  ...
+# Subtest: AI Router — diagnostics
+    # Subtest: getAIProviderDiagnostics returns array with 5 providers
+    ok 1 - getAIProviderDiagnostics returns array with 5 providers
+      ---
+      duration_ms: 166.3507
+      type: 'test'
+      ...
+    # Subtest: each diagnostic entry has required fields
+    not ok 2 - each diagnostic entry has required fields
+      ---
+      duration_ms: 17.4757
+      type: 'test'
+      location: 'C:\\Users\\sanja\\Downloads\\Test\\backend\\tests\\regression.test.js:166:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        The expression evaluated to a falsy value:
+        
+          assert.ok('status' in p)
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: true
+      actual: false
+      operator: '=='
+      stack: |-
+        TestContext.<anonymous> (file:///C:/Users/sanja/Downloads/Test/backend/tests/regression.test.js:172:14)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: all providers report configured when env vars set
+    not ok 3 - all providers report configured when env vars set
+      ---
+      duration_ms: 2.9009
+      type: 'test'
+      location: 'C:\\Users\\sanja\\Downloads\\Test\\backend\\tests\\regression.test.js:179:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        deepseek should be configured
+        
+        false !== true
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: true
+      actual: false
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///C:/Users/sanja/Downloads/Test/backend/tests/regression.test.js:183:14)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    1..3
+not ok 13 - AI Router — diagnostics
+  ---
+  duration_ms: 187.1056
+  type: 'suite'
+  location: 'C:\\Users\\sanja\\Downloads\\Test\\backend\\tests\\regression.test.js:158:1'
+  failureType: 'subtestsFailed'
+  error: '2 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: normalizeSeoKeywords — validationStatus
+    # Subtest: propagates validationStatus from keyword items
+    ok 1 - propagates validationStatus from keyword items
+      ---
+      duration_ms: 0.4864
+      type: 'test'
+      ...
+    1..1
+ok 14 - normalizeSeoKeywords — validationStatus
+  ---
+  duration_ms: 0.5822
+  type: 'suite'
+  ...
+# Subtest: Blog Intelligence — generateBlogIntelligence
+    # Subtest: returns empty blogIdeas when no validated keywords exist
+    ok 1 - returns empty blogIdeas when no validated keywords exist
+      ---
+      duration_ms: 7.695
+      type: 'test'
+      ...
+    1..1
+ok 15 - Blog Intelligence — generateBlogIntelligence
+  ---
+  duration_ms: 7.7906
+  type: 'suite'
+  ...
+# Subtest: Claim Validator — percentage patterns
+    # Subtest: removes unsupported percentage follower claims
+    ok 1 - removes unsupported percentage follower claims
+      ---
+      duration_ms: 4.2707
+      type: 'test'
+      ...
+    # Subtest: removes unsupported percentage engagement claims
+    ok 2 - removes unsupported percentage engagement claims
+      ---
+      duration_ms: 2.1969
+      type: 'test'
+      ...
+    # Subtest: preserves valid evidence-backed claims
+    ok 3 - preserves valid evidence-backed claims
+      ---
+      duration_ms: 2.5755
+      type: 'test'
+      ...
+    1..3
+ok 16 - Claim Validator — percentage patterns
+  ---
+  duration_ms: 9.3338
+  type: 'suite'
+  ...
+# [AI Orchestrator] groq/llama-3.3-70b-versatile failed: 401 Invalid API Key
+# [AI Orchestrator] Provider groq failed on all models, falling back
+# [AI Orchestrator] Fallback gemini also failed: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent: [400 Bad Request] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+# [AI Orchestrator] Fallback cerebras also failed: 401 status code (no body)
+# [AI Orchestrator] Fallback openrouter also failed: 401 Missing Authentication header
+# Subtest: Content Studio — identity handling
+    # Subtest: uses brief._productIdentity directly without re-resolving
+    ok 1 - uses brief._productIdentity directly without re-resolving
+      ---
+      duration_ms: 1229.7371
+      type: 'test'
+      ...
+    # Subtest: blocks when product name is empty
+    ok 2 - blocks when product name is empty
+      ---
+      duration_ms: 0.3446
+      type: 'test'
+      ...
+    1..2
+ok 17 - Content Studio — identity handling
+  ---
+  duration_ms: 1230.2808
+  type: 'suite'
+  ...
+# Subtest: DataForSEO location normalization
+    # Subtest: resolveLocation maps Global to US code 2840
+    ok 1 - resolveLocation maps Global to US code 2840
+      ---
+      duration_ms: 0.4163
+      type: 'test'
+      ...
+    # Subtest: resolveLocation maps Worldwide to US code 2840
+    ok 2 - resolveLocation maps Worldwide to US code 2840
+      ---
+      duration_ms: 0.2868
+      type: 'test'
+      ...
+    # Subtest: resolveLocation handles missing location
+    ok 3 - resolveLocation handles missing location
+      ---
+      duration_ms: 0.39
+      type: 'test'
+      ...
+    # Subtest: resolveLocation maps United States correctly
+    ok 4 - resolveLocation maps United States correctly
+      ---
+      duration_ms: 0.1513
+      type: 'test'
+      ...
+    # Subtest: resolveLocation maps India correctly
+    ok 5 - resolveLocation maps India correctly
+      ---
+      duration_ms: 0.0991
+      type: 'test'
+      ...
+    # Subtest: resolveLocation returns metadata
+    ok 6 - resolveLocation returns metadata
+      ---
+      duration_ms: 0.1222
+      type: 'test'
+      ...
+    # Subtest: resolveLocation leaves unknown location as unresolved
+    ok 7 - resolveLocation leaves unknown location as unresolved
+      ---
+      duration_ms: 0.12
+      type: 'test'
+      ...
+    1..7
+ok 18 - DataForSEO location normalization
+  ---
+  duration_ms: 1.8167
+  type: 'suite'
+  ...
+# Subtest: DataForSEO endpoint validation
+    # Subtest: exported functions use only valid endpoints
+    ok 1 - exported functions use only valid endpoints
+      ---
+      duration_ms: 0.1618
+      type: 'test'
+      ...
+    1..1
+ok 19 - DataForSEO endpoint validation
+  ---
+  duration_ms: 0.255
+  type: 'suite'
+  ...
+# Subtest: DataForSEO normalizeSerpCompetitors — article filtering
+    # Subtest: rejects "What is" article titles
+    ok 1 - rejects "What is" article titles
+      ---
+      duration_ms: 0.6803
+      type: 'test'
+      ...
+    # Subtest: rejects "Top 10" listicle titles
+    ok 2 - rejects "Top 10" listicle titles
+      ---
+      duration_ms: 0.369
+      type: 'test'
+      ...
+    # Subtest: rejects Wikipedia domains
+    ok 3 - rejects Wikipedia domains
+      ---
+      duration_ms: 0.2199
+      type: 'test'
+      ...
+    # Subtest: rejects career/job pages
+    ok 4 - rejects career/job pages
+      ---
+      duration_ms: 0.2058
+      type: 'test'
+      ...
+    # Subtest: preserves real competitor domains
+    ok 5 - preserves real competitor domains
+      ---
+      duration_ms: 1.5569
+      type: 'test'
+      ...
+    1..5
+ok 20 - DataForSEO normalizeSerpCompetitors — article filtering
+  ---
+  duration_ms: 3.3565
+  type: 'suite'
+  ...
+# Subtest: SEO Persistence — contract validation
+    # Subtest: exports saveSEOData
+    ok 1 - exports saveSEOData
+      ---
+      duration_ms: 11.9066
+      type: 'test'
+      ...
+    # Subtest: toNullableScore handles edge cases
+    ok 2 - toNullableScore handles edge cases
+      ---
+      duration_ms: 0.4114
+      type: 'test'
+      ...
+    # Subtest: buildKeywordIntelligence produces correct shape
+    ok 3 - buildKeywordIntelligence produces correct shape
+      ---
+      duration_ms: 0.1989
+      type: 'test'
+      ...
+    # Subtest: buildCompetitorIntelligence produces correct shape
+    ok 4 - buildCompetitorIntelligence produces correct shape
+      ---
+      duration_ms: 0.189
+      type: 'test'
+      ...
+    # Subtest: buildContentGapIntelligence produces gaps even with no data
+    ok 5 - buildContentGapIntelligence produces gaps even with no data
+      ---
+      duration_ms: 0.1409
+      type: 'test'
+      ...
+    # Subtest: buildGeoIntelligence produces correct shape
+    ok 6 - buildGeoIntelligence produces correct shape
+      ---
+      duration_ms: 0.2548
+      type: 'test'
+      ...
+    # Subtest: buildBlogIntelligence produces ideas from keywords
+    ok 7 - buildBlogIntelligence produces ideas from keywords
+      ---
+      duration_ms: 0.303
+      type: 'test'
+      ...
+    1..7
+ok 21 - SEO Persistence — contract validation
+  ---
+  duration_ms: 375.844
+  type: 'suite'
+  ...
+# [SEO SERPAPI STATUS] {
+#   provider: 'SERPAPI',
+#   enabled: true,
+#   configured: false,
+#   available: false,
+#   status: 'NOT_CONFIGURED',
+#   reason: 'SERPAPI_API_KEY environment variable is not set',
+#   searchesRemaining: null,
+#   checkedAt: '2026-07-24T18:03:28.342Z',
+#   keyDiagnostic: { configured: false, keyLength: undefined }
+# }
+# [SEO PROVIDER SELECTED] {
+#   selected: 'AI_FALLBACK',
+#   reason: 'all search providers unavailable, using AI fallback'
+# }
+# [SEO PROVIDER SELECTED] {
+#   selected: 'AI_FALLBACK',
+#   reason: 'all search providers unavailable, using AI fallback'
+# }
+# [SEO PROVIDER SELECTED] {
+#   selected: 'AI_FALLBACK',
+#   reason: 'all search providers unavailable, using AI fallback'
+# }
+# [SEO PROVIDER STATUS] {
+#   serpapiConfigured: false,
+#   serpapiStatus: 'NOT_CONFIGURED',
+#   dataforseoConfigured: false,
+#   dataforseoConnected: false,
+#   dataforseoStatus: 'NOT_CONFIGURED',
+#   selectedProvider: 'AI_FALLBACK'
+# }
+# Subtest: getSerpAPIStatus — no network
+    # Subtest: returns NOT_CONFIGURED when SERPAPI_API_KEY is missing
+    ok 1 - returns NOT_CONFIGURED when SERPAPI_API_KEY is missing
+      ---
+      duration_ms: 77.8135
+      type: 'test'
+      ...
+    # Subtest: returns NOT_CONFIGURED when SERPAPI_API_KEY is empty
+    ok 2 - returns NOT_CONFIGURED when SERPAPI_API_KEY is empty
+      ---
+      duration_ms: 0.5175
+      type: 'test'
+      ...
+    # Subtest: returns correct envelope shape
+    ok 3 - returns correct envelope shape
+      ---
+      duration_ms: 1.8159
+      type: 'test'
+      ...
+    # Subtest: never leaks the API key in output
+    ok 4 - never leaks the API key in output
+      ---
+      duration_ms: 0.9634
+      type: 'test'
+      ...
+    1..4
+ok 22 - getSerpAPIStatus — no network
+  ---
+  duration_ms: 82.1877
+  type: 'suite'
+  ...
+# Subtest: getCachedSerpAPIStatus
+    # Subtest: returns sync status object without network calls
+    ok 1 - returns sync status object without network calls
+      ---
+      duration_ms: 0.2284
+      type: 'test'
+      ...
+    1..1
+ok 23 - getCachedSerpAPIStatus
+  ---
+  duration_ms: 0.3879
+  type: 'suite'
+  ...
+# Subtest: Provider router import integration
+    # Subtest: getSEOProviderStatus is importable without ReferenceError
+    ok 1 - getSEOProviderStatus is importable without ReferenceError
+      ---
+      duration_ms: 6.755
+      type: 'test'
+      ...
+    # Subtest: getCachedSEOProviderStatus returns correct shape
+    ok 2 - getCachedSEOProviderStatus returns correct shape
+      ---
+      duration_ms: 0.9799
+      type: 'test'
+      ...
+    # Subtest: does not throw when calling getSEOProviderStatus (key missing = no network)
+    ok 3 - does not throw when calling getSEOProviderStatus (key missing = no network)
+      ---
+      duration_ms: 0.9533
+      type: 'test'
+      ...
+    1..3
+ok 24 - Provider router import integration
+  ---
+  duration_ms: 9.4444
+  type: 'suite'
+  ...
+# Subtest: SEO orchestrator integration
+    # Subtest: generateCompleteSeoIntelligence is importable
+    ok 1 - generateCompleteSeoIntelligence is importable
+      ---
+      duration_ms: 258.8203
+      type: 'test'
+      ...
+    # Subtest: seo controller exports are importable
+    ok 2 - seo controller exports are importable
+      ---
+      duration_ms: 304.8678
+      type: 'test'
+      ...
+    1..2
+ok 25 - SEO orchestrator integration
+  ---
+  duration_ms: 563.97
+  type: 'suite'
+  ...
+# Subtest: createStableHash
+    # Subtest: returns empty string for null/undefined
+    ok 1 - returns empty string for null/undefined
+      ---
+      duration_ms: 3.1493
+      type: 'test'
+      ...
+    # Subtest: returns deterministic output for the same input
+    ok 2 - returns deterministic output for the same input
+      ---
+      duration_ms: 0.5738
+      type: 'test'
+      ...
+    # Subtest: stable key ordering produces same hash regardless of key order
+    ok 3 - stable key ordering produces same hash regardless of key order
+      ---
+      duration_ms: 0.2798
+      type: 'test'
+      ...
+    # Subtest: different inputs produce different hashes
+    ok 4 - different inputs produce different hashes
+      ---
+      duration_ms: 0.2707
+      type: 'test'
+      ...
+    # Subtest: handles string input
+    ok 5 - handles string input
+      ---
+      duration_ms: 0.3385
+      type: 'test'
+      ...
+    # Subtest: handles nested objects
+    ok 6 - handles nested objects
+      ---
+      duration_ms: 0.2408
+      type: 'test'
+      ...
+    # Subtest: no process-dependent randomness
+    ok 7 - no process-dependent randomness
+      ---
+      duration_ms: 0.276
+      type: 'test'
+      ...
+    # Subtest: works for campaign fingerprint parts
+    ok 8 - works for campaign fingerprint parts
+      ---
+      duration_ms: 0.4151
+      type: 'test'
+      ...
+    1..8
+ok 26 - createStableHash
+  ---
+  duration_ms: 7.6855
+  type: 'suite'
+  ...
+1..26
+# tests 99
+# suites 26
+# pass 97
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1761.1369

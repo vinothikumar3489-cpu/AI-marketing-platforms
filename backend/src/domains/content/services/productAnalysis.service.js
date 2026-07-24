@@ -441,6 +441,12 @@ export async function generateProductAnalysis(manualData = {}, scrapedData = {})
   const schemaOrg = ensureArray(analysisResult?.schemaOrg || []);
   const faq = ensureArray(analysisResult?.faq || []);
   const resources = ensureArray(analysisResult?.resources || []);
+  const pricing = ensureArray(analysisResult?.pricing || []);
+  const integrations = ensureArray(analysisResult?.integrations || []);
+  const industries = ensureArray(analysisResult?.industries || []);
+  const cta = ensureArray(analysisResult?.cta || []);
+  const seoSuggestions = ensureArray(analysisResult?.seoSuggestions || []);
+  const campaignIdeas = ensureArray(analysisResult?.campaignIdeas || []);
 
   let confidenceScore = analysisResult?.confidenceScore ?? calculateConfidenceScore(manualData, scrapedData);
   if ((!benefits || benefits.length === 0) || (!painPoints || painPoints.length === 0)) {
@@ -490,6 +496,12 @@ export async function generateProductAnalysis(manualData = {}, scrapedData = {})
     schemaOrg,
     faq,
     resources,
+    pricing,
+    integrations,
+    industries,
+    cta,
+    seoSuggestions,
+    campaignIdeas,
     confidenceScore,
     dataSourcesUsed: uniq(dataSourcesUsed),
     warnings,

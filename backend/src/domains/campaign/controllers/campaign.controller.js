@@ -103,7 +103,7 @@ export const generateCampaignPlan = async (req, res) => {
         checks
       });
 
-      return res.status(422).json({
+      return res.status(200).json({
         success: false,
         error: {
           code,
@@ -121,7 +121,7 @@ export const generateCampaignPlan = async (req, res) => {
         userId,
         checks: evidence.readiness
       });
-      return res.status(422).json({
+      return res.status(200).json({
         success: false,
         error: {
           code: "PRODUCT_INTELLIGENCE_REQUIRED",
@@ -146,7 +146,7 @@ export const generateCampaignPlan = async (req, res) => {
         missing: ['CampaignIntelligence'],
         checks: evidenceContext.checks || {}
       });
-      return res.status(422).json({
+      return res.status(200).json({
         success: false,
         error: {
           code: "GENERATION_FAILED",

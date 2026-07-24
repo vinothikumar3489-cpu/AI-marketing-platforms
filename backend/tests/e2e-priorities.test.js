@@ -117,7 +117,7 @@ describe('Priority 3 — SEO Filtering', () => {
   });
 
   it('normalizeSerpCompetitors rejects articles, careers, wikipedia, support, login, same-domain', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const competitors = mod.normalizeSerpCompetitors(SERP_INPUT, { websiteUrl: 'https://target.com', productName: 'Target' });
     const domains = competitors.map(c => c.domain);
     assert.ok(!domains.includes('en.wikipedia.org'), 'Wikipedia must be rejected');
@@ -133,7 +133,7 @@ describe('Priority 3 — SEO Filtering', () => {
   });
 
   it('separateCompetitorsByType properly classifies', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const competitors = mod.normalizeSerpCompetitors(SERP_INPUT, { websiteUrl: 'https://target.com', productName: 'Target' });
     const separated = mod.separateCompetitorsByType(competitors);
     assert.ok(Array.isArray(separated.directBusinessCompetitors));
@@ -143,7 +143,7 @@ describe('Priority 3 — SEO Filtering', () => {
   });
 
   it('normalizeSerpCompetitors excludes self-target-domain', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const selfInput = [
       { domain: 'target.com', url: 'https://target.com', title: 'Target - Home', snippet: 'Welcome', rank: 1 },
       { domain: 'target.com', url: 'https://target.com/blog/post', title: 'Target Blog Post', snippet: 'Blog', rank: 2 },
@@ -304,7 +304,7 @@ describe('All module exports — contract validation', () => {
   });
 
   it('dataforseo exports all key service functions', async () => {
-    const mod = await import('../src/services/dataforseo.service.js');
+    const mod = await import('../src/providers/dataforseo.service.js');
     const fns = ['isDataForSEOConfigured', 'isDataForSEOAvailable', 'getDataForSEOStatus', 'normalizeSerpCompetitors', 'separateCompetitorsByType', 'getKeywordMetrics', 'getSerpCompetitors', 'getBacklinksSummary', 'getDomainAnalytics', 'getDomainData', 'resolveLocation'];
     for (const name of fns) {
       assert.equal(typeof mod[name], 'function', `${name} must be a function`);
@@ -378,7 +378,7 @@ describe('Priority 21 — Multi-Product Campaign Differentiation', () => {
   });
 
   it('brevo provider has idempotent send functions', async () => {
-    const mod = await import('../src/services/brevo/brevo.provider.js');
+    const mod = await import('../src/services/providers/brevo/brevo.provider.js');
     assert.equal(typeof mod.sendTestEmailIdempotent, 'function');
     assert.equal(typeof mod.sendCampaignNowIdempotent, 'function');
     assert.equal(typeof mod.healthCheck, 'function');

@@ -71,8 +71,8 @@ async function testCampaignGeneration() {
       response: res.data
     };
 
-    if (res.status === 422) {
-      console.log('✓ Campaign generation returns 422 for missing evidence');
+    if (res.status === 200 && res.data && res.data.success === false) {
+      console.log('✓ Campaign generation returns 200 with error for missing evidence');
       results.campaignGeneration.status = 'pass';
     } else if (res.status === 201) {
       console.log('✓ Campaign generation returns 201 on success');
@@ -123,8 +123,8 @@ async function testAutomationGeneration() {
       response: res.data
     };
 
-    if (res.status === 422) {
-      console.log('✓ Automation generation returns 422 for missing evidence');
+    if (res.status === 200 && res.data && res.data.success === false) {
+      console.log('✓ Automation generation returns 200 with error for missing evidence');
       results.automationGeneration.status = 'pass';
     } else if (res.status === 201) {
       console.log('✓ Automation generation returns 201 on success');
@@ -236,8 +236,8 @@ async function testContentGeneration() {
       response: res.data
     };
 
-    if (res.status === 422) {
-      console.log('✓ Content generation returns 422 for missing evidence');
+    if (res.status === 200 && res.data && res.data.success === false) {
+      console.log('✓ Content generation returns 200 with error for missing evidence');
       results.contentGeneration.status = 'pass';
     } else if (res.status === 201 && res.data && res.data.data) {
       const data = res.data.data;

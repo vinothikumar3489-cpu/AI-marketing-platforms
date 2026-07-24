@@ -7,7 +7,8 @@ import { generateVideoScript, generateCreativeBrief } from '../../domains/conten
 import { buildProductEvidenceContext, getPersonaName, getFirstPainPoint } from '../../domains/content/agents/agent.utils.js';
 import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
 import { validateContentClaims, validateBriefContent } from "./claim-validator.service.js";
-import { validateContentOutput, repairAIOutput, SCHEMA_REGISTRY } from "./content-schemas.js";
+import { validateContentOutput, repairAIOutput } from "./content-schemas.js";
+import { SCHEMA_REGISTRY } from "../../shared/schemas/content-types.schema.js";
 import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
 import { createStableHash } from "../../utils/stable-hash.js";
 import { CONTENT_TYPES, CONTENT_TYPES_LIST } from "../../constants/content-types.js";

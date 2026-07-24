@@ -177,7 +177,7 @@ export async function handleFromAsset(req, res) {
   });
 
   if (!result.success) {
-    return res.status(422).json(result);
+    return res.status(200).json(result);
   }
 
   res.json(result);

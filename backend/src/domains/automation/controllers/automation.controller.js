@@ -139,7 +139,7 @@ export const generateAutomationDemo = async (req, res) => {
         reason: evidenceContext.reason,
         missing
       });
-      return res.status(422).json({
+      return res.status(200).json({
         success: false,
         error: {
           code: evidenceContext.code || "PRODUCT_INTELLIGENCE_REQUIRED",
@@ -177,7 +177,7 @@ export const generateAutomationDemo = async (req, res) => {
 
     // Check for insufficient data
     if (automationData._noData) {
-      return res.status(422).json({
+      return res.status(200).json({
         success: false,
         error: {
           code: "PRODUCT_INTELLIGENCE_REQUIRED",
@@ -892,7 +892,7 @@ export const getContentBrief = async (req, res) => {
     const briefWarnings = brief?.warnings || [];
     
     if (brief?.rejected) {
-      return res.status(422).json({
+      return res.status(200).json({
         success: false,
         error: {
           code: brief.code || "EVIDENCE_MISSING",
@@ -994,7 +994,7 @@ export const generateContentItem = async (req, res) => {
     
     if (brief?.rejected) {
       console.warn("[Content Studio] Brief rejected", { chatId, userId, code: brief.code, reason: brief.reason });
-      return res.status(422).json({
+      return res.status(200).json({
         success: false,
         error: {
           code: brief.code || "EVIDENCE_MISSING",
@@ -1030,7 +1030,7 @@ export const generateContentItem = async (req, res) => {
         reason: contentBody._reason,
       });
       if (contentBody._status === 'blocked') {
-        return res.status(422).json({
+        return res.status(200).json({
           success: false, status: 'BLOCKED', code: 'PRODUCT_IDENTITY_UNAVAILABLE',
           message: contentBody._reason || 'Content generation requires a verified product identity',
           readiness: { ready: false, missingRequired: ['PRODUCT_IDENTITY'] },
