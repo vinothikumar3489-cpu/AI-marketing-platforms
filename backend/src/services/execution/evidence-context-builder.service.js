@@ -190,6 +190,9 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
     ? normalizedSeoExecution.primaryKeywords
     : normalizedSeoExecution.keywords;
 
+  // Normalize product data outside of context object literal
+  const normalizedProduct = normalizeProductForContentStudio(productIntel, { website: websiteRaw, usp: productAnalysis.usp, summary: productAnalysis.summary || productAnalysis.productSummary });
+
   const context = {
     contextId: `ctx_${chatId}_${Date.now()}`,
     chatId: sourced(chatId, 'chat', 'id'),
@@ -213,7 +216,6 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
     },
 
     // 3. Features & Benefits & USP (use comprehensive normalizer)
-    const normalizedProduct = normalizeProductForContentStudio(productIntel, { website: websiteRaw, usp: productAnalysis.usp, summary: productAnalysis.summary || productAnalysis.productSummary });
     features: sourcedOpt(normalizedProduct.features.length > 0 ? normalizedProduct.features : null, 'productIntelligence', 'features'),
     benefits: sourcedOpt(normalizedProduct.benefits.length > 0 ? normalizedProduct.benefits : null, 'productIntelligence', 'benefits'),
     usp: sourcedOpt(normalizedProduct.usp || productAnalysis.usp || null, 'productIntelligence', 'usp'),
