@@ -119,12 +119,12 @@ describe('Provider router import integration', () => {
 
 describe('SEO orchestrator integration', () => {
   it('generateCompleteSeoIntelligence is importable', async () => {
-    const orchestrator = await import('../src/modules/seo-intelligence/seoIntelligence.service.js');
+    const orchestrator = await import('../src/services/seo/seo-orchestrator.service.js');
     assert.equal(typeof orchestrator.generateCompleteSeoIntelligence, 'function');
   });
 
   it('seo controller exports are importable', async () => {
-    const controller = await import('../src/modules/seo-intelligence/seo.controller.js');
+    const controller = await import('../src/domains/seo/controllers/seo.controller.js');
     assert.equal(typeof controller.runSeoHandler, 'function');
     assert.equal(typeof controller.getSeoHandler, 'function');
     assert.equal(typeof controller.getSEOProviderStatusHandler, 'function');

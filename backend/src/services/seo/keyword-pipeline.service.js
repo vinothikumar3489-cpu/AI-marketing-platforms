@@ -500,40 +500,6 @@ export function rankAndFilterKeywords(keywords, productName = '', companyName = 
   };
 }
 
-// PART 14: Professional keyword pipeline enhancements
-export function estimateKeywordMetrics(keyword, category) {
-  const phrase = keyword.phrase || keyword.keyword || keyword;
-  const words = phrase.split(' ');
-  
-  // PART 14: Estimate volume based on category and length
-  let estimatedVolume = 0;
-  if (category === 'commercial') {
-    estimatedVolume = Math.floor(1000 / words.length) * 10;
-  } else if (category === 'transactional') {
-    estimatedVolume = Math.floor(500 / words.length) * 10;
-  } else if (category === 'question') {
-    estimatedVolume = Math.floor(200 / words.length) * 10;
-  } else {
-    estimatedVolume = Math.floor(100 / words.length) * 10;
-  }
-  
-  // PART 14: Estimate difficulty based on commercial intent
-  let estimatedDifficulty = 30;
-  if (category === 'commercial' || category === 'transactional') {
-    estimatedDifficulty = 60 + Math.floor(Math.random() * 30);
-  } else if (category === 'question') {
-    estimatedDifficulty = 40 + Math.floor(Math.random() * 20);
-  } else {
-    estimatedDifficulty = 30 + Math.floor(Math.random() * 30);
-  }
-  
-  return {
-    volume: estimatedVolume,
-    difficulty: estimatedDifficulty,
-    estimated: true
-  };
-}
-
 // PART 14: Enhanced intent classification
 export function classifyKeywordIntent(phrase, category) {
   const lower = phrase.toLowerCase();

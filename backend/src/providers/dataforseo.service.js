@@ -927,3 +927,55 @@ function extractDomain(url) {
     return '';
   }
 }
+
+export async function verifyDataForSEO() {
+  if (!DATAFORSEO_LOGIN || !DATAFORSEO_PASSWORD) {
+    return { success: false, reason: 'NOT_CONFIGURED', error: 'Credentials not configured' };
+  }
+  try {
+    const response = await fetch(`${DATAFORSEO_API_URL}/keywords_data/google_ads/search_volume/live`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${DATAFORSEO_LOGIN}:${DATAFORSEO_PASSWORD}`).toString('base64')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify([{ keywords: ['test'], location_code: 2840, language_code: 'en' }])
+    });
+    if (response.status === 200) {
+      _dataforseoVerified = true;
+      _dataforseoAuthFailed = false;
+      return { success: true, reason: 'CONNECTED', status: 'CONNECTED' };
+    }
+    if (response.status === 401) {
+      _dataforseoAuthFailed = true;
+      const errorText = await response.text();
+      if (errorText.includes('40104')) {
+        return { success: false, reason: 'INVALID_CREDENTIALS', error: 'Invalid DataForSEO credentials', status: 'INVALID_CREDENTIALS' };
+      }
+      return { success: false, reason: 'INVALID_CREDENTIALS', error: 'DataForSEO authentication failed', status: 'INVALID_CREDENTIALS' };
+    }
+    if (response.status === 402) {
+      _dataforseoBlockedUntil = Date.now() + 300000;
+      return { success: false, reason: 'RATE_LIMITED', error: 'DataForSEO payment required', status: 'RATE_LIMITED' };
+    }
+    return { success: false, reason: 'FAILED', error: `HTTP ${response.status}`, status: 'FAILED' };
+  } catch (e) {
+    return { success: false, reason: 'FAILED', error: e.message, status: 'FAILED' };
+  }
+}
+
+export function getDataForSEOConnectionStatus() {
+  if (!DATAFORSEO_LOGIN || !DATAFORSEO_PASSWORD) {
+    return { connected: false, status: 'NOT_CONFIGURED', reason: 'Credentials not configured' };
+  }
+  if (_dataforseoAuthFailed) {
+    return { connected: false, status: 'INVALID_CREDENTIALS', reason: 'Authentication previously failed' };
+  }
+  if (Date.now() < _dataforseoBlockedUntil) {
+    return { connected: false, status: 'RATE_LIMITED', reason: 'Rate limited or payment required' };
+  }
+  if (_dataforseoVerified) {
+    return { connected: true, status: 'CONNECTED', reason: 'Previously verified' };
+  }
+  return { connected: false, status: 'UNVERIFIED', reason: 'Not yet verified at startup' };
+}

@@ -5,7 +5,7 @@ describe('SEO Persistence — contract validation', () => {
   let mod;
 
   before(async () => {
-    mod = await import('../src/modules/seo-intelligence/seoIntelligence.service.js');
+    mod = await import('../src/domains/seo/services/seoIntelligence.service.js');
   });
 
   it('exports saveSEOData', () => {
