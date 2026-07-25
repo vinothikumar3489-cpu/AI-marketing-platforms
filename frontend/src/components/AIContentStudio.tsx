@@ -892,10 +892,10 @@ function AssetDetailPanel({ asset, onClose, onRegenerate }: { asset: any; onClos
 }
 
 function AssetLibraryPanel({
-  selectedChatId, onRegenerate, onAssetOpen, selectedAsset, onCloseAsset, view
+  selectedChatId, onRegenerate, onAssetOpen, selectedAsset, onCloseAsset, view, refreshKey
 }: {
   selectedChatId: string; onRegenerate: (asset: any) => void;
-  onAssetOpen: (asset: any) => void; selectedAsset: any; onCloseAsset: () => void; view: string;
+  onAssetOpen: (asset: any) => void; selectedAsset: any; onCloseAsset: () => void; view: string; refreshKey?: number;
 }) {
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -927,7 +927,7 @@ function AssetLibraryPanel({
     setSelectedAssetId(null);
     onCloseAsset();
     if (selectedChatId) loadAssets();
-  }, [selectedChatId, loadAssets, onCloseAsset]);
+  }, [selectedChatId, loadAssets, onCloseAsset, refreshKey]);
 
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
 
@@ -1076,6 +1076,7 @@ export default function AIContentStudio() {
   const [readiness, setReadiness] = useState<any>(null);
   const [readinessLoading, setReadinessLoading] = useState(false);
   const [addingToCampaign, setAddingToCampaign] = useState(false);
+  const [assetRefreshKey, setAssetRefreshKey] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const requestVersionRef = useRef(0);
   const pendingRequestsRef = useRef<Set<string>>(new Set());
@@ -1162,7 +1163,7 @@ export default function AIContentStudio() {
     );
 
     safeFetch('evidenceReadiness',
-      (signal) => api.get(`/chats/${selectedChatId}/evidence-readiness`, { signal }) as Promise<any>,
+      (signal) => api.get(`/chats/${selectedChatId}/evidence-readiness`, signal) as Promise<any>,
       (d) => {
         const readinessData = d?.data || d;
         if (readinessData && typeof readinessData === 'object') setReadiness(readinessData);
@@ -1196,6 +1197,7 @@ export default function AIContentStudio() {
     if (result.asset || result._assetId) {
       setSelectedAsset(result.asset || null);
     }
+    setAssetRefreshKey(k => k + 1);
   }, []);
 
   const handleRegenerate = useCallback((asset: any) => {
@@ -1211,6 +1213,7 @@ export default function AIContentStudio() {
           setGeneratedContent(res.data.content || res.data);
           setQualityScore(res.data.qualityScore || null);
           setActiveTab('content');
+          setAssetRefreshKey(k => k + 1);
         }
       })
       .catch(err => {
@@ -1265,6 +1268,7 @@ export default function AIContentStudio() {
           selectedAsset={selectedAsset}
           onCloseAsset={() => setSelectedAsset(null)}
           view="grid"
+          refreshKey={assetRefreshKey}
         />
       );
     }

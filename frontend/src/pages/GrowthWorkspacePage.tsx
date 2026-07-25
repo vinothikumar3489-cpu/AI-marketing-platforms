@@ -34,7 +34,7 @@ const tabs = ['Executive Snapshot', 'Executive Story', 'Product DNA', 'Market In
 type RestoreStatus = 'idle' | 'loading' | 'found' | 'empty' | 'error';
 
 export default function GrowthWorkspacePage() {
-  const { selectedChatId, createChat, loadFullResults, fullResultsByChat } = useProject();
+  const { selectedChatId, createChat, loadFullResults, fullResultsByChat, fullResults, refreshChats } = useProject();
   const [form, setForm] = useState(defaults);
   const [activeTab, setActiveTab] = useWorkspaceMemory('gw-activeTab', 'Executive Snapshot');
   const [loading, setLoading] = useState(false);
@@ -107,7 +107,10 @@ export default function GrowthWorkspacePage() {
       setRestoreError(null);
       if (!initialisedRef.current) {
         initialisedRef.current = true;
-        loadFullResults(selectedChatId, false).catch(() => {});
+        loadFullResults(selectedChatId, true).then(r => {
+          if (selectedChatIdRef.current !== selectedChatId) return;
+          if (checkGrowthData(r)) setResults(r?.growth || {});
+        }).catch(() => {});
       }
       return;
     }
@@ -161,6 +164,7 @@ export default function GrowthWorkspacePage() {
       console.info('[Growth UI] Run completed, refreshing results', { chatId, selectedChatId: selectedChatIdRef.current });
       
       const refreshed = await loadFullResults(chatId, true);
+      await refreshChats();
       
       if (selectedChatIdRef.current !== chatId) {
         console.info('[Growth UI] Chat switched during refresh, aborting view update');
@@ -300,7 +304,7 @@ export default function GrowthWorkspacePage() {
               <p style={{ margin: 0, color: '#ff8a8a' }}>{restoreError}</p>
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => { if (selectedChatId) restoreForChat(selectedChatId); }} className="secondary-btn">Retry</button>
+              <button onClick={() => { if (selectedChatId) loadFullResults(selectedChatId, true).then(() => setRestoreError(null)); }} className="secondary-btn">Retry</button>
               <button onClick={handleNewAnalysis} className="ghost-btn">New Analysis</button>
             </div>
           </div>

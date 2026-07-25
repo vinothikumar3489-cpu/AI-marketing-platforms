@@ -94,8 +94,21 @@ export async function generateContentGapIntelligence({
 
     // Deduplicate content gaps by targetKeyword + pageType + title
     console.log('🔄 [Content Gap] Deduplicating content gaps...');
-    const deduplicatedGaps = deduplicateContentGaps(allGaps);
+    let deduplicatedGaps = deduplicateContentGaps(allGaps);
     console.log(`✅ [Content Gap] Deduplicated: ${allGaps.length} → ${deduplicatedGaps.length} gaps`);
+
+    // Fallback: if no gaps were generated from any source, generate deterministic gaps
+    if (deduplicatedGaps.length === 0) {
+      console.log('🔄 [Content Gap] No gaps from keyword/competitor sources, generating deterministic fallback gaps...');
+      deduplicatedGaps = generateDeterministicFallbackGaps({
+        websiteData,
+        competitorIntelligence: filteredCompetitorIntelligence,
+        identity,
+        productName,
+        industry
+      });
+      console.log(`✅ [Content Gap] Generated ${deduplicatedGaps.length} deterministic fallback gaps`);
+    }
 
     // Step 8: Generate content calendar
     console.log('📅 [Content Gap] Step 8: Creating content calendar...');
@@ -198,7 +211,6 @@ function analyzeExistingPages(websiteData) {
 function analyzeKeywordOpportunities(keywordIntelligence, existingPages, productName) {
   const gaps = [];
   
-  // Only generate gaps if we have real keyword data
   const allKeywords = [
     ...(keywordIntelligence.primaryKeywords || []),
     ...(keywordIntelligence.secondaryKeywords || []),
@@ -212,18 +224,14 @@ function analyzeKeywordOpportunities(keywordIntelligence, existingPages, product
 
   console.log(`✅ [Content Gap] Using ${allKeywords.length} keywords for gap analysis`);
 
-  // Filter to only VERIFIED or HEURISTICALLY_VALIDATED keywords
-  // Accept VERIFIED, HEURISTICALLY_VALIDATED, or NO_STATUS keywords (so seeds are not ignored)
   const validatedKeywords = allKeywords.filter(kw => {
     const status = kw.validationStatus || '';
     if (status === 'VERIFIED' || status === 'HEURISTICALLY_VALIDATED' || !status) return true;
-    return true; // The user said "Do not reject valid keyword opportunities." - we'll just allow all.
+    return true;
   });
   
   if (validatedKeywords.length === 0) {
-    console.log('⚠️ [Content Gap] No validated keywords (VERIFIED/HEURISTICALLY_VALIDATED) available');
-    gaps.status = 'PARTIAL';
-    gaps.warnings = [{ code: 'NO_VALIDATED_KEYWORDS', message: 'No validated keywords available for content gap analysis.' }];
+    console.log('⚠️ [Content Gap] No validated keywords available');
     return gaps;
   }
   
@@ -231,36 +239,30 @@ function analyzeKeywordOpportunities(keywordIntelligence, existingPages, product
 
   const productLower = productName.toLowerCase();
 
-  // Analyze each keyword for content opportunities
   validatedKeywords.forEach(kw => {
     const keyword = kw.keyword || kw;
     const volume = kw.searchVolume;
     const difficulty = kw.difficulty || kw.keywordDifficulty;
     const intent = kw.intent || 'informational';
 
-    // Skip if keyword is already covered in existing content
     if (isKeywordCovered(keyword, existingPages)) {
       return;
     }
     
-    // Skip malformed titles (sentence fragments, stopword-starting/ending)
     const words = keyword.split(' ');
     const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
       'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had',
       'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'must', 'can', 'this',
       'that', 'these', 'those']);
     if (stopWords.has(words[0])) {
-      // Relaxed stopword filtering: only skip if it's literally just a stopword or two stopwords.
       if (words.length < 3) return;
     }
     
-    // Skip generic weak terms
     const weakTerms = ['general', 'account', 'tools', 'competitors', 'alternatives', 'platform for', 'for building', 'the collaborative'];
     if (weakTerms.some(wt => keyword.includes(wt))) {
       return;
     }
 
-    // Generate content gap based on keyword type and intent
     if (intent === 'transactional' && (volume > 10 || !volume)) {
       gaps.push({
         title: generateTitleFromKeyword(keyword, productName),
@@ -389,7 +391,7 @@ function identifyMissingServicePages(websiteData, keywordIntelligence, productNa
     const keyword = kw.keyword || kw;
     const volume = kw.searchVolume;
     
-    if (!isKeywordCovered(keyword, existingPages) && volume > 50) {
+    if (!isKeywordCovered(keyword, existingPages) && (!volume || volume > 30)) {
       gaps.push({
         title: generateTitleFromKeyword(keyword, productName),
         pageType: 'landing_page',
@@ -397,11 +399,11 @@ function identifyMissingServicePages(websiteData, keywordIntelligence, productNa
         searchVolume: volume,
         keywordDifficulty: kw.difficulty,
         intent: kw.intent || 'commercial',
-        evidence: `Service-related keyword with ${volume} monthly searches`,
+        evidence: volume ? `Service-related keyword with ${volume} monthly searches` : `Service-related keyword (no volume data)`,
         source: 'DataForSEO',
         confidence: calculateConfidence(volume, kw.difficulty),
-        businessImpact: 'high',
-        priority: 'high',
+        businessImpact: volume > 500 ? 'high' : 'medium',
+        priority: volume > 500 ? 'high' : 'medium',
         recommendedSections: ['Service overview', 'Process', 'Pricing', 'Case studies'],
         competitorEvidence: []
       });
@@ -438,7 +440,7 @@ function identifyFaqOpportunities(keywordIntelligence, geoIntelligence, existing
     const keyword = kw.keyword || kw;
     const volume = kw.searchVolume;
     
-    if (volume > 100) {
+    if (!volume || volume > 50) {
       gaps.push({
         title: generateTitleFromKeyword(keyword, productName),
         pageType: 'faq',
@@ -446,11 +448,11 @@ function identifyFaqOpportunities(keywordIntelligence, geoIntelligence, existing
         searchVolume: volume,
         keywordDifficulty: kw.difficulty,
         intent: 'informational',
-        evidence: `Question keyword with ${volume} monthly searches`,
+        evidence: volume ? `Question keyword with ${volume} monthly searches` : `Question keyword (no volume data)`,
         source: 'DataForSEO',
         confidence: calculateConfidence(volume, kw.difficulty),
-        businessImpact: 'medium',
-        priority: 'medium',
+        businessImpact: volume > 500 ? 'high' : 'medium',
+        priority: volume > 500 ? 'high' : 'medium',
         recommendedSections: ['Answer', 'Examples', 'Related questions'],
         competitorEvidence: []
       });
@@ -505,7 +507,7 @@ function identifyComparisonOpportunities(keywordIntelligence, competitorIntellig
     const keyword = kw.keyword || kw;
     const volume = kw.searchVolume;
     
-    if (volume > 50) {
+    if (!volume || volume > 30) {
       gaps.push({
         title: generateTitleFromKeyword(keyword, productName),
         pageType: 'comparison',
@@ -513,11 +515,11 @@ function identifyComparisonOpportunities(keywordIntelligence, competitorIntellig
         searchVolume: volume,
         keywordDifficulty: kw.difficulty,
         intent: 'commercial',
-        evidence: `Comparison keyword with ${volume} monthly searches`,
+        evidence: volume ? `Comparison keyword with ${volume} monthly searches` : `Comparison keyword (no volume data)`,
         source: 'DataForSEO',
         confidence: calculateConfidence(volume, kw.difficulty),
-        businessImpact: 'high',
-        priority: 'high',
+        businessImpact: volume > 500 ? 'high' : 'medium',
+        priority: volume > 500 ? 'high' : 'medium',
         recommendedSections: ['Feature comparison', 'Pricing', 'Pros and cons', 'Verdict'],
         competitorEvidence: []
       });
@@ -551,7 +553,7 @@ function identifyResourceOpportunities(keywordIntelligence, existingPages, produ
     const keyword = kw.keyword || kw;
     const volume = kw.searchVolume;
     
-    if (volume > 200 && !isKeywordCovered(keyword, existingPages)) {
+    if ((!volume || volume > 50) && !isKeywordCovered(keyword, existingPages)) {
       gaps.push({
         title: generateTitleFromKeyword(keyword, productName),
         pageType: 'resource',
@@ -559,11 +561,11 @@ function identifyResourceOpportunities(keywordIntelligence, existingPages, produ
         searchVolume: volume,
         keywordDifficulty: kw.difficulty,
         intent: 'informational',
-        evidence: `High-volume informational keyword (${volume} searches)`,
+        evidence: volume ? `Informational keyword (${volume} searches)` : `Informational keyword (no volume data)`,
         source: 'DataForSEO',
         confidence: calculateConfidence(volume, kw.difficulty),
-        businessImpact: 'medium',
-        priority: 'medium',
+        businessImpact: volume > 1000 ? 'high' : 'medium',
+        priority: volume > 1000 ? 'high' : 'medium',
         recommendedSections: ['Introduction', 'Step-by-step guide', 'Examples', 'FAQ'],
         competitorEvidence: []
       });
@@ -654,6 +656,155 @@ function deduplicateContentGaps(gaps) {
   });
 
   return deduplicated;
+}
+
+function generateDeterministicFallbackGaps({ websiteData, competitorIntelligence, identity, productName, industry }) {
+  const gaps = [];
+  const existingPages = analyzeExistingPages(websiteData);
+  const competitors = competitorIntelligence?.competitorProfiles || [];
+
+  if (!existingPages.hasPricing) {
+    gaps.push({
+      title: `${productName} Pricing`,
+      pageType: 'landing_page',
+      targetKeyword: `${productName} pricing`,
+      searchVolume: null,
+      keywordDifficulty: null,
+      intent: 'transactional',
+      evidence: 'Standard pricing page - not yet on site',
+      source: 'Fallback Generation',
+      confidence: 80,
+      businessImpact: 'high',
+      priority: 'critical',
+      recommendedSections: ['Plan tiers', 'Feature comparison', 'FAQ'],
+      competitorEvidence: competitors.length > 0 ? [competitors[0].name] : []
+    });
+  }
+
+  if (!existingPages.hasFeatures) {
+    gaps.push({
+      title: `${productName} Features`,
+      pageType: 'landing_page',
+      targetKeyword: `${productName} features`,
+      searchVolume: null,
+      keywordDifficulty: null,
+      intent: 'informational',
+      evidence: 'Standard features page - not yet on site',
+      source: 'Fallback Generation',
+      confidence: 75,
+      businessImpact: 'medium',
+      priority: 'high',
+      recommendedSections: ['Core features', 'Advanced capabilities', 'Integrations'],
+      competitorEvidence: []
+    });
+  }
+
+  if (!existingPages.hasComparison && competitors.length > 0) {
+    const altNames = competitors.slice(0, 3).map(c => c.name);
+    altNames.forEach(altName => {
+      const keyword = `${productName} vs ${altName}`;
+      if (!isKeywordCovered(keyword, existingPages)) {
+        gaps.push({
+          title: `Comparing ${productName} vs ${altName}`,
+          pageType: 'comparison',
+          targetKeyword: keyword,
+          searchVolume: null,
+          keywordDifficulty: null,
+          intent: 'commercial',
+          evidence: `Direct comparison with competitor ${altName}`,
+          source: 'Fallback Generation',
+          confidence: 70,
+          businessImpact: 'high',
+          priority: 'high',
+          recommendedSections: ['Feature comparison', 'Pricing', 'Pros and cons', 'Verdict'],
+          competitorEvidence: [altName]
+        });
+      }
+    });
+  }
+
+  if (!existingPages.hasFaq) {
+    const faqKeywords = [
+      `what is ${productName}`,
+      `how does ${productName} work`,
+      `why choose ${productName}`,
+      `is ${productName} worth it`
+    ];
+    faqKeywords.forEach(kw => {
+      if (!isKeywordCovered(kw, existingPages)) {
+        gaps.push({
+          title: kw.charAt(0).toUpperCase() + kw.slice(1) + '?',
+          pageType: 'faq',
+          targetKeyword: kw + '?',
+          searchVolume: null,
+          keywordDifficulty: null,
+          intent: 'informational',
+          evidence: `Common customer question about ${productName}`,
+          source: 'Fallback Generation',
+          confidence: 65,
+          businessImpact: 'medium',
+          priority: 'medium',
+          recommendedSections: ['Direct answer', 'Context', 'Examples'],
+          competitorEvidence: []
+        });
+      }
+    });
+  }
+
+  if (!existingPages.hasResource) {
+    const resourceKeywords = [
+      `${productName} best practices`,
+      `${industry} trends 2026`,
+      `how to use ${productName} effectively`
+    ];
+    resourceKeywords.forEach(kw => {
+      if (!isKeywordCovered(kw, existingPages)) {
+        gaps.push({
+          title: generateTitleFromKeyword(kw, productName) || kw,
+          pageType: 'resource',
+          targetKeyword: kw,
+          searchVolume: null,
+          keywordDifficulty: null,
+          intent: 'informational',
+          evidence: `Standard resource topic for ${industry}`,
+          source: 'Fallback Generation',
+          confidence: 60,
+          businessImpact: 'medium',
+          priority: 'medium',
+          recommendedSections: ['Introduction', 'Step-by-step guide', 'Examples', 'FAQ'],
+          competitorEvidence: []
+        });
+      }
+    });
+  }
+
+  if (!existingPages.hasUseCase) {
+    const industryKeywords = [
+      `${productName} for ${industry}`,
+      `${industry} use cases for ${productName}`
+    ];
+    industryKeywords.forEach(kw => {
+      if (!isKeywordCovered(kw, existingPages)) {
+        gaps.push({
+          title: generateTitleFromKeyword(kw, productName) || kw,
+          pageType: 'landing_page',
+          targetKeyword: kw,
+          searchVolume: null,
+          keywordDifficulty: null,
+          intent: 'commercial',
+          evidence: `Industry-specific landing page for ${industry}`,
+          source: 'Fallback Generation',
+          confidence: 65,
+          businessImpact: 'medium',
+          priority: 'high',
+          recommendedSections: ['Overview', 'Benefits for ' + industry, 'Use cases', 'Testimonials'],
+          competitorEvidence: []
+        });
+      }
+    });
+  }
+
+  return deduplicateContentGaps(gaps);
 }
 
 function generateContentCalendar(gaps) {

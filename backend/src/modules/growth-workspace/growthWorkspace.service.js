@@ -1017,14 +1017,74 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     console.log('💾 [Growth Workspace] Core intelligence saved to database');
     console.log(`✅ [Growth Workspace] hasActionPlan: ${!!normalizedResults.campaign.actionPlan}`);
 
+    // 2a. Reload the latest campaign intelligence to verify persistence
+    let reloadedCampaignIntel = null;
+    try {
+      reloadedCampaignIntel = await prisma.campaignIntelligence.findUnique({ where: { chatId: validChatId } });
+      if (reloadedCampaignIntel) {
+        const hasExecutiveStory = !!reloadedCampaignIntel.executiveStory;
+        const hasActionPlan = !!reloadedCampaignIntel.actionPlan;
+        console.log('[Growth Workspace] Campaign intel reloaded:', { hasExecutiveStory, hasActionPlan });
+
+        // 2b. Generate/refresh the Executive Snapshot — ensure executive story + action plan are persisted
+        if ((!hasExecutiveStory || !hasActionPlan) && (growthExecutiveStory || growthActionPlan)) {
+          const patchData = {};
+          if (!hasExecutiveStory && growthExecutiveStory) patchData.executiveStory = growthExecutiveStory;
+          if (!hasActionPlan && growthActionPlan) patchData.actionPlan = growthActionPlan;
+          patchData.campaignGenerator = {
+            ...(reloadedCampaignIntel.campaignGenerator || normalizedResults.campaign || {}),
+            growthSummary,
+            executiveStory: growthExecutiveStory,
+            actionPlan: growthActionPlan,
+            metadata: {
+              growthSummary,
+              executiveStory: growthExecutiveStory,
+              actionPlan: growthActionPlan,
+              generatedAt: new Date().toISOString()
+            }
+          };
+          await prisma.campaignIntelligence.update({ where: { chatId: validChatId }, data: patchData });
+          console.log('[Growth Workspace] Executive snapshot refreshed: missing fields patched');
+        }
+
+        // Evidence snapshot refresh — mark that analysis completed with reference data
+        if (evidenceSnapshot) {
+          await prisma.evidenceSnapshot.update({
+            where: { id: evidenceSnapshot.id },
+            data: {
+              updatedAt: new Date(),
+              sourceSummary: {
+                ...(typeof evidenceSnapshot.sourceSummary === 'object' ? evidenceSnapshot.sourceSummary : {}),
+                lastAnalysisCompletedAt: new Date().toISOString(),
+                overallGrowthScore,
+                dataCompletenessScore: growthSummary.dataCompletenessScore,
+              }
+            }
+          }).catch(e => console.warn('[Growth Workspace] Evidence snapshot update skipped:', e.message));
+        }
+      }
+    } catch (reloadError) {
+      console.warn('[Growth Workspace] Campaign intel reload non-fatal:', reloadError.message);
+    }
+
+    // 2c. Re-save executive story + action plan into normalizedResults for response completeness
+    if (growthExecutiveStory && !normalizedResults.campaign) {
+      normalizedResults.campaign = normalizedResults.campaign || {};
+      normalizedResults.campaign.executiveStory = growthExecutiveStory;
+      normalizedResults.campaign.actionPlan = growthActionPlan;
+    }
+
     // Refetch persisted data — return DB truth, not in-memory
+    let refetchSucceeded = false;
     try {
       const [dbProductIntel, dbCompetitorIntel, dbCampaignIntel] = await Promise.all([
         prisma.productIntelligence.findFirst({ where: { userId, chatId: validChatId } }),
         prisma.competitorIntelligence.findFirst({ where: { userId, chatId: validChatId } }),
         prisma.campaignIntelligence.findFirst({ where: { userId, chatId: validChatId } }),
       ]);
-      if (dbProductIntel || dbCompetitorIntel || dbCampaignIntel) {
+
+      const hasRequiredData = !!dbProductIntel && (!!dbCompetitorIntel || !!dbCampaignIntel);
+      if (hasRequiredData) {
         const dbResults = {};
         if (dbProductIntel) {
           dbResults.product = dbProductIntel.productAnalysis;
@@ -1043,27 +1103,72 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
           }
           dbResults.channel = dbCampaignIntel.channelRecommendation;
         }
-        Object.assign(results, dbResults);
-        const refetchedNormalized = normalizeGrowthResults(results, input);
-        Object.assign(normalizedResults, refetchedNormalized);
+
+        const keyModules = ['product', 'market', 'competitor', 'campaign'];
+        const loadedModules = keyModules.filter(k => dbResults[k] && typeof dbResults[k] === 'object' && Object.keys(dbResults[k]).length > 0);
+        console.log('[Growth Workspace] Refetched DB modules:', loadedModules);
+
+        if (loadedModules.length >= 3) {
+          Object.assign(results, dbResults);
+          const refetchedNormalized = normalizeGrowthResults(results, input);
+          Object.assign(normalizedResults, refetchedNormalized);
+          refetchSucceeded = true;
+          console.info('[Growth Stage]', { stage: 'PERSISTENCE_REFETCHED', status: 'completed', modules: loadedModules, chatId: validChatId });
+        } else {
+          console.warn('[Growth Stage]', {
+            stage: 'PERSISTENCE_REFETCH_INCOMPLETE',
+            status: 'warning',
+            loadedModules,
+            chatId: validChatId,
+            message: 'Refetched DB data was incomplete — using in-memory results'
+          });
+        }
+      } else {
+        console.warn('[Growth Stage]', {
+          stage: 'PERSISTENCE_REFETCH_INCOMPLETE',
+          status: 'warning',
+          hasProductIntel: !!dbProductIntel,
+          hasCompetitorIntel: !!dbCompetitorIntel,
+          hasCampaignIntel: !!dbCampaignIntel,
+          chatId: validChatId,
+          message: 'Not all required DB records found — using in-memory results'
+        });
       }
-      console.info('[Growth Stage]', { stage: 'PERSISTENCE_REFETCHED', status: 'completed', chatId: validChatId });
     } catch (refetchError) {
       console.error('[Growth Stage]', {
         stage: 'PERSISTENCE_REFETCH_FAILED',
         status: 'warning',
         chatId: validChatId,
         error: refetchError.message,
+        stack: refetchError.stack,
       });
     }
 
-    // Add message to chat
+    // Ensure response always has complete data even if refetch failed
+    if (!refetchSucceeded) {
+      refetchSucceeded = true;
+      console.warn('[Growth Workspace] Using in-memory results for response (refetch was incomplete or skipped)');
+    }
+
+    // 3. Set refresh flag that frontend can detect — update chat timestamp + write message with refresh marker
+    await prisma.chat.update({
+      where: { id: validChatId },
+      data: { updatedAt: new Date() }
+    });
+
+    const refreshTimestamp = new Date().toISOString();
     await prisma.message.create({
       data: {
         chatId: validChatId,
         role: 'assistant',
         content: `Full growth analysis completed for ${input.productName}. Growth Score: ${overallGrowthScore}/100`,
-        analysisData: { summary: { overallGrowthScore, stepsCompleted: completedSteps } }
+        analysisData: {
+          summary: {
+            overallGrowthScore,
+            stepsCompleted: completedSteps,
+            dataRefreshedAt: refreshTimestamp
+          }
+        }
       }
     });
 
@@ -1079,6 +1184,8 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps,
       overallStatus,
       warnings,
+      executiveStory: growthExecutiveStory || null,
+      actionPlan: growthActionPlan || null,
       businessIntelligence: synthesizedIntel ? {
         company: synthesizedIntel.companyIntelligence,
         technology: synthesizedIntel.technologyIntelligence,
@@ -1101,7 +1208,8 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
         completedSteps: steps.filter(s => s.status === 'completed').length,
         progress: Math.round((steps.filter(s => s.status === 'completed').length / steps.length) * 100)
       },
-      diagnostics: steps.map(s => ({ key: s.key, label: s.label, status: s.status, provider: s.provider, diagnostics: s.diagnostics }))
+      diagnostics: steps.map(s => ({ key: s.key, label: s.label, status: s.status, provider: s.provider, diagnostics: s.diagnostics })),
+      refreshedAt: new Date().toISOString()
     };
 
   } catch (error) {

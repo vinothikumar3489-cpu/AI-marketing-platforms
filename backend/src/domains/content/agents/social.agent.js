@@ -1,5 +1,5 @@
 import { callAI } from "../../../domains/ai/services/aiOrchestrator.service.js";
-import { buildEvidenceSection, buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getKeyword, getEvidenceForTrend, FALLBACK_FAILURE } from "./agent.utils.js";
+import { buildEvidenceSection, buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getKeyword, getEvidenceForTrend, FALLBACK_FAILURE, buildFallbackFeatures, buildFallbackBenefits, buildFallbackEvidenceFields } from "./agent.utils.js";
 
 export async function generateLinkedInPost(brief, aiFunction = callAI, normalizedEvidence) {
   const evidence = buildEvidenceSection(brief);
@@ -42,7 +42,24 @@ Return valid JSON:
     const result = await aiFunction(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { }
-  return FALLBACK_FAILURE;
+  return generateLinkedInPostFallback(brief, productName, persona, painPoint, usp);
+}
+
+function generateLinkedInPostFallback(brief, productName, persona, painPoint, usp) {
+  const features = buildFallbackFeatures(brief);
+  const benefits = buildFallbackBenefits(brief);
+  return {
+    hook: `${persona} still dealing with ${painPoint}? Here is how leading teams are solving it.`,
+    body: `For too long, ${persona} have accepted "${painPoint}" as just part of the workflow. Forward-thinking organizations are taking a new approach with ${productName}.\n\nBy leveraging ${features[0]} and ${features[1]}, teams unlock ${benefits[0]} and ${benefits[1]} — without the overhead of traditional solutions.\n\nThe shift is clear: ${benefits[2] || 'better outcomes'} is achievable with the right foundation.`,
+    cta: 'What approach has worked for your team? Share below.',
+    hashtags: ['#Productivity', '#Innovation', '#Strategy'],
+    audience: persona,
+    angle: usp ? 'product differentiation' : 'trend insight',
+    evidenceUsed: buildFallbackEvidenceFields(brief),
+    claimsRequiringReview: [],
+    _provider: 'fallback',
+    _fallbackUsed: true,
+  };
 }
 
 export async function generateInstagramPost(brief, aiFunction = callAI, normalizedEvidence) {
@@ -91,7 +108,31 @@ Return valid JSON:
     const result = await aiFunction(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { }
-  return FALLBACK_FAILURE;
+  return generateInstagramPostFallback(brief, productName, persona, painPoint);
+}
+
+function generateInstagramPostFallback(brief, productName, persona, painPoint) {
+  const features = buildFallbackFeatures(brief);
+  const benefits = buildFallbackBenefits(brief);
+  return {
+    hook: `${painPoint} — sound familiar?`,
+    caption: `We hear this from ${persona} every day. 👂\n\nThe good news? There is a better way with ${productName}.\n\n✨ ${features[0]}\n✨ ${features[1]}\n\n✅ ${benefits[0]}\n✅ ${benefits[1]}\n\nStop settling for less. 🚀`,
+    visualConcept: `Clean, modern interface of ${productName} showing ${features[0] || 'core features'} in use. Professional color scheme with accent highlights.`,
+    carouselSlides: [
+      { headline: `Meet ${productName}`, body: `Designed for ${persona} to overcome "${painPoint}".`, visualHint: 'Product branding and hero shot' },
+      { headline: 'Key Feature', body: features[0] || 'Core platform capability', visualHint: 'Feature screenshot with callouts' },
+      { headline: 'Key Benefit', body: benefits[0] || 'Primary value proposition', visualHint: 'Benefit visualization graphic' },
+    ],
+    imagePrompt: `Product screenshot of ${productName} dashboard, clean UI, modern design, technology context, professional lighting`,
+    callToAction: 'Link in bio to learn more',
+    hashtags: ['#' + productName.toLowerCase().replace(/\s+/g, ''), '#Productivity', '#Innovation', '#Tech', '#Growth', '#Efficiency', '#Digital', '#FutureOfWork', '#Platform', '#Solution'].slice(0, 10),
+    audience: persona,
+    angle: 'feature highlight',
+    evidenceUsed: buildFallbackEvidenceFields(brief),
+    claimsRequiringReview: [],
+    _provider: 'fallback',
+    _fallbackUsed: true,
+  };
 }
 
 export async function generateTwitterPost(brief, aiFunction = callAI, normalizedEvidence) {
@@ -130,7 +171,22 @@ Return valid JSON:
     const result = await aiFunction(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { }
-  return FALLBACK_FAILURE;
+  return generateTwitterPostFallback(brief, productName, persona, painPoint);
+}
+
+function generateTwitterPostFallback(brief, productName, persona, painPoint) {
+  const benefits = buildFallbackBenefits(brief);
+  return {
+    post: `Tired of ${painPoint}? ${productName} helps ${persona} achieve ${benefits[0] || 'better outcomes'} — without the complexity.`,
+    cta: 'Learn how →',
+    hashtags: ['#' + productName.toLowerCase().replace(/\s+/g, ''), '#Efficiency'],
+    audience: persona,
+    angle: 'pain point solution',
+    evidenceUsed: buildFallbackEvidenceFields(brief),
+    claimsRequiringReview: [],
+    _provider: 'fallback',
+    _fallbackUsed: true,
+  };
 }
 
 export async function generateFacebookPost(brief, aiFunction = callAI, normalizedEvidence) {
@@ -170,7 +226,23 @@ Return valid JSON:
     const result = await aiFunction(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { }
-  return FALLBACK_FAILURE;
+  return generateFacebookPostFallback(brief, productName, persona, painPoint);
+}
+
+function generateFacebookPostFallback(brief, productName, persona, painPoint) {
+  const features = buildFallbackFeatures(brief);
+  const benefits = buildFallbackBenefits(brief);
+  return {
+    headline: `How ${productName} Helps ${persona} Overcome ${painPoint}`,
+    body: `We know that ${painPoint} is a real challenge for ${persona}. It affects productivity, team morale, and ultimately your bottom line.\n\nThat is why we built ${productName} — to provide a practical, proven solution.\n\nWith features like ${features[0]} and ${features[1]}, our users are experiencing ${benefits[0]} and ${benefits[1]} every day.\n\n${persona} who have made the switch tell us the biggest difference is ${benefits[2] || 'the simplicity and effectiveness of the platform'}.\n\nWhat challenges have you faced with ${painPoint}? We would love to hear your story.`,
+    cta: 'Share your experience in the comments below',
+    audience: persona,
+    angle: 'community engagement',
+    evidenceUsed: buildFallbackEvidenceFields(brief),
+    claimsRequiringReview: [],
+    _provider: 'fallback',
+    _fallbackUsed: true,
+  };
 }
 
 export async function generateYouTubeDescription(brief, aiFunction = callAI, normalizedEvidence) {
@@ -213,5 +285,30 @@ Return valid JSON:
     const result = await aiFunction(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { }
-  return FALLBACK_FAILURE;
+  return generateYouTubeDescriptionFallback(brief, productName, persona, painPoint);
+}
+
+function generateYouTubeDescriptionFallback(brief, productName, persona, painPoint) {
+  const features = buildFallbackFeatures(brief);
+  const benefits = buildFallbackBenefits(brief);
+  return {
+    title: `${productName}: Solving ${painPoint} for ${persona}`,
+    description: `In this video, we explore how ${productName} helps ${persona} overcome "${painPoint}" with practical, effective solutions.\n\nTopics covered:\n• Understanding the ${painPoint} challenge\n• How ${productName} addresses it with ${features[0]}\n• ${benefits[0]} and ${benefits[1]} — real results\n• Implementation best practices and tips\n\nWatch to learn how your team can benefit from ${productName}.`,
+    openingHook: `${painPoint} is costing ${persona} time and resources — here is the solution.`,
+    chapters: [
+      { timestamp: '0:00', title: 'Introduction' },
+      { timestamp: '0:45', title: 'The Challenge' },
+      { timestamp: '2:30', title: 'How ' + productName + ' Helps' },
+      { timestamp: '4:15', title: 'Key Features Overview' },
+      { timestamp: '6:00', title: 'Getting Started' },
+    ],
+    links: [],
+    cta: 'Subscribe for more insights on ' + productName,
+    hashtags: ['#' + productName.toLowerCase().replace(/\s+/g, ''), '#Productivity', '#Tutorial', '#HowTo'],
+    keywords: [productName, painPoint.toLowerCase(), persona.toLowerCase(), features[0].toLowerCase(), benefits[0].toLowerCase()],
+    evidenceUsed: buildFallbackEvidenceFields(brief),
+    claimsRequiringReview: [],
+    _provider: 'fallback',
+    _fallbackUsed: true,
+  };
 }

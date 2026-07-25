@@ -5,6 +5,24 @@ import { resolveProductIdentity } from '../resolvers/product-identity.resolver.j
 import { normalizeSeoForExecution } from "../normalizers/seo-intelligence.normalizer.js";
 import { normalizeProductForContentStudio } from "../normalizers/product-intelligence.normalizer.js";
 
+const contextCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000;
+
+function getCachedEvidenceContext(userId, chatId) {
+  const key = `${userId}:${chatId}`;
+  const cached = contextCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  contextCache.delete(key);
+  return null;
+}
+
+function setCachedEvidenceContext(userId, chatId, data) {
+  const key = `${userId}:${chatId}`;
+  contextCache.set(key, { data, timestamp: Date.now() });
+}
+
 // Build a partial checks object, defaulting all known checks to false
 function emptyChecks(partial = {}) {
   return {
@@ -45,6 +63,11 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
   }
   if (!chatId) {
     throw new Error('chatId missing in buildEvidenceContext');
+  }
+
+  const cached = getCachedEvidenceContext(userId, chatId);
+  if (cached) {
+    return cached;
   }
 
   // --- Validate chat ownership ---
@@ -351,6 +374,7 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
     },
   };
 
+  setCachedEvidenceContext(userId, chatId, context);
   return context;
 }
 

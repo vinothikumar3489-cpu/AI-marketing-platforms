@@ -297,7 +297,7 @@ export default function SEOIntelligencePage() {
       }
 
       console.log('[SEO UI] refreshing full results');
-      await loadFullResults(chatId);
+      await loadFullResults(chatId, true);
 
       // Crash detector: find risky objects in full results after refresh
       if (import.meta.env.DEV) {

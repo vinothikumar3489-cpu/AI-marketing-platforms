@@ -1,4 +1,5 @@
 import prisma from "../../config/prisma.js";
+import { Prisma } from '@prisma/client';
 
 /**
  * PHASE 7: EXECUTIVE SEO DASHBOARD GENERATOR

@@ -230,170 +230,165 @@ async function saveSEOData({ chatId, userId, identity, websiteUrl, technicalAudi
       }
     });
 
-    if (keywordIntelligence) {
-      await tx.keywordIntelligenceRecord.upsert({
-        where: { seoIntelligenceId: savedId },
-        create: {
-          seoIntelligenceId: savedId,
-          primaryKeywords: keywordIntelligence.primaryKeywords || [],
-          secondaryKeywords: keywordIntelligence.secondaryKeywords || [],
-          longTailKeywords: keywordIntelligence.longTailKeywords || [],
-          questionKeywords: keywordIntelligence.questionKeywords || [],
-          clusters: keywordIntelligence.clusters || [],
-          competitorKeywords: keywordIntelligence.competitorKeywords || [],
-          contentOpportunities: keywordIntelligence.contentOpportunities || [],
-          geoKeywords: keywordIntelligence.geoKeywords || [],
-          totalKeywords: keywordIntelligence.metadata?.totalKeywords || 0,
-          clustersCount: keywordIntelligence.metadata?.clustersCount || 0,
-          opportunitiesCount: keywordIntelligence.metadata?.opportunitiesCount || 0
-        },
-        update: {
-          primaryKeywords: keywordIntelligence.primaryKeywords || [],
-          secondaryKeywords: keywordIntelligence.secondaryKeywords || [],
-          longTailKeywords: keywordIntelligence.longTailKeywords || [],
-          questionKeywords: keywordIntelligence.questionKeywords || [],
-          clusters: keywordIntelligence.clusters || [],
-          competitorKeywords: keywordIntelligence.competitorKeywords || [],
-          contentOpportunities: keywordIntelligence.contentOpportunities || [],
-          geoKeywords: keywordIntelligence.geoKeywords || [],
-          totalKeywords: keywordIntelligence.metadata?.totalKeywords || 0,
-          clustersCount: keywordIntelligence.metadata?.clustersCount || 0,
-          opportunitiesCount: keywordIntelligence.metadata?.opportunitiesCount || 0,
-          updatedAt: new Date()
-        }
-      });
-    }
+    const ki = keywordIntelligence || {};
+    await tx.keywordIntelligenceRecord.upsert({
+      where: { seoIntelligenceId: savedId },
+      create: {
+        seoIntelligenceId: savedId,
+        primaryKeywords: ki.primaryKeywords || [],
+        secondaryKeywords: ki.secondaryKeywords || [],
+        longTailKeywords: ki.longTailKeywords || [],
+        questionKeywords: ki.questionKeywords || [],
+        clusters: ki.clusters || [],
+        competitorKeywords: ki.competitorKeywords || [],
+        contentOpportunities: ki.contentOpportunities || [],
+        geoKeywords: ki.geoKeywords || [],
+        totalKeywords: ki.metadata?.totalKeywords || 0,
+        clustersCount: ki.metadata?.clustersCount || 0,
+        opportunitiesCount: ki.metadata?.opportunitiesCount || 0
+      },
+      update: {
+        primaryKeywords: ki.primaryKeywords || [],
+        secondaryKeywords: ki.secondaryKeywords || [],
+        longTailKeywords: ki.longTailKeywords || [],
+        questionKeywords: ki.questionKeywords || [],
+        clusters: ki.clusters || [],
+        competitorKeywords: ki.competitorKeywords || [],
+        contentOpportunities: ki.contentOpportunities || [],
+        geoKeywords: ki.geoKeywords || [],
+        totalKeywords: ki.metadata?.totalKeywords || 0,
+        clustersCount: ki.metadata?.clustersCount || 0,
+        opportunitiesCount: ki.metadata?.opportunitiesCount || 0,
+        updatedAt: new Date()
+      }
+    });
 
-    if (competitorIntelligence) {
-      await tx.competitorSeoRecord.upsert({
-        where: { seoIntelligenceId: savedId },
-        create: {
-          seoIntelligenceId: savedId,
-          competitors: competitorIntelligence.competitors || [],
-          competitorProfiles: competitorIntelligence.competitorProfiles || [],
-          keywordGaps: competitorIntelligence.keywordGaps || {},
-          contentGaps: competitorIntelligence.contentGaps || [],
-          authorityGaps: competitorIntelligence.authorityGaps || {},
-          geoGaps: competitorIntelligence.geoGaps || {},
-          competitorMatrix: competitorIntelligence.competitorMatrix || [],
-          recommendations: competitorIntelligence.recommendations || {},
-          metadata: competitorIntelligence.metadata || {}
-        },
-        update: {
-          competitors: competitorIntelligence.competitors || [],
-          competitorProfiles: competitorIntelligence.competitorProfiles || [],
-          keywordGaps: competitorIntelligence.keywordGaps || {},
-          contentGaps: competitorIntelligence.contentGaps || [],
-          authorityGaps: competitorIntelligence.authorityGaps || {},
-          geoGaps: competitorIntelligence.geoGaps || {},
-          competitorMatrix: competitorIntelligence.competitorMatrix || [],
-          recommendations: competitorIntelligence.recommendations || {},
-          metadata: competitorIntelligence.metadata || {},
-          updatedAt: new Date()
-        }
-      });
-    }
+    const ci = competitorIntelligence || {};
+    await tx.competitorSeoRecord.upsert({
+      where: { seoIntelligenceId: savedId },
+      create: {
+        seoIntelligenceId: savedId,
+        competitors: ci.competitors || [],
+        competitorProfiles: ci.competitorProfiles || [],
+        keywordGaps: ci.keywordGaps || {},
+        contentGaps: ci.contentGaps || [],
+        authorityGaps: ci.authorityGaps || {},
+        geoGaps: ci.geoGaps || {},
+        competitorMatrix: ci.competitorMatrix || [],
+        recommendations: ci.recommendations || {},
+        metadata: ci.metadata || {}
+      },
+      update: {
+        competitors: ci.competitors || [],
+        competitorProfiles: ci.competitorProfiles || [],
+        keywordGaps: ci.keywordGaps || {},
+        contentGaps: ci.contentGaps || [],
+        authorityGaps: ci.authorityGaps || {},
+        geoGaps: ci.geoGaps || {},
+        competitorMatrix: ci.competitorMatrix || [],
+        recommendations: ci.recommendations || {},
+        metadata: ci.metadata || {},
+        updatedAt: new Date()
+      }
+    });
 
-    if (contentGapIntelligence) {
-      await tx.contentGapRecord.upsert({
-        where: { seoIntelligenceId: savedId },
-        create: {
-          seoIntelligenceId: savedId,
-          contentGaps: contentGapIntelligence.contentGaps || [],
-          landingPageIdeas: contentGapIntelligence.landingPageIdeas || [],
-          comparisonPageIdeas: contentGapIntelligence.comparisonPageIdeas || [],
-          faqOpportunities: contentGapIntelligence.faqOpportunities || [],
-          geoContentIdeas: contentGapIntelligence.geoContentIdeas || [],
-          resourcePageIdeas: contentGapIntelligence.resourcePageIdeas || [],
-          contentCalendar: contentGapIntelligence.contentCalendar || {},
-          summary: contentGapIntelligence.summary || { totalGaps: 0, totalOpportunities: 0, criticalPriority: 0, highPriority: 0 }
-        },
-        update: {
-          contentGaps: contentGapIntelligence.contentGaps || [],
-          landingPageIdeas: contentGapIntelligence.landingPageIdeas || [],
-          comparisonPageIdeas: contentGapIntelligence.comparisonPageIdeas || [],
-          faqOpportunities: contentGapIntelligence.faqOpportunities || [],
-          geoContentIdeas: contentGapIntelligence.geoContentIdeas || [],
-          resourcePageIdeas: contentGapIntelligence.resourcePageIdeas || [],
-          contentCalendar: contentGapIntelligence.contentCalendar || {},
-          summary: contentGapIntelligence.summary || { totalGaps: 0, totalOpportunities: 0, criticalPriority: 0, highPriority: 0 },
-          updatedAt: new Date()
-        }
-      });
-    }
+    const cg = contentGapIntelligence || {};
+    await tx.contentGapRecord.upsert({
+      where: { seoIntelligenceId: savedId },
+      create: {
+        seoIntelligenceId: savedId,
+        contentGaps: cg.contentGaps || [],
+        landingPageIdeas: cg.landingPageIdeas || [],
+        comparisonPageIdeas: cg.comparisonPageIdeas || [],
+        faqOpportunities: cg.faqOpportunities || [],
+        geoContentIdeas: cg.geoContentIdeas || [],
+        resourcePageIdeas: cg.resourcePageIdeas || [],
+        contentCalendar: cg.contentCalendar || {},
+        summary: cg.summary || { totalGaps: 0, totalOpportunities: 0, criticalPriority: 0, highPriority: 0 }
+      },
+      update: {
+        contentGaps: cg.contentGaps || [],
+        landingPageIdeas: cg.landingPageIdeas || [],
+        comparisonPageIdeas: cg.comparisonPageIdeas || [],
+        faqOpportunities: cg.faqOpportunities || [],
+        geoContentIdeas: cg.geoContentIdeas || [],
+        resourcePageIdeas: cg.resourcePageIdeas || [],
+        contentCalendar: cg.contentCalendar || {},
+        summary: cg.summary || { totalGaps: 0, totalOpportunities: 0, criticalPriority: 0, highPriority: 0 },
+        updatedAt: new Date()
+      }
+    });
 
-    if (geoIntelligence) {
-      const numericScore = (v) => (v != null && typeof v === 'number' ? v : null);
-      await tx.geoIntelligenceRecord.upsert({
-        where: { seoIntelligenceId: savedId },
-        create: {
-          seoIntelligenceId: savedId,
-          aiVisibilityScore: numericScore(geoIntelligence.aiVisibilityScore),
-          chatGptScore: numericScore(geoIntelligence.chatGptScore),
-          geminiScore: numericScore(geoIntelligence.geminiScore),
-          claudeScore: numericScore(geoIntelligence.claudeScore),
-          perplexityScore: numericScore(geoIntelligence.perplexityScore),
-          googleAiOverviewScore: numericScore(geoIntelligence.googleAiOverviewScore),
-          entityCoverageScore: numericScore(geoIntelligence.entityCoverageScore),
-          knowledgeGraphReadinessScore: numericScore(geoIntelligence.knowledgeGraphReadinessScore),
-          citationReadinessScore: numericScore(geoIntelligence.citationReadinessScore),
-          answerabilityScore: numericScore(geoIntelligence.answerabilityScore),
-          topicalAuthorityScore: numericScore(geoIntelligence.topicalAuthorityScore),
-          entities: geoIntelligence.entities || [],
-          knowledgeGraphEntities: geoIntelligence.knowledgeGraphEntities || [],
-          citationOpportunities: geoIntelligence.citationOpportunities || [],
-          faqOpportunities: geoIntelligence.faqOpportunities || [],
-          aiContentOpportunities: geoIntelligence.aiContentOpportunities || [],
-          trustSignals: geoIntelligence.trustSignals || {},
-          recommendations: geoIntelligence.recommendations || {}
-        },
-        update: {
-          aiVisibilityScore: numericScore(geoIntelligence.aiVisibilityScore),
-          chatGptScore: numericScore(geoIntelligence.chatGptScore),
-          geminiScore: numericScore(geoIntelligence.geminiScore),
-          claudeScore: numericScore(geoIntelligence.claudeScore),
-          perplexityScore: numericScore(geoIntelligence.perplexityScore),
-          googleAiOverviewScore: numericScore(geoIntelligence.googleAiOverviewScore),
-          entityCoverageScore: numericScore(geoIntelligence.entityCoverageScore),
-          knowledgeGraphReadinessScore: numericScore(geoIntelligence.knowledgeGraphReadinessScore),
-          citationReadinessScore: numericScore(geoIntelligence.citationReadinessScore),
-          answerabilityScore: numericScore(geoIntelligence.answerabilityScore),
-          topicalAuthorityScore: numericScore(geoIntelligence.topicalAuthorityScore),
-          entities: geoIntelligence.entities || [],
-          knowledgeGraphEntities: geoIntelligence.knowledgeGraphEntities || [],
-          citationOpportunities: geoIntelligence.citationOpportunities || [],
-          faqOpportunities: geoIntelligence.faqOpportunities || [],
-          aiContentOpportunities: geoIntelligence.aiContentOpportunities || [],
-          trustSignals: geoIntelligence.trustSignals || {},
-          recommendations: geoIntelligence.recommendations || {},
-          updatedAt: new Date()
-        }
-      });
-    }
+    const gi = geoIntelligence || {};
+    const numericScore = (v) => (v != null && typeof v === 'number' ? v : null);
+    await tx.geoIntelligenceRecord.upsert({
+      where: { seoIntelligenceId: savedId },
+      create: {
+        seoIntelligenceId: savedId,
+        aiVisibilityScore: numericScore(gi.aiVisibilityScore),
+        chatGptScore: numericScore(gi.chatGptScore),
+        geminiScore: numericScore(gi.geminiScore),
+        claudeScore: numericScore(gi.claudeScore),
+        perplexityScore: numericScore(gi.perplexityScore),
+        googleAiOverviewScore: numericScore(gi.googleAiOverviewScore),
+        entityCoverageScore: numericScore(gi.entityCoverageScore),
+        knowledgeGraphReadinessScore: numericScore(gi.knowledgeGraphReadinessScore),
+        citationReadinessScore: numericScore(gi.citationReadinessScore),
+        answerabilityScore: numericScore(gi.answerabilityScore),
+        topicalAuthorityScore: numericScore(gi.topicalAuthorityScore),
+        entities: gi.entities || [],
+        knowledgeGraphEntities: gi.knowledgeGraphEntities || [],
+        citationOpportunities: gi.citationOpportunities || [],
+        faqOpportunities: gi.faqOpportunities || [],
+        aiContentOpportunities: gi.aiContentOpportunities || [],
+        trustSignals: gi.trustSignals || {},
+        recommendations: gi.recommendations || {}
+      },
+      update: {
+        aiVisibilityScore: numericScore(gi.aiVisibilityScore),
+        chatGptScore: numericScore(gi.chatGptScore),
+        geminiScore: numericScore(gi.geminiScore),
+        claudeScore: numericScore(gi.claudeScore),
+        perplexityScore: numericScore(gi.perplexityScore),
+        googleAiOverviewScore: numericScore(gi.googleAiOverviewScore),
+        entityCoverageScore: numericScore(gi.entityCoverageScore),
+        knowledgeGraphReadinessScore: numericScore(gi.knowledgeGraphReadinessScore),
+        citationReadinessScore: numericScore(gi.citationReadinessScore),
+        answerabilityScore: numericScore(gi.answerabilityScore),
+        topicalAuthorityScore: numericScore(gi.topicalAuthorityScore),
+        entities: gi.entities || [],
+        knowledgeGraphEntities: gi.knowledgeGraphEntities || [],
+        citationOpportunities: gi.citationOpportunities || [],
+        faqOpportunities: gi.faqOpportunities || [],
+        aiContentOpportunities: gi.aiContentOpportunities || [],
+        trustSignals: gi.trustSignals || {},
+        recommendations: gi.recommendations || {},
+        updatedAt: new Date()
+      }
+    });
 
-    if (blogIntelligence) {
-      await tx.blogIntelligenceRecord.upsert({
-        where: { seoIntelligenceId: savedId },
-        create: {
-          seoIntelligenceId: savedId,
-          blogIdeas: blogIntelligence.blogIdeas || [],
-          blogClusters: blogIntelligence.blogClusters || [],
-          blogBriefs: blogIntelligence.blogBriefs || [],
-          publishingCalendar: blogIntelligence.publishingCalendar || {},
-          summary: blogIntelligence.summary || { totalIdeas: 0, totalClusters: 0, highPriorityIdeas: 0 },
-          metadata: blogIntelligence.metadata || null
-        },
-        update: {
-          blogIdeas: blogIntelligence.blogIdeas || [],
-          blogClusters: blogIntelligence.blogClusters || [],
-          blogBriefs: blogIntelligence.blogBriefs || [],
-          publishingCalendar: blogIntelligence.publishingCalendar || {},
-          summary: blogIntelligence.summary || { totalIdeas: 0, totalClusters: 0, highPriorityIdeas: 0 },
-          metadata: blogIntelligence.metadata || null,
-          updatedAt: new Date()
-        }
-      });
-    }
+    const bi = blogIntelligence || {};
+    await tx.blogIntelligenceRecord.upsert({
+      where: { seoIntelligenceId: savedId },
+      create: {
+        seoIntelligenceId: savedId,
+        blogIdeas: bi.blogIdeas || [],
+        blogClusters: bi.blogClusters || [],
+        blogBriefs: bi.blogBriefs || [],
+        publishingCalendar: bi.publishingCalendar || {},
+        summary: bi.summary || { totalIdeas: 0, totalClusters: 0, highPriorityIdeas: 0 },
+        metadata: bi.metadata || null
+      },
+      update: {
+        blogIdeas: bi.blogIdeas || [],
+        blogClusters: bi.blogClusters || [],
+        blogBriefs: bi.blogBriefs || [],
+        publishingCalendar: bi.publishingCalendar || {},
+        summary: bi.summary || { totalIdeas: 0, totalClusters: 0, highPriorityIdeas: 0 },
+        metadata: bi.metadata || null,
+        updatedAt: new Date()
+      }
+    });
   });
 
   try {

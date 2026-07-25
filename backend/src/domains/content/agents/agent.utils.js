@@ -98,6 +98,30 @@ Missing evidence: ${(brief.limitations || []).join('; ') || 'None identified'}`;
 
 export const FALLBACK_FAILURE = { _status: 'generation_failed', _reason: 'AI generation failed, no rule-based templates available', _provider: 'ai' };
 
+export function buildFallbackFeatures(brief) {
+  const features = brief.product?.features || [];
+  if (features.length === 0) return ['Core platform capabilities', 'Advanced analytics dashboard', 'Seamless integration options'];
+  return features.map(f => typeof f === 'string' ? f : (f.name || f.feature || f.title || '')).filter(Boolean).slice(0, 5);
+}
+
+export function buildFallbackBenefits(brief) {
+  const benefits = brief.product?.benefits || [];
+  if (benefits.length === 0) return ['Increased operational efficiency', 'Enhanced team productivity', 'Reduced manual effort', 'Better data-driven decisions', 'Improved user satisfaction'];
+  return benefits.map(b => typeof b === 'string' ? b : (b.text || b.benefit || b.description || '')).filter(Boolean).slice(0, 5);
+}
+
+export function buildFallbackEvidenceFields(brief) {
+  const fields = [];
+  if (brief.product?.name) fields.push('product_name');
+  if (brief.product?.features?.length) fields.push('product_features');
+  if (brief.product?.benefits?.length) fields.push('product_benefits');
+  if (brief.painPoints?.length) fields.push('pain_points');
+  if (brief.targetPersonas?.length) fields.push('target_personas');
+  if (brief.validatedCompetitors?.length) fields.push('competitors');
+  if (brief.verifiedKeywords?.length) fields.push('seo_keywords');
+  return fields;
+}
+
 export function getEvidenceForTrend(brief) {
   const hasTrendKeywords = brief.verifiedKeywords?.some(k => k.keyword && (k.volume || k.difficulty)) || false;
   const hasWebData = brief.evidenceSources?.websiteScrape || false;

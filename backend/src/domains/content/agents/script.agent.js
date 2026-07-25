@@ -1,5 +1,5 @@
 import { callAI } from "../../../domains/ai/services/aiOrchestrator.service.js";
-import { buildEvidenceSection, buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getKeyword, getEvidenceForTrend, FALLBACK_FAILURE } from "./agent.utils.js";
+import { buildEvidenceSection, buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getKeyword, getEvidenceForTrend, FALLBACK_FAILURE, buildFallbackFeatures, buildFallbackBenefits, buildFallbackEvidenceFields } from "./agent.utils.js";
 
 export async function generateVideoScript(brief, aiFunction = callAI, normalizedEvidence) {
   const evidence = buildEvidenceSection(brief);
@@ -40,7 +40,64 @@ Return valid JSON:
     const result = await aiFunction(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { }
-  return FALLBACK_FAILURE;
+  return generateVideoScriptFallback(brief, productName, persona, painPoint);
+}
+
+function generateVideoScriptFallback(brief, productName, persona, painPoint) {
+  const features = buildFallbackFeatures(brief);
+  const benefits = buildFallbackBenefits(brief);
+  return {
+    title: `${productName}: Solving ${painPoint} for ${persona}`.slice(0, 70),
+    format: 'Explainer',
+    duration: '60-90 seconds',
+    scenes: [
+      {
+        scene: 1,
+        narration: `Meet ${persona}. Every day they face "${painPoint}" — a challenge that slows them down and limits their potential.`,
+        onScreenText: `${painPoint} — a daily struggle for ${persona}`,
+        visual: `${persona} working at a desk, looking frustrated, clock ticking in background`,
+        evidencePoint: painPoint || null,
+        cta: null,
+      },
+      {
+        scene: 2,
+        narration: `But what if there was a better way? ${productName} was built specifically to solve this exact problem.`,
+        onScreenText: `Introducing ${productName}`,
+        visual: `${productName} logo animating on screen, clean interface mockup fades in`,
+        evidencePoint: productName || null,
+        cta: null,
+      },
+      {
+        scene: 3,
+        narration: `With ${features[0] || 'powerful features'}, ${productName} helps ${persona} achieve ${benefits[0] || 'better outcomes'} — faster and more efficiently than ever before.`,
+        onScreenText: features[0] || 'Powerful features',
+        visual: `Screen recording of ${productName} interface showing ${features[0] || 'core features'} in action`,
+        evidencePoint: features[0] || null,
+        cta: null,
+      },
+      {
+        scene: 4,
+        narration: `${benefits[0] || 'Better outcomes'} and ${benefits[1] || 'enhanced efficiency'} — that is what ${productName} delivers to teams like yours every day.`,
+        onScreenText: `${benefits[0] || 'Better outcomes'} + ${benefits[1] || 'Enhanced efficiency'}`,
+        visual: `Split screen showing before/after scenarios, happy team collaborating`,
+        evidencePoint: benefits[0] || null,
+        cta: null,
+      },
+      {
+        scene: 5,
+        narration: `Ready to transform your approach? Start with ${productName} today and see the difference for yourself.`,
+        onScreenText: `Start your journey with ${productName}`,
+        visual: `${productName} website CTA screen, button animating`,
+        evidencePoint: null,
+        cta: `Visit ${productName} to learn more`,
+      },
+    ],
+    evidenceUsed: buildFallbackEvidenceFields(brief),
+    claimsRequiringReview: [],
+    limitations: [],
+    _provider: 'fallback',
+    _fallbackUsed: true,
+  };
 }
 
 export async function generateCreativeBrief(brief, aiFunction = callAI, normalizedEvidence) {
@@ -85,5 +142,31 @@ Return valid JSON:
     const result = await aiFunction(prompt);
     if (result.success && result.data) return { ...result.data, _provider: result.provider };
   } catch (e) { }
-  return FALLBACK_FAILURE;
+  return generateCreativeBriefFallback(brief, productName, persona, painPoint);
+}
+
+function generateCreativeBriefFallback(brief, productName, persona, painPoint) {
+  const features = buildFallbackFeatures(brief);
+  const benefits = buildFallbackBenefits(brief);
+  return {
+    objective: `Drive awareness and adoption of ${productName} among ${persona} by demonstrating how it solves "${painPoint}" through ${features[0] || 'innovative capabilities'} and ${benefits[0] || 'proven outcomes'}.`,
+    audience: persona,
+    message: `${productName} helps ${persona} overcome ${painPoint} with ${features[0] || 'targeted solutions'} that deliver ${benefits[0] || 'real results'} — simply and effectively.`,
+    visualDirection: `Clean, modern aesthetic with ${productName} brand colors. Imagery should show ${persona} in realistic work settings transitioning from frustration to success. Use product interface screenshots and data visualization elements.`,
+    brandSignals: [
+      `${productName} brand typography and color palette`,
+      'Clean, minimal design language',
+      'Professional imagery with human elements',
+      'Data-driven visual elements',
+      'Consistent iconography style',
+    ],
+    requiredText: `${productName} — ${benefits[0] || 'Smarter solutions for'} ${persona}`,
+    cta: `Discover ${productName}`,
+    format: 'Multi-channel campaign',
+    evidenceLimitations: [],
+    evidenceUsed: buildFallbackEvidenceFields(brief),
+    claimsRequiringReview: [],
+    _provider: 'fallback',
+    _fallbackUsed: true,
+  };
 }

@@ -207,14 +207,17 @@ async function runModuleTechnicalSeo(websiteData, websiteUrl) {
   const pageSpeed = await runPageSpeedWithRetry(websiteUrl, 3);
   if (pageSpeed.success) {
     tech.pageSpeed = pageSpeed.data;
+    const mobilePerf = pageSpeed.data.mobile?.lighthouseScores?.performance ?? pageSpeed.data.mobile?.performance ?? null;
+    const desktopPerf = pageSpeed.data.desktop?.lighthouseScores?.performance ?? pageSpeed.data.desktop?.performance ?? null;
     tech.performance = {
-      mobile: pageSpeed.data.mobile?.performance ?? null,
-      desktop: pageSpeed.data.desktop?.performance ?? null,
+      mobile: mobilePerf,
+      desktop: desktopPerf,
       status: 'measured'
     };
-    tech.overallScore = pageSpeed.data.mobile?.performance ?? pageSpeed.data.desktop?.performance ?? null;
+    tech.overallScore = mobilePerf ?? desktopPerf ?? null;
   } else {
     console.log('[SEO TECHNICAL] PageSpeed unavailable, trying CrUX...');
+    tech.pageSpeed = { status: 'unavailable', error: pageSpeed.error || 'PageSpeed request failed', mobile: null, desktop: null };
     const crux = await getChromeUXReport(websiteUrl);
     if (crux.success) {
       tech.crux = crux.data;
@@ -224,8 +227,10 @@ async function runModuleTechnicalSeo(websiteData, websiteUrl) {
         inp: crux.data.inp?.p75 ?? null,
         status: 'measured_from_crux'
       };
+      tech.overallScore = tech.performance.lcp ? 70 : null;
     } else {
       tech.performance = { status: 'unavailable', reason: pageSpeed.error || 'PageSpeed and CrUX both unavailable' };
+      tech.overallScore = null;
     }
   }
 
