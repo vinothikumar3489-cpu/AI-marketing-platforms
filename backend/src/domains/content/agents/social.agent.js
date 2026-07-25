@@ -1,8 +1,7 @@
 import { callAI } from "../../../domains/ai/services/aiOrchestrator.service.js";
-import { buildEvidenceSection, buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getKeyword, getEvidenceForTrend, FALLBACK_FAILURE, buildFallbackFeatures, buildFallbackBenefits, buildFallbackEvidenceFields } from "./agent.utils.js";
+import { buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getKeyword, getEvidenceForTrend, buildFallbackFeatures, buildFallbackBenefits, buildFallbackEvidenceFields } from "./agent.utils.js";
 
 export async function generateLinkedInPost(brief, aiFunction = callAI, normalizedEvidence) {
-  const evidence = buildEvidenceSection(brief);
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
@@ -63,7 +62,6 @@ function generateLinkedInPostFallback(brief, productName, persona, painPoint, us
 }
 
 export async function generateInstagramPost(brief, aiFunction = callAI, normalizedEvidence) {
-  const evidence = buildEvidenceSection(brief);
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
@@ -136,7 +134,6 @@ function generateInstagramPostFallback(brief, productName, persona, painPoint) {
 }
 
 export async function generateTwitterPost(brief, aiFunction = callAI, normalizedEvidence) {
-  const evidence = buildEvidenceSection(brief);
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
@@ -190,7 +187,6 @@ function generateTwitterPostFallback(brief, productName, persona, painPoint) {
 }
 
 export async function generateFacebookPost(brief, aiFunction = callAI, normalizedEvidence) {
-  const evidence = buildEvidenceSection(brief);
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
@@ -246,8 +242,7 @@ function generateFacebookPostFallback(brief, productName, persona, painPoint) {
 }
 
 export async function generateYouTubeDescription(brief, aiFunction = callAI, normalizedEvidence) {
-  const evidence = buildEvidenceSection(brief);
-  const productContext = buildProductEvidenceContext(brief);
+  const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);

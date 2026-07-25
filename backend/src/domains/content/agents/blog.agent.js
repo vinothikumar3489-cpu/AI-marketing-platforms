@@ -1,8 +1,7 @@
 import { callAI } from "../../../domains/ai/services/aiOrchestrator.service.js";
-import { buildEvidenceSection, buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getKeyword, getEvidenceForTrend, FALLBACK_FAILURE, buildFallbackFeatures, buildFallbackBenefits, buildFallbackEvidenceFields } from "./agent.utils.js";
+import { buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getKeyword, getEvidenceForTrend, buildFallbackFeatures, buildFallbackBenefits, buildFallbackEvidenceFields } from "./agent.utils.js";
 
 export async function generateBlogArticle(brief, aiFunction = callAI, normalizedEvidence) {
-  const evidence = buildEvidenceSection(brief);
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
@@ -80,8 +79,7 @@ function generateBlogArticleFallback(brief, productName, persona, painPoint, key
 }
 
 export async function generateFAQ(brief, aiFunction = callAI, normalizedEvidence) {
-  const evidence = buildEvidenceSection(brief);
-  const productContext = buildProductEvidenceContext(brief);
+  const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);

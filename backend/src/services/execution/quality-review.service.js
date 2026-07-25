@@ -1,122 +1,272 @@
-import { validateContentOutput, repairAIOutput } from "./content-schemas.js";
-import { SCHEMA_REGISTRY } from "../../shared/schemas/content-types.schema.js";
+const QUALITY_WEIGHTS = {
+  platformSuitability: 0.15,
+  productSpecificity: 0.20,
+  brandConsistency: 0.10,
+  seoUsage: 0.10,
+  readability: 0.10,
+  ctaQuality: 0.15,
+  evidenceUsage: 0.10,
+  originality: 0.05,
+  compliance: 0.05,
+};
 
-export function qualityReview(content, assetType, brief) {
-  const issues = [];
-  const warnings = [];
-
-  // 1. Schema validation
-  const schemaValidation = validateContentOutput(content, assetType);
-  if (!schemaValidation.valid) {
-    issues.push(...schemaValidation.errors.map(e => `schema: ${e}`));
-  }
-
-  // 2. SEO keyword usage check
-  const keywords = brief?.verifiedKeywords || brief?.seo?.keywords || [];
-  const contentText = JSON.stringify(content).toLowerCase();
-  const usedKeywords = keywords.filter(k => {
-    const kw = (typeof k === 'string' ? k : (k.keyword || k.phrase || '')).toLowerCase();
-    return kw && contentText.includes(kw);
-  });
-  if (keywords.length > 0 && usedKeywords.length === 0) {
-    warnings.push('No SEO keywords used in content');
-  }
-
-  // 3. CTA validation
-  const ctaFields = ['cta', 'callToAction', 'primaryCta', 'heroCTA', 'finalCTA'];
-  const hasCta = ctaFields.some(f => {
-    const v = content[f];
-    return v && (typeof v === 'string' || (typeof v === 'object' && v.label));
-  });
-  if (!hasCta) {
-    warnings.push('No call-to-action found');
-  }
-
-  // 4. Readability check (minimum content length)
-  const textLength = contentText.replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(Boolean).length;
-  if (textLength < 10) {
-    issues.push('Content too short for meaningful output');
-  }
-
-  // 5. Platform suitability
-  if (assetType === 'twitter_post' || assetType === 'x_post') {
-    const postText = content.post || content.text || '';
-    if (postText.length > 280) {
-      issues.push('X/Twitter post exceeds 280 character limit');
-    }
-  }
+function scorePlatformSuitability(content, assetType) {
+  let score = 1.0;
   if (assetType === 'linkedin_post') {
-    if (!content.hook) warnings.push('LinkedIn post missing hook');
-    if (!content.body) warnings.push('LinkedIn post missing body');
+    if (content.body?.length > 1500) score -= 0.3;
+    if (!content.hook || content.hook.length > 200) score -= 0.2;
+    if (!content.cta) score -= 0.1;
+  }
+  if (assetType === 'twitter_post' || assetType === 'x_post') {
+    if (content.post?.length > 280) score -= 0.5;
+    if (content.post?.length < 50) score -= 0.2;
   }
   if (assetType === 'instagram_post') {
-    if (!content.caption) warnings.push('Instagram post missing caption');
-    if (!content.visualConcept) warnings.push('Instagram post missing visual concept');
+    if (!content.caption) score -= 0.3;
+    if (!content.visualConcept) score -= 0.2;
   }
-  if (assetType.startsWith('email_')) {
-    if (!content.subject) issues.push('Email missing subject');
-    if (!content.html) warnings.push('Email missing HTML version');
-    if (!content.plainText && !content._plainText) warnings.push('Email missing plain text version');
+  if (assetType === 'blog_article') {
+    if (!content.sections || content.sections.length < 2) score -= 0.3;
+    if (!content.headline) score -= 0.2;
+    if (!content.introduction) score -= 0.2;
+  }
+  if (assetType === 'landing_page') {
+    if (!content.headline) score -= 0.3;
+    if (!content.heroCTA) score -= 0.2;
+    if (!content.features || content.features.length < 2) score -= 0.2;
+  }
+  if (assetType === 'email_copy' || assetType.startsWith('email_')) {
+    if (!content.subject) score -= 0.3;
+    if (!content.html) score -= 0.2;
+    if (!content.callToAction && !content.primaryCta) score -= 0.1;
+  }
+  if (assetType === 'video_script') {
+    if (!content.scenes || content.scenes.length < 3) score -= 0.4;
+    if (!content.title) score -= 0.2;
+  }
+  if (assetType === 'comparison_page') {
+    if (!content.comparisonTable?.rows?.length) score -= 0.4;
+    if (!content.whyChooseUs) score -= 0.2;
+  }
+  if (assetType === 'product_page') {
+    if (!content.keyFeatures || content.keyFeatures.length < 2) score -= 0.3;
+    if (!content.useCases?.length) score -= 0.2;
+  }
+  if (assetType === 'faq_page') {
+    if (!content.faqs || content.faqs.length < 3) score -= 0.4;
+  }
+  if (assetType === 'feature_announcement') {
+    if (!content.headline) score -= 0.3;
+    if (!content.body) score -= 0.3;
+  }
+  if (assetType === 'whitepaper') {
+    if (!content.sections || content.sections.length < 3) score -= 0.4;
+    if (!content.executiveSummary) score -= 0.2;
+  }
+  if (assetType === 'creative_brief') {
+    if (!content.objective) score -= 0.3;
+    if (!content.message) score -= 0.2;
+    if (!content.visualDirection) score -= 0.2;
+  }
+  if (assetType === 'youtube_description') {
+    if (!content.description) score -= 0.3;
+    if (!content.title) score -= 0.2;
   }
 
+  return Math.max(0, Math.min(1, score));
+}
+
+function scoreProductSpecificity(content, evidenceGraph) {
+  let score = 0.5;
+  if (!evidenceGraph?.product?.name) return score;
+
+  const productName = evidenceGraph.product.name.toLowerCase();
+  const contentStr = JSON.stringify(content).toLowerCase();
+
+  if (contentStr.includes(productName)) score += 0.2;
+
+  const features = evidenceGraph.product.features || [];
+  const matchedFeatures = features.filter(f => {
+    const fName = typeof f === 'string' ? f : (f.name || f.feature || '');
+    return fName && contentStr.includes(fName.toLowerCase());
+  });
+  if (matchedFeatures.length > 0) score += 0.15 * Math.min(1, matchedFeatures.length / 3);
+
+  const benefits = evidenceGraph.product.benefits || [];
+  const matchedBenefits = benefits.filter(b => {
+    const bText = typeof b === 'string' ? b : (b.text || b.benefit || '');
+    return bText && contentStr.includes(bText.toLowerCase());
+  });
+  if (matchedBenefits.length > 0) score += 0.1 * Math.min(1, matchedBenefits.length / 3);
+
+  if (evidenceGraph.product.usp && contentStr.includes(evidenceGraph.product.usp.toLowerCase())) score += 0.05;
+
+  return Math.min(1, score);
+}
+
+function scoreBrandConsistency(content, evidenceGraph) {
+  let score = 0.7;
+  const brandName = evidenceGraph?.company?.brandName || evidenceGraph?.product?.brandName;
+  if (!brandName) return score;
+
+  const brandLower = brandName.toLowerCase();
+  const contentStr = JSON.stringify(content).toLowerCase();
+
+  if (contentStr.includes(brandLower)) score += 0.15;
+
+  const industry = evidenceGraph?.company?.industry;
+  if (industry && contentStr.includes(industry.toLowerCase())) score += 0.15;
+
+  return Math.min(1, score);
+}
+
+function scoreSeoUsage(content, evidenceGraph) {
+  const keywords = evidenceGraph?.seo?.keywords || [];
+  if (keywords.length === 0) return 0.5;
+
+  const contentStr = JSON.stringify(content).toLowerCase();
+  const matchedCount = keywords.filter(k => {
+    const kw = typeof k === 'string' ? k : (k.keyword || k.phrase || '');
+    return kw && contentStr.includes(kw.toLowerCase());
+  }).length;
+
+  if (matchedCount === 0) return 0.3;
+  const ratio = matchedCount / Math.min(keywords.length, 10);
+  return Math.min(1, 0.3 + ratio * 0.7);
+}
+
+function scoreReadability(content) {
+  const contentStr = JSON.stringify(content);
+  const sentences = contentStr.split(/[.!?]+\s/).filter(Boolean);
+  if (sentences.length === 0) return 0.5;
+
+  const avgWords = sentences.reduce((sum, s) => sum + s.split(/\s+/).filter(Boolean).length, 0) / sentences.length;
+  if (avgWords > 40) return 0.3;
+  if (avgWords > 25) return 0.6;
+  if (avgWords > 12) return 0.9;
+  return 1.0;
+}
+
+function scoreCtaQuality(content) {
+  if (content.cta && content.cta.length > 10 && content.cta.length < 100) return 1.0;
+  if (content.callToAction) {
+    const cta = typeof content.callToAction === 'string' ? content.callToAction : (content.callToAction.label || '');
+    if (cta.length > 5) return 1.0;
+  }
+  if (content.primaryCta?.label) return 1.0;
+  if (content.heroCTA) return 0.8;
+  if (content.finalCTA) return 0.8;
+
+  const anyCta = content.ctaText || content.ctaUrl || content.callToActionText;
+  if (anyCta) return 0.6;
+
+  return 0.0;
+}
+
+function scoreEvidenceUsage(content) {
+  const evidenceUsed = content.evidenceUsed || content._evidenceUsed || [];
+  if (Array.isArray(evidenceUsed) && evidenceUsed.length > 0) return Math.min(1, 0.4 + evidenceUsed.length * 0.1);
+  if (content.claimsRequiringReview && content.claimsRequiringReview.length === 0) return 0.5;
+  return 0.3;
+}
+
+function scoreOriginality(content) {
+  const checks = [
+    'stay ahead', 'game-changer', 'cutting-edge', 'revolutionary', 'best-in-class',
+    'industry-leading', 'state-of-the-art', 'ultimate', '#1', 'number one',
+    'In today\'s world', 'In today\'s digital', 'transform your',
+  ];
+  const contentStr = JSON.stringify(content).toLowerCase();
+  const clicheCount = checks.filter(c => contentStr.includes(c)).length;
+  if (clicheCount > 3) return 0.2;
+  if (clicheCount > 1) return 0.5;
+  return 1.0;
+}
+
+function scoreCompliance(content) {
+  const contentStr = JSON.stringify(content).toLowerCase();
+  const riskyClaims = [
+    'guarantee', 'guaranteed', 'proven', '100%', 'money back', 'best',
+    'fastest', 'cheapest', 'most effective',
+  ];
+  const riskyCount = riskyClaims.filter(c => contentStr.includes(c)).length;
+  if (riskyCount > 2) return 0.3;
+  if (riskyCount > 0) return 0.7;
+  return 1.0;
+}
+
+export function scoreContentQuality(content, evidenceGraphOrNull, assetType) {
+  if (!content || typeof content !== 'object') {
+    return { overall: 0, scores: {}, details: ['No content provided'], passed: false };
+  }
+
+  const evidenceGraph = evidenceGraphOrNull && typeof evidenceGraphOrNull === 'object' && !Array.isArray(evidenceGraphOrNull)
+    ? evidenceGraphOrNull : null;
+
+  const scores = {};
+  const details = [];
+
+  scores.platformSuitability = scorePlatformSuitability(content, assetType);
+  scores.productSpecificity = scoreProductSpecificity(content, evidenceGraph);
+  scores.brandConsistency = scoreBrandConsistency(content, evidenceGraph);
+  scores.seoUsage = scoreSeoUsage(content, evidenceGraph);
+  scores.readability = scoreReadability(content);
+  scores.ctaQuality = scoreCtaQuality(content);
+  scores.evidenceUsage = scoreEvidenceUsage(content);
+  scores.originality = scoreOriginality(content);
+  scores.compliance = scoreCompliance(content);
+
+  let overall = 0;
+  let totalWeight = 0;
+  for (const [key, weight] of Object.entries(QUALITY_WEIGHTS)) {
+    if (scores[key] !== undefined) {
+      overall += scores[key] * weight;
+      totalWeight += weight;
+    }
+  }
+  if (totalWeight > 0) overall /= totalWeight;
+  overall = Math.round(overall * 100);
+
+  if (overall < 40) details.push('Quality score critically low — content needs significant improvement');
+  if (scores.platformSuitability < 0.5) details.push(`Platform suitability is weak for ${assetType}`);
+  if (scores.productSpecificity < 0.5) details.push('Content lacks specific product references');
+  if (scores.ctaQuality < 0.5) details.push('Call-to-action is missing or weak');
+  if (scores.evidenceUsage < 0.4) details.push('Content does not cite evidence sources');
+  if (scores.originality < 0.5) details.push('Content uses cliches or overused phrases');
+
+  const passed = overall >= 60;
+
   return {
-    passed: issues.length === 0,
-    issues,
-    warnings,
-    usedKeywords: usedKeywords.length,
-    totalKeywords: keywords.length,
-    wordCount: textLength,
-    needsRetry: issues.length > 0,
-    score: issues.length === 0 ? (warnings.length === 0 ? 1 : 0.7) : 0.3,
+    overall,
+    scores,
+    details,
+    passed,
+    needsRewrite: overall < 60,
+    rewriteSuggestions: details.length > 0 ? details : ['Minor improvements needed'],
   };
 }
 
-export function autoRepair(content, assetType) {
-  const repaired = repairAIOutput(content, assetType);
+export function buildRewritePrompt(originalContent, qualityResult, assetType, brief) {
+  const weakAreas = Object.entries(qualityResult.scores)
+    .filter(([, score]) => score < 0.6)
+    .map(([key]) => key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()));
 
-  if (assetType === 'instagram_post') {
-    if (!repaired.caption && repaired.body) repaired.caption = repaired.body;
-    if (!repaired.caption && repaired.hook) repaired.caption = repaired.hook;
-    if (!repaired.caption) repaired.caption = 'Discover how this can help you.';
-    if (!repaired.visualConcept) repaired.visualConcept = 'Modern, clean design with product imagery and brand colors.';
-    if (!repaired.carouselSlides) repaired.carouselSlides = [];
-    if (!repaired.callToAction && repaired.cta) { repaired.callToAction = repaired.cta; delete repaired.cta; }
-    if (!repaired.callToAction && repaired.callToAction !== repaired.cta) repaired.callToAction = repaired.cta || null;
-    if (!repaired.imagePrompt) repaired.imagePrompt = repaired.visualConcept || null;
-    if (!repaired.audience) repaired.audience = 'General audience';
-    if (!repaired.angle) repaired.angle = 'informational';
-    if (!repaired.hashtags) repaired.hashtags = [];
-    if (!repaired.evidenceUsed) repaired.evidenceUsed = [];
-    if (!repaired.claimsRequiringReview) repaired.claimsRequiringReview = [];
-  }
+  return `Rewrite the following ${assetType.replace(/_/g, ' ')} to address these quality issues:
 
-  if (assetType === 'linkedin_post') {
-    if (!repaired.hook) repaired.hook = 'Check this out';
-    if (!repaired.body) repaired.body = repaired.content || repaired.text || '';
-    if (!repaired.hashtags) repaired.hashtags = [];
-    if (!repaired.audience) repaired.audience = 'Professionals';
-    if (!repaired.angle) repaired.angle = 'informational';
-  }
+Weak areas: ${weakAreas.join(', ')}
 
-  if (assetType.startsWith('email_')) {
-    if (!repaired.subject) repaired.subject = 'Update';
-    if (!repaired.previewText) repaired.previewText = repaired.subject;
-    if (!repaired.greeting) repaired.greeting = 'Hi {{firstName}},';
-    if (!repaired.opening) repaired.opening = 'We wanted to share an update with you.';
-    if (!repaired.bodyParagraphs || !repaired.bodyParagraphs.length) {
-      repaired.bodyParagraphs = [repaired.body || 'Check out what we have to offer.'];
-    }
-    if (!repaired.benefits || !repaired.benefits.length) repaired.benefits = ['Improved efficiency', 'Better results', 'Easy to use'];
-    if (!repaired.primaryCta) repaired.primaryCta = { label: 'Learn More', url: '#' };
-    if (!repaired.closing) repaired.closing = 'Best regards';
-    if (!repaired.signature) repaired.signature = 'The Team';
-    if (!repaired.complianceFooter) repaired.complianceFooter = `© ${new Date().getFullYear()}. All rights reserved.`;
-    if (!repaired.unsubscribeText) repaired.unsubscribeText = 'Unsubscribe';
-    if (!repaired.html) repaired.html = `<p>${repaired.opening}</p><p>${Array.isArray(repaired.bodyParagraphs) ? repaired.bodyParagraphs.join('</p><p>') : repaired.bodyParagraphs}</p>`;
-    if (!repaired.plainText) repaired.plainText = [repaired.opening, ...(Array.isArray(repaired.bodyParagraphs) ? repaired.bodyParagraphs : [])].join('\n\n');
-  }
+Original issues to fix:
+${qualityResult.details.map(d => `- ${d}`).join('\n')}
 
-  return repaired;
+Product context:
+${brief?.product?.name ? `Product: ${brief.product.name}` : ''}
+${brief?.product?.usp ? `USP: ${brief.product.usp}` : ''}
+${brief?.product?.features?.length ? `Key features: ${brief.product.features.slice(0, 5).map(f => typeof f === 'string' ? f : f.name).filter(Boolean).join(', ')}` : ''}
+
+Original content body (rewrite this with the above feedback in mind):
+${JSON.stringify(originalContent, null, 2)}
+
+Return the same JSON structure with improved content addressing each issue.`;
 }
 
-export default { qualityReview, autoRepair };
+export default { scoreContentQuality, buildRewritePrompt };

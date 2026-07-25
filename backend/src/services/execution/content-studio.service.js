@@ -9,11 +9,10 @@ import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
 import { validateContentClaims, validateBriefContent } from "./claim-validator.service.js";
 import { validateContentOutput, repairAIOutput } from "./content-schemas.js";
 import { SCHEMA_REGISTRY } from "../../shared/schemas/content-types.schema.js";
-import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
-import { createStableHash } from "../../utils/stable-hash.js";
 import { CONTENT_TYPES, CONTENT_TYPES_LIST } from "../../constants/content-types.js";
 import { EMAIL_WORD_COUNT_LIMITS, validateEmailCopyDTO, createEmptyEmailCopyDTO } from "../../dto/email-copy.dto.js";
-import { normalizeSeoForExecution } from "../normalizers/seo-intelligence.normalizer.js";
+import { scoreContentQuality, buildRewritePrompt } from "./quality-review.service.js";
+import { saveContentMemory, buildEvidenceGraphHash, buildPromptHash } from "./content-memory.service.js";
 
 export { CONTENT_TYPES, CONTENT_TYPES_LIST } from "../../constants/content-types.js";
 
@@ -358,19 +357,29 @@ Unsubscribe: [unsubscribe link]`;
 
 
 
-/**
- * Build normalized evidence for generators — safe array wrapper
- * Prevents runtime crashes by normalizing raw SEO objects to flat arrays
- */
+function unwrapSourced(val) {
+  if (val && typeof val === 'object' && 'value' in val && 'source' in val) return val.value;
+  return val;
+}
+
 function buildNormalizedEvidence(brief, evidenceContext) {
   const rawKeywords = brief.verifiedKeywords || [];
   const safeKeywords = Array.isArray(rawKeywords) ? rawKeywords : [];
-  const rawSeoContext = evidenceContext?.seo || {};
-  const contextKeywords = rawSeoContext.keywords || rawSeoContext.primary || [];
-  const combinedKeywords = [
-    ...safeKeywords,
-    ...(Array.isArray(contextKeywords) ? contextKeywords : [])
+
+  const kwSection = evidenceContext?.keywords || {};
+  const primaryVal = unwrapSourced(kwSection.primary);
+  const secondaryVal = unwrapSourced(kwSection.secondary);
+  const longTailVal = unwrapSourced(kwSection.longTail);
+  const questionVal = unwrapSourced(kwSection.question);
+
+  const contextKeywords = [
+    ...(Array.isArray(primaryVal) ? primaryVal : []),
+    ...(Array.isArray(secondaryVal) ? secondaryVal : []),
+    ...(Array.isArray(longTailVal) ? longTailVal : []),
+    ...(Array.isArray(questionVal) ? questionVal : []),
   ];
+
+  const combinedKeywords = [...safeKeywords, ...contextKeywords];
   const seen = new Set();
   const deduplicated = combinedKeywords.filter(k => {
     const key = typeof k === 'string' ? k : (k?.keyword || k?.phrase || '');
@@ -379,15 +388,41 @@ function buildNormalizedEvidence(brief, evidenceContext) {
     return true;
   });
 
+  const productFeatures = Array.isArray(brief.product?.features) ? brief.product.features
+    : Array.isArray(unwrapSourced(evidenceContext?.features)) ? unwrapSourced(evidenceContext?.features)
+    : [];
+
+  const productBenefits = Array.isArray(brief.product?.benefits) ? brief.product.benefits
+    : Array.isArray(unwrapSourced(evidenceContext?.benefits)) ? unwrapSourced(evidenceContext?.benefits)
+    : [];
+
+  const audienceSection = evidenceContext?.audience || {};
+  const painPoints = Array.isArray(brief.painPoints) ? brief.painPoints
+    : Array.isArray(unwrapSourced(audienceSection.painPoints)) ? unwrapSourced(audienceSection.painPoints)
+    : [];
+
+  const competitorSection = evidenceContext?.competitors || {};
+  const competitorsList = Array.isArray(brief.validatedCompetitors) ? brief.validatedCompetitors
+    : Array.isArray(unwrapSourced(competitorSection.list)) ? unwrapSourced(competitorSection.list)
+    : [];
+
+  const contentGapSection = evidenceContext?.contentGaps || {};
+  const contentGaps = Array.isArray(brief.contentGaps) ? brief.contentGaps
+    : Array.isArray(unwrapSourced(contentGapSection.missingContent)) ? unwrapSourced(contentGapSection.missingContent)
+    : [];
+
+  const topicIdeas = Array.isArray(brief.topicIdeas) ? brief.topicIdeas
+    : (evidenceContext?.seo?.topicIdeas?.value || evidenceContext?.seo?.blogIdeas?.value || []);
+
   return {
     keywords: deduplicated.slice(0, 30),
-    primaryKeywords: Array.isArray(rawSeoContext.primary) ? rawSeoContext.primary.slice(0, 10) : [],
-    features: Array.isArray(brief.product?.features) ? brief.product.features : [],
-    benefits: Array.isArray(brief.product?.benefits) ? brief.product.benefits : [],
-    painPoints: Array.isArray(brief.painPoints) ? brief.painPoints : [],
-    competitors: Array.isArray(brief.validatedCompetitors) ? brief.validatedCompetitors : [],
-    contentGaps: Array.isArray(brief.contentGaps) ? brief.contentGaps : [],
-    topicIdeas: Array.isArray(brief.topicIdeas) ? brief.topicIdeas : [],
+    primaryKeywords: Array.isArray(primaryVal) ? primaryVal.slice(0, 10) : [],
+    features: productFeatures,
+    benefits: productBenefits,
+    painPoints,
+    competitors: competitorsList,
+    contentGaps,
+    topicIdeas: Array.isArray(topicIdeas) ? topicIdeas : [],
     evidenceSnapshotId: evidenceContext?.evidenceSnapshotId || null,
   };
 }
@@ -434,14 +469,14 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
     };
   }
 
-  const identity = brief?._productIdentity || {};
-  const productName = (identity?.productName || '').toLowerCase().trim();
+  const identity = brief?._productIdentity || brief?.productIdentity || {};
+  const productName = (identity?.productName || brief?.product?.name || '').toLowerCase().trim();
   if (INVALID_PRODUCT_LABELS.has(productName) || !productName || productName.length < 2) {
     return {
       _type: assetType,
       _label: typeConfig.label,
       _status: 'blocked',
-      _reason: `Invalid product identity: "${identity?.productName || 'none'}" — content generation requires a verified product`,
+      _reason: `Invalid product identity: "${identity?.productName || brief?.product?.name || 'none'}" — content generation requires a verified product`,
       _generatedAt: new Date().toISOString(),
     };
   }
@@ -470,7 +505,7 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
       ...brief,
       _retryInstructions: `Schema validation failed. Errors:\n${schemaValidation.errors.join('\n')}\nReturn valid JSON matching the original schema.`,
     };
-    const retryResult = await generator(retryBrief, aiFunction);
+    const retryResult = await generator(retryBrief, aiFunction, normalizedEvidence);
     if (retryResult) {
       repairedResult = repairAIOutput(retryResult, assetType);
       schemaValidation = validateContentOutput(repairedResult, assetType);
@@ -513,6 +548,49 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
     validatedContent._subject = renderedEmail.subject;
   }
 
+  const qualityResult = scoreContentQuality(validatedContent, evidenceContext?.product ? evidenceContext : null, assetType);
+  validatedContent._qualityScore = qualityResult.overall;
+  validatedContent._qualityDetails = qualityResult.details;
+
+  if (qualityResult.needsRewrite && userId) {
+    const rewritePrompt = buildRewritePrompt(validatedContent, qualityResult, assetType, brief);
+    const rewriteResult = await callAI(rewritePrompt);
+    if (rewriteResult?.success && rewriteResult?.data) {
+      let rewriteRepaired = repairAIOutput(rewriteResult.data, assetType);
+      let rewriteValidation = validateContentOutput(rewriteRepaired, assetType);
+      if (rewriteValidation.valid) {
+        const rewriteClaimValidation = validateContentClaims(rewriteValidation.data, assetType);
+        const rewrittenContent = {
+          ...(rewriteClaimValidation.sanitized || rewriteValidation.data),
+          _type: assetType,
+          _approvalStatus: APPROVAL_STATUSES.DRAFT,
+          _generatedAt: new Date().toISOString(),
+          _version: 1,
+          _rewritten: true,
+          _originalScore: qualityResult.overall,
+        };
+        const rewriteQuality = scoreContentQuality(rewrittenContent, evidenceContext?.product ? evidenceContext : null, assetType);
+        rewrittenContent._qualityScore = rewriteQuality.overall;
+        if (rewriteQuality.overall > qualityResult.overall) {
+          Object.assign(validatedContent, rewrittenContent);
+        }
+      }
+    }
+  }
+
+  if (userId && chatId) {
+    saveContentMemory(null, {
+      userId, chatId,
+      assetType,
+      evidenceGraphHash: buildEvidenceGraphHash(evidenceContext),
+      promptHash: buildPromptHash(brief),
+      aiOutput: result,
+      finalOutput: validatedContent,
+      qualityScore: qualityResult.overall,
+      provider: result._provider || 'content_studio_ai',
+    });
+  }
+
   return {
     content: validatedContent,
     metadata: {
@@ -524,6 +602,7 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
       claimFindings: claimValidation.findings,
       schemaValid: true,
       approvalStatus: APPROVAL_STATUSES.DRAFT,
+      qualityScore: qualityResult,
     },
   };
 }
