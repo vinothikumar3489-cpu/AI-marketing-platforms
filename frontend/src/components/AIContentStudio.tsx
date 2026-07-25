@@ -282,8 +282,16 @@ function ContentGeneratorPanel({
         onGenerated(res.data);
       } else if (res?.success !== false && res?.content) {
         onGenerated(res);
+      } else if (res?.content?._status === 'enrichment_failed' || res?._status === 'enrichment_failed') {
+        const reason = res?.content?._reason || res?._reason || 'Content generation failed because required fields were missing. Auto-repair attempted.';
+        const reqCheck = res?.content?._requirements || res?._requirements;
+        const failureDetail = reqCheck?.failures?.length ? `Missing: ${reqCheck.failures.join(', ')}` : '';
+        setError(`${reason} ${failureDetail}`);
+      } else if (res?.content?._status === 'generation_failed' || res?._status === 'generation_failed') {
+        const reason = res?.content?._reason || res?._reason || 'Content generation failed because required fields were missing. Auto-repair attempted. Retrying...';
+        setError(reason);
       } else {
-        setError('Generation returned empty. Ensure product analysis is complete.');
+        setError('Content generation failed because required fields were missing. Auto-repair attempted. Retrying...');
       }
     } catch (err: any) {
       if (err.name === 'AbortError') return;

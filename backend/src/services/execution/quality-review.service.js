@@ -234,14 +234,16 @@ export function scoreContentQuality(content, evidenceGraphOrNull, assetType) {
   if (scores.evidenceUsage < 0.4) details.push('Content does not cite evidence sources');
   if (scores.originality < 0.5) details.push('Content uses cliches or overused phrases');
 
-  const passed = overall >= 60;
+  const passed = overall >= 90;
 
   return {
     overall,
     scores,
     details,
     passed,
-    needsRewrite: overall < 60,
+    needsRewrite: overall < 90,
+    rewriteAttempts: 0,
+    maxRewriteAttempts: 3,
     rewriteSuggestions: details.length > 0 ? details : ['Minor improvements needed'],
   };
 }

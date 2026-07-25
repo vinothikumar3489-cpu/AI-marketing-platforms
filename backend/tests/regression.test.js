@@ -266,7 +266,18 @@ describe('Content Studio — identity handling', () => {
   it('uses brief._productIdentity directly without re-resolving', async () => {
     const mod = await import('../src/services/execution/content-studio.service.js');
     const brief = {
-      product: { name: 'instagram' },
+      product: {
+        name: 'instagram',
+        features: ['Photo Sharing', 'Stories', 'Reels', 'Messaging', 'Shopping'].map(f => ({ name: f, description: null, benefit: null, evidence: null })),
+        benefits: ['Visual storytelling', 'Brand awareness', 'Community engagement', 'Direct sales', 'Influencer reach'].map(b => ({ text: b })),
+        useCases: [{ scenario: 'Brand promotion', solution: 'Use Reels', outcome: 'High reach' }, { scenario: 'Customer engagement', solution: 'Use Stories', outcome: 'Direct interaction' }, { scenario: 'Sales', solution: 'Use Shopping', outcome: 'Revenue' }],
+      },
+      painPoints: ['Low engagement', 'Poor reach', 'Hard to measure', 'Content fatigue', 'Algorithm changes'],
+      targetPersonas: [{ name: 'Marketer', role: 'Social Media Manager', painPoints: [], goals: [] }, { name: 'Business Owner', role: 'SME', painPoints: [], goals: [] }, { name: 'Creator', role: 'Influencer', painPoints: [], goals: [] }],
+      verifiedKeywords: ['social media', 'marketing', 'engagement', 'brand', 'audience', 'reach', 'content', 'analytics', 'growth', 'strategy'],
+      contentGaps: ['Video tutorials', 'Case studies', 'Best practices', 'Industry trends', 'Tips & tricks'],
+      campaign: { goal: 'Increase brand awareness' },
+      CTA: [{ text: 'Sign up now', url: 'https://instagram.com' }],
       _productIdentity: { productName: 'instagram', brandName: 'instagram', resolved: true, source: 'test' },
     };
     const result = await mod.generateContent('blog_article', brief, {}, null, 'user1', 'chat1');
@@ -285,7 +296,7 @@ describe('Content Studio — identity handling', () => {
     };
     const result = await mod.generateContent('blog_article', brief, {}, null, 'user1', 'chat1');
     assert.equal(result._status, 'blocked');
-    assert.ok(result._reason.includes('No product name'));
+    assert.ok(result._reason.includes('verified product') || result._reason.includes('product name'));
   });
 });
 

@@ -1010,7 +1010,7 @@ export const generateContentItem = async (req, res) => {
 
     // Stage 4: Generate content using canonical type
     const effectiveType = getCanonicalContentType(contentType) || contentType;
-    const result = await generateContent(effectiveType, brief, evidenceContext, callAI, userId, chatId);
+    const result = await generateContent(effectiveType, brief, evidenceContext, callAI, userId, chatId, prisma);
     const contentBody = result?.content || result;
     const meta = result?.metadata || {};
 
@@ -1023,22 +1023,21 @@ export const generateContentItem = async (req, res) => {
 
     if (!contentBody._type) contentBody._type = effectiveType;
 
-    if (contentBody._status === 'generation_failed' || contentBody._status === 'blocked') {
+    if (contentBody._status === 'generation_failed' || contentBody._status === 'blocked' || contentBody._status === 'enrichment_failed') {
       console.error("[Content Studio] Generation failed", {
         chatId, userId, contentType, effectiveType,
         status: contentBody._status,
         reason: contentBody._reason,
       });
-      if (contentBody._status === 'blocked') {
-        return res.status(200).json({
-          success: false, status: 'BLOCKED', code: 'PRODUCT_IDENTITY_UNAVAILABLE',
-          message: contentBody._reason || 'Content generation requires a verified product identity',
-          readiness: { ready: false, missingRequired: ['PRODUCT_IDENTITY'] },
-        });
-      }
-      return res.status(500).json({
+      return res.status(200).json({
         success: false,
-        error: { code: "CONTENT_GENERATION_FAILED", message: contentBody._reason || "AI provider returned no content", retryable: true, stage: "GENERATION" }
+        status: contentBody._status === 'blocked' ? 'BLOCKED' : contentBody._status === 'enrichment_failed' ? 'ENRICHMENT_FAILED' : 'GENERATION_FAILED',
+        code: contentBody._status === 'blocked' ? 'PRODUCT_IDENTITY_UNAVAILABLE' : contentBody._status === 'enrichment_failed' ? 'ENRICHMENT_FAILED' : 'CONTENT_GENERATION_FAILED',
+        message: contentBody._reason || 'Content generation failed',
+        content: contentBody,
+        readiness: contentBody._status === 'blocked' ? { ready: false, missingRequired: ['PRODUCT_IDENTITY'] } : undefined,
+        requirements: contentBody._requirements,
+        enrichment: contentBody._enrichment,
       });
     }
 
@@ -1178,7 +1177,7 @@ export const generateAllContent = async (req, res) => {
       return res.status(400).json({ success: false, error: `Invalid types: ${invalid.join(', ')}` });
     }
 
-    const planResult = await generateContentStudioPlan(types, brief, evidenceContext, callAI, userId, chatId);
+    const planResult = await generateContentStudioPlan(types, brief, evidenceContext, callAI, userId, chatId, prisma);
     const generatedItems = planResult?.assets || [];
 
     // Score each, save each (skip failed generations)
@@ -1279,7 +1278,7 @@ export const regenerateContentAsset = async (req, res) => {
     const evidenceContext = await buildEvidenceContext(prisma, userId, chatId);
     const contentType = existing.assetType.replace('content_', '');
 
-    const result = await generateContent(contentType, brief, evidenceContext, callAI, userId, chatId);
+    const result = await generateContent(contentType, brief, evidenceContext, callAI, userId, chatId, prisma);
     const contentBody = result?.content || result;
     const meta = result?.metadata || {};
 

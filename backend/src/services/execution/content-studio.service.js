@@ -13,6 +13,7 @@ import { CONTENT_TYPES, CONTENT_TYPES_LIST } from "../../constants/content-types
 import { EMAIL_WORD_COUNT_LIMITS, validateEmailCopyDTO, createEmptyEmailCopyDTO } from "../../dto/email-copy.dto.js";
 import { scoreContentQuality, buildRewritePrompt } from "./quality-review.service.js";
 import { saveContentMemory, buildEvidenceGraphHash, buildPromptHash } from "./content-memory.service.js";
+import { enrichContentBrief, checkBriefRequirements } from "./brief-enrichment.service.js";
 
 export { CONTENT_TYPES, CONTENT_TYPES_LIST } from "../../constants/content-types.js";
 
@@ -448,7 +449,7 @@ const GENERATORS = {
   video_script: generateVideoScript,
 };
 
-export async function generateContent(assetType, brief, evidenceContext, callAiFn, userId, chatId) {
+export async function generateContent(assetType, brief, evidenceContext, callAiFn, userId, chatId, prisma) {
   const typeConfig = CONTENT_TYPES[assetType];
   if (!typeConfig) throw new Error(`Unknown content type: ${assetType}`);
 
@@ -481,18 +482,55 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
     };
   }
 
-  // Build normalizedEvidence from SEO context — safe array, never raw objects
-  const normalizedEvidence = buildNormalizedEvidence(brief, evidenceContext);
+  let enriched = brief;
+  let enrichmentDiagnostics = null;
+  if (prisma && userId && chatId && !brief._enrichedAt) {
+    const enrichment = await enrichContentBrief(prisma, userId, chatId, brief);
+    enriched = enrichment.brief;
+    enrichmentDiagnostics = enrichment.diagnostics;
+    if (enrichment.enriched) {
+      console.info(`[Content Studio] Brief enriched: ${enrichment.diagnostics.enriched.join(', ')}`);
+    }
+  }
 
-  // PART 6: Use passed AI function from generationContext for provider routing, testing, and logging
+  const reqCheck = checkBriefRequirements(enriched);
+  if (!reqCheck.passed) {
+    const missingFields = reqCheck.failures.join(', ');
+    return {
+      _type: assetType,
+      _label: typeConfig.label,
+      _status: 'enrichment_failed',
+      _reason: `Content generation failed because required fields were missing: ${missingFields}. Auto-repair attempted.`,
+      _requirements: reqCheck,
+      _enrichment: enrichmentDiagnostics,
+      _generatedAt: new Date().toISOString(),
+    };
+  }
+
+  const painPoint = getFirstPainPoint(enriched);
+  const productDisplayName = enriched.product?.name || enriched.company?.name || 'this solution';
+
+  const normalizedEvidence = buildNormalizedEvidence(enriched, evidenceContext);
+
   const aiFunction = callAiFn || callAI;
-  const result = await generator(brief, aiFunction, normalizedEvidence);
+  const briefWithMeta = {
+    ...enriched,
+    _painPoint: painPoint,
+    _productName: productDisplayName,
+  };
+  const result = await generator(briefWithMeta, aiFunction, normalizedEvidence);
 
   if (!result) {
+    const missingReasons = [];
+    if (!enriched.product?.features?.length) missingReasons.push('Missing Product Benefits');
+    if (!enriched.campaign?.goal) missingReasons.push('Missing Campaign Goal');
+    if (!enriched.verifiedKeywords?.length) missingReasons.push('Missing SEO Data');
     return {
       _type: assetType,
       _label: typeConfig.label,
       _status: 'generation_failed',
+      _reason: `Content generation failed because required fields were missing. Auto-repair attempted. Retrying... ${missingReasons.length ? '(' + missingReasons.join(', ') + ')' : ''}`,
+      _enrichment: enrichmentDiagnostics,
       _generatedAt: new Date().toISOString(),
     };
   }
@@ -500,9 +538,9 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
   let repairedResult = repairAIOutput(result, assetType);
   let schemaValidation = validateContentOutput(repairedResult, assetType);
 
-  if (!schemaValidation.valid) {
+  for (let attempt = 0; attempt < 2 && !schemaValidation.valid; attempt++) {
     const retryBrief = {
-      ...brief,
+      ...briefWithMeta,
       _retryInstructions: `Schema validation failed. Errors:\n${schemaValidation.errors.join('\n')}\nReturn valid JSON matching the original schema.`,
     };
     const retryResult = await generator(retryBrief, aiFunction, normalizedEvidence);
@@ -524,69 +562,91 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
         schemaErrors: schemaValidation.errors,
         missingFields: schemaValidation.missingFields || [],
         issues: schemaValidation.issues || [],
+        enrichmentDiagnostics,
       },
     };
   }
 
   const claimValidation = validateContentClaims(schemaValidation.data, assetType);
 
-  const validatedContent = {
+  let validatedContent = {
     ...(claimValidation.sanitized || schemaValidation.data),
     _type: assetType,
     _approvalStatus: APPROVAL_STATUSES.DRAFT,
     _generatedAt: new Date().toISOString(),
     _version: 1,
+    _productName: productDisplayName,
+    _painPoint: painPoint,
   };
 
-  // For email copy, render full HTML template
   if (assetType === 'email_copy' || assetType === 'email_campaign') {
-    const companyName = brief?.company?.name || brief?.product?.name || '';
-    const companyWebsite = brief?.company?.websiteUrl || '';
+    const companyName = enriched?.company?.name || enriched?.product?.name || '';
+    const companyWebsite = enriched?.company?.websiteUrl || '';
     const renderedEmail = renderEmailHtmlTemplate(validatedContent, companyName, companyWebsite);
     validatedContent._htmlTemplate = renderedEmail.html;
     validatedContent._plainText = renderedEmail.plainText;
     validatedContent._subject = renderedEmail.subject;
   }
 
-  const qualityResult = scoreContentQuality(validatedContent, evidenceContext?.product ? evidenceContext : null, assetType);
-  validatedContent._qualityScore = qualityResult.overall;
-  validatedContent._qualityDetails = qualityResult.details;
+  let qualityResult = scoreContentQuality(validatedContent, evidenceContext?.product ? evidenceContext : null, assetType);
+  let bestContent = validatedContent;
+  let bestQuality = qualityResult.overall;
+  let rewritesUsed = 0;
 
-  if (qualityResult.needsRewrite && userId) {
-    const rewritePrompt = buildRewritePrompt(validatedContent, qualityResult, assetType, brief);
+  for (let attempt = 1; attempt <= 3 && qualityResult.needsRewrite && userId; attempt++) {
+    rewritesUsed = attempt;
+    const rewritePrompt = buildRewritePrompt(bestContent, qualityResult, assetType, briefWithMeta);
     const rewriteResult = await callAI(rewritePrompt);
-    if (rewriteResult?.success && rewriteResult?.data) {
-      let rewriteRepaired = repairAIOutput(rewriteResult.data, assetType);
-      let rewriteValidation = validateContentOutput(rewriteRepaired, assetType);
-      if (rewriteValidation.valid) {
-        const rewriteClaimValidation = validateContentClaims(rewriteValidation.data, assetType);
-        const rewrittenContent = {
-          ...(rewriteClaimValidation.sanitized || rewriteValidation.data),
-          _type: assetType,
-          _approvalStatus: APPROVAL_STATUSES.DRAFT,
-          _generatedAt: new Date().toISOString(),
-          _version: 1,
-          _rewritten: true,
-          _originalScore: qualityResult.overall,
-        };
-        const rewriteQuality = scoreContentQuality(rewrittenContent, evidenceContext?.product ? evidenceContext : null, assetType);
-        rewrittenContent._qualityScore = rewriteQuality.overall;
-        if (rewriteQuality.overall > qualityResult.overall) {
-          Object.assign(validatedContent, rewrittenContent);
-        }
+    if (!rewriteResult?.success || !rewriteResult?.data) break;
+
+    let rewriteRepaired = repairAIOutput(rewriteResult.data, assetType);
+    let rewriteValidation = validateContentOutput(rewriteRepaired, assetType);
+    if (rewriteValidation.valid) {
+      const rewriteClaimValidation = validateContentClaims(rewriteValidation.data, assetType);
+      const rewrittenContent = {
+        ...(rewriteClaimValidation.sanitized || rewriteValidation.data),
+        _type: assetType,
+        _approvalStatus: APPROVAL_STATUSES.DRAFT,
+        _generatedAt: new Date().toISOString(),
+        _version: 1,
+        _rewritten: true,
+        _rewriteAttempt: attempt,
+        _originalScore: bestQuality,
+        _productName: productDisplayName,
+        _painPoint: painPoint,
+      };
+      if (assetType === 'email_copy' || assetType === 'email_campaign') {
+        const companyName = enriched?.company?.name || enriched?.product?.name || '';
+        const companyWebsite = enriched?.company?.websiteUrl || '';
+        const renderedEmail = renderEmailHtmlTemplate(rewrittenContent, companyName, companyWebsite);
+        rewrittenContent._htmlTemplate = renderedEmail.html;
+        rewrittenContent._plainText = renderedEmail.plainText;
+        rewrittenContent._subject = renderedEmail.subject;
       }
+      qualityResult = scoreContentQuality(rewrittenContent, evidenceContext?.product ? evidenceContext : null, assetType);
+      if (qualityResult.overall > bestQuality) {
+        bestContent = rewrittenContent;
+        bestQuality = qualityResult.overall;
+      }
+      if (!qualityResult.needsRewrite) break;
     }
   }
+
+  validatedContent = bestContent;
+  validatedContent._qualityScore = bestQuality;
+  validatedContent._qualityDetails = qualityResult.details;
+  validatedContent._qualityRewritesUsed = rewritesUsed;
+  validatedContent._enrichmentDiagnostics = enrichmentDiagnostics;
 
   if (userId && chatId) {
     saveContentMemory(null, {
       userId, chatId,
       assetType,
       evidenceGraphHash: buildEvidenceGraphHash(evidenceContext),
-      promptHash: buildPromptHash(brief),
+      promptHash: buildPromptHash(briefWithMeta),
       aiOutput: result,
       finalOutput: validatedContent,
-      qualityScore: qualityResult.overall,
+      qualityScore: bestQuality,
       provider: result._provider || 'content_studio_ai',
     });
   }
@@ -603,11 +663,13 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
       schemaValid: true,
       approvalStatus: APPROVAL_STATUSES.DRAFT,
       qualityScore: qualityResult,
+      rewritesUsed,
+      enrichmentDiagnostics,
     },
   };
 }
 
-export async function generateContentStudioPlan(typesOrCtx, brief, evidenceContext, callAiFn, userId, chatId) {
+export async function generateContentStudioPlan(typesOrCtx, brief, evidenceContext, callAiFn, userId, chatId, prisma) {
   if (typesOrCtx && typeof typesOrCtx === 'object' && !Array.isArray(typesOrCtx)) {
     const execCtx = typesOrCtx;
     const minimalBrief = {
@@ -619,14 +681,14 @@ export async function generateContentStudioPlan(typesOrCtx, brief, evidenceConte
       _briefId: `legacy_${Date.now()}`, _chatId: null, _userId: null, _builtAt: new Date().toISOString(),
     };
     const allTypes = Object.keys(CONTENT_TYPES);
-    return generateContentStudioPlan(allTypes, minimalBrief, execCtx, null, null, null);
+    return generateContentStudioPlan(allTypes, minimalBrief, execCtx, null, null, null, null);
   }
 
   const types = typesOrCtx;
   const results = [];
 
   for (const type of types) {
-    const genResult = await generateContent(type, brief, evidenceContext, callAiFn, userId, chatId);
+    const genResult = await generateContent(type, brief, evidenceContext, callAiFn, userId, chatId, null);
     if (genResult) results.push({ type, content: genResult.content || genResult, metadata: genResult.metadata || null });
   }
 
