@@ -20,7 +20,7 @@ const INFERENCE_STATUS = InferenceStatus;
 function extractFeatureName(feature) {
   if (typeof feature === 'string') return feature;
   if (!feature || typeof feature !== 'object') return null;
-  return feature.name || feature.title || feature.feature || feature.description || null;
+  return feature.name || feature.title || feature.feature || feature.value || feature.description || null;
 }
 
 /**
@@ -67,6 +67,7 @@ function normalizeFeature(item) {
     item.capability ??
     item.label ??
     item.description ??
+    item.value ??
     null;
 
   if (!name || typeof name !== "string") {
@@ -381,7 +382,7 @@ export function normalizeProductForContentStudio(productIntel, extraContext = {}
   const useCases = rawUseCases.map(u => {
     if (typeof u === 'string') return { scenario: u, solution: null, outcome: null };
     return {
-      scenario: u.scenario || u.useCase || u.name || u.title || '',
+      scenario: u.scenario || u.useCase || u.value || u.name || u.title || '',
       solution: u.solution || u.description || null,
       outcome: u.outcome || u.result || null,
     };
@@ -436,7 +437,7 @@ export function normalizeProductForContentStudio(productIntel, extraContext = {}
   );
   const painPoints = rawPainPoints.map(p => {
     if (typeof p === 'string') return p;
-    return p.text || p.painPoint || p.description || p.name || '';
+    return p.text || p.painPoint || p.value || p.description || p.name || '';
   }).filter(Boolean);
 
   // --- Extract Industries ---
@@ -447,7 +448,7 @@ export function normalizeProductForContentStudio(productIntel, extraContext = {}
   );
   const industries = rawIndustries.map(i => {
     if (typeof i === 'string') return i;
-    return i.name || i.industry || '';
+    return i.name || i.value || i.industry || '';
   }).filter(Boolean);
 
   // --- Extract Target Audience ---
@@ -464,7 +465,7 @@ export function normalizeProductForContentStudio(productIntel, extraContext = {}
     if (typeof a === 'string') return { name: a, role: null, description: null };
     if (typeof a === 'object') {
       return {
-        name: a.name || a.audience || a.title || a.role || '',
+        name: a.name || a.value || a.audience || a.title || a.role || '',
         role: a.role || a.jobTitle || null,
         description: a.description || a.summary || null,
       };
@@ -482,7 +483,7 @@ export function normalizeProductForContentStudio(productIntel, extraContext = {}
   const capabilities = rawCapabilities.map(c => {
     if (typeof c === 'string') return { name: c, description: null };
     return {
-      name: c.name || c.title || c.feature || c.capability || '',
+      name: c.name || c.value || c.title || c.feature || c.capability || '',
       description: c.description || c.details || null,
     };
   }).filter(c => c.name);

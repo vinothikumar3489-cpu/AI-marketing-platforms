@@ -7,32 +7,43 @@ export async function generateBlogArticle(brief, aiFunction = callAI, normalized
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
   const keyword = getKeyword(brief, 0) || painPoint.toLowerCase().replace(/\s+/g, '-');
+  const campaignGoal = brief.campaign?.goal?.value || brief.campaign?.goal || '';
 
-  const prompt = `You are writing a blog article for ${productName}.
+  const prompt = `You are a senior content marketing writer for ${productName}.
 
-Write an informative blog post for ${persona} dealing with "${painPoint}".
+Write an authoritative, research-driven blog article for ${persona}.
 
 ${productContext}
 
-REQUIREMENTS:
-- headline: SEO-friendly headline including target keyword "${keyword}" if natural. Max 70 chars.
-- metaDescription: Compelling meta description. Max 160 chars.
-- introduction: Engaging intro paragraph addressing the pain point.
-- sections: Array of {heading, body, keyTakeaways}. 2-4 sections. Each section should reference evidence.
-- conclusion: Strong conclusion with CTA.
-- cta: A clear call to action. Product-specific.
-- targetKeywords: Array of 2-3 target keywords.
-- Do NOT use: fake stats, testimonials, superlatives, invented data, "revolutionary".
+Format: Long-form blog article (1,200-1,800 words)
+Tone: Authoritative, educational, data-informed
+
+STRATEGIC REQUIREMENTS:
+- Headline: SEO-optimized headline including primary keyword "${keyword}" naturally. Use numbers, power words, or "How to" format. Max 70 chars.
+- MetaDescription: Compelling meta description with keyword, benefit, and CTA. Max 160 chars. Include a click-worthy promise.
+- Introduction: Strong hook that names the pain point "${painPoint}", establishes empathy, and previews the solution. Use the "Problem-Agitate-Solution" framework.
+- Sections: 3-4 in-depth sections. Each with:
+  - heading: H2 with keyword variant
+  - body: 2-3 paragraphs, evidence-backed claims, specific examples
+  - keyTakeaways: 2-3 actionable takeaways per section
+- Conclusion: Summarize key points, reinforce value proposition, include specific CTA.
+- CTA: Product-specific, action-oriented. Not "Learn more" — be specific about what they get.
+- Internal Links: Reference related features or capabilities from evidence.
+- Evidence: Every claim must map to evidence. No fabricated data or invented statistics.
+
+${campaignGoal ? `Campaign Alignment: This article supports the goal "${campaignGoal}".` : ''}
+
+Do NOT use: fake statistics ("studies show", "research indicates"), invented testimonials, superlatives ("best", "ultimate", "revolutionary"), generic advice.
 
 Return valid JSON:
 {
-  "headline": "string",
-  "metaDescription": "string — max 160 chars",
-  "introduction": "string",
-  "sections": [{"heading": "string", "body": "string", "keyTakeaways": ["string"]}],
-  "conclusion": "string",
-  "cta": "string",
-  "targetKeywords": ["string"],
+  "headline": "string — max 70 chars, SEO-optimized",
+  "metaDescription": "string — max 160 chars, includes keyword and benefit",
+  "introduction": "string — Problem-Agitate-Solution framework",
+  "sections": [{"heading": "string — H2 with keyword variant", "body": "string — 2-3 evidence-backed paragraphs", "keyTakeaways": ["2-3", "actionable", "takeaways"]}],
+  "conclusion": "string — summarize, reinforce, CTA",
+  "cta": "string — specific, action-oriented CTA",
+  "targetKeywords": ["2-3", "target", "keywords"],
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
 }`;
@@ -83,26 +94,33 @@ export async function generateFAQ(brief, aiFunction = callAI, normalizedEvidence
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
+  const keyword = getKeyword(brief, 0) || '';
 
-  const prompt = `You are writing an FAQ page for ${productName}.
+  const prompt = `You are writing an SEO-optimized FAQ page for ${productName}.
 
 ${productContext}
 
-REQUIREMENTS:
-- headline: Clear FAQ page title including product name.
-- metaDescription: SEO meta description. Max 160 chars.
-- introduction: Short intro paragraph addressing common questions.
-- faqs: Array of {question, answer}. 4-6 FAQs based on evidence. Questions should reflect real customer concerns.
-- cta: A clear CTA. Product-specific.
-- Do NOT invent: fake questions, pricing, claims not supported by evidence.
+Format: FAQ / Schema-markup ready page
+Tone: Clear, concise, helpful
+
+STRATEGIC REQUIREMENTS:
+- Headline: Include product name and primary keyword "${keyword}". "Frequently Asked Questions About [Product Name] for [Persona]".
+- MetaDescription: SEO meta with keyword and value proposition. Max 160 chars.
+- Introduction: 1-2 sentences acknowledging that ${persona} often have questions about "${painPoint}" and ${productName} addresses them.
+- FAQs: 5-7 questions reflecting REAL customer concerns from evidence. NOT generic FAQs. Each question should address a specific aspect of the product or solution.
+- Answer format: 2-4 sentences. First sentence directly answers. Second provides evidence/feature reference. Third adds specific benefit.
+- CTA: Specific next-step CTA based on campaign goal.
+${brief.campaign?.goal ? `- Campaign Goal reference: "${brief.campaign.goal}"` : ''}
+
+Do NOT invent: pricing questions not in evidence, fake stats, testimonials, questions unrelated to product capabilities.
 
 Return valid JSON:
 {
-  "headline": "string",
+  "headline": "string — include product name and keyword",
   "metaDescription": "string — max 160 chars",
-  "introduction": "string",
-  "faqs": [{"question": "string", "answer": "string"}],
-  "cta": "string",
+  "introduction": "string — 1-2 sentences",
+  "faqs": [{"question": "string — real customer concern", "answer": "string — 2-4 sentences, evidence-backed"}],
+  "cta": "string — specific CTA",
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
 }`;

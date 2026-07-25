@@ -6,29 +6,36 @@ export async function generateFeatureAnnouncement(brief, aiFunction = callAI, no
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const feature = getFirstFeature(brief);
+  const painPoint = getFirstPainPoint(brief);
 
-  const prompt = `You are announcing a new feature for ${productName}.
+  const prompt = `You are a product marketing manager at ${productName}.
+
+Write an exciting feature announcement for ${persona}.
 
 ${productContext}
 
-REQUIREMENTS:
-- headline: Announcement headline highlighting "${feature}". Include product name.
-- subheadline: Supporting subheadline.
-- body: 1-2 paragraphs describing the feature and its value for ${persona}. Reference evidence.
-- benefits: Array of 3 key benefits from evidence.
-- cta: Clear CTA. Product-specific.
-- availability: "Available now" or specific timeline if supported by evidence.
-- technicalDetails: null unless evidence supports it.
-- Do NOT: fake stats, testimonials, superlatives, "game-changing".
+Format: Feature announcement / Product update
+Tone: Excited but credible, specific not hypey
+
+STRATEGIC REQUIREMENTS:
+- Headline: Announcement headline featuring "${feature}" and ${productName}. "[Product Name] Launches [Feature Name]: [Key Benefit for Persona]".
+- Subheadline: Supporting subheadline explaining the "why" behind the feature. One sentence.
+- Body: 2-3 paragraphs. Context (problem → pain point "${painPoint}") → What we built (feature) → Why it matters (benefit for ${persona}). Specific, evidence-backed.
+- Benefits: 3 specific benefits from evidence. Not generic. "Benefit — Outcome" format.
+- CTA: Specific next step. "Try it now in [product]", "Enable [feature] in settings", "Learn how [feature] helps".
+- Availability: Evidence-based. "Available now" or specific timeline.
+- TechnicalDetails: null unless evidence supports it.
+
+Do NOT: fake stats, testimonials, superlatives ("game-changing", "revolutionary"), invented quotes.
 
 Return valid JSON:
 {
-  "headline": "string",
-  "subheadline": "string",
-  "body": "string",
-  "benefits": ["string"],
-  "cta": "string",
-  "availability": "string",
+  "headline": "string — [Product] launches [Feature]: [Benefit]",
+  "subheadline": "string — one sentence, the 'why'",
+  "body": "string — 2-3 paragraphs, problem → solution → benefit",
+  "benefits": ["3 specific benefits — Benefit: Outcome"],
+  "cta": "string — specific next step",
+  "availability": "string — evidence-based timeline",
   "technicalDetails": null,
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
@@ -64,29 +71,38 @@ export async function generateWhitepaper(brief, aiFunction = callAI, normalizedE
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
 
-  const prompt = `You are writing a whitepaper outline for ${productName}.
+  const prompt = `You are a senior industry analyst writing a whitepaper for ${productName}.
+
+Write a comprehensive whitepaper outline for ${persona}.
 
 ${productContext}
 
-REQUIREMENTS:
-- title: Whitepaper title focusing on ${painPoint} and ${productName}.
-- subtitle: Supporting subtitle.
-- executiveSummary: 2-3 sentence executive summary.
-- sections: Array of {heading, body, keyFindings}. 3 sections minimum. Each section grounded in evidence.
-- conclusion: Strong conclusion with recommendations.
-- references: Empty array — do not invent references.
-- cta: Clear CTA. Product-specific.
-- Do NOT: invent statistics, references, testimonials, superlatives.
+Format: Whitepaper / Industry report
+Tone: Authoritative, research-driven, data-informed
+
+STRATEGIC REQUIREMENTS:
+- Title: "Overcoming [Pain Point]: A [Product Name] Whitepaper for [Persona]". Include key theme.
+- Subtitle: "Strategies, Insights, and Best Practices for [Persona]".
+- ExecutiveSummary: 3-5 sentences. Problem statement, why it matters, what this whitepaper covers, key finding.
+- Sections: 4-5 sections minimum. Each with:
+  - heading: Research-driven section title
+  - body: 2-3 paragraphs, evidence-backed claims, industry context
+  - keyFindings: 3 bullet points per section
+- Conclusion: Recommendations based on evidence. Call to action.
+- References: Empty array — do not invent.
+- CTA: Specific. "Download the full whitepaper", "Access the complete research".
+
+Do NOT: invent statistics, references, testimonials, superlatives.
 
 Return valid JSON:
 {
-  "title": "string",
-  "subtitle": "string",
-  "executiveSummary": "string",
-  "sections": [{"heading": "string", "body": "string", "keyFindings": ["string"]}],
-  "conclusion": "string",
+  "title": "string — including pain point and product name",
+  "subtitle": "string — strategies and insights positioning",
+  "executiveSummary": "string — 3-5 sentences",
+  "sections": [{"heading": "string", "body": "string — 2-3 paragraphs", "keyFindings": ["3", "findings"]}],
+  "conclusion": "string — recommendations and CTA",
   "references": [],
-  "cta": "string",
+  "cta": "string — download or access CTA",
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
 }`;

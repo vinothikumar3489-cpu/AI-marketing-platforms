@@ -11,7 +11,7 @@ import { validateContentOutput, repairAIOutput } from "./content-schemas.js";
 import { SCHEMA_REGISTRY } from "../../shared/schemas/content-types.schema.js";
 import { CONTENT_TYPES, CONTENT_TYPES_LIST } from "../../constants/content-types.js";
 import { EMAIL_WORD_COUNT_LIMITS, validateEmailCopyDTO, createEmptyEmailCopyDTO } from "../../dto/email-copy.dto.js";
-import { scoreContentQuality, buildRewritePrompt } from "./quality-review.service.js";
+import { scoreContentQuality, buildRewritePrompt, QUALITY_THRESHOLD } from "./quality-review.service.js";
 import { saveContentMemory, buildEvidenceGraphHash, buildPromptHash } from "./content-memory.service.js";
 import { enrichContentBrief, checkBriefRequirements } from "./brief-enrichment.service.js";
 
@@ -83,10 +83,18 @@ async function generateEmailCopy(brief, aiFunction = callAI, normalizedEvidence)
   const benefits = Array.isArray(brief?.product?.benefits) ? brief.product.benefits.slice(0, 5) : [];
   const featureTexts = features.map(f => typeof f === 'string' ? f : (f.name || f.feature || '')).filter(Boolean);
   const benefitTexts = benefits.map(b => typeof b === 'string' ? b : (b.text || b.benefit || '')).filter(Boolean);
+  const campaignGoal = brief.campaign?.goal?.value || brief.campaign?.goal || '';
+  const campaignObjective = brief.campaign?.objective?.value || brief.campaign?.objective || '';
+  const brandVoice = brief.campaign?.brandVoice?.value || brief.campaign?.brandVoice || brief.brandVoice?.value || brief.brandVoice || '';
 
   const prompt = `You are an enterprise email copywriter for ${displayName}. Write a ${emailType} email comparable to HubSpot, Brevo, and Mailchimp quality standards.
 
 ${productContext}
+
+BUSINESS CONTEXT:
+Campaign Goal: ${campaignGoal || 'N/A'}
+Campaign Objective: ${campaignObjective || 'N/A'}
+Brand Voice: ${brandVoice || 'Professional'}
 
 EMAIL CONFIGURATION:
 - Email Type: ${emailType}

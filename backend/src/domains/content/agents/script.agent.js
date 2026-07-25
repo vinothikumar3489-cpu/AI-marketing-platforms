@@ -6,30 +6,43 @@ export async function generateVideoScript(brief, aiFunction = callAI, normalized
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
+  const keyword = getKeyword(brief, 0) || '';
 
-  const prompt = `You are writing a video script for ${productName}.
+  const prompt = `You are a senior video scriptwriter for ${productName}.
+
+Write a compelling video script for ${persona}.
 
 ${productContext}
 
-REQUIREMENTS:
-- title: Video title. Include product name and target keyword if available.
-- format: "Explainer" or "Testimonial" or "Demo".
-- duration: Estimated duration like "60-90 seconds".
-- scenes: Array of {scene, narration, onScreenText, visual, evidencePoint, cta}. 3-5 scenes.
-- Each scene should reference specific evidence from the evidence above.
-- scene must start at 1.
-- Last scene should include cta.
-- Use "evidencePoint" (not "evidence") for the evidence reference field.
-- Use "onScreenText" (not "on_screen_text") for on-screen text.
-- narration should be speakable, natural dialogue, not formal copy.
-- Do NOT: invent testimonials, fake data, unverifiable claims, superlatives.
+Format: Video script (Explainer/Demo)
+Tone: Conversational, benefit-focused, authentic
+
+STRATEGIC REQUIREMENTS:
+- Title: "[Product Name]: [Solution] for [Persona]" — include keyword "${keyword}" if natural.
+- Format: "Explainer" or "Demo".
+- Duration: "60-90 seconds" or "2-3 minutes" based on complexity.
+- Scenes: 5 scenes minimum.
+  - Scene 1: Hook — Open with the pain point "${painPoint}" in a relatable scenario. Show the struggle.
+  - Scene 2: Discovery — Introduce ${productName} as the solution. Show the "aha" moment.
+  - Scene 3: Features — Demonstrate 2-3 specific features from evidence. Show, don't tell.
+  - Scene 4: Benefits — Show the transformation. Before vs. after. End state.
+  - Scene 5: CTA — Strong closing with specific call to action.
+- Each scene:
+  - scene: sequential number starting at 1
+  - narration: natural, speakable dialogue. Not formal copy. Conversational.
+  - onScreenText: Key text overlay (headline, stat, or callout) or null
+  - visual: Specific visual direction for video editor/animator
+  - evidencePoint: Specific evidence field referenced or null
+  - cta: null except final scene
+
+Do NOT: invent testimonials, fake data, unverifiable claims, superlatives, "revolutionary".
 
 Return valid JSON:
 {
-  "title": "string",
-  "format": "string",
-  "duration": "string",
-  "scenes": [{"scene": 1, "narration": "string", "onScreenText": "string or null", "visual": "string", "evidencePoint": "string or null", "cta": "string or null"}],
+  "title": "string — include product name and keyword",
+  "format": "string — Explainer or Demo",
+  "duration": "string — estimated duration",
+  "scenes": [{"scene": 1, "narration": "string — speakable dialogue", "onScreenText": "string or null", "visual": "string — specific visual direction", "evidencePoint": "string or null", "cta": "string or null"}],
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": [],
   "limitations": []
@@ -104,33 +117,43 @@ export async function generateCreativeBrief(brief, aiFunction = callAI, normaliz
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
+  const campaignGoal = brief.campaign?.goal?.value || brief.campaign?.goal || '';
+  const brandVoice = brief.campaign?.brandVoice?.value || brief.campaign?.brandVoice || brief.brandVoice?.value || brief.brandVoice || 'professional';
 
-  const prompt = `You are creating a creative brief for ${productName}.
+  const prompt = `You are a senior creative director for ${productName}.
+
+Create a comprehensive creative brief for ${persona}.
 
 ${productContext}
 
-REQUIREMENTS:
-- objective: Clear campaign objective focused on solving "${painPoint}" for ${persona}. Specific to ${productName}'s USP.
-- audience: Target audience name from evidence.
-- message: Single key message that communicates value. Rooted in product evidence.
-- visualDirection: Describe the visual creative direction with specific imagery references.
-- brandSignals: Array of brand-specific signals or themes (e.g., "minimalist design", "case study blue"). Max 5.
-- requiredText: A short required product text or tagline.
-- cta: Primary call to action. Product-specific.
-- format: Content format (e.g., "Multi-channel campaign", "Social video series", "Email nurture sequence").
-- evidenceLimitations: Empty array — do not invent limitations.
-- Do NOT: invent budget, timeline beyond evidence, fake testimonials, or generic advice.
+Format: Creative brief / Campaign brief
+Tone: Strategic, specific, creative yet grounded
+
+STRATEGIC REQUIREMENTS:
+- Objective: Clear, measurable campaign objective. "Drive [metric] among [persona] by [value prop] through [channels]."
+- Audience: Target audience from evidence. Include persona name, role, pain point, buying stage.
+- Message: Single, powerful core message. "From [pain point] to [desired state] with [product name]."
+- VisualDirection: Comprehensive visual direction. Color palette, mood, typography, composition, photography style, motion guidelines.
+- BrandSignals: 5 specific brand elements that must be present. E.g., "gradient overlays", "case-study-blue accent", "icon system X".
+- RequiredText: Short tagline or product text that must appear in every piece.
+- CTA: Primary and secondary CTA recommendations.
+- Format: "Multi-channel campaign" or specific channel focus.
+
+${campaignGoal ? `Campaign Alignment: "${campaignGoal}"` : ''}
+${brandVoice ? `Brand Voice: "${brandVoice}"` : ''}
+
+Do NOT: invent budget, timeline beyond evidence, fake testimonials, or generic advice.
 
 Return valid JSON:
 {
-  "objective": "string — clear campaign objective",
-  "audience": "string — target audience name",
-  "message": "string — single key message",
-  "visualDirection": "string — visual creative direction",
-  "brandSignals": ["string"],
-  "requiredText": "string — required product text",
-  "cta": "string",
-  "format": "string",
+  "objective": "string — clear, measurable campaign objective",
+  "audience": "string — persona description including role, pain point, stage",
+  "message": "string — single core message, pain-point to solution",
+  "visualDirection": "string — comprehensive visual direction paragraph",
+  "brandSignals": ["5 specific brand elements that must be present"],
+  "requiredText": "string — tagline or text that must appear",
+  "cta": "string — primary CTA recommendation",
+  "format": "string — campaign format",
   "evidenceLimitations": [],
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []

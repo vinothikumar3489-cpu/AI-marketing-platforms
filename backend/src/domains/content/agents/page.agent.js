@@ -6,34 +6,44 @@ export async function generateLandingPage(brief, aiFunction = callAI, normalized
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
+  const campaignGoal = brief.campaign?.goal?.value || brief.campaign?.goal || '';
+  const primaryCTA = brief.campaign?.primaryCTA?.value || brief.campaign?.primaryCTA || '';
 
-  const prompt = `You are writing a landing page for ${productName}.
+  const prompt = `You are a senior conversion copywriter for ${productName}.
+
+Write a high-converting landing page for ${persona}.
 
 ${productContext}
 
-REQUIREMENTS:
-- headline: Benefit-driven headline. Max 80 chars. Reference USP if available.
-- subheadline: Supporting subheadline. Max 150 chars.
-- heroCTA: Primary CTA button text. Product-specific.
-- painPoints: Array of 3 pain points from the evidence this page addresses.
-- solution: One paragraph describing the solution using evidence.
-- features: Array of {icon (emoji), title, description}. 3 features. Use evidence-backed descriptions.
-- socialProof: Empty array — do not invent testimonials or stats.
-- finalCTA: Closing CTA text.
-- seoKeywords: Array of 3 SEO keywords from evidence.
-- Do NOT: invent testimonials, fake stats, ROI claims, pricing, superlatives.
+Format: Landing page
+Tone: Persuasive, benefit-driven, urgent without being pushy
+
+STRATEGIC REQUIREMENTS:
+- Headline: Single, powerful benefit-driven headline. Include primary value prop. Max 80 chars. Use the "So that" framework: [Feature] so that [Benefit].
+- Subheadline: Expand on the headline with a specific promise. Max 150 chars.
+- HeroCTA: Primary CTA button text. Action-oriented. Specific to ${productName}. ${primaryCTA ? `Recommended: "${primaryCTA}"` : ''}
+- PainPoints: 3 specific pain points from evidence that ${persona} experiences.
+- Solution: One compelling paragraph describing the solution. Specific features, not generic claims.
+- Features: 3 features with icon (emoji), title, and benefit-driven description. Use the "Feature → Benefit → Outcome" structure.
+- SocialProof: Empty array — do NOT invent testimonials, logos, or stats.
+- FinalCTA: Closing CTA. Strong, confident, specific.
+- SEO Keywords: 3 keywords from evidence to optimize for.
+
+${campaignGoal ? `- Campaign Goal: "${campaignGoal}"` : ''}
+
+Do NOT: invent testimonials, fake stats, ROI claims, pricing, superlatives, generic stock photography references.
 
 Return valid JSON:
 {
-  "headline": "string",
-  "subheadline": "string",
-  "heroCTA": "string",
-  "painPoints": ["string"],
-  "solution": "string",
-  "features": [{"icon": "string", "title": "string", "description": "string"}],
+  "headline": "string — max 80 chars, benefit-driven, USP-focused",
+  "subheadline": "string — max 150 chars, specific promise",
+  "heroCTA": "string — action-oriented button text",
+  "painPoints": ["3", "specific", "pain", "points"],
+  "solution": "string — one paragraph, specific, evidence-backed",
+  "features": [{"icon": "emoji", "title": "string", "description": "string — Feature → Benefit → Outcome"}],
   "socialProof": [],
-  "finalCTA": "string",
-  "seoKeywords": ["string"],
+  "finalCTA": "string — strong, confident closing CTA",
+  "seoKeywords": ["3", "seo", "keywords"],
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
 }`;
@@ -78,31 +88,37 @@ export async function generateProductPage(brief, aiFunction = callAI, normalized
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
 
-  const prompt = `You are writing a product page for ${productName}.
+  const prompt = `You are a senior product copywriter for ${productName}.
+
+Write a compelling product page for ${persona}.
 
 ${productContext}
 
-REQUIREMENTS:
-- productName: "${productName}".
-- tagline: Short compelling tagline referencing USP if available.
-- overview: One paragraph product overview addressing pain point "${painPoint}".
-- keyFeatures: Array of {name, description, benefit}. 3 features minimum from evidence.
-- useCases: Array of {scenario, solution, outcome}. At least 1 use case relevant to ${persona}.
-- cta: Clear CTA. Product-specific.
-- pricing: null — do not invent pricing.
-- faqs: Array of {question, answer}. 2 FAQs minimum from evidence.
-- Do NOT: invent pricing, testimonials, fake data, superlatives.
+Format: Product page
+Tone: Confident, specific, value-oriented
+
+STRATEGIC REQUIREMENTS:
+- productName: "${productName}" — use exactly.
+- tagline: One-line value proposition. Reference USP from evidence. "The [category] for [persona] that [key benefit]."
+- overview: One paragraph. Problem (pain point) → Solution (product) → Outcome (benefits). Reference evidence.
+- keyFeatures: 4-5 features. Each: name, description (what it does), benefit (what it means for them). Map directly to evidence.
+- useCases: 2-3 use cases. Each: scenario (when), solution (how), outcome (result). Relevant to ${persona}.
+- cta: Specific, confident CTA. Action + value.
+- pricing: null — do not invent.
+- faqs: 3-4 FAQs addressing real customer concerns from evidence. Not generic.
+
+Do NOT: invent pricing, testimonials, fake data, superlatives, competitor bashing.
 
 Return valid JSON:
 {
-  "productName": "string",
-  "tagline": "string",
-  "overview": "string",
-  "keyFeatures": [{"name": "string", "description": "string", "benefit": "string"}],
-  "useCases": [{"scenario": "string", "solution": "string", "outcome": "string"}],
-  "cta": "string",
+  "productName": "${productName}",
+  "tagline": "string — one-line value proposition with USP",
+  "overview": "string — Problem → Solution → Outcome paragraph",
+  "keyFeatures": [{"name": "string", "description": "string — what it does", "benefit": "string — what it means"}],
+  "useCases": [{"scenario": "string — when", "solution": "string — how", "outcome": "string — result"}],
+  "cta": "string — specific, confident CTA",
   "pricing": null,
-  "faqs": [{"question": "string", "answer": "string"}],
+  "faqs": [{"question": "string — real concern", "answer": "string — evidence-backed"}],
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
 }`;
@@ -152,26 +168,32 @@ export async function generateComparisonPage(brief, aiFunction = callAI, normali
   const persona = getPersonaName(brief);
   const competitors = brief.validatedCompetitors?.slice(0, 3).map(c => c.name) || [];
 
-  const prompt = `You are writing a comparison page for ${productName}.
+  const prompt = `You are writing an objective comparison page for ${productName}.
 
 ${productContext}
 
-REQUIREMENTS:
-- headline: Comparison page title. Include product name and key category.
-- introduction: One paragraph intro stating what is being compared.
-- comparisonTable: Object with headers (array) and rows (array of objects). Be objective — ${productName} does not need to win every row. Use evidence for claims.
-- whyChooseUs: Why someone would choose ${productName} based on evidence. Reference specific features/USPs.
-- cta: Clear CTA. Product-specific.
-- competitorWeaknesses: Array of {competitor, weakness}. Only include if evidence supports it.
-${competitors.length ? `\nCompetitors from evidence: ${competitors.join(', ')}` : '\nNo competitor evidence available — use generic "Alternatives" category.'}
-- Do NOT: bash competitors without evidence, make superlative claims, use fake data.
+Format: Comparison / Alternatives page
+Tone: Objective, evidence-based, helpful
+
+STRATEGIC REQUIREMENTS:
+- headline: "${productName} vs. [Competitor 1] vs. [Competitor 2]: [Category] Comparison for ${persona}".
+- introduction: 1-2 paragraphs. What's being compared, who it's for, criteria used. No bias.
+- comparisonTable: Object with headers [criteria, ${productName}, competitors...] and rows. Be OBJECTIVE. ${productName} does NOT need to win every row. Only use evidence-backed comparisons.
+- The table must have at least 5-7 rows comparing: Features, Ease of Use, Time to Value, Integration, Scalability, Support, Pricing (if known).
+- whyChooseUs: Evidence-based reasons to choose ${productName}. Specific features, capabilities.
+- competitorWeaknesses: ONLY if evidence supports. Empty array otherwise.
+- cta: Specific, helpful CTA.
+
+${competitors.length ? `Competitors from evidence: ${competitors.join(', ')}` : 'No competitor evidence — use generic categories.'}
+
+Do NOT: bash competitors without evidence, make superlative claims, use fake data, invent competitor weaknesses.
 
 Return valid JSON:
 {
   "headline": "string",
   "introduction": "string",
   "comparisonTable": {"headers": ["string"], "rows": [{"feature": "string"}]},
-  "whyChooseUs": "string",
+  "whyChooseUs": "string — evidence-based differentiators",
   "cta": "string",
   "competitorWeaknesses": [{"competitor": "string", "weakness": "string"}],
   "evidenceUsed": ["list evidence fields referenced"],

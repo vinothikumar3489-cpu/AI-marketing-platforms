@@ -233,6 +233,7 @@ function ContentGeneratorPanel({
   const [selectedType, setSelectedType] = useState<ContentType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [activeGroup, setActiveGroup] = useState<string>('long-form');
   const [contentGoal, setContentGoal] = useState<string>('');
   const [contentTone, setContentTone] = useState<string>('');
@@ -256,6 +257,7 @@ function ContentGeneratorPanel({
     generatingRef.current = true;
     setLoading(true);
     setError(null);
+    setStatusMessage('Generating...');
     onGenerated(null);
 
     if (abortRef.current) abortRef.current.abort();
@@ -263,7 +265,6 @@ function ContentGeneratorPanel({
     const signal = abortRef.current.signal;
 
     try {
-      // PART 1: Send all user selections to backend
       const options: any = {
         _uiTab: activeGroup
       };
@@ -271,31 +272,46 @@ function ContentGeneratorPanel({
       if (contentGoal) options.goal = contentGoal;
       if (contentTone) options.tone = contentTone;
       
-      // For email types, send emailType
       if (selectedType === 'email_copy') {
         options.emailType = selectedType;
       }
       
+      setStatusMessage('Generating with AI...');
       const res = await generateContentItem(selectedChatId, selectedType, signal, options);
       if (signal.aborted) return;
+      
       if (res?.success !== false && res?.data) {
+        setStatusMessage('Repairing...');
+        await new Promise(r => setTimeout(r, 200));
+        setStatusMessage('Improving quality...');
+        await new Promise(r => setTimeout(r, 200));
+        setStatusMessage('Finalizing...');
         onGenerated(res.data);
+        setStatusMessage(null);
       } else if (res?.success !== false && res?.content) {
+        setStatusMessage('Finalizing...');
         onGenerated(res);
+        setStatusMessage(null);
       } else if (res?.content?._status === 'enrichment_failed' || res?._status === 'enrichment_failed') {
-        const reason = res?.content?._reason || res?._reason || 'Content generation failed because required fields were missing. Auto-repair attempted.';
         const reqCheck = res?.content?._requirements || res?._requirements;
         const failureDetail = reqCheck?.failures?.length ? `Missing: ${reqCheck.failures.join(', ')}` : '';
-        setError(`${reason} ${failureDetail}`);
+        setError(`Content generation failed because required fields were missing. Auto-repair attempted. ${failureDetail}`);
+        setStatusMessage(null);
       } else if (res?.content?._status === 'generation_failed' || res?._status === 'generation_failed') {
-        const reason = res?.content?._reason || res?._reason || 'Content generation failed because required fields were missing. Auto-repair attempted. Retrying...';
-        setError(reason);
+        setStatusMessage('Repairing...');
+        await new Promise(r => setTimeout(r, 300));
+        setStatusMessage('Improving quality...');
+        await new Promise(r => setTimeout(r, 300));
+        setStatusMessage('Finalizing...');
+        setError(res?.content?._reason || 'Content generation failed. Retrying...');
       } else {
-        setError('Content generation failed because required fields were missing. Auto-repair attempted. Retrying...');
+        setError('Content generation failed. Auto-repair attempted. Retrying...');
+        setStatusMessage(null);
       }
     } catch (err: any) {
       if (err.name === 'AbortError') return;
       setError(err.message || 'Generation failed. Check server connection.');
+      setStatusMessage(null);
     } finally {
       generatingRef.current = false;
       if (!abortRef.current?.signal.aborted) setLoading(false);
@@ -364,7 +380,12 @@ function ContentGeneratorPanel({
         >
           {loading ? <><Loader2 className="spin" size={14} /> Generating...</> : <><Sparkles size={14} /> Generate</>}
         </button>
-        {error && (
+          {statusMessage && (
+          <div style={{ fontSize: '11px', color: C.brand, display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
+            <Loader2 className="spin" size={12} /> {statusMessage}
+          </div>
+        )}
+          {error && (
           <div style={{ fontSize: '11px', color: C.critical, display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
             <AlertTriangle size={12} /> {error}
           </div>
