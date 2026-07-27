@@ -277,12 +277,12 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
           )}
         </SectionCard>
 
-        {/* SECTION 4: Quality */}
+        {/* SECTION 4: Quality (Advisory) */}
         <SectionCard title="Quality" icon={<CheckCircle2 size={14} />}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
             <div style={{ padding: '10px', background: '#0f1729', borderRadius: '6px', textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: (emailData?.quality?.score || 0) >= 0.8 ? '#10e18b' : (emailData?.quality?.score || 0) >= 0.5 ? '#ffb347' : '#ff4757' }}>{Math.round((emailData?.quality?.score || 0) * 100)}</div>
-              <div style={{ fontSize: '10px', color: '#9aa7bd' }}>Score</div>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: (emailData?._qualityScore || 0) >= 90 ? '#10e18b' : (emailData?._qualityScore || 0) >= 80 ? '#ffb347' : '#ff4757' }}>{emailData?._qualityScore || 0}</div>
+              <div style={{ fontSize: '10px', color: '#9aa7bd' }}>{emailData?._qualityLabel || 'Score'}</div>
             </div>
             <div style={{ padding: '10px', background: '#0f1729', borderRadius: '6px', textAlign: 'center' }}>
               <div style={{ fontSize: '20px', fontWeight: 700, color: '#53a7ff' }}>{emailData?.spamScore?.score || 0}</div>
@@ -293,10 +293,15 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
               <div style={{ fontSize: '10px', color: '#9aa7bd' }}>Readability</div>
             </div>
             <div style={{ padding: '10px', background: '#0f1729', borderRadius: '6px', textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#10e18b' }}>{emailData?.quality?.checks?.length || 0}</div>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#10e18b' }}>{emailData?._qualityDetails?.length || 0}</div>
               <div style={{ fontSize: '10px', color: '#9aa7bd' }}>Checks</div>
             </div>
           </div>
+          {(emailData?._qualityScore || 0) < 90 && (
+            <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(255,179,71,0.1)', borderRadius: '4px', border: '1px solid #ffb347', fontSize: '12px', color: '#ffb347', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <AlertTriangle size={14} /> Suggestions available — quality can be improved
+            </div>
+          )}
         </SectionCard>
 
         {/* SECTION 5: Approval */}
@@ -314,6 +319,16 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
             <button onClick={handleGenerate} style={{ padding: '8px 16px', background: '#818cf8', border: '1px solid #818cf8', borderRadius: '6px', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}><RefreshCw size={14} /> Regenerate</button>
           </div>
           {approvalStatus !== 'APPROVED' && <div style={{ marginTop: '8px', fontSize: '11px', color: '#9aa7bd' }}>{!templateId ? 'Save a draft before approving' : 'Approve to enable sending'}</div>}
+        </SectionCard>
+
+        {/* SECTION 5b: Improve Content (manual, always available) */}
+        <SectionCard title="Improve Content" icon={<RefreshCw size={14} />}>
+          <div style={{ fontSize: '12px', color: '#9aa7bd', marginBottom: '8px' }}>
+            Click below to request an AI-powered quality improvement pass. The current content is preserved if the rewrite fails.
+          </div>
+          <button onClick={handleGenerate} style={{ padding: '10px 16px', background: '#818cf8', border: '1px solid #818cf8', borderRadius: '6px', color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <RefreshCw size={14} /> Improve Content
+          </button>
         </SectionCard>
 
         {/* SECTION 6: Send */}

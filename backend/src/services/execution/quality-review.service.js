@@ -15,7 +15,14 @@ const QUALITY_WEIGHTS = {
   marketingImpact: 0.06,
 };
 
-const QUALITY_THRESHOLD = 92;
+const QUALITY_THRESHOLD = 80;
+
+function getQualityLabel(score) {
+  if (score >= 95) return 'Excellent';
+  if (score >= 90) return 'Production Ready';
+  if (score >= 80) return 'Approved with Suggestions';
+  return 'Needs Rewrite';
+}
 
 function clamp(v) { return Math.max(0, Math.min(100, v)); }
 
@@ -288,6 +295,7 @@ export function scoreContentQuality(content, evidenceContext, assetType) {
 
   return {
     overall,
+    label: getQualityLabel(overall),
     dimensions,
     needsRewrite: overall < QUALITY_THRESHOLD,
     details: Object.entries(dimensions).map(([k, v]) => ({
@@ -300,6 +308,8 @@ export function scoreContentQuality(content, evidenceContext, assetType) {
     gap: overall < QUALITY_THRESHOLD ? QUALITY_THRESHOLD - overall : 0,
   };
 }
+
+export { QUALITY_WEIGHTS, QUALITY_THRESHOLD, getQualityLabel };
 
 export function buildRewritePrompt(content, qualityResult, assetType, brief) {
   const lowDimensions = qualityResult.details
@@ -367,5 +377,3 @@ Return ONLY valid JSON matching the original schema exactly. Improve the content
 
   return prompt;
 }
-
-export { QUALITY_WEIGHTS, QUALITY_THRESHOLD };

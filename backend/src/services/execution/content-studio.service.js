@@ -867,24 +867,24 @@ function localPolishContent(content, assetType, qualityResult, brief) {
   return polished;
 }
 
-  // ===== STAGE 6: QUALITY REVIEW =====
-  console.info('[Pipeline] STAGE 6: Quality review');
+  // ===== STAGE 6: QUALITY REVIEW (Advisory) =====
+  console.info('[Pipeline] STAGE 6: Quality review (advisory)');
   let qualityResult = scoreContentQuality(validatedContent, evidenceContext?.product ? evidenceContext : null, assetType);
-  let bestContent = validatedContent;
   let bestQuality = qualityResult.overall;
   let rewritesUsed = 0;
 
-  console.info('[Pipeline] Initial quality', {
-    overall: qualityResult.overall, needsRewrite: qualityResult.needsRewrite,
+  console.info('[Pipeline] Quality score', {
+    overall: bestQuality,
+    label: qualityResult.label,
     threshold: QUALITY_THRESHOLD,
   });
 
-  // Local deterministic polish first — no AI required
+  // Local deterministic polish — always applied, no AI required, never blocks
   if (qualityResult.needsRewrite) {
-    const polished = localPolishContent(bestContent, assetType, qualityResult, briefWithMeta);
+    const polished = localPolishContent(validatedContent, assetType, qualityResult, briefWithMeta);
     const polishedQuality = scoreContentQuality(polished, evidenceContext?.product ? evidenceContext : null, assetType);
     if (polishedQuality.overall > bestQuality) {
-      bestContent = polished;
+      validatedContent = polished;
       bestQuality = polishedQuality.overall;
       qualityResult = polishedQuality;
       rewritesUsed = 1;
@@ -892,60 +892,18 @@ function localPolishContent(content, assetType, qualityResult, brief) {
     }
   }
 
-  // Only call AI rewrite if local polish didn't reach threshold and user context is available
-  for (let attempt = 1; attempt <= 1 && qualityResult.needsRewrite && userId && rewritesUsed === 0; attempt++) {
-    rewritesUsed = attempt + 1;
-    console.info('[Pipeline] Quality AI rewrite attempt', { attempt, currentScore: bestQuality });
-    const rewritePrompt = buildRewritePrompt(bestContent, qualityResult, assetType, briefWithMeta);
-    const rewriteResult = await callAI(rewritePrompt);
-    if (!rewriteResult?.success || !rewriteResult?.data) {
-      console.warn('[Pipeline] AI rewrite failed, keeping original content');
-      break;
-    }
-
-    let rewriteRepaired = repairAIOutput(rewriteResult.data, assetType);
-    let rewriteValidation = validateContentOutput(rewriteRepaired, assetType);
-    if (rewriteValidation.valid) {
-      const rewriteClaimValidation = validateContentClaims(rewriteValidation.data, assetType);
-      const rewrittenContent = {
-        ...(rewriteClaimValidation.sanitized || rewriteValidation.data),
-        _type: assetType,
-        _approvalStatus: APPROVAL_STATUSES.DRAFT,
-        _generatedAt: new Date().toISOString(),
-        _version: 1,
-        _rewritten: true,
-        _rewriteAttempt: attempt,
-        _originalScore: bestQuality,
-        _productName: productDisplayName,
-        _painPoint: painPoint,
-      };
-      if (assetType.startsWith('email_')) {
-        const companyName = enriched?.company?.name || enriched?.product?.name || '';
-        const companyWebsite = enriched?.company?.websiteUrl || '';
-        const renderedEmail = renderEmailHtmlTemplate(rewrittenContent, companyName, companyWebsite);
-        rewrittenContent._htmlTemplate = renderedEmail.html;
-        rewrittenContent._plainText = renderedEmail.plainText;
-        rewrittenContent._subject = renderedEmail.subject;
-      }
-      const newQuality = scoreContentQuality(rewrittenContent, evidenceContext?.product ? evidenceContext : null, assetType);
-      if (newQuality.overall > bestQuality) {
-        bestContent = rewrittenContent;
-        bestQuality = newQuality.overall;
-        qualityResult = newQuality;
-        console.info('[Pipeline] AI rewrite improved quality', { from: bestQuality, to: newQuality.overall });
-      } else {
-        console.info('[Pipeline] AI rewrite did not improve quality, keeping original');
-      }
-    }
-  }
+  // AI rewrite is NEVER called automatically.
+  // Only triggered manually via "Improve Content" button on frontend.
+  // If AI rewrite is called and fails, original content is kept unconditionally.
 
   console.info('[Pipeline] Quality final', {
-    bestScore: bestQuality, rewritesUsed,
-    needsRewrite: qualityResult.needsRewrite,
+    score: bestQuality,
+    label: qualityResult.label,
+    rewritesUsed,
   });
 
-  validatedContent = bestContent;
   validatedContent._qualityScore = bestQuality;
+  validatedContent._qualityLabel = qualityResult.label;
   validatedContent._qualityDetails = qualityResult.details;
   validatedContent._qualityRewritesUsed = rewritesUsed;
   validatedContent._enrichmentDiagnostics = enrichmentDiagnostics;
