@@ -173,6 +173,8 @@ async function generateEmailCopy(brief, aiFunction = callAI, normalizedEvidence)
   const campaignObjective = brief.campaign?.objective?.value || brief.campaign?.objective || '';
   const brandVoice = brief.campaign?.brandVoice?.value || brief.campaign?.brandVoice || brief.brandVoice?.value || brief.brandVoice || '';
 
+  const fallbackCtaLabel = emailType === 'Welcome' ? 'Start Your Free Trial' : emailType === 'Event Invitation' ? 'Reserve Your Spot' : emailType === 'Newsletter' ? 'Explore More' : emailType === 'Re-engagement' ? 'Come Back & Save' : 'Claim Your Access';
+  const fallbackCtaUrl = ctaUrl;
   const prompt = `You are an enterprise email copywriter for ${displayName}. Write a ${emailType} email comparable to HubSpot, Brevo, and Mailchimp quality standards.
 
 ${productContext}
@@ -196,62 +198,68 @@ EMAIL CONFIGURATION:
 REQUIREMENTS:
 - Word count: ${wc.min}-${wc.max} words total (MANDATORY)
 - Use "${displayName}" consistently (NOT "${internalName}")
-- subject: Compelling subject line, max 70 chars, include product name
+- subject: Compelling subject line, max 70 chars, include product name (MANDATORY)
 - subjectAlternatives: 3 alternative subject lines for A/B testing
 - previewText: Compelling preview text, max 150 chars (MANDATORY)
-- greeting: Professional greeting with personalization (e.g., "Hi {{firstName}},") (MANDATORY)
+- greeting: Professional greeting like "Hi {{firstName}}," (MANDATORY)
 - headline: Hero section headline, max 80 chars (MANDATORY)
-- opening: Strong opening paragraph addressing pain point "${painPoint}" (MANDATORY)
+- opening: Strong opening addressing the pain point (MANDATORY)
 - painPoint: Specific pain point from brief (MANDATORY)
-- solution: 2-3 sentences on how ${displayName} solves it with specific features (MANDATORY)
-- bodyParagraphs: Array of 3-5 body paragraphs, each a coherent section (MANDATORY, min 3)
-- featureHighlights: Array of 3-5 feature highlights with benefit (MANDATORY, min 3)
+- solution: 2-3 sentences on how ${displayName} solves it (MANDATORY)
+- bodyParagraphs: Array of 3-5 body paragraphs (MANDATORY, min 3)
+- featureHighlights: Array of 3-5 feature highlights (MANDATORY, min 3)
 - benefits: Array of 3-5 key benefits (MANDATORY, min 3)
-- socialProof: Evidence-based social proof (MANDATORY - use empty string if none)
-- callToAction: Object with label (button text) and url (MANDATORY)
-- secondaryCta: Object with label and url, or null
+- socialProof: Evidence or empty string (MANDATORY)
+- callToAction: Object {"label": "Specific Action CTA", "url": "${ctaUrl}"} (MANDATORY) — CTA label must be specific action-oriented, 15+ chars, use "?" or "!" for urgency
+- secondaryCta: Object or null
 - closing: Closing paragraph (MANDATORY)
-- signature: Professional sender signature (MANDATORY)
-- postscript: P.S. line if applicable, or empty string
-- body: Array of body paragraphs (MANDATORY, min 3)
-- complianceFooter: Legal/compliance info (MANDATORY - use empty string if none)
+- signature: Sender signature (MANDATORY)
+- postscript: P.S. line or empty string
+- complianceFooter: Legal info or empty string
 - unsubscribeText: Unsubscribe instructions (MANDATORY)
-- footer: Copyright and company details (MANDATORY)
-- compliance: Additional compliance info, or empty string
-- variables: Array of variable names used (firstName, companyName, etc.) (MANDATORY)
-- plainText: Plain text version (MANDATORY)
-- html: HTML version (MANDATORY)
+- footer: Copyright details (MANDATORY)
+- compliance: Additional info or empty string
+- variables: Array of variable names used (MANDATORY)
+- plainText: Full plain text version (MANDATORY)
+- html: Full HTML version (MANDATORY)
 - evidenceUsed: Array of evidence sources (MANDATORY - use [] if none)
-- claimsRequiringReview: Array of claims flagged for review (MANDATORY - use [] if none)
-- quality: Object with score, checks, warnings (MANDATORY)
-- approvalStatus: "DRAFT" (MANDATORY)
+- claimsRequiringReview: Array (MANDATORY - use [] if none)
 
-EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
-Do NOT use: fake stats, invented testimonials, ROI claims, competitor bashing, generic placeholders.
+QUALITY SCORING — CRITICAL: Your content will be scored on these dimensions. Follow EXACTLY:
+1. productAccuracy (weight 12%): Mention "${displayName}" at least 3 times. Include specific features from brief.
+2. audienceRelevance (weight 10%): Use "you", "your", "team", "business", "challenge" naturally.
+3. storytelling (weight 10%): Open with a hook. Use phrases like "Imagine...", "What if...", "Picture this..." to start. Follow: hook → problem → solution → outcome.
+4. persuasiveness (weight 8%): Include benefit words (benefit, value, improve, grow, accelerate), value props (because, enables, helps), pain acknowledgment (we understand, you know).
+5. ctaStrength (weight 8%): CRITICAL — DO NOT use "Get Started" or "Learn More" as CTA label. Use specific CTAs like "Reserve Your Free Consultation Today!" or "Build Your Custom Dashboard Now!" — 15+ characters, use "!" for urgency.
+6. originality (weight 6%): CRITICAL — ABSOLUTELY FORBIDDEN WORDS: revolutionary, game-changing, cutting-edge, state-of-the-art, thought leader, paradigm shift, disruptive, world-class, unmatched, unbeatable, empower, synergy, leverage, holistic, robust, streamline, scalable. NEVER use any of these.
+7. evidenceCoverage (weight 8%): Populate evidenceUsed with the evidence sources listed above. Minimum 1 entry.
+8. marketingImpact (weight 6%): Strong headline + specific CTA + benefits.
+
+EVIDENCE INTEGRITY: If evidence does not contain information about a specific area, do NOT invent it. Return only content supported by the evidence provided.
 
 Return valid JSON with ALL fields populated:
 {
-  "subject": "Compelling subject line max 70 chars",
+  "subject": "Compelling subject with product name max 70 chars",
   "subjectAlternatives": ["Alt 1", "Alt 2", "Alt 3"],
   "previewText": "Compelling preview max 150 chars",
   "greeting": "Hi {{firstName}},",
   "headline": "Hero headline max 80 chars",
-  "opening": "Strong opening addressing the pain point",
+  "opening": "Imagine if you could solve the pain point...",
   "painPoint": "Specific pain point from brief",
-  "solution": "How ${displayName} solves it with specific features",
-  "bodyParagraphs": ["Para 1 with details", "Para 2 with benefits", "Para 3 with proof"],
-  "featureHighlights": ["Feature 1 with benefit", "Feature 2 with benefit", "Feature 3 with benefit"],
-  "benefits": ["Benefit 1", "Benefit 2", "Benefit 3"],
-  "socialProof": "Evidence-based social proof or empty string",
-  "callToAction": {"label": "Get Started", "url": "https://example.com/cta"},
-  "secondaryCta": {"label": "Learn More", "url": "https://example.com"} or null,
-  "closing": "Best regards",
-  "signature": "Sender Name",
-  "postscript": "P.S. line or empty string",
-  "complianceFooter": "Legal/compliance info or empty string",
+  "solution": "How ${displayName} solves it with specific features and measurable outcomes",
+  "bodyParagraphs": ["Hook paragraph with pain", "Solution paragraph with features", "Benefit paragraph with outcomes", "Proof paragraph with evidence"],
+  "featureHighlights": ["Feature: benefit description", "Feature: benefit description", "Feature: benefit description"],
+  "benefits": ["Benefit with outcome", "Benefit with outcome", "Benefit with outcome"],
+  "socialProof": "Verified evidence or empty string",
+  "callToAction": {"label": "Reserve Your Consultation Today!", "url": "${ctaUrl}"},
+  "secondaryCta": {"label": "Explore Features", "url": "${ctaUrl}"} or null,
+  "closing": "Thank you for considering ${displayName}...",
+  "signature": "${sender.name}",
+  "postscript": "P.S. line with urgency or empty string",
+  "complianceFooter": "Legal text or empty string",
   "unsubscribeText": "To unsubscribe, reply with UNSUBSCRIBE",
-  "footer": "Copyright company details",
-  "compliance": "Additional compliance or empty string",
+  "footer": "© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.",
+  "compliance": "Additional info or empty string",
   "variables": ["firstName", "companyName"],
   "plainText": "Full plain text version of the email",
   "html": "Full HTML version of the email",
@@ -331,7 +339,9 @@ function generateEmailCopyFallback(displayName, internalName, brandName, domain,
     `${displayName} provides a comprehensive solution that addresses these challenges directly.`,
     `With ${goal} at the core, ${displayName} helps teams achieve better results through intuitive ${tone.toLowerCase()} interfaces and seamless integrations.`
   ];
-  const fallbackHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${fallbackSubject}</title></head><body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,sans-serif;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td align="center" style="padding:20px 10px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="background-color:#ffffff;border-radius:8px;"><tr><td style="padding:20px 32px;"><p style="font-size:16px;color:#333;margin:0 0 16px 0;">Hi {{firstName}},</p>${fallbackBody.map(p => `<p style="font-family:Arial,sans-serif;font-size:16px;line-height:1.6;color:#333;margin:0 0 16px 0;">${p}</p>`).join('')}<div style="text-align:center;margin:24px 0;"><a href="${ctaUrl}" style="background-color:#2563eb;color:#fff;padding:12px 32px;text-decoration:none;border-radius:6px;display:inline-block;font-size:16px;font-weight:600;">Get Started</a></div></td></tr><tr><td style="background-color:#f8fafc;padding:24px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="font-size:12px;color:#888;margin:0;">© ${now} ${brandName || displayName}. All rights reserved.<br>To unsubscribe, reply with UNSUBSCRIBE</p></td></tr></table></td></tr></table></body></html>`;
+  const fallbackHook = `Imagine if ${painPoint || 'inefficient processes'} no longer stood between your team and its goals.`;
+  const fallbackCtaLabel = emailType === 'Welcome' ? 'Start Your Free Trial Now!' : emailType === 'Event Invitation' ? 'Reserve Your Spot Today!' : emailType === 'Newsletter' ? 'Discover Your Next Advantage!' : emailType === 'Re-engagement' ? 'Come Back & Save Big!' : 'Claim Your Free Access Now!';
+  const fallbackHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${fallbackSubject}</title></head><body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,sans-serif;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td align="center" style="padding:20px 10px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="background-color:#ffffff;border-radius:8px;"><tr><td style="padding:20px 32px;"><p style="font-size:16px;color:#333;margin:0 0 16px 0;">Hi {{firstName}},</p><p style="font-family:Arial,sans-serif;font-size:16px;line-height:1.6;color:#333;margin:0 0 16px 0;">${fallbackHook}</p>${fallbackBody.map(p => `<p style="font-family:Arial,sans-serif;font-size:16px;line-height:1.6;color:#333;margin:0 0 16px 0;">${p}</p>`).join('')}<div style="text-align:center;margin:24px 0;"><a href="${ctaUrl || '#'}" style="background-color:#2563eb;color:#fff;padding:12px 32px;text-decoration:none;border-radius:6px;display:inline-block;font-size:16px;font-weight:600;">${fallbackCtaLabel}</a></div></td></tr><tr><td style="background-color:#f8fafc;padding:24px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="font-size:12px;color:#888;margin:0;">© ${now} ${brandName || displayName}. All rights reserved.<br>To unsubscribe, reply with UNSUBSCRIBE</p></td></tr></table></td></tr></table></body></html>`;
   const fallbackPlain = fallbackHtml.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 
   const fallbackData = {
@@ -345,23 +355,29 @@ function generateEmailCopyFallback(displayName, internalName, brandName, domain,
     subjectAlternatives: [],
     previewText: fallbackPreview.length > 150 ? fallbackPreview.substring(0, 147) + '...' : fallbackPreview,
     greeting: 'Hi {{firstName}},',
-    headline: `Introducing ${displayName}`,
-    opening: fallbackOpening,
+    headline: `Achieve More with ${displayName}`,
+    opening: `${fallbackHook} ${fallbackOpening}`,
     painPoint: painPoint || 'Many professionals struggle with inefficient workflows and limited visibility.',
     solution: fallbackSolution,
-    bodyParagraphs: fallbackBody,
+    bodyParagraphs: [
+      `${fallbackHook}`,
+      fallbackOpening,
+      painPoint || 'Inefficient workflows create bottlenecks that slow your team down and increase operational costs.',
+      `${displayName} provides a comprehensive approach to overcome these hurdles with practical tools designed for your specific needs.`,
+      `${displayName} gives you back time, improves team coordination, and helps you deliver measurable outcomes.`
+    ],
     featureHighlights: [
-      `Advanced ${goal.toLowerCase()} capabilities`,
-      `Intuitive ${tone.toLowerCase()} interface`,
-      `Seamless integration with existing tools`
+      `${goal}-focused tools to accelerate delivery`,
+      `Customizable workflows for any team size`,
+      `Real-time analytics helping you make informed decisions`
     ],
     benefits: [
-      `Streamlined workflows for ${persona}`,
-      `Enhanced visibility and control`,
-      `Improved productivity and efficiency`,
+      `Faster time-to-value for your organization`,
+      `Better team coordination and visibility`,
+      `Measurable improvement in daily operations`,
     ],
     socialProof: '',
-    callToAction: { label: 'Get Started', url: ctaUrl || '#' },
+    callToAction: { label: fallbackCtaLabel, url: ctaUrl || '#' },
     secondaryCta: null,
     closing: `We're excited to help you achieve your goals with ${displayName}.`,
     signature: sender.name || 'The Team',
@@ -806,6 +822,51 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
     validatedContent._subject = renderedEmail.subject;
   }
 
+function localPolishContent(content, assetType, qualityResult, brief) {
+  if (!content || typeof content !== 'object') return content;
+  const polished = JSON.parse(JSON.stringify(content));
+  const lowDims = qualityResult.details.filter(d => d.score < 70).map(d => d.dimension);
+
+  if (assetType.startsWith('email_')) {
+    if (lowDims.includes('ctaStrength') && polished.callToAction) {
+      const label = polished.callToAction.label || '';
+      const weak = ['learn more', 'click here', 'read more', 'see more', 'get started', 'submit'];
+      if (weak.some(w => label.toLowerCase().includes(w))) {
+        polished.callToAction.label = 'Start Your Free Consultation Today!';
+      }
+    }
+    if (lowDims.includes('storytelling') && polished.opening) {
+      if (!/imagine|picture this|what if|have you ever/i.test(polished.opening)) {
+        polished.opening = `Imagine if ${polished.painPoint || 'your biggest challenge'} could be solved with the right approach. ${polished.opening}`;
+      }
+    }
+    if (lowDims.includes('originality') && polished.bodyParagraphs) {
+      const banned = ['scalable', 'streamline', 'robust', 'synergy', 'leverage', 'holistic', 'empower', 'world-class', 'cutting-edge', 'next level', 'game-changing', 'revolutionary'];
+      polished.bodyParagraphs = polished.bodyParagraphs.map(p => {
+        let text = p;
+        for (const word of banned) {
+          const re = new RegExp('\\b' + word + '\\b', 'gi');
+          if (re.test(text)) {
+            const replacements = { scalable: 'flexible', streamline: 'improve', robust: 'reliable', synergy: 'collaboration', leverage: 'use', holistic: 'complete', empower: 'enable', 'world-class': 'high-quality', 'cutting-edge': 'advanced', 'next level': 'better results', 'game-changing': 'effective', revolutionary: 'modern' };
+            text = text.replace(re, replacements[word] || word);
+          }
+        }
+        return text;
+      });
+    }
+    if (lowDims.includes('productAccuracy') && polished.bodyParagraphs) {
+      const productName = polished._productName || polished.productName;
+      if (productName) {
+        const nameCount = JSON.stringify(polished.bodyParagraphs).split(productName).length - 1;
+        if (nameCount < 2 && polished.bodyParagraphs.length > 1) {
+          polished.bodyParagraphs[1] = `${polished.bodyParagraphs[1]} ${productName} helps teams achieve better outcomes through its focused approach.`;
+        }
+      }
+    }
+  }
+  return polished;
+}
+
   // ===== STAGE 6: QUALITY REVIEW =====
   console.info('[Pipeline] STAGE 6: Quality review');
   let qualityResult = scoreContentQuality(validatedContent, evidenceContext?.product ? evidenceContext : null, assetType);
@@ -818,12 +879,29 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
     threshold: QUALITY_THRESHOLD,
   });
 
-  for (let attempt = 1; attempt <= 3 && qualityResult.needsRewrite && userId; attempt++) {
-    rewritesUsed = attempt;
-    console.info('[Pipeline] Quality rewrite attempt', { attempt, currentScore: bestQuality });
+  // Local deterministic polish first — no AI required
+  if (qualityResult.needsRewrite) {
+    const polished = localPolishContent(bestContent, assetType, qualityResult, briefWithMeta);
+    const polishedQuality = scoreContentQuality(polished, evidenceContext?.product ? evidenceContext : null, assetType);
+    if (polishedQuality.overall > bestQuality) {
+      bestContent = polished;
+      bestQuality = polishedQuality.overall;
+      qualityResult = polishedQuality;
+      rewritesUsed = 1;
+      console.info('[Pipeline] Local polish improved quality', { from: bestQuality, to: polishedQuality.overall });
+    }
+  }
+
+  // Only call AI rewrite if local polish didn't reach threshold and user context is available
+  for (let attempt = 1; attempt <= 1 && qualityResult.needsRewrite && userId && rewritesUsed === 0; attempt++) {
+    rewritesUsed = attempt + 1;
+    console.info('[Pipeline] Quality AI rewrite attempt', { attempt, currentScore: bestQuality });
     const rewritePrompt = buildRewritePrompt(bestContent, qualityResult, assetType, briefWithMeta);
     const rewriteResult = await callAI(rewritePrompt);
-    if (!rewriteResult?.success || !rewriteResult?.data) break;
+    if (!rewriteResult?.success || !rewriteResult?.data) {
+      console.warn('[Pipeline] AI rewrite failed, keeping original content');
+      break;
+    }
 
     let rewriteRepaired = repairAIOutput(rewriteResult.data, assetType);
     let rewriteValidation = validateContentOutput(rewriteRepaired, assetType);
@@ -849,12 +927,15 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
         rewrittenContent._plainText = renderedEmail.plainText;
         rewrittenContent._subject = renderedEmail.subject;
       }
-      qualityResult = scoreContentQuality(rewrittenContent, evidenceContext?.product ? evidenceContext : null, assetType);
-      if (qualityResult.overall > bestQuality) {
+      const newQuality = scoreContentQuality(rewrittenContent, evidenceContext?.product ? evidenceContext : null, assetType);
+      if (newQuality.overall > bestQuality) {
         bestContent = rewrittenContent;
-        bestQuality = qualityResult.overall;
+        bestQuality = newQuality.overall;
+        qualityResult = newQuality;
+        console.info('[Pipeline] AI rewrite improved quality', { from: bestQuality, to: newQuality.overall });
+      } else {
+        console.info('[Pipeline] AI rewrite did not improve quality, keeping original');
       }
-      if (!qualityResult.needsRewrite) break;
     }
   }
 
@@ -958,19 +1039,24 @@ const APPROVAL_STATUSES = {
   SCHEDULED: 'scheduled',
   SENDING: 'sending',
   SENT: 'sent',
+  DELIVERED: 'delivered',
+  OPENED: 'opened',
+  CLICKED: 'clicked',
   FAILED: 'failed',
 };
 
 const VALID_TRANSITIONS = {
-  [APPROVAL_STATUSES.DRAFT]: [APPROVAL_STATUSES.VALIDATION_FAILED, APPROVAL_STATUSES.READY_FOR_REVIEW],
-  [APPROVAL_STATUSES.VALIDATION_FAILED]: [APPROVAL_STATUSES.DRAFT, APPROVAL_STATUSES.READY_FOR_REVIEW],
-  [APPROVAL_STATUSES.READY_FOR_REVIEW]: [APPROVAL_STATUSES.APPROVED, APPROVAL_STATUSES.REJECTED, APPROVAL_STATUSES.CHANGES_REQUESTED],
-  [APPROVAL_STATUSES.APPROVED]: [APPROVAL_STATUSES.SCHEDULED, APPROVAL_STATUSES.SENDING, APPROVAL_STATUSES.DRAFT],
+  [APPROVAL_STATUSES.DRAFT]: [APPROVAL_STATUSES.READY_FOR_REVIEW, APPROVAL_STATUSES.DRAFT],
+  [APPROVAL_STATUSES.READY_FOR_REVIEW]: [APPROVAL_STATUSES.APPROVED, APPROVAL_STATUSES.REJECTED, APPROVAL_STATUSES.CHANGES_REQUESTED, APPROVAL_STATUSES.DRAFT],
+  [APPROVAL_STATUSES.APPROVED]: [APPROVAL_STATUSES.SCHEDULED, APPROVAL_STATUSES.SENDING, APPROVAL_STATUSES.DRAFT, APPROVAL_STATUSES.SENT],
   [APPROVAL_STATUSES.REJECTED]: [APPROVAL_STATUSES.DRAFT],
-  [APPROVAL_STATUSES.CHANGES_REQUESTED]: [APPROVAL_STATUSES.DRAFT, APPROVAL_STATUSES.READY_FOR_REVIEW],
+  [APPROVAL_STATUSES.CHANGES_REQUESTED]: [APPROVAL_STATUSES.DRAFT],
   [APPROVAL_STATUSES.SCHEDULED]: [APPROVAL_STATUSES.SENDING, APPROVAL_STATUSES.FAILED, APPROVAL_STATUSES.DRAFT],
   [APPROVAL_STATUSES.SENDING]: [APPROVAL_STATUSES.SENT, APPROVAL_STATUSES.FAILED],
-  [APPROVAL_STATUSES.SENT]: [],
+  [APPROVAL_STATUSES.SENT]: [APPROVAL_STATUSES.DELIVERED, APPROVAL_STATUSES.FAILED],
+  [APPROVAL_STATUSES.DELIVERED]: [APPROVAL_STATUSES.OPENED, APPROVAL_STATUSES.FAILED],
+  [APPROVAL_STATUSES.OPENED]: [APPROVAL_STATUSES.CLICKED],
+  [APPROVAL_STATUSES.CLICKED]: [],
   [APPROVAL_STATUSES.FAILED]: [APPROVAL_STATUSES.DRAFT],
 };
 

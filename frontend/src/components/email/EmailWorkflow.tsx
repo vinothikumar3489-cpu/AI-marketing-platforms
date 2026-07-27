@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Loader2, Sparkles, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Send, Save, Eye, Smartphone, Code, FileText, ThumbsUp, RefreshCw, Calendar, Activity, User, Building } from 'lucide-react';
+import { Mail, Loader2, Sparkles, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Send, Save, Eye, Smartphone, Code, FileText, ThumbsUp, RefreshCw, Calendar, Activity, Settings } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import {
   generateEmailContent,
@@ -203,43 +203,7 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
         </div>
       )}
 
-      {/* SECTION 1: Header */}
-      <SectionCard title="Header" icon={<Mail size={14} />}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-          <div>
-            <label style={{ fontSize: '11px', color: '#9aa7bd', marginBottom: '4px', display: 'block' }}>Subject</label>
-            <input type="text" value={emailData?.subject || ''} onChange={e => setEmailData(p => ({ ...p, subject: e.target.value }))} placeholder="Email subject" style={{ width: '100%', padding: '8px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px' }} />
-          </div>
-          <div>
-            <label style={{ fontSize: '11px', color: '#9aa7bd', marginBottom: '4px', display: 'block' }}>Preview Text</label>
-            <input type="text" value={emailData?.previewText || ''} onChange={e => setEmailData(p => ({ ...p, previewText: e.target.value }))} placeholder="Preview text" style={{ width: '100%', padding: '8px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px' }} />
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '11px', color: '#9aa7bd' }}>Status:</span>
-          <span style={{ fontSize: '12px', fontWeight: 600, color: isApproved ? '#10e18b' : approvalStatus === 'REJECTED' ? '#ff4757' : '#ffb347', padding: '3px 8px', background: isApproved ? 'rgba(16,225,139,0.1)' : approvalStatus === 'REJECTED' ? 'rgba(255,71,87,0.1)' : 'rgba(255,179,71,0.1)', borderRadius: '4px', border: `1px solid ${isApproved ? '#10e18b' : approvalStatus === 'REJECTED' ? '#ff4757' : '#ffb347'}` }}>
-            {approvalStatus}
-          </span>
-          <span style={{ fontSize: '11px', color: '#9aa7bd', marginLeft: '12px' }}>Type: {emailConfig.emailType}</span>
-        </div>
-      </SectionCard>
-
-      {/* SECTION 2: Email Config + Recipient */}
-      <SectionCard title="Configuration" icon={<User size={14} />}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-          <select value={emailConfig.emailType} onChange={e => setEmailConfig(p => ({ ...p, emailType: e.target.value }))} style={{ padding: '8px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '12px' }}>{EMAIL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
-          <select value={emailConfig.goal} onChange={e => setEmailConfig(p => ({ ...p, goal: e.target.value }))} style={{ padding: '8px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '12px' }}>{GOALS.map(g => <option key={g} value={g}>{g}</option>)}</select>
-          <select value={emailConfig.tone} onChange={e => setEmailConfig(p => ({ ...p, tone: e.target.value }))} style={{ padding: '8px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '12px' }}>{TONES.map(t => <option key={t} value={t}>{t}</option>)}</select>
-          <input type="text" value={emailConfig.audience} onChange={e => setEmailConfig(p => ({ ...p, audience: e.target.value }))} placeholder="Target audience" style={{ padding: '8px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '12px' }} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-          <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Sender Name</label><input type="text" value={emailConfig.sender.name} onChange={e => setEmailConfig(p => ({ ...p, sender: { ...p.sender, name: e.target.value } }))} style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
-          <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Sender Email</label><input type="text" value={emailConfig.sender.email} onChange={e => setEmailConfig(p => ({ ...p, sender: { ...p.sender, email: e.target.value } }))} style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
-          <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Reply-To</label><input type="text" value={emailConfig.sender.replyTo} onChange={e => setEmailConfig(p => ({ ...p, sender: { ...p.sender, replyTo: e.target.value } }))} style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
-        </div>
-      </SectionCard>
-
-      {/* Generate Button */}
+      {/* SECTION 1: Generate Button */}
       {!emailData && (
         <button onClick={handleGenerate} disabled={generating} style={{ padding: '14px', background: '#53a7ff', border: '1px solid #53a7ff', borderRadius: '8px', color: 'white', cursor: generating ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: generating ? 0.5 : 1 }}>
           {generating ? <Loader2 size={18} className="spin" /> : <Sparkles size={18} />}
@@ -248,29 +212,28 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
       )}
 
       {emailData && <>
-        {/* SECTION 3: Preview Tabs */}
-        <SectionCard title="Preview" icon={<Eye size={14} />}>
-          <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', borderBottom: '1px solid #293245' }}>
-            {(['visual', 'mobile', 'html', 'plain'] as const).map(tab => (
-              <button key={tab} onClick={() => setPreviewTab(tab)} style={{ padding: '8px 14px', background: previewTab === tab ? '#1e293b' : 'transparent', border: 'none', borderBottom: previewTab === tab ? '2px solid #53a7ff' : '2px solid transparent', borderRadius: '6px 6px 0 0', color: previewTab === tab ? '#e5e7eb' : '#9aa7bd', cursor: 'pointer', fontSize: '12px', fontWeight: previewTab === tab ? 600 : 400, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                {tab === 'visual' && <Eye size={13} />}{tab === 'mobile' && <Smartphone size={13} />}{tab === 'html' && <Code size={13} />}{tab === 'plain' && <FileText size={13} />}
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            ))}
+        {/* SECTION 1: Config (email type + sender + recipient) */}
+        <SectionCard title="Configuration" icon={<Settings size={14} />}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+            <select value={emailConfig.emailType} onChange={e => setEmailConfig(p => ({ ...p, emailType: e.target.value }))} style={{ padding: '7px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '12px' }}>{EMAIL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
+            <select value={emailConfig.goal} onChange={e => setEmailConfig(p => ({ ...p, goal: e.target.value }))} style={{ padding: '7px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '12px' }}>{GOALS.map(g => <option key={g} value={g}>{g}</option>)}</select>
+            <select value={emailConfig.tone} onChange={e => setEmailConfig(p => ({ ...p, tone: e.target.value }))} style={{ padding: '7px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '12px' }}>{TONES.map(t => <option key={t} value={t}>{t}</option>)}</select>
+            <input type="text" value={emailConfig.audience} onChange={e => setEmailConfig(p => ({ ...p, audience: e.target.value }))} placeholder="Target audience" style={{ padding: '7px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '12px' }} />
           </div>
-          {previewTab === 'visual' || previewTab === 'mobile' ? (
-            <div style={{ maxWidth: previewTab === 'mobile' ? '375px' : '600px', margin: '0 auto', background: '#fff', borderRadius: '8px', overflow: 'hidden', border: '1px solid #293245' }}>
-              <iframe srcDoc={html} title="Email Preview" style={{ width: '100%', height: '500px', border: 'none' }} sandbox="allow-same-origin" />
-            </div>
-          ) : previewTab === 'html' ? (
-            <pre style={{ background: '#0f1729', color: '#e5e7eb', padding: '16px', borderRadius: '6px', fontSize: '12px', overflow: 'auto', maxHeight: '500px', whiteSpace: 'pre-wrap' }}>{html}</pre>
-          ) : (
-            <pre style={{ background: '#0f1729', color: '#e5e7eb', padding: '16px', borderRadius: '6px', fontSize: '13px', lineHeight: 1.6, overflow: 'auto', maxHeight: '500px', whiteSpace: 'pre-wrap' }}>{plainText}</pre>
-          )}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+            <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Sender Name</label><input type="text" value={emailConfig.sender.name} onChange={e => setEmailConfig(p => ({ ...p, sender: { ...p.sender, name: e.target.value } }))} style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
+            <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Sender Email</label><input type="text" value={emailConfig.sender.email} onChange={e => setEmailConfig(p => ({ ...p, sender: { ...p.sender, email: e.target.value } }))} style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
+            <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Recipient Email</label><input type="email" value={recipient.email} onChange={e => setRecipient(p => ({ ...p, email: e.target.value }))} placeholder="email@example.com" style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+            <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>First Name</label><input type="text" value={recipient.firstName} onChange={e => setRecipient(p => ({ ...p, firstName: e.target.value }))} placeholder="John" style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
+            <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Last Name</label><input type="text" value={recipient.lastName} onChange={e => setRecipient(p => ({ ...p, lastName: e.target.value }))} placeholder="Smith" style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
+            <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Company</label><input type="text" value={recipient.companyName} onChange={e => setRecipient(p => ({ ...p, companyName: e.target.value }))} placeholder="Acme Inc" style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
+          </div>
         </SectionCard>
 
-        {/* SECTION 3b: Content Editor */}
-        <SectionCard title="Content Editor" icon={<Save size={14} />}>
+        {/* SECTION 2: Email Editor */}
+        <SectionCard title="Email Editor" icon={<Mail size={14} />}>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
             <button onClick={() => setEditMode('edit')} style={{ padding: '6px 14px', background: editMode === 'edit' ? '#53a7ff' : '#293245', border: 'none', borderRadius: '6px', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>Edit</button>
             <button onClick={() => setEditMode('preview')} style={{ padding: '6px 14px', background: editMode === 'preview' ? '#53a7ff' : '#293245', border: 'none', borderRadius: '6px', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>Personalized Preview</button>
@@ -293,29 +256,68 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
           )}
         </SectionCard>
 
-        {/* SECTION 4: Recipient + Variables */}
-        <SectionCard title="Recipient" icon={<User size={14} />}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Email *</label><input type="email" value={recipient.email} onChange={e => setRecipient(p => ({ ...p, email: e.target.value }))} placeholder="email@example.com" style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
-            <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>First Name</label><input type="text" value={recipient.firstName} onChange={e => setRecipient(p => ({ ...p, firstName: e.target.value }))} placeholder="John" style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
-            <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Last Name</label><input type="text" value={recipient.lastName} onChange={e => setRecipient(p => ({ ...p, lastName: e.target.value }))} placeholder="Smith" style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
-            <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Company</label><input type="text" value={recipient.companyName} onChange={e => setRecipient(p => ({ ...p, companyName: e.target.value }))} placeholder="Acme Inc" style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
+        {/* SECTION 3: Preview */}
+        <SectionCard title="Preview" icon={<Eye size={14} />}>
+          <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', borderBottom: '1px solid #293245' }}>
+            {(['visual', 'mobile', 'html', 'plain'] as const).map(tab => (
+              <button key={tab} onClick={() => setPreviewTab(tab)} style={{ padding: '8px 14px', background: previewTab === tab ? '#1e293b' : 'transparent', border: 'none', borderBottom: previewTab === tab ? '2px solid #53a7ff' : '2px solid transparent', borderRadius: '6px 6px 0 0', color: previewTab === tab ? '#e5e7eb' : '#9aa7bd', cursor: 'pointer', fontSize: '12px', fontWeight: previewTab === tab ? 600 : 400, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {tab === 'visual' && <Eye size={13} />}{tab === 'mobile' && <Smartphone size={13} />}{tab === 'html' && <Code size={13} />}{tab === 'plain' && <FileText size={13} />}
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
+          {previewTab === 'visual' || previewTab === 'mobile' ? (
+            <div style={{ maxWidth: previewTab === 'mobile' ? '375px' : '600px', margin: '0 auto', background: '#fff', borderRadius: '8px', overflow: 'hidden', border: '1px solid #293245' }}>
+              <iframe srcDoc={html} title="Email Preview" style={{ width: '100%', height: '500px', border: 'none' }} sandbox="allow-same-origin" />
+            </div>
+          ) : previewTab === 'html' ? (
+            <pre style={{ background: '#0f1729', color: '#e5e7eb', padding: '16px', borderRadius: '6px', fontSize: '12px', overflow: 'auto', maxHeight: '500px', whiteSpace: 'pre-wrap' }}>{html}</pre>
+          ) : (
+            <pre style={{ background: '#0f1729', color: '#e5e7eb', padding: '16px', borderRadius: '6px', fontSize: '13px', lineHeight: 1.6, overflow: 'auto', maxHeight: '500px', whiteSpace: 'pre-wrap' }}>{plainText}</pre>
+          )}
+        </SectionCard>
+
+        {/* SECTION 4: Quality */}
+        <SectionCard title="Quality" icon={<CheckCircle2 size={14} />}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+            <div style={{ padding: '10px', background: '#0f1729', borderRadius: '6px', textAlign: 'center' }}>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: (emailData?.quality?.score || 0) >= 0.8 ? '#10e18b' : (emailData?.quality?.score || 0) >= 0.5 ? '#ffb347' : '#ff4757' }}>{Math.round((emailData?.quality?.score || 0) * 100)}</div>
+              <div style={{ fontSize: '10px', color: '#9aa7bd' }}>Score</div>
+            </div>
+            <div style={{ padding: '10px', background: '#0f1729', borderRadius: '6px', textAlign: 'center' }}>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#53a7ff' }}>{emailData?.spamScore?.score || 0}</div>
+              <div style={{ fontSize: '10px', color: '#9aa7bd' }}>Spam</div>
+            </div>
+            <div style={{ padding: '10px', background: '#0f1729', borderRadius: '6px', textAlign: 'center' }}>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#818cf8' }}>{emailData?.readabilityScore?.score || 0}</div>
+              <div style={{ fontSize: '10px', color: '#9aa7bd' }}>Readability</div>
+            </div>
+            <div style={{ padding: '10px', background: '#0f1729', borderRadius: '6px', textAlign: 'center' }}>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#10e18b' }}>{emailData?.quality?.checks?.length || 0}</div>
+              <div style={{ fontSize: '10px', color: '#9aa7bd' }}>Checks</div>
+            </div>
           </div>
         </SectionCard>
 
-        {/* SECTION 5: Workflow */}
-        <SectionCard title="Workflow" icon={<ThumbsUp size={14} />}>
+        {/* SECTION 5: Approval */}
+        <SectionCard title="Approval" icon={<ThumbsUp size={14} />}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+            <span style={{ fontSize: '11px', color: '#9aa7bd' }}>Status:</span>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: isApproved ? '#10e18b' : approvalStatus === 'REJECTED' ? '#ff4757' : '#ffb347', padding: '3px 8px', background: isApproved ? 'rgba(16,225,139,0.1)' : approvalStatus === 'REJECTED' ? 'rgba(255,71,87,0.1)' : 'rgba(255,179,71,0.1)', borderRadius: '4px', border: `1px solid ${isApproved ? '#10e18b' : approvalStatus === 'REJECTED' ? '#ff4757' : '#ffb347'}` }}>
+              {approvalStatus}
+            </span>
+          </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button onClick={handleSaveDraft} style={{ padding: '8px 16px', background: '#293245', border: '1px solid #3b4d61', borderRadius: '6px', color: '#e5e7eb', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}><Save size={14} /> Save Draft</button>
             {approvalStatus !== 'APPROVED' && <button onClick={handleApprove} disabled={!templateId} style={{ padding: '8px 16px', background: templateId ? '#10e18b' : '#293245', border: templateId ? '1px solid #10e18b' : '1px solid #3b4d61', borderRadius: '6px', color: templateId ? '#0f1729' : '#9aa7bd', cursor: templateId ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', opacity: templateId ? 1 : 0.5 }}><CheckCircle2 size={14} /> Approve</button>}
             {approvalStatus !== 'REJECTED' && <button onClick={handleReject} disabled={!templateId} style={{ padding: '8px 16px', background: templateId ? '#ff4757' : '#293245', border: templateId ? '1px solid #ff4757' : '1px solid #3b4d61', borderRadius: '6px', color: templateId ? 'white' : '#9aa7bd', cursor: templateId ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', opacity: templateId ? 1 : 0.5 }}><XCircle size={14} /> Reject</button>}
             <button onClick={handleGenerate} style={{ padding: '8px 16px', background: '#818cf8', border: '1px solid #818cf8', borderRadius: '6px', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}><RefreshCw size={14} /> Regenerate</button>
           </div>
-          {approvalStatus !== 'APPROVED' && <div style={{ marginTop: '8px', fontSize: '11px', color: '#9aa7bd' }}>{!templateId ? 'Save a draft before approving' : 'Approve to enable Send & Schedule'}</div>}
+          {approvalStatus !== 'APPROVED' && <div style={{ marginTop: '8px', fontSize: '11px', color: '#9aa7bd' }}>{!templateId ? 'Save a draft before approving' : 'Approve to enable sending'}</div>}
         </SectionCard>
 
-        {/* SECTION 5b: Send / Schedule (merged with test send) */}
-        <SectionCard title="Send & Schedule" icon={<Send size={14} />}>
+        {/* SECTION 6: Send */}
+        <SectionCard title="Send" icon={<Send size={14} />}>
           <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', background: '#0f1729', padding: '3px', borderRadius: '6px' }}>
             {(['test', 'now', 'schedule'] as const).map(m => (
               <button key={m} onClick={() => { setSendMode(m); setSendResult(null); }} style={{ flex: 1, padding: '7px', background: sendMode === m ? '#53a7ff' : 'transparent', border: 'none', borderRadius: '4px', color: sendMode === m ? 'white' : '#9aa7bd', cursor: 'pointer', fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
@@ -333,19 +335,18 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
               <input type="time" value={sendTime} onChange={e => setSendTime(e.target.value)} style={{ padding: '8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} />
             </div>
           )}
-          <button onClick={handleSendAction} disabled={!canSend || sending || !sendEmail} style={{ width: '100%', padding: '10px', background: canSend ? '#10e18b' : '#293245', border: canSend ? '1px solid #10e18b' : '1px solid #3b4d61', borderRadius: '6px', color: canSend ? '#0f1729' : '#9aa7bd', cursor: canSend ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: canSend ? 1 : 0.5 }}>
-            {sending ? <Loader2 size={16} className="spin" /> : sendMode === 'test' ? <Mail size={16} /> : sendMode === 'now' ? <Send size={16} /> : <Calendar size={16} />}
+          {!isApproved && <div style={{ marginTop: '8px', marginBottom: '8px', fontSize: '11px', color: '#ffb347', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={12} /> Approve the email before sending</div>}
+          <button onClick={handleSendAction} disabled={!canSend || sending || !sendEmail} style={{ width: '100%', padding: '10px', background: canSend ? '#10e18b' : '#293245', border: canSend ? '1px solid #10e18b' : '1px solid #3b4d61', borderRadius: '6px', color: canSend ? '#0f1729' : '#9aa7bd', cursor: canSend ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: 600, opacity: canSend ? 1 : 0.5 }}>
             {sending ? 'Sending...' : sendMode === 'test' ? 'Send Test Email' : sendMode === 'now' ? 'Send Now' : 'Schedule Email'}
           </button>
-          {!isApproved && <div style={{ marginTop: '8px', fontSize: '11px', color: '#ffb347', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={12} /> Approve the email before sending</div>}
           {sendResult && <div style={{ marginTop: '8px', padding: '8px 12px', background: sendResult.success ? 'rgba(16,225,139,0.1)' : 'rgba(255,71,87,0.1)', borderRadius: '4px', border: `1px solid ${sendResult.success ? '#10e18b' : '#ff4757'}`, fontSize: '12px', color: sendResult.success ? '#10e18b' : '#ff4757', display: 'flex', alignItems: 'center', gap: '6px' }}>
             {sendResult.success ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}{sendResult.message}
           </div>}
         </SectionCard>
 
-        {/* SECTION 6: Delivery Status */}
+        {/* SECTION 7: Analytics */}
         {templateId && (
-          <SectionCard title="Delivery" icon={<Activity size={14} />}>
+          <SectionCard title="Analytics" icon={<Activity size={14} />}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <span style={{ fontSize: '12px', color: '#9aa7bd' }}>Tracking for template #{templateId.slice(-8)}</span>
               <button onClick={loadDeliveries} disabled={deliveryLoading} style={{ padding: '5px 10px', background: '#293245', border: '1px solid #3b4d61', borderRadius: '4px', color: '#e5e7eb', cursor: 'pointer', fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}><RefreshCw size={12} className={deliveryLoading ? 'spin' : ''} /> Refresh</button>

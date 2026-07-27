@@ -8,8 +8,6 @@
 import { resolveProductIdentity as canonicalResolve } from './canonical-product-identity.resolver.js';
 
 export function resolveProductIdentity({ chat, productIntelligence, evidenceSnapshot, website }) {
-  console.warn('[DEPRECATED] Using legacy product-identity.resolver.js. Migrate to canonical-product-identity.resolver.js');
-  
   // Delegate to canonical resolver
   return canonicalResolve({
     websiteUrl: chat?.websiteUrl || website?.url,

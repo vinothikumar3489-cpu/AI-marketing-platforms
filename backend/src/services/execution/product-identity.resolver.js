@@ -19,8 +19,6 @@ function cleanTitle(title) {
 }
 
 export async function resolveProductIdentity({ prisma, userId, chatId, chatTitle }) {
-  console.warn('[DEPRECATED] Using legacy execution/product-identity.resolver.js. Migrate to canonical-product-identity.resolver.js');
-  
   const identity = {
     projectTitle: cleanTitle(chatTitle) || 'Product Analysis',
     productName: null,

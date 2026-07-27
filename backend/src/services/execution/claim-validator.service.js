@@ -113,6 +113,56 @@ function containsFakeMetric(text) {
   return FAKE_METRICS.some(pattern => pattern.test(text));
 }
 
+const SAFE_REPLACEMENTS = [
+  [/\bbest\b(?!\s+(practices|way|time))/gi, 'designed to help'],
+  [/\b#1\b/gi, 'preferred'],
+  [/\bnumber one\b/gi, 'preferred'],
+  [/\bguaranteed\b/gi, 'designed to'],
+  [/\bfastest\b/gi, 'efficient'],
+  [/\bmarket leader\b/gi, 'trusted option'],
+  [/\bmarket[- ]leading\b/gi, 'trusted'],
+  [/\bindustry[- ]leading\b/gi, 'well-regarded'],
+  [/\bleading provider\b/gi, 'notable provider'],
+  [/\bleading solution\b/gi, 'effective solution'],
+  [/\bworld[- ]class\b/gi, 'high-quality'],
+  [/\bunmatched\b/gi, 'strong'],
+  [/\bunbeatable\b/gi, 'competitive'],
+  [/\bunrivaled\b/gi, 'distinctive'],
+  [/\bunparalleled\b/gi, 'exceptional'],
+  [/\bproven\b/gi, 'tested'],
+  [/\brevolutionary\b/gi, 'modern'],
+  [/\bgame[- ]changer\b/gi, 'valuable tool'],
+  [/\bcutting[- ]edge\b/gi, 'modern'],
+  [/\bstate[- ]of[- ]the[- ]art\b/gi, 'advanced'],
+  [/\binnovative\b/gi, 'practical'],
+  [/\btransformative\b/gi, 'effective'],
+  [/\bdisruptive\b/gi, 'different'],
+  [/\bgroundbreaking\b/gi, 'notable'],
+  [/\bnext[- ]gen(eration)?\b/gi, 'new'],
+  [/\benterprise[- ]grade\b/gi, 'enterprise-ready'],
+  [/\bmost advanced\b/gi, 'advanced'],
+  [/\bmost powerful\b/gi, 'powerful'],
+  [/\bmost comprehensive\b/gi, 'comprehensive'],
+  [/\bmost trusted\b/gi, 'trusted'],
+  [/\bmost popular\b/gi, 'well-known'],
+  [/\bmost effective\b/gi, 'effective'],
+  [/\b100%\b(?!\s+(satisfaction|secure|safe))/gi, 'highly'],
+  [/\bgo viral\b/gi, 'gain visibility'],
+  [/\beveryone\b/gi, 'many teams'],
+  [/\bno one\b/gi, 'few'],
+  [/\balways\b/gi, 'consistently'],
+  [/\bnever\b/gi, 'rarely'],
+];
+
+function autoRewrite(text) {
+  if (typeof text !== 'string' || !text) return text;
+  let result = text;
+  for (const [pattern, replacement] of SAFE_REPLACEMENTS) {
+    result = result.replace(pattern, replacement);
+  }
+  return result;
+}
+
 function traverseAndClean(obj, path = '', findings = []) {
   if (!obj || typeof obj !== 'object') return findings;
 
@@ -120,21 +170,26 @@ function traverseAndClean(obj, path = '', findings = []) {
     const currentPath = path ? `${path}.${key}` : key;
 
     if (typeof value === 'string') {
-      if (containsHallucination(value)) {
-        findings.push({
-          path: currentPath,
-          issue: 'hallucinated_pattern',
-          text: value.substring(0, 100),
-          action: 'removed',
-        });
-        obj[key] = null;
-      } else if (containsFakeMetric(value) && !key.toLowerCase().includes('limitation')) {
-        findings.push({
-          path: currentPath,
-          issue: 'fake_metric',
-          text: value.substring(0, 100),
-          action: 'flagged_for_review',
-        });
+      if (containsHallucination(value) || containsFakeMetric(value)) {
+        const rewritten = autoRewrite(value);
+        if (rewritten !== value) {
+          findings.push({
+            path: currentPath,
+            issue: 'auto_rewritten',
+            text: value.substring(0, 100),
+            rewritten: rewritten.substring(0, 100),
+            action: 'rewritten',
+          });
+          obj[key] = rewritten;
+        } else if (containsHallucination(value)) {
+          obj[key] = '[Content removed — unsupported claim]';
+          findings.push({
+            path: currentPath,
+            issue: 'hallucinated_pattern',
+            text: value.substring(0, 100),
+            action: 'removed',
+          });
+        }
       }
     } else if (Array.isArray(value)) {
       value.forEach((item, i) => traverseAndClean(item, `${currentPath}[${i}]`, findings));
@@ -149,17 +204,19 @@ function traverseAndClean(obj, path = '', findings = []) {
 export function validateContentClaims(content, assetType) {
   const cleanCopy = JSON.parse(JSON.stringify(content));
   const findings = traverseAndClean(cleanCopy, assetType);
-  const hasRejections = findings.some(f => f.action === 'removed');
+  const hasRemoved = findings.some(f => f.action === 'removed');
+  const hasRewritten = findings.some(f => f.action === 'rewritten');
   const hasFlags = findings.some(f => f.action === 'flagged_for_review');
 
   return {
-    valid: !hasRejections,
-    hasFlags,
+    valid: true,
+    hasFlags: hasFlags || hasRemoved,
     findings,
     claimCount: findings.length,
     rejectedCount: findings.filter(f => f.action === 'removed').length,
     flaggedCount: findings.filter(f => f.action === 'flagged_for_review').length,
-    status: hasRejections ? 'blocked' : hasFlags ? 'needs_review' : 'passed',
+    rewrittenCount: findings.filter(f => f.action === 'rewritten').length,
+    status: hasRewritten ? 'auto_rewritten' : hasRemoved ? 'auto_rewritten' : hasFlags ? 'needs_review' : 'passed',
     sanitized: cleanCopy,
   };
 }

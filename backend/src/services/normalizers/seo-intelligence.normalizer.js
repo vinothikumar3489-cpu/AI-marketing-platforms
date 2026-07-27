@@ -120,7 +120,6 @@ function extractNestedKeywords(keywordOpportunities) {
  * This function now delegates to the canonical consumer payload
  */
 export function normalizeSeoForExecution(seoInfo) {
-  console.warn('[SEO Normalizer] normalizeSeoForExecution is deprecated, use normalizeSeoIntelligenceForConsumers');
   const canonical = normalizeSeoIntelligenceForConsumers(seoInfo);
   
   // Legacy compatibility: map to old structure
@@ -152,7 +151,6 @@ export function normalizeSeoForExecution(seoInfo) {
  * This function now delegates to the canonical consumer payload
  */
 export function normalizeSeoForFrontend(seoInfo) {
-  console.warn('[SEO Normalizer] normalizeSeoForFrontend is deprecated, use normalizeSeoIntelligenceForConsumers');
   return normalizeSeoIntelligenceForConsumers(seoInfo);
 }
 
