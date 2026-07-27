@@ -29,9 +29,10 @@ export function CampaignGeneratorModule() {
     if (!chatId) return;
     (async () => {
       try {
-        const resp = await api.get(`/api/chats/${chatId}/campaign-intelligence`);
-        if (resp?.data?.success && resp.data.campaignGenerator) {
-          setData(resp.data.campaignGenerator);
+        const resp = await api.get(`/chats/${chatId}/campaign-intelligence`);
+        const gen = resp?.campaignGenerator || resp?.campaignPlan || null;
+        if (gen) {
+          setData(gen);
         }
       } catch (e) {
         // silent
@@ -48,10 +49,9 @@ export function CampaignGeneratorModule() {
     setLoading(true);
     setError(null);
     try {
-      const resp = await api.post(`/api/chats/${chatId}/campaign-intelligence/campaign/run`, form);
-      if (resp?.data?.success) {
-        setData(resp.data.campaignGenerator);
-      }
+      const resp = await api.post(`/chats/${chatId}/campaign-intelligence/campaign/run`, form);
+      const gen = resp?.campaignGenerator || resp?.campaignPlan || resp;
+      setData(gen);
     } catch (e: any) {
       const msg = e?.response?.data?.error || "Failed to generate campaign";
       setError(msg);
@@ -151,10 +151,12 @@ export function CampaignGeneratorModule() {
 
       {data && (
         <div className="space-y-6">
-          {data.fallbackUsed && (
+          {(data.status === 'PARTIALLY_GENERATED' || data.fallbackUsed) && (
             <div className="rounded-2xl bg-yellow-500/10 border border-yellow-500/20 p-4 text-sm text-yellow-200 flex items-center gap-2">
               <AlertCircle className="w-5 h-5" />
-              Generated using fallback analysis (AI providers unavailable).
+              {data.status === 'PARTIALLY_GENERATED'
+                ? 'Campaign generated with partial data (some intelligence unavailable).'
+                : 'Generated using fallback analysis (AI providers unavailable).'}
             </div>
           )}
 

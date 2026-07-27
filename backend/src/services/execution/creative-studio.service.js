@@ -1,4 +1,4 @@
-import { callAI } from "../../ai/services/aiRouter.service.js";
+import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
 
 const CREATIVE_TYPES = {
   poster_brief: { label: 'Poster Brief', dimensions: 'Various' },

@@ -1,5 +1,6 @@
-import { buildReportData, generateExecutiveReport, generateGrowthReport, generateSeoReport } from './report-builder.service.js';
-import { prisma } from '../../config/prisma.js';
+import { buildReportData, generateExecutiveReport, generateGrowthReport, generateSeoReport } from "./report-builder.service.js";
+import prisma from "../../config/prisma.js";
+import { getReportQueue } from "../../jobs/queues.js";
 
 export const exportExecutiveReportHandler = async (req, res) => {
   const { chatId, format } = req.params;
@@ -14,6 +15,19 @@ export const exportExecutiveReportHandler = async (req, res) => {
   const validFormats = ['pdf', 'docx', 'pptx', 'json', 'csv', 'markdown'];
   if (!validFormats.includes(format)) {
     return res.status(400).json({ success: false, error: `Unsupported format: ${format}. Supported: ${validFormats.join(', ')}` });
+  }
+
+  const heavyFormats = ['pdf', 'docx', 'pptx'];
+  if (heavyFormats.includes(format)) {
+    const queue = getReportQueue();
+    if (!queue) return res.status(503).json({ success: false, error: 'Report generation unavailable' });
+    const job = await queue.add('generate-report', {
+      chatId,
+      userId,
+      format,
+      reportType: 'executive'
+    });
+    return res.json({ success: true, jobId: job.id, message: "Report generation started" });
   }
 
   try {
@@ -39,6 +53,19 @@ export const exportGrowthReportHandler = async (req, res) => {
     return res.status(400).json({ success: false, error: `Unsupported format: ${format}. Supported: ${validFormats.join(', ')}` });
   }
 
+  const heavyFormats = ['pdf', 'docx', 'pptx'];
+  if (heavyFormats.includes(format)) {
+    const queue = getReportQueue();
+    if (!queue) return res.status(503).json({ success: false, error: 'Report generation unavailable' });
+    const job = await queue.add('generate-report', {
+      chatId,
+      userId,
+      format,
+      reportType: 'growth'
+    });
+    return res.json({ success: true, jobId: job.id, message: "Report generation started" });
+  }
+
   try {
     let buffer = await generateGrowthReport(chatId, userId, format);
     if (!Buffer.isBuffer(buffer)) buffer = Buffer.from(buffer);
@@ -62,6 +89,19 @@ export const exportSeoReportHandler = async (req, res) => {
     return res.status(400).json({ success: false, error: `Unsupported format: ${format}. Supported: ${validFormats.join(', ')}` });
   }
 
+  const heavyFormats = ['pdf', 'docx', 'pptx'];
+  if (heavyFormats.includes(format)) {
+    const queue = getReportQueue();
+    if (!queue) return res.status(503).json({ success: false, error: 'Report generation unavailable' });
+    const job = await queue.add('generate-report', {
+      chatId,
+      userId,
+      format,
+      reportType: 'seo'
+    });
+    return res.json({ success: true, jobId: job.id, message: "Report generation started" });
+  }
+
   try {
     let buffer = await generateSeoReport(chatId, userId, format);
     if (!Buffer.isBuffer(buffer)) buffer = Buffer.from(buffer);
@@ -69,6 +109,30 @@ export const exportSeoReportHandler = async (req, res) => {
   } catch (error) {
     console.error('[Report Controller] Error:', error);
     return res.status(500).json({ success: false, error: error.message || 'Report generation failed' });
+  }
+};
+
+export const checkReportStatusHandler = async (req, res) => {
+  const { jobId } = req.params;
+  
+  try {
+    const queue = getReportQueue();
+    if (!queue) return res.status(503).json({ success: false, error: 'Queue unavailable' });
+    const job = await queue.getJob(jobId);
+    if (!job) {
+      return res.status(404).json({ success: false, error: 'Job not found' });
+    }
+    
+    const state = await job.getState();
+    if (state === 'completed') {
+      return res.json({ success: true, status: state, url: job.returnvalue?.url });
+    } else if (state === 'failed') {
+      return res.json({ success: false, status: state, error: job.failedReason });
+    } else {
+      return res.json({ success: true, status: state });
+    }
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
 
@@ -152,11 +216,11 @@ function generateCsv(data) {
   csv += `Market,SOM,${csvEscape(data.market?.som)}\n`;
   csv += `Market,Growth Rate,${csvEscape(data.market?.growthRate)}\n`;
 
-  csv += `Scores,Overall Growth,${data.scores?.overallGrowthScore || 0}\n`;
-  csv += `Scores,Market Opportunity,${data.scores?.marketOpportunityScore || 0}\n`;
-  csv += `Scores,Audience Clarity,${data.scores?.audienceClarityScore || 0}\n`;
-  csv += `Scores,Competitive Defensibility,${data.scores?.competitiveDefensibilityScore || 0}\n`;
-  csv += `Scores,Campaign Readiness,${data.scores?.campaignReadinessScore || 0}\n`;
+  csv += `Scores,Overall Growth,${data.scores?.overallGrowthScore ?? 0}\n`;
+  csv += `Scores,Market Opportunity,${data.scores?.marketOpportunityScore ?? 0}\n`;
+  csv += `Scores,Audience Clarity,${data.scores?.audienceClarityScore ?? 0}\n`;
+  csv += `Scores,Competitive Defensibility,${data.scores?.competitiveDefensibilityScore ?? 0}\n`;
+  csv += `Scores,Campaign Readiness,${data.scores?.campaignReadinessScore ?? 0}\n`;
 
   if (data.competitor?.direct?.length > 0) {
     data.competitor.direct.forEach(c => {
@@ -250,11 +314,11 @@ function generateMarkdown(data) {
 
   md += `## 2. Performance Scores\n\n`;
   md += `| Score | Value |\n| --- | --- |\n`;
-  md += `| Overall Growth | ${scores?.overallGrowthScore || 0}/100 |\n`;
-  md += `| Market Opportunity | ${scores?.marketOpportunityScore || 0}/100 |\n`;
-  md += `| Audience Clarity | ${scores?.audienceClarityScore || 0}/100 |\n`;
-  md += `| Competitive Defensibility | ${scores?.competitiveDefensibilityScore || 0}/100 |\n`;
-  md += `| Campaign Readiness | ${scores?.campaignReadinessScore || 0}/100 |\n\n`;
+  md += `| Overall Growth | ${scores?.overallGrowthScore ?? 0}/100 |\n`;
+  md += `| Market Opportunity | ${scores?.marketOpportunityScore ?? 0}/100 |\n`;
+  md += `| Audience Clarity | ${scores?.audienceClarityScore ?? 0}/100 |\n`;
+  md += `| Competitive Defensibility | ${scores?.competitiveDefensibilityScore ?? 0}/100 |\n`;
+  md += `| Campaign Readiness | ${scores?.campaignReadinessScore ?? 0}/100 |\n\n`;
 
   md += `## 3. Market Intelligence\n\n`;
   md += `- **TAM:** ${market?.tam || 'Unknown'}\n`;
@@ -291,7 +355,7 @@ function generateMarkdown(data) {
   if (directComps.length > 0) {
     md += `| Competitor | Domain | Type | Similarity |\n| --- | --- | --- | --- |\n`;
     directComps.forEach(c => {
-      md += `| ${c.name || 'Unknown'} | ${c.domain || 'N/A'} | ${c.type || 'N/A'} | ${c.similarityScore || 'N/A'}/100 |\n`;
+      md += `| ${c.name || 'Unknown'} | ${c.domain || 'N/A'} | ${c.type || 'N/A'} | ${c.similarityScore ?? 'N/A'}/100 |\n`;
     });
     md += '\n';
   } else {
@@ -342,7 +406,7 @@ function generateMarkdown(data) {
   if (chData.length > 0) {
     md += `## 9. Channel Plan\n\n`;
     chData.slice(0, 10).forEach(c => {
-      md += `- **${c.name || c.channel}** (Fit: ${c.fitScore || c.fit || 'N/A'} | Budget: ${c.budgetAllocation || 'N/A'}%)\n`;
+      md += `- **${c.name || c.channel}** (Fit: ${c.fitScore ?? c.fit ?? 'N/A'} | Budget: ${c.budgetAllocation ?? 'N/A'}%)\n`;
     });
     md += '\n';
   }

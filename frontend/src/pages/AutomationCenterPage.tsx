@@ -380,11 +380,11 @@ function renderGoogleAdsTab(data: any) {
         <Card key={i}>
           <h4 style={{ margin: '0 0 12px 0' }}>{ad.title || ad.headline || `Ad ${i + 1}`}</h4>
           <div style={{ display: 'grid', gap: '8px' }}>
-            {ad.headline && <div><strong>Headline:</strong> {ad.headline}</div>}
-            {ad.description && <div><strong>Description:</strong> {ad.description}</div>}
-            {ad.cta && <div><strong>CTA:</strong> {ad.cta}</div>}
-            {ad.destinationUrl && <div><strong>Destination URL:</strong> {ad.destinationUrl}</div>}
-            {ad.budget && <div><strong>Budget:</strong> {ad.budget}</div>}
+            {ad.headline && <div><strong>Headline:</strong> {renderSafeValue(ad.headline)}</div>}
+            {ad.description && <div><strong>Description:</strong> {renderSafeValue(ad.description)}</div>}
+            {ad.cta && <div><strong>CTA:</strong> {renderSafeValue(ad.cta)}</div>}
+            {ad.destinationUrl && <div><strong>Destination URL:</strong> {renderSafeValue(ad.destinationUrl)}</div>}
+            {ad.budget && <div><strong>Budget:</strong> {renderSafeValue(ad.budget)}</div>}
             {ad.targeting && <div><strong>Targeting:</strong> {renderValue(ad.targeting)}</div>}
             {renderObjectCard(ad, ['channel', 'priority', 'trigger', 'condition', 'action', 'tool', 'owner', 'evidence', 'confidence', 'dataSource'])}
           </div>
@@ -508,14 +508,14 @@ function renderPosterTab(data: any) {
                 <div style={{ display: 'grid', gap: '6px' }}>
                   {p.campaignGoal && <div><strong>Campaign Goal:</strong> {p.campaignGoal}</div>}
                   {p.targetAudience && <div><strong>Target Audience:</strong> {renderValue(p.targetAudience)}</div>}
-                  {p.visualStyle && <div><strong>Visual Style:</strong> {p.visualStyle}</div>}
-                  {p.headline && <div><strong>Headline:</strong> {p.headline}</div>}
-                  {p.cta && <div><strong>CTA:</strong> {p.cta}</div>}
-                  {p.format && <div><strong>Format:</strong> {p.format}</div>}
-                  {p.platform && <div><strong>Platform:</strong> {p.platform}</div>}
-                  {p.brandNotes && <div><strong>Brand Notes:</strong> {p.brandNotes}</div>}
-                  {p.prompt && <div><strong>Prompt:</strong><p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0' }}>{p.prompt}</p></div>}
-                  {p.description && <div><strong>Description:</strong><p style={{ color: '#9aa7bd', margin: '4px 0' }}>{p.description}</p></div>}
+                  {p.visualStyle && <div><strong>Visual Style:</strong> {renderSafeValue(p.visualStyle)}</div>}
+                  {p.headline && <div><strong>Headline:</strong> {renderSafeValue(p.headline)}</div>}
+                  {p.cta && <div><strong>CTA:</strong> {renderSafeValue(p.cta)}</div>}
+                  {p.format && <div><strong>Format:</strong> {renderSafeValue(p.format)}</div>}
+                  {p.platform && <div><strong>Platform:</strong> {renderSafeValue(p.platform)}</div>}
+                  {p.brandNotes && <div><strong>Brand Notes:</strong> {renderSafeValue(p.brandNotes)}</div>}
+                  {p.prompt && <div><strong>Prompt:</strong><p style={{ color: '#9aa7bd', whiteSpace: 'pre-wrap', margin: '4px 0' }}>{renderSafeValue(p.prompt)}</p></div>}
+                  {p.description && <div><strong>Description:</strong><p style={{ color: '#9aa7bd', margin: '4px 0' }}>{renderSafeValue(p.description)}</p></div>}
                   {renderObjectCard(p, ['trigger', 'condition', 'action', 'tool', 'owner', 'evidence', 'confidence', 'dataSource'])}
                 </div>
               </div>
@@ -718,7 +718,7 @@ function renderContentCalendarTab(data: any) {
               <tr key={i} style={{ borderBottom: '1px solid #1d2738' }}>
                 <td style={{ padding: '8px', color: '#53a7ff' }}>{entry.date}</td>
                 <td style={{ padding: '8px' }}><Badge>{entry.channel}</Badge></td>
-                <td style={{ padding: '8px', color: '#9aa7bd' }}>{entry.content}</td>
+                <td style={{ padding: '8px', color: '#9aa7bd' }}>{renderSafeValue(entry.content)}</td>
               </tr>
             ))}
           </tbody>

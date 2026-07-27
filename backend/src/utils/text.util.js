@@ -89,7 +89,8 @@ export function isValidKeyword(keyword) {
     'company', 'free', 'best', 'premium', 'plan', 'month', 'features',
     'get', 'make', 'use', 'work', 'time', 'new', 'good', 'great', 'top',
     'random', 'sentence', 'fragments', 'users', 'chose', 'choose', 'days',
-    'trial', 'try', 'click', 'sign', 'login', 'demo', 'video', 'image'
+    'trial', 'try', 'click', 'sign', 'login', 'demo', 'video', 'image',
+    'started', 'menu', 'next', 'previous', 'learn', 'submit', 'copyright'
   ]);
   
   if (genericKeywords.has(cleaned)) return false;
@@ -158,6 +159,7 @@ function normalizeKeywordItem(item) {
     intent: typeof item === 'object' ? (item.intent ?? null) : null,
     confidence: typeof item === 'object' ? (item.confidence ?? null) : null,
     metricType: typeof item === 'object' ? (item.metricType ?? null) : null,
+    validationStatus: typeof item === 'object' ? (item.validationStatus ?? null) : null,
   };
 }
 

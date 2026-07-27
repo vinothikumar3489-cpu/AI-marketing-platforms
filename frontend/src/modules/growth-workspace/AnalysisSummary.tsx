@@ -15,7 +15,11 @@ interface AnalysisSummaryProps {
 }
 
 export function AnalysisSummary({ summary }: AnalysisSummaryProps) {
-  const { overallGrowthScore, bestChannel, topOpportunity, topRisk, nextAction } = summary;
+  const overallGrowthScore = summary.overallGrowthScore ?? summary.growthScore ?? summary.score ?? null;
+  const bestChannel = summary.bestChannel ?? summary.channel ?? summary.recommendedChannel ?? '';
+  const topOpportunity = summary.topOpportunity ?? summary.opportunity ?? summary.mainOpportunity ?? '';
+  const topRisk = summary.topRisk ?? summary.risk ?? summary.mainRisk ?? '';
+  const nextAction = summary.nextAction ?? summary.action ?? summary.recommendedAction ?? '';
 
   const getScoreColor = (score: number | null) => {
     if (score == null) return 'text-gray-400';

@@ -66,9 +66,9 @@ export function validateCampaignConsistency(campaign, evidenceContext) {
     }
   }
 
-  // Check: Marketing funnel has all stages
-  if (!campaign.marketingFunnel?.awareness && !campaign.marketingFunnel?.interest && !campaign.marketingFunnel?.consideration) {
-    issues.push({ field: 'marketingFunnel', severity: 'medium', message: 'Marketing funnel missing standard stages' });
+  // Check: Marketing funnel has at least one stage
+  if (!campaign.marketingFunnel || Object.keys(campaign.marketingFunnel).length === 0) {
+    issues.push({ field: 'marketingFunnel', severity: 'medium', message: 'Marketing funnel is empty' });
   }
 
   // Check: No contradictory next actions

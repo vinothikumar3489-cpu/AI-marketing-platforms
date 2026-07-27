@@ -1,6 +1,6 @@
 
 import { runCompetitorAnalysis, runIntentPrediction, runPositioning } from "./competitor.service.js";
-import { prisma } from "../../config/prisma.js";
+import prisma from "../../config/prisma.js";
 
 export const runCompetitorsHandler = async (req, res) => {
   const { chatId } = req.params;

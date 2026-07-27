@@ -1,0 +1,419 @@
+import prisma from "../../../config/prisma.js";
+import { generateCompleteSeoIntelligence as orchestratorGenerateSeo } from "../../../services/seo/seo-orchestrator.service.js";
+import { logEvidenceInfo, logEvidenceError } from "../../../utils/evidence-logger.js";
+import { generateExecutiveDashboard } from "../../../services/seo/executive-dashboard-generator.service.js";
+
+const toNullableScore = (v) => {
+  if (v === undefined || v === null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.round(n) : null;
+};
+
+export { generateCompleteSeoIntelligence };
+
+async function generateCompleteSeoIntelligence({ chatId, userId, websiteUrl, chat }) {
+  logEvidenceInfo('seo.intelligence', 'Starting SEO intelligence generation', { chatId, websiteUrl });
+
+  const orchestratorResult = await orchestratorGenerateSeo({ chatId, userId, websiteUrl, chat });
+
+  if (!orchestratorResult.success) {
+    return { success: false, error: orchestratorResult.error || 'SEO intelligence generation failed' };
+  }
+
+  const { data: report, modules, warnings, provider, providers, runId } = orchestratorResult;
+
+  const overallScore = report?.overallScore ?? null;
+  const confidence = report?.scoreConfidence ?? 'LOW';
+  const coverage = report?.scoreCoverage ?? 0;
+  const measuredModules = report?.measuredModules || [];
+  const unavailableModules = report?.unavailableModules || [];
+
+  const seoStatus = provider === 'AI_FALLBACK' || provider === 'CACHE' ? 'ESTIMATED' : 'completed';
+
+  const identity = modules?.crawl?.identity || {};
+
+  const keywordIntelligence = modules?.keywordIntelligence?.data || null;
+  const competitorIntelligence = modules?.competitorIntelligence?.data || null;
+  const contentGapIntelligence = modules?.contentGapIntelligence?.data || null;
+  const geoIntelligence = modules?.geoIntelligence?.data || null;
+  const blogIntelligence = modules?.blogIntelligence?.data || null;
+
+  const technicalAuditModule = modules?.technicalSeo || {};
+  const pageSpeedModule = technicalAuditModule.data?.pageSpeed || null;
+  const cruxModule = technicalAuditModule.data?.crux || null;
+  const techAuditData = {
+    meta: technicalAuditModule.data?.meta || null,
+    canonical: technicalAuditModule.data?.canonical || null,
+    robots: technicalAuditModule.data?.robots || null,
+    headings: technicalAuditModule.data?.headings || null,
+    openGraph: technicalAuditModule.data?.openGraph || null,
+    twitterCard: technicalAuditModule.data?.twitterCard || null,
+    structuredData: technicalAuditModule.data?.structuredData || null,
+    images: technicalAuditModule.data?.images || null,
+    links: technicalAuditModule.data?.links || null,
+    performance: technicalAuditModule.data?.performance || null,
+    overallScore: technicalAuditModule.data?.overallScore ?? null,
+  };
+
+  console.log('[SEO RESULT]', {
+    runId, status: seoStatus, provider,
+    hasTechnicalAudit: !!technicalAuditModule.data,
+    hasPageSpeed: !!pageSpeedModule,
+    hasCrux: !!cruxModule,
+    keywordCount: keywordIntelligence?.metadata?.totalKeywords || 0,
+    competitorCount: competitorIntelligence?.competitors?.length || 0,
+    contentGapCount: contentGapIntelligence?.contentGaps?.length || 0,
+    warnings: warnings?.length || 0
+  });
+
+  let persistedSeoRecordId = null;
+  try {
+    persistedSeoRecordId = await saveSEOData({
+      chatId, userId, identity, websiteUrl,
+      technicalAudit: techAuditData,
+      chromeUXData: cruxModule,
+      pageSpeedMobile: pageSpeedModule?.mobile || null,
+      pageSpeedDesktop: pageSpeedModule?.desktop || null,
+      keywordIntelligence,
+      competitorIntelligence,
+      geoIntelligence,
+      contentGapIntelligence,
+      blogIntelligence,
+      seoReport: report,
+      runId,
+      overallScore, confidence, coverage,
+      measuredModules, unavailableModules,
+      providers, provider, warnings
+    });
+    logEvidenceInfo('seo.persist', 'SEO data persisted', { seoIntelligenceId: persistedSeoRecordId });
+  } catch (e) {
+    logEvidenceError('seo.persist', chatId, e);
+    warnings.push({ code: 'PERSIST_FAILED', message: `Failed to persist SEO data: ${e.message}` });
+  }
+
+  return {
+    success: true,
+    status: seoStatus,
+    data: {
+      id: persistedSeoRecordId,
+      status: seoStatus,
+      warnings,
+      identity,
+      technicalAudit: techAuditData,
+      pageSpeed: { mobile: pageSpeedModule?.mobile || null, desktop: pageSpeedModule?.desktop || null },
+      crux: cruxModule,
+      keywordIntelligence,
+      competitorIntelligence,
+      geoIntelligence,
+      contentGapAnalysis: contentGapIntelligence,
+      blogIntelligence,
+      seoReport: report,
+      providers,
+      providerSelection: { selectedProvider: provider },
+      overallScore,
+      scoreConfidence: confidence,
+      scoreCoverage: coverage,
+      measuredModules,
+      unavailableModules
+    },
+    warnings
+  };
+}
+
+async function saveSEOData({ chatId, userId, identity, websiteUrl, technicalAudit, chromeUXData, pageSpeedMobile, pageSpeedDesktop, keywordIntelligence, competitorIntelligence, geoIntelligence, contentGapIntelligence, blogIntelligence, seoReport, runId, overallScore, confidence, coverage, measuredModules, unavailableModules, providers, provider, warnings }) {
+  const seoIntelligencePayload = {
+    chatId, userId,
+    websiteUrl: identity?.websiteUrl || websiteUrl,
+    domain: identity?.domain || '',
+    companyName: identity?.companyName || '',
+    productName: identity?.productName || '',
+    seoScore: overallScore ?? null,
+    analyzedAt: new Date(),
+    fallbackUsed: provider !== 'SERPAPI',
+    status: provider === 'AI_FALLBACK' || provider === 'CACHE' ? 'ESTIMATED' : 'completed',
+    technicalAudit: technicalAudit || {},
+    keywordOpportunities: keywordIntelligence || {},
+    competitorKeywords: competitorIntelligence || {},
+    contentGaps: contentGapIntelligence || {},
+    aiVisibility: geoIntelligence || {},
+    blogIdeas: blogIntelligence || {},
+    actionPlan: { recommendations: seoReport?.recommendations || [] },
+    landingPageSuggestions: seoReport?.landingPageSuggestions || [],
+    providers: providers || {},
+    warnings: warnings || [],
+    inputJson: { runId, chatId, userId, websiteUrl, measuredModules, unavailableModules }
+  };
+
+  const seoRecord = await prisma.seoIntelligence.upsert({
+    where: { chatId },
+    create: seoIntelligencePayload,
+    update: { ...seoIntelligencePayload, updatedAt: new Date() }
+  });
+
+  const savedId = seoRecord.id;
+
+  await prisma.$transaction(async (tx) => {
+    const techMobileScore = pageSpeedMobile?.lighthouseScores?.performance ?? null;
+    const techDesktopScore = pageSpeedDesktop?.lighthouseScores?.performance ?? null;
+
+    await tx.technicalSeoAudit.upsert({
+      where: { seoIntelligenceId: savedId },
+      create: {
+        seoIntelligenceId: savedId,
+        auditData: {
+          audit: technicalAudit,
+          chromeUX: chromeUXData,
+          pageSpeed: { mobile: pageSpeedMobile, desktop: pageSpeedDesktop }
+        },
+        overallScore: toNullableScore(technicalAudit?.performance?.mobile ?? technicalAudit?.overallScore),
+        titleScore: technicalAudit?.meta?.title ? 85 : null,
+        metaScore: technicalAudit?.meta?.description ? 80 : null,
+        securityScore: technicalAudit?.https?.status === 'enabled' ? 100 : null,
+        mobileScore: toNullableScore(techMobileScore),
+        headingScore: (technicalAudit?.headings?.h1?.length || 0) > 0 ? 85 : null,
+        schemaScore: (technicalAudit?.structuredData?.count || 0) > 0 ? 80 : null,
+        criticalIssues: [],
+        highIssues: [],
+        mediumIssues: [],
+        lowIssues: [],
+        recommendations: []
+      },
+      update: {
+        auditData: {
+          audit: technicalAudit,
+          chromeUX: chromeUXData,
+          pageSpeed: { mobile: pageSpeedMobile, desktop: pageSpeedDesktop }
+        },
+        overallScore: toNullableScore(technicalAudit?.performance?.mobile ?? technicalAudit?.overallScore),
+        titleScore: technicalAudit?.meta?.title ? 85 : null,
+        metaScore: technicalAudit?.meta?.description ? 80 : null,
+        securityScore: technicalAudit?.https?.status === 'enabled' ? 100 : null,
+        mobileScore: toNullableScore(techMobileScore),
+        headingScore: (technicalAudit?.headings?.h1?.length || 0) > 0 ? 85 : null,
+        schemaScore: (technicalAudit?.structuredData?.count || 0) > 0 ? 80 : null,
+        analyzedAt: new Date()
+      }
+    });
+
+    const psMobile = pageSpeedMobile?.lighthouseScores;
+    const psDesktop = pageSpeedDesktop?.lighthouseScores;
+    const psMobilePerf = psMobile?.performance;
+    const psDesktopPerf = psDesktop?.performance;
+    const hasPerfData = psMobilePerf != null || psDesktopPerf != null;
+    const perfAvg = hasPerfData
+      ? Math.round(((psMobilePerf || 0) + (psDesktopPerf || 0)) / ((psMobilePerf != null ? 1 : 0) + (psDesktopPerf != null ? 1 : 0)))
+      : null;
+
+    await tx.seoScoreBreakdown.upsert({
+      where: { seoIntelligenceId: savedId },
+      create: {
+        seoIntelligenceId: savedId,
+        overallScore: toNullableScore(overallScore),
+        technicalScore: techMobileScore ?? perfAvg ?? null,
+        onPageScore: null,
+        contentScore: null,
+        authorityScore: null,
+        aiVisibilityScore: null,
+        localSeoScore: null,
+        scoreHistory: {}
+      },
+      update: {
+        overallScore: toNullableScore(overallScore),
+        technicalScore: techMobileScore ?? perfAvg ?? null,
+        onPageScore: null,
+        contentScore: null,
+        authorityScore: null,
+        aiVisibilityScore: null,
+        localSeoScore: null,
+        scoreHistory: {},
+        lastCalculated: new Date()
+      }
+    });
+
+    const ki = keywordIntelligence || {};
+    await tx.keywordIntelligenceRecord.upsert({
+      where: { seoIntelligenceId: savedId },
+      create: {
+        seoIntelligenceId: savedId,
+        primaryKeywords: ki.primaryKeywords || [],
+        secondaryKeywords: ki.secondaryKeywords || [],
+        longTailKeywords: ki.longTailKeywords || [],
+        questionKeywords: ki.questionKeywords || [],
+        clusters: ki.clusters || [],
+        competitorKeywords: ki.competitorKeywords || [],
+        contentOpportunities: ki.contentOpportunities || [],
+        geoKeywords: ki.geoKeywords || [],
+        totalKeywords: ki.metadata?.totalKeywords || 0,
+        clustersCount: ki.metadata?.clustersCount || 0,
+        opportunitiesCount: ki.metadata?.opportunitiesCount || 0
+      },
+      update: {
+        primaryKeywords: ki.primaryKeywords || [],
+        secondaryKeywords: ki.secondaryKeywords || [],
+        longTailKeywords: ki.longTailKeywords || [],
+        questionKeywords: ki.questionKeywords || [],
+        clusters: ki.clusters || [],
+        competitorKeywords: ki.competitorKeywords || [],
+        contentOpportunities: ki.contentOpportunities || [],
+        geoKeywords: ki.geoKeywords || [],
+        totalKeywords: ki.metadata?.totalKeywords || 0,
+        clustersCount: ki.metadata?.clustersCount || 0,
+        opportunitiesCount: ki.metadata?.opportunitiesCount || 0,
+        updatedAt: new Date()
+      }
+    });
+
+    const ci = competitorIntelligence || {};
+    await tx.competitorSeoRecord.upsert({
+      where: { seoIntelligenceId: savedId },
+      create: {
+        seoIntelligenceId: savedId,
+        competitors: ci.competitors || [],
+        competitorProfiles: ci.competitorProfiles || [],
+        keywordGaps: ci.keywordGaps || {},
+        contentGaps: ci.contentGaps || [],
+        authorityGaps: ci.authorityGaps || {},
+        geoGaps: ci.geoGaps || {},
+        competitorMatrix: ci.competitorMatrix || [],
+        recommendations: ci.recommendations || {},
+        metadata: ci.metadata || {}
+      },
+      update: {
+        competitors: ci.competitors || [],
+        competitorProfiles: ci.competitorProfiles || [],
+        keywordGaps: ci.keywordGaps || {},
+        contentGaps: ci.contentGaps || [],
+        authorityGaps: ci.authorityGaps || {},
+        geoGaps: ci.geoGaps || {},
+        competitorMatrix: ci.competitorMatrix || [],
+        recommendations: ci.recommendations || {},
+        metadata: ci.metadata || {},
+        updatedAt: new Date()
+      }
+    });
+
+    const cg = contentGapIntelligence || {};
+    await tx.contentGapRecord.upsert({
+      where: { seoIntelligenceId: savedId },
+      create: {
+        seoIntelligenceId: savedId,
+        contentGaps: cg.contentGaps || [],
+        landingPageIdeas: cg.landingPageIdeas || [],
+        comparisonPageIdeas: cg.comparisonPageIdeas || [],
+        faqOpportunities: cg.faqOpportunities || [],
+        geoContentIdeas: cg.geoContentIdeas || [],
+        resourcePageIdeas: cg.resourcePageIdeas || [],
+        contentCalendar: cg.contentCalendar || {},
+        summary: cg.summary || { totalGaps: 0, totalOpportunities: 0, criticalPriority: 0, highPriority: 0 }
+      },
+      update: {
+        contentGaps: cg.contentGaps || [],
+        landingPageIdeas: cg.landingPageIdeas || [],
+        comparisonPageIdeas: cg.comparisonPageIdeas || [],
+        faqOpportunities: cg.faqOpportunities || [],
+        geoContentIdeas: cg.geoContentIdeas || [],
+        resourcePageIdeas: cg.resourcePageIdeas || [],
+        contentCalendar: cg.contentCalendar || {},
+        summary: cg.summary || { totalGaps: 0, totalOpportunities: 0, criticalPriority: 0, highPriority: 0 },
+        updatedAt: new Date()
+      }
+    });
+
+    const gi = geoIntelligence || {};
+    const numericScore = (v) => (v != null && typeof v === 'number' ? v : null);
+    await tx.geoIntelligenceRecord.upsert({
+      where: { seoIntelligenceId: savedId },
+      create: {
+        seoIntelligenceId: savedId,
+        aiVisibilityScore: numericScore(gi.aiVisibilityScore),
+        chatGptScore: numericScore(gi.chatGptScore),
+        geminiScore: numericScore(gi.geminiScore),
+        claudeScore: numericScore(gi.claudeScore),
+        perplexityScore: numericScore(gi.perplexityScore),
+        googleAiOverviewScore: numericScore(gi.googleAiOverviewScore),
+        entityCoverageScore: numericScore(gi.entityCoverageScore),
+        knowledgeGraphReadinessScore: numericScore(gi.knowledgeGraphReadinessScore),
+        citationReadinessScore: numericScore(gi.citationReadinessScore),
+        answerabilityScore: numericScore(gi.answerabilityScore),
+        topicalAuthorityScore: numericScore(gi.topicalAuthorityScore),
+        entities: gi.entities || [],
+        knowledgeGraphEntities: gi.knowledgeGraphEntities || [],
+        citationOpportunities: gi.citationOpportunities || [],
+        faqOpportunities: gi.faqOpportunities || [],
+        aiContentOpportunities: gi.aiContentOpportunities || [],
+        trustSignals: gi.trustSignals || {},
+        recommendations: gi.recommendations || {}
+      },
+      update: {
+        aiVisibilityScore: numericScore(gi.aiVisibilityScore),
+        chatGptScore: numericScore(gi.chatGptScore),
+        geminiScore: numericScore(gi.geminiScore),
+        claudeScore: numericScore(gi.claudeScore),
+        perplexityScore: numericScore(gi.perplexityScore),
+        googleAiOverviewScore: numericScore(gi.googleAiOverviewScore),
+        entityCoverageScore: numericScore(gi.entityCoverageScore),
+        knowledgeGraphReadinessScore: numericScore(gi.knowledgeGraphReadinessScore),
+        citationReadinessScore: numericScore(gi.citationReadinessScore),
+        answerabilityScore: numericScore(gi.answerabilityScore),
+        topicalAuthorityScore: numericScore(gi.topicalAuthorityScore),
+        entities: gi.entities || [],
+        knowledgeGraphEntities: gi.knowledgeGraphEntities || [],
+        citationOpportunities: gi.citationOpportunities || [],
+        faqOpportunities: gi.faqOpportunities || [],
+        aiContentOpportunities: gi.aiContentOpportunities || [],
+        trustSignals: gi.trustSignals || {},
+        recommendations: gi.recommendations || {},
+        updatedAt: new Date()
+      }
+    });
+
+    const bi = blogIntelligence || {};
+    await tx.blogIntelligenceRecord.upsert({
+      where: { seoIntelligenceId: savedId },
+      create: {
+        seoIntelligenceId: savedId,
+        blogIdeas: bi.blogIdeas || [],
+        blogClusters: bi.blogClusters || [],
+        blogBriefs: bi.blogBriefs || [],
+        publishingCalendar: bi.publishingCalendar || {},
+        summary: bi.summary || { totalIdeas: 0, totalClusters: 0, highPriorityIdeas: 0 },
+        metadata: bi.metadata || null
+      },
+      update: {
+        blogIdeas: bi.blogIdeas || [],
+        blogClusters: bi.blogClusters || [],
+        blogBriefs: bi.blogBriefs || [],
+        publishingCalendar: bi.publishingCalendar || {},
+        summary: bi.summary || { totalIdeas: 0, totalClusters: 0, highPriorityIdeas: 0 },
+        metadata: bi.metadata || null,
+        updatedAt: new Date()
+      }
+    });
+  });
+
+  try {
+    await generateExecutiveDashboard({
+      seoIntelligenceId: savedId,
+      chatId,
+      userId,
+      seoData: {
+        technicalAudit,
+        keywordIntelligence,
+        competitorIntelligence,
+        geoIntelligence,
+        blogIntelligence,
+        contentGapIntelligence,
+        scoreBreakdown: {
+          overallScore: toNullableScore(overallScore)
+        },
+        identity: { websiteUrl, domain: identity?.domain, companyName: identity?.companyName, productName: identity?.productName }
+      }
+    });
+    logEvidenceInfo('seo.persist', 'Executive Dashboard generated and saved', { seoIntelligenceId: savedId });
+  } catch (e) {
+    logEvidenceError('seo.persist', chatId, e);
+    console.error('[SEO Exec Dashboard Save Error]', e);
+  }
+
+  return savedId;
+}

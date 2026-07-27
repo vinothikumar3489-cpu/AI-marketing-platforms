@@ -147,6 +147,7 @@ export async function generateDocx(data) {
     if (hasSeo) {
       const keywords = arr(seo?.keywords);
       const competitors = arr(seo?.competitors);
+      const hasPlatformCompetitors = seo?.__raw?.competitorIntelligence?.competitors?.length > 0;
       const gaps = arr(seo?.gaps);
       const geo = seo?.geo || {};
       const geoPlatforms = ['chatgpt','gemini','claude','perplexity','googleAiOverview'];
@@ -167,7 +168,9 @@ export async function generateDocx(data) {
               ['Competitor', 'Domain', 'Authority', 'Traffic', 'Overlap'],
               ...competitors.slice(0, 10).map(c => [safeStr(c.name || c.domain), safeStr(c.domain), c.seoAuthority || c.estimatedAuthority ? `${c.seoAuthority || c.estimatedAuthority}/100` : 'N/A', c.estimatedTraffic ? `${c.estimatedTraffic}` : 'N/A', safeStr(c.overlapReason || c.reason || c.description)])
             ])]
-          : [createInfoBox('Note', 'Competitor SEO data unavailable. Configure DataForSEO for competitor analysis.')]),
+          : hasPlatformCompetitors
+            ? [createInfoBox('Note', 'Competitor intelligence partially available — platform-level estimates present. Connect DataForSEO for detailed SERP analysis.')]
+            : [createInfoBox('Note', 'Competitor SEO data unavailable. Configure DataForSEO for competitor analysis.')]),
         new Paragraph({ children: [new PageBreak()] }),
         createHeading('7. Content Gap Analysis', HeadingLevel.HEADING_1),
         ...(gaps.length > 0

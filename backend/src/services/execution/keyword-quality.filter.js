@@ -1,9 +1,3 @@
-/**
- * Keyword quality filter — validates complete phrases, not individual tokens.
- * Rejects raw page tokens, navigation labels, single generic words, and malformed text.
- * Only passes phrases with sufficient product relevance and understandable intent.
- */
-
 const LOW_QUALITY_KEYWORDS = new Set([
   'started', 'alerts', 'outlier', 'shorts', 'text', 'tracking', 'trends',
   'content', 'alert', 'product', 'home', 'page', 'app', 'get', 'use',
@@ -13,121 +7,149 @@ const LOW_QUALITY_KEYWORDS = new Set([
   'settings', 'dashboard', 'profile', 'account', 'billing',
   'review', 'reviews', 'download', 'free', 'trial', 'demo', 'video',
   'tutorial', 'guide', 'manual', 'instructions', 'overview',
-  'receive', 'accordance', 'personal', 'newsletters', 'google.', 'workspace.',
-  'accordance', 'cloud', 'receive', 'google', 'cloud', 'workspace', 'meet',
-  'notifications', 'admin', 'storage', 'security', 'privacy', 'terms',
-  'sign', 'manage', 'create', 'delete', 'edit', 'update', 'view',
-  'share', 'send', 'invite', 'join', 'leave', 'accept', 'decline',
-  'allow', 'block', 'report', 'feedback', 'survey', 'poll',
+  'google', 'facebook', 'twitter', 'instagram', 'linkedin', 'youtube',
+  'google.', 'facebook.', 'twitter.', 'instagram.', 'youtube.',
+  'google.com', 'facebook.com', 'twitter.com',
+  'workspace.', 'workspace', 'newsletters', 'accordance',
+  'receive', 'click', 'here', 'read', 'more', 'learn', 'email',
+  'privacy', 'cookies', 'cookie', 'terms', 'conditions',
+  'javascript', 'browser', 'chrome', 'firefox', 'safari', 'edge',
+  'android', 'ios', 'iphone', 'ipad', 'mac', 'windows',
 ]);
 
-// Generic single words that should never standalone as keywords
-const GENERIC_SINGLE_WORDS = new Set([
-  'software', 'system', 'platform', 'service', 'solution', 'tool', 'app',
-  'product', 'company', 'business', 'team', 'data', 'tech', 'code',
-  'cloud', 'web', 'site', 'page', 'user', 'client', 'general',
-  'account', 'semrush', 'google', 'meet', 'workspace', 'cloud',
-  'receive', 'accordance', 'personal', 'newsletters', 'notifications',
-  'admin', 'storage', 'security', 'privacy', 'terms', 'design',
-  'services', 'solutions', 'features', 'pricing', 'login', 'signup',
-  'register', 'dashboard', 'profile', 'settings', 'help', 'support',
-  'faq', 'about', 'contact', 'careers', 'blog', 'docs', 'home',
-  'overview', 'started', 'alerts', 'shorts', 'tracking', 'trends',
-  'outlier', 'content',
+const STOP_WORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+  'of', 'with', 'by', 'from', 'up', 'about', 'into', 'over', 'after',
+  'all', 'each', 'every', 'both', 'few', 'more', 'most', 'other', 'some',
+  'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too',
+  'very', 'just', 'because', 'as', 'until', 'while', 'that', 'this',
+  'these', 'those', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+  'should', 'may', 'might', 'shall', 'can', 'need', 'dare', 'ought',
+  'used', 'it', 'its', 'you', 'your', 'we', 'our', 'they', 'their',
+  'he', 'she', 'his', 'her', 'him', 'i', 'me', 'my', 'myself',
 ]);
 
-// Phrases that are too generic or boilerplate
-const LOW_QUALITY_PHRASE_PATTERNS = [
-  /^- /, /^[a-z]{15,}$/, /^[a-z]+[A-Z]/, /^[a-z]{2,}[A-Z]{2,}/,
-  /\.(com|org|net|io|app|ai)\b/, /\bhttp/, /^www\./,
-  /cookie|privacy policy|terms of service|all rights reserved/i,
-  /sign in|sign up|log in|create account|forgot password/i,
-  /newsletter|subscribe|unsubscribe/i,
-  /get started|learn more|read more|contact us/i,
-  /^[a-z]\.$/, /\.$/, /\s\.$/, /\s-\s$/,
-  /^\d+$/, /^[\d,+.$\-‰%]+$/,
-  /complete guide for/i, /comprehensive guide/i,
-];
+const NAVIGATION_TERMS = /^(login|sign.?in|sign.?up|register|get.?started|try.?free|book.?demo|watch.?demo|schedule|pricing|plans|contact.?us|support|help|docs|documentation|faq|knowledge.?base|community|forum|status|blog|careers|about.?us|our.?story|team|investors|press|news|partners|integrations|apps|marketplace|changelog|releases|roadmap|system.?status|cookie.?policy|privacy.?policy|terms.?of.?service|eula|license|sitemap|accessibility)($|\s)/i;
 
-/**
- * Check if a keyword string is low quality.
- * Validates complete phrases, not individual tokens.
- */
-export function isLowQualityKeyword(keyword) {
-  if (!keyword || typeof keyword !== 'string') return true;
-  const trimmed = keyword.trim().toLowerCase();
-  if (trimmed.length < 3) return true;
-  if (LOW_QUALITY_KEYWORDS.has(trimmed)) return true;
-  if (/^\d+$/.test(trimmed)) return true;
-  if (trimmed.startsWith('http') || trimmed.startsWith('www')) return true;
-  if (/^(new\s+analysis|untitled|new\s+project|growth\s+analysis|project)$/i.test(trimmed)) return true;
+function normalizeKeyword(text) {
+  if (!text || typeof text !== 'string') return '';
+  return text
+    .replace(/[.,/#!$%^&*;:{}=\-_`~()"]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
 
-  // Check phrase-level patterns
-  for (const pattern of LOW_QUALITY_PHRASE_PATTERNS) {
-    if (pattern.test(trimmed)) return true;
-  }
+function countTokens(text) {
+  return text.trim().split(/\s+/).filter(t => t.length > 0).length;
+}
 
-  // Single-word check: reject unless it has clear product intent
-  const words = trimmed.split(/\s+/).filter(Boolean);
-  if (words.length === 1) {
-    if (GENERIC_SINGLE_WORDS.has(words[0])) return true;
-    if (words[0].length <= 2) return true;
-    if (/^[a-z]{15,}$/.test(words[0])) return true;
-    if (words[0].endsWith('.') || words[0].endsWith(',') || words[0].endsWith(';')) return true;
-  }
-
-  // Multi-word: reject if it's essentially a single generic word + filler
-  if (words.length >= 2) {
-    const meaningfulWords = words.filter(w => !['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'it', 'its', 'we', 'you', 'they', 'he', 'she'].includes(w));
-    if (meaningfulWords.length === 0) return true;
-    // All meaningful words are single generic terms
-    if (meaningfulWords.every(w => GENERIC_SINGLE_WORDS.has(w))) return true;
-  }
-
-  // Reject if ends with orphaned punctuation
-  if (/[\s,;:.!?]$/.test(trimmed) && !trimmed.endsWith('?')) return true;
-
+function isNavigationOrLegal(text) {
+  const lower = text.toLowerCase().trim();
+  if (NAVIGATION_TERMS.test(lower)) return true;
+  const navTokens = ['privacy', 'cookies', 'terms', 'conditions', 'legal', 'compliance', 'gdpr', 'ccpa', 'accessibility', 'sitemap', 'eula', 'license'];
+  const tokens = lower.split(/\s+/);
+  const navCount = tokens.filter(t => navTokens.includes(t)).length;
+  if (tokens.length <= 3 && navCount >= Math.ceil(tokens.length / 2)) return true;
   return false;
 }
 
-/**
- * Filter an array of keyword objects or strings, keeping only high-quality keywords.
- */
+function isVerbalOrUtility(text) {
+  const tokens = text.toLowerCase().trim().split(/\s+/);
+  if (tokens.length > 3) return false;
+  const verbalTokens = ['get', 'use', 'make', 'do', 'have', 'see', 'find', 'try', 'buy', 'sell', 'pay', 'send', 'receive', 'click', 'read', 'watch', 'listen', 'learn', 'know', 'need', 'want', 'like', 'love', 'share', 'post', 'talk', 'say', 'tell', 'ask', 'answer', 'help', 'show', 'give', 'take', 'keep', 'start', 'stop', 'continue'];
+  return tokens.every(t => verbalTokens.includes(t));
+}
+
+function hasSingleTokenMeaning(text) {
+  if (!text || typeof text !== 'string') return false;
+  const trimmed = text.trim();
+  if (trimmed.includes(' ')) return false;
+  const genericSingleTokens = ['google', 'youtube', 'facebook', 'twitter', 'instagram', 'linkedin', 'amazon', 'apple', 'microsoft', 'netflix', 'spotify', 'reddit', 'pinterest', 'tiktok', 'snapchat', 'whatsapp', 'telegram', 'slack', 'zoom', 'outlook', 'gmail', 'dropbox', 'drive', 'docs', 'sheets', 'slides', 'meet', 'calendar', 'chrome', 'firefox', 'safari', 'edge', 'android', 'iphone', 'ipad', 'macbook', 'windows', 'linux', 'ubuntu', 'npm', 'node', 'docker', 'kubernetes', 'github', 'gitlab', 'bitbucket', 'jira', 'confluence', 'trello', 'asana', 'monday', 'notion', 'evernote', 'airtable', 'salesforce', 'hubspot', 'marketo', 'mailchimp', 'sendgrid', 'brevo', 'twilio', 'stripe', 'paypal', 'square', 'shopify', 'woocommerce', 'magento', 'wordpress', 'wix', 'squarespace', 'webflow', 'figma', 'sketch', 'adobe', 'canva', 'photoshop', 'illustrator', 'after', 'effects', 'premiere', 'lightroom', 'indesign'];
+  return genericSingleTokens.includes(trimmed.toLowerCase());
+}
+
+export function isLowQualityKeyword(keyword) {
+  if (!keyword || typeof keyword !== 'string') return true;
+  const normalized = normalizeKeyword(keyword);
+  if (!normalized) return true;
+  if (normalized.length < 3) return true;
+  if (LOW_QUALITY_KEYWORDS.has(normalized)) return true;
+  if (/^\d+$/.test(normalized)) return true;
+  if (normalized.startsWith('http') || normalized.startsWith('www')) return true;
+  if (/^(new\s+analysis|untitled|new\s+project|growth\s+analysis|project)$/i.test(normalized)) return true;
+  if (isNavigationOrLegal(normalized)) return true;
+  if (isVerbalOrUtility(normalized)) return true;
+  if (hasSingleTokenMeaning(normalized)) return true;
+  if (normalized.endsWith('.') && normalized.length > 3) {
+    const withoutDot = normalized.slice(0, -1).trim();
+    if (withoutDot.length >= 3) return false;
+  }
+  if (countTokens(normalized) >= 2) return false;
+  return true;
+}
+
 export function filterKeywords(keywords) {
   if (!Array.isArray(keywords)) return [];
   return keywords.filter(k => {
     if (typeof k === 'string') return !isLowQualityKeyword(k);
     if (k && typeof k === 'object') {
       const text = k.keyword || k.phrase || k.name || k.term || '';
-      return !isLowQualityKeyword(text);
+      const passed = !isLowQualityKeyword(text);
+      if (passed && typeof k === 'object') {
+        k.validationStatus = 'PASSED';
+      }
+      return passed;
     }
     return false;
   });
 }
 
-/**
- * Separate keywords into product-relevant and broad categories.
- */
-export function prioritizeProductKeywords(keywords, productName, brandName) {
+export function rateKeywordRelevance(keyword, productName, brandName, description) {
+  const text = (typeof keyword === 'string' ? keyword : (keyword?.keyword || keyword?.phrase || '')).toLowerCase();
+  const productLower = (productName || '').toLowerCase();
+  const brandLower = (brandName || '').toLowerCase();
+  const descLower = (description || '').toLowerCase();
+  let score = 0;
+  if (productLower && text.includes(productLower)) score += 40;
+  if (brandLower && text.includes(brandLower)) score += 30;
+  const productTokens = productLower.split(/\s+/).filter(Boolean);
+  for (const token of productTokens) {
+    if (token.length > 2 && text.includes(token)) score += 10;
+  }
+  const descTokens = descLower.split(/\s+/).filter(Boolean);
+  for (const token of descTokens) {
+    if (token.length > 3 && text.includes(token)) score += 5;
+  }
+  const intentScores = { 'how to': 15, 'what is': 10, 'best': 15, 'vs': 10, 'alternative': 10, 'pricing': 5, 'review': 5, 'tutorial': 10, 'guide': 8, 'example': 5, 'software': 3, 'tool': 3, 'platform': 5, 'solution': 3, 'service': 2 };
+  for (const [phrase, s] of Object.entries(intentScores)) {
+    if (text.includes(phrase)) score += s;
+  }
+  const tokens = text.split(/\s+/).filter(Boolean);
+  if (tokens.length >= 2) score += 10;
+  if (tokens.length >= 3) score += 5;
+  return Math.min(score, 100);
+}
+
+export function prioritizeProductKeywords(keywords, productName, brandName, description) {
   if (!Array.isArray(keywords)) return { product: [], broad: [] };
   const product = [];
   const broad = [];
-  const productLower = (productName || '').toLowerCase();
-  const brandLower = (brandName || '').toLowerCase();
-
   for (const k of keywords) {
     const text = typeof k === 'string' ? k : (k.keyword || k.phrase || k.name || '');
-    const lower = text.toLowerCase();
-    if (productLower && lower.includes(productLower)) {
-      product.push(k);
-    } else if (brandLower && lower.includes(brandLower)) {
-      product.push(k);
+    const relevance = rateKeywordRelevance(text, productName, brandName, description);
+    const entry = typeof k === 'object' ? { ...k, relevanceScore: relevance } : { phrase: k, relevanceScore: relevance };
+    if (relevance >= 30) {
+      product.push(entry);
     } else {
-      broad.push(k);
+      entry.relevanceScore = relevance;
+      broad.push(entry);
     }
   }
-
+  product.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0));
+  broad.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0));
   return { product, broad };
 }
 
-export default { isLowQualityKeyword, filterKeywords, prioritizeProductKeywords };
+export default { isLowQualityKeyword, filterKeywords, prioritizeProductKeywords, rateKeywordRelevance };

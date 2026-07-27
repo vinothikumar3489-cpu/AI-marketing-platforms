@@ -1,4 +1,4 @@
-import { prisma } from "../../config/prisma.js";
+import prisma from "../../config/prisma.js";
 import { validateOwnership } from "./crm-data.service.js";
 
 const DEFAULT_STAGES = [

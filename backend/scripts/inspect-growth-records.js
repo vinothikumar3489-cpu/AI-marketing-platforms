@@ -1,4 +1,4 @@
-import { prisma } from '../src/config/prisma.js';
+import prisma from '../src/config/prisma.js';
 
 const CHAT_ID = 'cmrl0zm7r0001q7hueyow01di'; // Grammarly chat with Growth data
 

@@ -1,0 +1,345 @@
+/**
+ * Canonical Content Type Contract
+ * Shared enum used by frontend and backend
+ */
+
+export const CONTENT_TYPE_ENUM = {
+  BLOG_ARTICLE: 'blog_article',
+  FAQ_PAGE: 'faq_page',
+  LANDING_PAGE: 'landing_page',
+  PRODUCT_PAGE: 'product_page',
+  COMPARISON_PAGE: 'comparison_page',
+  FEATURE_ANNOUNCEMENT: 'feature_announcement',
+  WHITEPAPER: 'whitepaper',
+  LINKEDIN_POST: 'linkedin_post',
+  INSTAGRAM_POST: 'instagram_post',
+  TWITTER_POST: 'twitter_post',
+  FACEBOOK_POST: 'facebook_post',
+  YOUTUBE_DESCRIPTION: 'youtube_description',
+  EMAIL_COPY: 'email_copy',
+  CREATIVE_BRIEF: 'creative_brief',
+  VIDEO_SCRIPT: 'video_script',
+};
+
+/**
+ * Canonical content types - must match frontend exactly
+ */
+export const CANONICAL_CONTENT_TYPES = [
+  'blog_article',
+  'faq_page',
+  'landing_page',
+  'product_page',
+  'comparison_page',
+  'feature_announcement',
+  'whitepaper',
+  'linkedin_post',
+  'instagram_post',
+  'twitter_post',
+  'facebook_post',
+  'youtube_description',
+  'email_copy',
+  'creative_brief',
+  'video_script',
+];
+
+export const CONTENT_TYPES = {
+  email_copy: { label: 'Email Copy' },
+  email_campaign: { label: 'Email Campaign' },
+  email_nurture: { label: 'Email Nurture' },
+  email_newsletter: { label: 'Email Newsletter' },
+  email_welcome: { label: 'Welcome Email' },
+  email_promotional: { label: 'Promotional Email' },
+  email_follow_up: { label: 'Follow-up Email' },
+  email_event_invitation: { label: 'Event Invitation' },
+  email_reengagement: { label: 'Re-engagement Email' },
+  email_final_cta: { label: 'Final CTA Email' },
+  linkedin_post: { label: 'LinkedIn Post' },
+  instagram_post: { label: 'Instagram Post' },
+  instagram_carousel: { label: 'Instagram Carousel' },
+  instagram_reel_script: { label: 'Instagram Reel Script' },
+  facebook_post: { label: 'Facebook Post' },
+  facebook_ad: { label: 'Facebook Ad' },
+  x_post: { label: 'X (Twitter) Post' },
+  x_thread: { label: 'X (Twitter) Thread' },
+  twitter_post: { label: 'X (Twitter) Post' },
+  youtube_description: { label: 'YouTube Description' },
+  youtube_script: { label: 'YouTube Script' },
+  blog_article: { label: 'Blog Article' },
+  landing_page: { label: 'Landing Page' },
+  case_study: { label: 'Case Study' },
+  product_announcement: { label: 'Product Announcement' },
+  faq_page: { label: 'FAQ Page' },
+  product_page: { label: 'Product Page' },
+  comparison_page: { label: 'Comparison Page' },
+  feature_announcement: { label: 'Feature Announcement' },
+  whitepaper: { label: 'Whitepaper' },
+  creative_brief: { label: 'Creative Brief' },
+  video_script: { label: 'Video Script' },
+};
+
+export const CONTENT_TYPES_LIST = Object.keys(CONTENT_TYPES);
+export const SUPPORTED_CONTENT_TYPES = CONTENT_TYPES_LIST;
+
+export const CONTENT_TYPE_ALIASES = {
+  email: 'email_campaign',
+  social: 'linkedin_post',
+  blog: 'blog_article',
+  video: 'youtube_script',
+  brief: 'creative_brief',
+  ad: 'facebook_ad',
+  'x (twitter) post': 'x_post',
+  'x thread': 'x_thread',
+  'instagram reel': 'instagram_reel_script',
+  'instagram carousel': 'instagram_carousel',
+  'facebook ad': 'facebook_ad',
+  'email campaign': 'email_campaign',
+  'email nurture': 'email_nurture',
+  'email newsletter': 'email_newsletter',
+  'email welcome': 'email_welcome',
+  'email promotional': 'email_promotional',
+  'email follow-up': 'email_follow_up',
+  'email event': 'email_event_invitation',
+  'email reengagement': 'email_reengagement',
+  'email final cta': 'email_final_cta',
+  'case study': 'case_study',
+  'product announcement': 'product_announcement',
+  'youtube script': 'youtube_script',
+  twitter_post: 'x_post',
+  x_post: 'x_post',
+};
+
+export const CONTENT_TYPE_GROUPS = {
+  email: ['email_copy', 'email_campaign', 'email_nurture', 'email_newsletter', 'email_welcome', 'email_promotional', 'email_follow_up', 'email_event_invitation', 'email_reengagement', 'email_final_cta'],
+  social: ['linkedin_post', 'instagram_post', 'instagram_carousel', 'instagram_reel_script', 'facebook_post', 'facebook_ad', 'x_post', 'x_thread'],
+  video: ['youtube_description', 'youtube_script'],
+  longForm: ['blog_article', 'landing_page', 'case_study', 'product_announcement', 'faq_page', 'product_page', 'comparison_page', 'feature_announcement', 'whitepaper'],
+  brief: ['creative_brief', 'video_script'],
+};
+
+export const CONTENT_TYPE_REGISTRY = {
+  email_copy: {
+    canonicalType: 'email_copy',
+    generator: 'generateEmailCopy',
+    validator: 'emailCopySchema',
+    qualityRules: 'email_copy',
+  },
+  email_campaign: {
+    canonicalType: 'email_campaign',
+    generator: 'emailCampaignGenerator',
+    validator: 'emailCampaignValidator',
+    renderer: 'EmailAssetPreview',
+  },
+  email_nurture: {
+    canonicalType: 'email_campaign',
+    generator: 'emailCampaignGenerator',
+    validator: 'emailCampaignValidator',
+    renderer: 'EmailAssetPreview',
+  },
+  email_newsletter: {
+    canonicalType: 'email_campaign',
+    generator: 'emailCampaignGenerator',
+    validator: 'emailCampaignValidator',
+    renderer: 'EmailAssetPreview',
+  },
+  email_welcome: {
+    canonicalType: 'email_copy',
+    generator: 'generateEmailCopy',
+    validator: 'emailCopySchema',
+    renderer: 'EmailAssetPreview',
+  },
+  email_promotional: {
+    canonicalType: 'email_copy',
+    generator: 'generateEmailCopy',
+    validator: 'emailCopySchema',
+    renderer: 'EmailAssetPreview',
+  },
+  email_follow_up: {
+    canonicalType: 'email_copy',
+    generator: 'generateEmailCopy',
+    validator: 'emailCopySchema',
+    renderer: 'EmailAssetPreview',
+  },
+  email_event_invitation: {
+    canonicalType: 'email_copy',
+    generator: 'generateEmailCopy',
+    validator: 'emailCopySchema',
+    renderer: 'EmailAssetPreview',
+  },
+  email_reengagement: {
+    canonicalType: 'email_copy',
+    generator: 'generateEmailCopy',
+    validator: 'emailCopySchema',
+    renderer: 'EmailAssetPreview',
+  },
+  email_final_cta: {
+    canonicalType: 'email_copy',
+    generator: 'generateEmailCopy',
+    validator: 'emailCopySchema',
+    renderer: 'EmailAssetPreview',
+  },
+  linkedin_post: {
+    canonicalType: 'linkedin_post',
+    generator: 'linkedInPostGenerator',
+    validator: 'linkedInPostValidator',
+    renderer: 'LinkedInPostPreview',
+  },
+  instagram_post: {
+    canonicalType: 'instagram_post',
+    generator: 'instagramPostGenerator',
+    validator: 'instagramPostValidator',
+    renderer: 'InstagramPostPreview',
+  },
+  instagram_carousel: {
+    canonicalType: 'instagram_carousel',
+    generator: 'instagramCarouselGenerator',
+    validator: 'instagramPostValidator',
+    renderer: 'InstagramCarouselPreview',
+  },
+  instagram_reel_script: {
+    canonicalType: 'instagram_reel_script',
+    generator: 'instagramReelGenerator',
+    validator: 'instagramPostValidator',
+    renderer: 'InstagramReelPreview',
+  },
+  facebook_post: {
+    canonicalType: 'facebook_post',
+    generator: 'facebookPostGenerator',
+    validator: 'facebookPostValidator',
+    renderer: 'FacebookPostPreview',
+  },
+  facebook_ad: {
+    canonicalType: 'facebook_ad',
+    generator: 'facebookAdGenerator',
+    validator: 'facebookAdValidator',
+    renderer: 'FacebookAdPreview',
+  },
+  x_post: {
+    canonicalType: 'x_post',
+    generator: 'twitterPostGenerator',
+    validator: 'twitterPostValidator',
+    renderer: 'XPostPreview',
+  },
+  twitter_post: {
+    canonicalType: 'twitter_post',
+    generator: 'twitterPostGenerator',
+    validator: 'twitterPostValidator',
+    renderer: 'XPostPreview',
+  },
+  x_thread: {
+    canonicalType: 'x_thread',
+    generator: 'twitterThreadGenerator',
+    validator: 'twitterPostValidator',
+    renderer: 'XThreadPreview',
+  },
+  youtube_description: {
+    canonicalType: 'youtube_description',
+    generator: 'youtubeDescriptionGenerator',
+    validator: 'youtubeDescriptionValidator',
+    renderer: 'YouTubeDescriptionPreview',
+  },
+  youtube_script: {
+    canonicalType: 'youtube_script',
+    generator: 'youtubeScriptGenerator',
+    validator: 'youtubeScriptValidator',
+    renderer: 'YouTubeScriptPreview',
+  },
+  blog_article: {
+    canonicalType: 'blog_article',
+    generator: 'blogArticleGenerator',
+    validator: 'blogArticleValidator',
+    renderer: 'BlogArticlePreview',
+  },
+  landing_page: {
+    canonicalType: 'landing_page',
+    generator: 'landingPageGenerator',
+    validator: 'landingPageValidator',
+    renderer: 'LandingPagePreview',
+  },
+  case_study: {
+    canonicalType: 'case_study',
+    generator: 'caseStudyGenerator',
+    validator: 'caseStudyValidator',
+    renderer: 'CaseStudyPreview',
+  },
+  product_announcement: {
+    canonicalType: 'product_announcement',
+    generator: 'productAnnouncementGenerator',
+    validator: 'blogArticleValidator',
+    renderer: 'BlogArticlePreview',
+  },
+  faq_page: {
+    canonicalType: 'faq_page',
+    generator: 'faqPageGenerator',
+    validator: 'faqPageValidator',
+    renderer: 'BlogArticlePreview',
+  },
+  product_page: {
+    canonicalType: 'product_page',
+    generator: 'productPageGenerator',
+    validator: 'blogArticleValidator',
+    renderer: 'BlogArticlePreview',
+  },
+  comparison_page: {
+    canonicalType: 'comparison_page',
+    generator: 'comparisonPageGenerator',
+    validator: 'comparisonPageValidator',
+    renderer: 'BlogArticlePreview',
+  },
+  feature_announcement: {
+    canonicalType: 'feature_announcement',
+    generator: 'featureAnnouncementGenerator',
+    validator: 'featureAnnouncementValidator',
+    renderer: 'BlogArticlePreview',
+  },
+  whitepaper: {
+    canonicalType: 'whitepaper',
+    generator: 'whitepaperGenerator',
+    validator: 'blogArticleValidator',
+    renderer: 'BlogArticlePreview',
+  },
+  creative_brief: {
+    canonicalType: 'creative_brief',
+    generator: 'creativeBriefGenerator',
+    validator: 'creativeBriefValidator',
+    renderer: 'CreativeBriefPreview',
+  },
+  video_script: {
+    canonicalType: 'video_script',
+    generator: 'videoScriptGenerator',
+    validator: 'videoScriptValidator',
+    renderer: 'VideoScriptPreview',
+  },
+};
+
+export function normalizeContentType(type) {
+  if (!type) return null;
+  const lower = String(type).toLowerCase().replace(/^content_/, '');
+  if (CONTENT_TYPES[lower]) return lower;
+  if (CONTENT_TYPE_ALIASES[lower]) return CONTENT_TYPE_ALIASES[lower];
+  return null;
+}
+
+export function isSupportedContentType(type) {
+  return CONTENT_TYPES_LIST.includes(normalizeContentType(type));
+}
+
+export function getContentTypeRegistryEntry(type) {
+  const normalized = normalizeContentType(type);
+  if (!normalized) return null;
+  return CONTENT_TYPE_REGISTRY[normalized] || null;
+}
+
+export function getGeneratorNameForType(type) {
+  const entry = getContentTypeRegistryEntry(type);
+  return entry?.generator || null;
+}
+
+export function getValidatorNameForType(type) {
+  const entry = getContentTypeRegistryEntry(type);
+  return entry?.validator || null;
+}
+
+export function getCanonicalContentType(type) {
+  const entry = getContentTypeRegistryEntry(type);
+  return entry?.canonicalType || normalizeContentType(type) || null;
+}

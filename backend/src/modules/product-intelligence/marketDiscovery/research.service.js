@@ -1,5 +1,5 @@
-import { researchCompetitors, generateFallbackCompetitorInsights } from "../../../services/tavily.service.js";
-import { scrapeWebsite, scrapeWebsiteFallback } from "../../../services/scraper.service.js";
+import { researchCompetitors, generateFallbackCompetitorInsights } from "../../../providers/tavily.service.js";
+import { scrapeWebsite, scrapeWebsiteFallback } from "../../../domains/research/services/scraper.service.js";
 
 const SERPER_API_KEY = process.env.SERPER_API_KEY;
 

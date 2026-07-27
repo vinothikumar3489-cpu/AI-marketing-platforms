@@ -264,7 +264,7 @@ export function generateCompetitorComparisonChart(competitors, options = {}) {
   if (!competitors || competitors.length === 0) return '';
   const data = competitors.map(c => ({
     label: c.name || c.domain || 'Unknown',
-    value: c.similarityScore || c.confidence || 50,
+    value: c.similarityScore ?? c.confidence ?? 50,
     color: c.color
   }));
   return generateBarChartSvg(data, { ...options, title: options.title || 'Competitor Comparison', barColor: '#8b5cf6' });
@@ -274,7 +274,7 @@ export function generateChannelAllocationChart(channels, options = {}) {
   if (!channels || channels.length === 0) return '';
   const data = channels.map(c => ({
     label: c.name || c.channel || 'Unknown',
-    value: c.budgetAllocation || c.fitScore || 50
+    value: c.budgetAllocation ?? c.fitScore ?? 50
   }));
   return generatePieChartSvg(data, { ...options, title: options.title || 'Channel Budget Allocation', donut: true });
 }

@@ -1,4 +1,4 @@
-import { callAI } from "../../ai/services/aiRouter.service.js";
+import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
 
 const PLAN_TYPES = {
   day_30: { label: '30 Day Campaign', days: 30 },
@@ -99,6 +99,7 @@ RULES:
         _generatedAt: new Date().toISOString(),
         _provider: result.provider || 'ai',
         _evidenceVersion: '2.0.0',
+        _evidenceSnapshotId: context.evidenceSnapshotId || null,
       };
     }
   } catch (e) {
@@ -125,6 +126,7 @@ export async function generateCampaignPlannerPlan(context) {
       generatedAt: new Date().toISOString(),
       typesGenerated: Object.keys(results),
       provider: 'campaign_planner',
+      evidenceSnapshotId: context.evidenceSnapshotId || null,
     },
   };
 }

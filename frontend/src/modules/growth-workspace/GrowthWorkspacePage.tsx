@@ -40,7 +40,7 @@ export function GrowthWorkspacePage() {
   async function fetchSavedResults(chatId: string) {
     setLoadingResults(true);
     try {
-      console.log('≡ƒöì Fetching saved growth workspace results for chatId:', chatId);
+      console.log('[GW] Fetching saved growth workspace results for chatId:', chatId);
       const res = await api.get(`/api/chats/${chatId}/growth-workspace/results`);
       
       if (res && (res.success || res.exists)) {
@@ -55,7 +55,7 @@ export function GrowthWorkspacePage() {
         setSavedInput(null);
       }
     } catch (err) {
-      console.error('Γ¥î Failed to fetch saved results:', err);
+      console.warn('[GW] No saved results found:', err instanceof Error ? err.message : err);
       setAnalysisData(null);
       setSteps([]);
       setSummary(null);
@@ -115,37 +115,34 @@ export function GrowthWorkspacePage() {
     setSummary(null);
 
     try {
-      console.log('≡ƒÜÇ Starting full growth analysis...');
+      console.log('🚀 Starting full growth analysis...');
       
       const res = await api.post(`/api/chats/${project.id}/growth-workspace/run-full-analysis`, formData);
 
-      console.log('≡ƒôª FULL ANALYSIS RESPONSE:', res.data);
-      console.log('≡ƒôè RESULTS:', res.data.results);
-      console.log('≡ƒôï STEPS:', res.data.steps);
+      console.log('[GW] Analysis response:', { status: res.success, stepsCount: res.steps?.length });
 
-      if (res.data.success) {
-        console.log('Γ£à Analysis complete!');
-        setAnalysisData(res.data.results);
-        setSteps(res.data.steps || initialSteps);
-        setSummary(res.data.summary || null);
+      if (res.success) {
+        console.log('✅ Analysis complete!');
+        setAnalysisData(res.results);
+        setSteps(res.steps || initialSteps);
+        setSummary(res.summary || null);
         setSavedInput(formData);
         setAnalysisStage('completed');
         toast.success('Full growth analysis completed successfully!');
       } else {
-        console.error('ΓÜá∩╕Å Analysis failed:', res.data.error);
-        setSteps(res.data.steps || initialSteps);
+        console.error('⚠️ Analysis failed:', res.error);
+        setSteps(res.steps || initialSteps);
         setAnalysisStage('error');
-        setAnalysisError(res.data.error || 'Unknown error');
+        setAnalysisError(res.error || 'Unknown error');
         
-        // Show user-friendly error message
-        if (res.data.errorCode === 'CHAT_NOT_FOUND') {
+        if (res.errorCode === 'CHAT_NOT_FOUND') {
           toast.error('Project not found. Please create or select a valid project first.');
         } else {
-          toast.error(`Analysis failed: ${res.data.error || 'Unknown error'}`);
+          toast.error(`Analysis failed: ${res.error || 'Unknown error'}`);
         }
       }
     } catch (err: any) {
-      console.error('Γ¥î Analysis error:', err);
+      console.error('[GW] Analysis error:', err?.message || err);
       setAnalysisStage('error');
       setAnalysisError(err.response?.data?.error || err.message || 'Connection error');
       
@@ -257,14 +254,14 @@ export function GrowthWorkspacePage() {
                   Fill out the form above and click "Run Full Analysis" to generate comprehensive growth insights across all 8 modules.
                 </p>
                 <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>ΓÇó Product Analysis - Understand your product's USP and features</li>
-                  <li>ΓÇó Market Discovery - Analyze market size and trends</li>
-                  <li>ΓÇó Audience Intelligence - Identify target segments and personas</li>
-                  <li>ΓÇó Competitor Analysis - Map competitive landscape</li>
-                  <li>ΓÇó Intent Prediction - Identify high-intent prospects</li>
-                  <li>ΓÇó Positioning Engine - Craft unique positioning</li>
-                  <li>ΓÇó Campaign Generator - Create campaign ideas</li>
-                  <li>ΓÇó Channel Recommendation - Find best marketing channels</li>
+                  <li>Product Analysis - Understand your product's USP and features</li>
+                  <li>Market Discovery - Analyze market size and trends</li>
+                  <li>Audience Intelligence - Identify target segments and personas</li>
+                  <li>Competitor Analysis - Map competitive landscape</li>
+                  <li>Intent Prediction - Identify high-intent prospects</li>
+                  <li>Positioning Engine - Craft unique positioning</li>
+                  <li>Campaign Generator - Create campaign ideas</li>
+                  <li>Channel Recommendation - Find best marketing channels</li>
                 </ul>
               </CardContent>
             </Card>

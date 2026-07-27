@@ -1,4 +1,4 @@
-import { runFullGrowthAnalysis, getGrowthWorkspaceResults } from './growthWorkspace.service.js';
+import { runFullGrowthAnalysis, getGrowthWorkspaceResults } from "./growthWorkspace.service.js";
 
 export const runFullAnalysisHandler = async (req, res) => {
   const { chatId } = req.params;
@@ -20,7 +20,7 @@ export const runFullAnalysisHandler = async (req, res) => {
   // Map frontend multi-step form arrays to string fields for the AI service
   const mappedInput = {
     ...input,
-    targetCountry: Array.isArray(input.targetCountries) && input.targetCountries.length > 0 ? input.targetCountries.join(', ') : 'Global',
+    targetCountry: Array.isArray(input.targetCountries) && input.targetCountries.length > 0 ? input.targetCountries[0] : 'United States',
     targetAudience: Array.isArray(input.audienceTypes) && input.audienceTypes.length > 0 ? input.audienceTypes.join(', ') : 'General Market',
     campaignGoal: Array.isArray(input.campaignGoals) && input.campaignGoals.length > 0 ? input.campaignGoals.join(', ') + (input.customGoal ? ` - ${input.customGoal}` : '') : (input.customGoal || 'Growth'),
     preferredChannel: Array.isArray(input.preferredChannels) && input.preferredChannels.length > 0 ? input.preferredChannels.join(', ') : 'Digital Channels',
@@ -39,22 +39,23 @@ export const runFullAnalysisHandler = async (req, res) => {
       console.info('[Growth Stage]', { stage: 'PIPELINE_FAILED', status: 'failed', error: result.error, chatId });
       return res.status(500).json({
         success: false,
-        error: result.error,
-        results: result.results,
-        steps: result.steps
+        error: result.error || 'Growth analysis failed',
+        results: result.results || null,
+        steps: result.steps || []
       });
     }
 
-    console.info('[Growth Stage]', { stage: 'PIPELINE_COMPLETE', status: 'completed', chatId });
-    console.log('✅ [Growth Workspace Controller] Analysis complete');
+    const stageLabel = result.overallStatus === 'PARTIAL' ? 'PIPELINE_PARTIAL' : 'PIPELINE_COMPLETE';
+    const stageStatus = result.overallStatus === 'PARTIAL' ? 'partial' : 'completed';
+    console.info('[Growth Stage]', { stage: stageLabel, status: stageStatus, overallStatus: result.overallStatus, chatId });
     
     return res.json({
       success: true,
-      chatId: result.chatId, // Return the actual or newly created chatId
+      chatId: result.chatId,
       results: result.results,
       steps: result.steps,
       summary: result.summary,
-      overallStatus: result.overallStatus,
+      overallStatus: result.overallStatus || 'completed',
       warnings: result.warnings || []
     });
 
@@ -147,6 +148,7 @@ export const getStatusHandler = async (req, res) => {
         'Loading website evidence',
         'Analysing product',
         'Discovering market signals',
+        'Analysing SEO',
         'Building audience intelligence',
         'Validating competitors',
         'Creating positioning',
@@ -157,28 +159,31 @@ export const getStatusHandler = async (req, res) => {
         'Finalising dashboard'
       ];
 
-      const currentStepIndex = runningStep >= 0 ? Math.min(runningStep + 3, 11) : completedSteps.length;
+      const currentStepIndex = runningStep >= 0 ? Math.min(runningStep + 3, 12) : completedSteps.length;
       
       return res.json({
         status: 'running',
         currentStep: currentStepIndex + 1,
-        totalSteps: 12,
-        stage: stageNames[Math.min(currentStepIndex, 11)] || 'Processing',
+        totalSteps: 13,
+        stage: stageNames[Math.min(currentStepIndex, 12)] || 'Processing',
         startedAt: null,
         completedSteps,
+        diagnostics: result.steps?.flatMap(s => s.diagnostics || []) || [],
         error: null
       });
     }
 
+    const totalStepsCount = result.steps?.length || 9;
     const completedCount = result.steps?.filter(s => s.status === 'completed').length || 0;
     
     return res.json({
-      status: completedCount >= 8 ? 'completed' : 'partial',
-      currentStep: 12,
-      totalSteps: 12,
+      status: completedCount >= totalStepsCount ? 'completed' : 'partial',
+      currentStep: totalStepsCount,
+      totalSteps: totalStepsCount,
       stage: 'Complete',
       startedAt: null,
       completedSteps: result.steps?.filter(s => s.status === 'completed').map(s => s.label) || [],
+      diagnostics: result.steps?.flatMap(s => s.diagnostics || []) || [],
       error: null
     });
 

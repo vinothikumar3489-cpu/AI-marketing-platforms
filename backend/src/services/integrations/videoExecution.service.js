@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { buildVideoContent } from './videoContentBuilder.js';
+import { buildVideoContent } from "./videoContentBuilder.js";
 
 function buildShotstackTimeline(scenes, aspectRatio, duration) {
   const ratio = aspectRatio || '16:9';

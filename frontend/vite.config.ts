@@ -19,4 +19,16 @@ export default defineConfig({
       }
     }
   },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'chart-vendor': ['recharts'],
+          'ui-vendor': ['lucide-react', 'sonner', 'clsx', 'tailwind-merge']
+        }
+      }
+    }
+  }
 });

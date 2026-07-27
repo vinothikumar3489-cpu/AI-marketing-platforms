@@ -77,9 +77,8 @@ export async function resolveProductIdentity({ prisma, userId, chatId, chatTitle
   }
 }
 
-/**
- * Resolve features from all possible ProductIntelligence paths.
- */
+import { InferenceStatus } from '../../shared/schemas/enums.js';
+
 export function resolveProductFeatures(productIntel) {
   const analysis = productIntel?.productAnalysis || {};
   const paths = [
@@ -131,7 +130,7 @@ export function resolveProductFeatures(productIntel) {
           description: `Inferred from product evidence`,
           benefit: '',
           source: 'product_summary_analysis',
-          inferenceStatus: 'AI_INFERRED_FROM_EVIDENCE',
+          inferenceStatus: InferenceStatus.AI_INFERRED,
         });
       }
     }

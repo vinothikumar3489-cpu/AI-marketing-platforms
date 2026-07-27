@@ -1,4 +1,4 @@
-import { prisma } from "../../config/prisma.js";
+import prisma from "../../config/prisma.js";
 import { normalizeEmail, normalizePhone } from "./crm-data.service.js";
 
 const VALID_DUPLICATE_STRATEGIES = [

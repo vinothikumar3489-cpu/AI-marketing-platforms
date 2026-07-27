@@ -5,6 +5,7 @@ export function generateActionPlan(intelligence) {
   const competitors = intelligence.competitorIntelligence || {};
   const market = intelligence.marketIntelligence || {};
   const audience = intelligence.audienceIntelligence || {};
+  const seo = intelligence.seoIntelligence || {};
 
   const companyName = company.name || 'Unknown';
   const industry = company.industry || 'Unknown';
@@ -16,6 +17,12 @@ export function generateActionPlan(intelligence) {
   const personaCount = (audience.personas || []).length;
   const hasCompetitors = directCount > 0;
   const now = new Date().toISOString();
+
+  // PART 16: SEO-specific evidence
+  const seoScore = seo.scores?.seoScore ?? seo.scores?.overall ?? null;
+  const keywordCount = seo.keywords?.length || 0;
+  const seoCompetitorCount = seo.competitors?.length || 0;
+  const hasSeoData = seoScore !== null || keywordCount > 0 || seoCompetitorCount > 0;
 
   const actionPlan = {
     day7: [],
@@ -110,6 +117,73 @@ export function generateActionPlan(intelligence) {
     why: 'Analytics infrastructure must be verified before any growth campaigns begin. Baseline metrics are required to measure the impact of all subsequent actions.',
     evidence: { source: 'Analytics audit requirement', confidence: 90, collectedAt: now }
   });
+
+  // PART 16: SEO-specific actions based on evidence
+  if (!hasSeoData) {
+    actionPlan.day7.push({
+      title: 'Run comprehensive SEO technical audit',
+      priority: 'High',
+      roi: 'Foundation for organic search visibility',
+      impact: 'Identifies technical barriers to search engine crawling and indexing',
+      difficulty: 'Medium',
+      dependencies: ['Website URL', 'PageSpeed Insights or Lighthouse tool', 'Screaming Frog or similar crawler'],
+      timeline: '7 days',
+      owner: 'SEO / Technical Marketing',
+      kpis: ['Technical audit report with priority fixes', 'Core Web Vitals baseline metrics', 'Crawlability assessment'],
+      businessJustification: 'SEO technical barriers prevent organic search visibility regardless of content quality.',
+      why: 'No SEO intelligence data available. A comprehensive technical audit (PageSpeed, Lighthouse, crawlability) is required to establish baseline SEO health and identify technical barriers.',
+      evidence: { source: 'SEO intelligence gap analysis', confidence: 100, collectedAt: now }
+    });
+  } else if (seoScore !== null && seoScore < 50) {
+    actionPlan.day7.push({
+      title: 'Address critical SEO technical issues',
+      priority: 'Critical',
+      roi: 'Immediate improvement in organic search visibility',
+      impact: 'Removes barriers preventing search engine indexing and ranking',
+      difficulty: 'Medium',
+      dependencies: ['SEO technical audit results', 'Development team availability'],
+      timeline: '7 days',
+      owner: 'SEO / Engineering',
+      kpis: ['Fix all critical technical issues', 'Improve Core Web Vitals to passing threshold', 'Resolve crawlability errors'],
+      businessJustification: 'SEO score below 50 indicates critical technical barriers preventing organic search visibility.',
+      why: 'Current SEO score is ' + seoScore + '/100, indicating significant technical barriers. Critical issues (Core Web Vitals, crawlability, meta tags) must be addressed before content optimization can be effective.',
+      evidence: { source: 'SEO technical audit', confidence: 95, collectedAt: now }
+    });
+  }
+
+  if (hasSeoData && keywordCount > 0) {
+    actionPlan.day30.push({
+      title: 'Develop keyword targeting strategy based on evidence',
+      priority: 'High',
+      roi: 'Organic traffic growth through targeted content creation',
+      impact: 'Content strategy aligned with search demand and competitive opportunity',
+      difficulty: 'Medium',
+      dependencies: ['Keyword intelligence data', 'Content team availability'],
+      timeline: '30 days',
+      owner: 'SEO / Content Marketing',
+      kpis: ['Keyword targeting document with priority tiers', 'Content calendar aligned with keyword opportunities', 'Competitor keyword gap analysis'],
+      businessJustification: 'Keyword-driven content strategy converts 3-5x better than generic content.',
+      why: keywordCount + ' keywords identified from SEO intelligence. A structured keyword targeting strategy prioritizes high-opportunity keywords based on volume, difficulty, and competitive gaps.',
+      evidence: { source: 'Keyword intelligence analysis', confidence: 85, collectedAt: now }
+    });
+  }
+
+  if (hasSeoData && seoCompetitorCount > 0) {
+    actionPlan.day60.push({
+      title: 'Build SEO competitor gap analysis and content strategy',
+      priority: 'High',
+      roi: 'Organic market share growth through competitive content gaps',
+      impact: 'Content strategy targeting competitor weaknesses and opportunity keywords',
+      difficulty: 'Medium',
+      dependencies: ['SEO competitor intelligence', 'Keyword targeting strategy', 'Content team'],
+      timeline: '60 days',
+      owner: 'SEO / Content Marketing',
+      kpis: ['Competitor keyword gap document', 'Content opportunity prioritization matrix', 'Target content calendar'],
+      businessJustification: 'Competitor gap analysis identifies high-opportunity keywords where competitors are weak.',
+      why: seoCompetitorCount + ' SEO competitors identified. Systematic analysis of competitor keyword rankings and content gaps identifies opportunities to capture organic market share through targeted content creation.',
+      evidence: { source: 'SEO competitor intelligence', confidence: 80, collectedAt: now }
+    });
+  }
 
   // ============================================
   // DAY 30 ACTIONS - Research & Validation

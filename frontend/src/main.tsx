@@ -4,6 +4,15 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './styles.css';
 import { AuthProvider } from './context/AuthContext';
+import { Toaster } from 'sonner';
+
+// Log frontend build info on startup
+console.log('[FRONTEND BUILD INFO]', {
+  gitCommit: import.meta.env.VITE_GIT_COMMIT || 'unknown',
+  buildTimestamp: import.meta.env.VITE_BUILD_TIMESTAMP || new Date().toISOString(),
+  frontendVersion: '1.0.0',
+  environment: import.meta.env.MODE || 'development'
+});
 
 // Build metadata logging for development/debug
 function getBuildMetadata() {
@@ -31,6 +40,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <AuthProvider>
         <App />
+        <Toaster theme="dark" position="top-right" richColors />
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>

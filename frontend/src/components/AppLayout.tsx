@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import { Bot, Home, Rocket, Search, Settings, User, WandSparkles, Menu, X, Briefcase, PenTool } from 'lucide-react';
+import { Bot, Home, Rocket, Search, Settings, User, WandSparkles, Menu, X, Briefcase, PenTool, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useProject } from '../context/ProjectContext';
 import { useState } from 'react';
@@ -11,6 +11,7 @@ const links = [
   { to: '/app/seo', label: 'SEO Intelligence', icon: Search },
   { to: '/app/automation-center', label: 'AI Automation', icon: Bot },
   { to: '/app/content-studio', label: 'Content Studio', icon: PenTool },
+  { to: '/app/email-builder', label: 'Email Builder', icon: Mail },
   { to: '/app/profile', label: 'Profile', icon: User },
   { to: '/app/settings', label: 'Settings', icon: Settings },
 ];
@@ -23,7 +24,7 @@ export default function AppLayout() {
       <aside className="sidebar">
         <div className="brand" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button className="ghost-btn small" onClick={() => setDrawerOpen(true)} style={{ padding: '6px', border: 'none', background: 'transparent' }}><Menu size={24} color="#fff" /></button>
-          <span className="brand-icon"><WandSparkles size={18} /></span><span>AI Marketform</span>
+          <span className="brand-icon"><WandSparkles size={18} /></span><span>AI Marketing Platform</span>
         </div>
         <nav>
           {links.map(link => {
@@ -83,7 +84,7 @@ function ProjectDropdown() {
 
   const handleCreate = async () => {
     setOpen(false);
-    await createChat('New Project');
+    await createChat('New Project', 'USER_CLICK_PROJECT_DROPDOWN');
   };
 
   return (

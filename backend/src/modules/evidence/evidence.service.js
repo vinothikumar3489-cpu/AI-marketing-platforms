@@ -1,4 +1,4 @@
-import { prisma } from '../../config/prisma.js';
+import prisma from "../../config/prisma.js";
 import { collectWebsiteEvidence } from "./websiteEvidence.service.js";
 import { collectRobotsEvidence } from "./robotsEvidence.service.js";
 import { collectSitemapEvidence } from "./sitemapEvidence.service.js";
@@ -38,7 +38,7 @@ export async function collectEvidence(websiteUrl, options = {}) {
   let $ = null;
   try {
     const cheerio = await import("cheerio");
-    const scraperModule = await import("../../services/scraper.service.js");
+    const scraperModule = await import("../../domains/research/services/scraper.service.js");
     const scrapeResult = await scraperModule.scrapeWebsite({ websiteUrl, companyName: companyName || "" });
     if (scrapeResult.success && scrapeResult.scrapedData?.html) {
       $ = cheerio.load(scrapeResult.scrapedData.html);

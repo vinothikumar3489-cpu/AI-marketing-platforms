@@ -15,6 +15,7 @@ import {
   regenerateContentAsset, getIntegrationHealth, fromAssetToEmailCampaign
 } from '../lib/api';
 import { useProject } from '../context/ProjectContext';
+import { EmailWorkflow } from './email/EmailWorkflow';
 
 // ============================================
 // CONSTANTS
@@ -229,9 +230,10 @@ function ContentGeneratorPanel({
   brief: any; evidenceContext: any; onGenerated: (result: any) => void;
   selectedChatId: string; abortRef: React.MutableRefObject<AbortController | null>;
 }) {
-  const [selectedType, setSelectedType] = useState<ContentType>('blog_article');
+  const [selectedType, setSelectedType] = useState<ContentType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [activeGroup, setActiveGroup] = useState<string>('long-form');
   const [contentGoal, setContentGoal] = useState<string>('');
   const [contentTone, setContentTone] = useState<string>('');
@@ -240,13 +242,22 @@ function ContentGeneratorPanel({
   const GOALS = ['Awareness', 'Education', 'Engagement', 'Lead generation', 'Trial conversion', 'Product announcement'];
   const TONES = ['Professional', 'Educational', 'Conversational', 'Bold', 'Technical', 'Founder-led'];
 
+  const handleGroupChange = useCallback((group: string) => {
+    setActiveGroup(group);
+    const groupTypes = CONTENT_TYPES.filter(t => t.group === group);
+    if (groupTypes.length > 0) {
+      setSelectedType(groupTypes[0].value as ContentType);
+    }
+  }, []);
+
   const handleGenerate = useCallback(async () => {
-    // PART 9: In-flight protection to prevent duplicate POSTs
+    if (!selectedType) { setError('Select a content type first'); return; }
     if (!selectedChatId || loading || generatingRef.current) return;
     
     generatingRef.current = true;
     setLoading(true);
     setError(null);
+    setStatusMessage('Generating...');
     onGenerated(null);
 
     if (abortRef.current) abortRef.current.abort();
@@ -254,23 +265,60 @@ function ContentGeneratorPanel({
     const signal = abortRef.current.signal;
 
     try {
-      const res = await generateContentItem(selectedChatId, selectedType, signal);
+      const options: any = {
+        _uiTab: activeGroup
+      };
+      
+      if (contentGoal) options.goal = contentGoal;
+      if (contentTone) options.tone = contentTone;
+      
+      if (selectedType === 'email_copy') {
+        options.emailType = selectedType;
+      }
+      
+      setStatusMessage('Generating with AI...');
+      const res = await generateContentItem(selectedChatId, selectedType, signal, options);
       if (signal.aborted) return;
+      
       if (res?.success !== false && res?.data) {
-        onGenerated(res.data);
+        if (res.data?.content?._status === 'generation_failed' || res.data?.content?._status === 'blocked') {
+          setError(res.data.content?._reason || `Generation ${res.data.content?._status}`);
+          setStatusMessage(null);
+        } else {
+          setStatusMessage('Repairing...');
+          await new Promise(r => setTimeout(r, 200));
+          setStatusMessage('Improving quality...');
+          await new Promise(r => setTimeout(r, 200));
+          setStatusMessage('Finalizing...');
+          onGenerated(res.data);
+          setStatusMessage(null);
+        }
       } else if (res?.success !== false && res?.content) {
+        setStatusMessage('Finalizing...');
         onGenerated(res);
+        setStatusMessage(null);
+      } else if (res?.success === false && res?.error) {
+        const errMsg = typeof res.error === 'string' ? res.error : res.error?.message || res.error?.code || 'Generation failed';
+        const stage = res.error?.stage ? ` [${res.error.stage}]` : '';
+        const code = res.code || res.error?.code || '';
+        setError(`${errMsg}${code ? ` (${code})` : ''}${stage}`);
+        setStatusMessage(null);
+      } else if (res?.content?._status === 'generation_failed' || res?._status === 'generation_failed') {
+        setError(res?.content?._reason || res?._reason || 'Content generation failed');
+        setStatusMessage(null);
       } else {
-        setError('Generation returned empty. Ensure product analysis is complete.');
+        setError(res?.error?.message || res?.error || res?.message || 'Generation failed. Check server logs.');
+        setStatusMessage(null);
       }
     } catch (err: any) {
       if (err.name === 'AbortError') return;
       setError(err.message || 'Generation failed. Check server connection.');
+      setStatusMessage(null);
     } finally {
       generatingRef.current = false;
       if (!abortRef.current?.signal.aborted) setLoading(false);
     }
-  }, [selectedChatId, selectedType, loading, onGenerated, abortRef]);
+  }, [selectedChatId, selectedType, loading, onGenerated, abortRef, activeGroup, contentGoal, contentTone]);
 
   const grouped = TYPE_GROUPS.map(group => ({
     group,
@@ -285,7 +333,7 @@ function ContentGeneratorPanel({
         {grouped.map(g => (
           <button
             key={g.group}
-            onClick={() => setActiveGroup(g.group)}
+            onClick={() => handleGroupChange(g.group)}
             style={{
               padding: '4px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer',
               fontSize: '10px', fontWeight: 600, background: activeGroup === g.group ? `${C.accent}20` : 'transparent', color: activeGroup === g.group ? C.accent : C.muted,
@@ -329,14 +377,17 @@ function ContentGeneratorPanel({
         <button
           onClick={handleGenerate}
           disabled={loading || !selectedChatId}
-          style={{
-            ...S.btn(C.brand), padding: '8px 20px', opacity: loading ? 0.6 : 1,
-            cursor: loading ? 'not-allowed' : 'pointer',
-          }}
+          className="primary-btn"
+          style={{ padding: '10px 24px', opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
         >
           {loading ? <><Loader2 className="spin" size={14} /> Generating...</> : <><Sparkles size={14} /> Generate</>}
         </button>
-        {error && (
+          {statusMessage && (
+          <div style={{ fontSize: '11px', color: C.brand, display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
+            <Loader2 className="spin" size={12} /> {statusMessage}
+          </div>
+        )}
+          {error && (
           <div style={{ fontSize: '11px', color: C.critical, display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
             <AlertTriangle size={12} /> {error}
           </div>
@@ -443,15 +494,15 @@ function EvidenceUsedPanel({ content }: { content: any }) {
 // ============================================
 
 function LinkedInRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
-  const fullText = [content.hook, content.body, content.cta].filter(Boolean).join('\n\n');
+  const fullText = [toText(content.hook), toText(content.body), toText(content.cta)].filter(Boolean).join('\n\n');
   return (
     <div style={S.card}>
       <div style={{ ...S.cardHeader, marginBottom: '4px' }}><Linkedin size={18} style={{ color: C.brand }} /><span style={S.cardTitle}>LinkedIn Post</span></div>
-      <div style={{ fontSize: '11px', color: C.dim, marginBottom: '8px' }}>Angle: {content.angle} {content.audience ? `| Audience: ${content.audience}` : ''}</div>
+      <div style={{ fontSize: '11px', color: C.dim, marginBottom: '8px' }}>Angle: {toText(content.angle)} {content.audience ? `| Audience: ${toText(content.audience)}` : ''}</div>
       <div style={S.previewBox}>
-        <div style={{ fontWeight: 600, color: C.text, marginBottom: '8px' }}>{content.hook}</div>
-        <div style={{ color: C.muted, marginBottom: '8px' }}>{content.body}</div>
-        {content.cta && <div style={{ color: C.brand, fontWeight: 600, marginTop: '8px' }}>{content.cta}</div>}
+        <div style={{ fontWeight: 600, color: C.text, marginBottom: '8px' }}>{toText(content.hook)}</div>
+        <div style={{ color: C.muted, marginBottom: '8px' }}>{toText(content.body)}</div>
+        {content.cta && <div style={{ color: C.brand, fontWeight: 600, marginTop: '8px' }}>{toText(content.cta)}</div>}
       </div>
       {content.hashtags?.length > 0 && (
         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '8px' }}>
@@ -465,25 +516,25 @@ function LinkedInRenderer({ content, onCopy }: { content: any; onCopy: (text: st
 
 function InstagramRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
   const captionWithHashtags = content.hashtags?.length
-    ? content.caption + '\n\n' + content.hashtags.join(' ')
-    : content.caption;
+    ? toText(content.caption) + '\n\n' + content.hashtags.join(' ')
+    : toText(content.caption);
   return (
     <div style={S.card}>
       <div style={{ ...S.cardHeader, marginBottom: '4px' }}><Instagram size={18} style={{ color: C.pink }} /><span style={S.cardTitle}>Instagram Post</span></div>
       <div style={{ fontSize: '11px', color: C.dim, marginBottom: '8px' }}>
-        {content.angle ? `Angle: ${content.angle} | ` : ''}
-        {content.audience ? `Audience: ${content.audience}` : ''}
+        {content.angle ? `Angle: ${toText(content.angle)} | ` : ''}
+        {content.audience ? `Audience: ${toText(content.audience)}` : ''}
       </div>
       {content.visualConcept && (
         <div style={{ padding: '8px 10px', background: 'rgba(168,85,247,0.08)', borderRadius: '6px', border: '1px solid rgba(168,85,247,0.2)', fontSize: '11px', color: C.purple, marginBottom: '10px' }}>
-          <Camera size={12} style={{ marginRight: '4px' }} /> Visual concept: {content.visualConcept}
+          <Camera size={12} style={{ marginRight: '4px' }} /> Visual concept: {toText(content.visualConcept)}
         </div>
       )}
       <div style={S.previewBox}>
-        <div style={{ fontWeight: 600, color: C.text, marginBottom: '8px' }}>{content.hook}</div>
+        <div style={{ fontWeight: 600, color: C.text, marginBottom: '8px' }}>{toText(content.hook)}</div>
         <div style={{ whiteSpace: 'pre-wrap', color: C.muted }}>{captionWithHashtags}</div>
       </div>
-      {content.cta && <div style={{ color: C.pink, fontWeight: 600, marginTop: '8px', fontSize: '13px' }}>{content.cta}</div>}
+      {content.cta && <div style={{ color: C.pink, fontWeight: 600, marginTop: '8px', fontSize: '13px' }}>{toText(content.cta)}</div>}
       <CopyButton text={captionWithHashtags} onCopy={onCopy} />
     </div>
   );
@@ -491,30 +542,30 @@ function InstagramRenderer({ content, onCopy }: { content: any; onCopy: (text: s
 
 function TwitterRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
   const fullPost = content.hashtags?.length
-    ? content.post + ' ' + content.hashtags.join(' ')
-    : content.post;
+    ? toText(content.post) + ' ' + content.hashtags.join(' ')
+    : toText(content.post);
   return (
     <div style={S.card}>
       <div style={{ ...S.cardHeader, marginBottom: '4px' }}><Twitter size={18} style={{ color: C.cyan }} /><span style={S.cardTitle}>X (Twitter) Post</span></div>
-      <div style={{ fontSize: '11px', color: C.dim, marginBottom: '4px' }}>Angle: {content.angle}</div>
+      <div style={{ fontSize: '11px', color: C.dim, marginBottom: '4px' }}>Angle: {toText(content.angle)}</div>
       <div style={S.previewBox}>{fullPost}</div>
       <div style={{ fontSize: '10px', color: C.dim, marginTop: '4px' }}>{fullPost.length}/280 chars</div>
-      {content.cta && <div style={{ color: C.cyan, fontWeight: 600, marginTop: '6px', fontSize: '13px' }}>{content.cta}</div>}
+      {content.cta && <div style={{ color: C.cyan, fontWeight: 600, marginTop: '6px', fontSize: '13px' }}>{toText(content.cta)}</div>}
       <CopyButton text={fullPost} onCopy={onCopy} />
     </div>
   );
 }
 
 function FacebookRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
-  const fullText = [content.headline, content.body, content.cta].filter(Boolean).join('\n\n');
+  const fullText = [toText(content.headline), toText(content.body), toText(content.cta)].filter(Boolean).join('\n\n');
   return (
     <div style={S.card}>
       <div style={{ ...S.cardHeader, marginBottom: '4px' }}><Facebook size={18} style={{ color: C.brand }} /><span style={S.cardTitle}>Facebook Post</span></div>
-      <div style={{ fontSize: '11px', color: C.dim, marginBottom: '8px' }}>Angle: {content.angle} {content.audience ? `| Audience: ${content.audience}` : ''}</div>
+      <div style={{ fontSize: '11px', color: C.dim, marginBottom: '8px' }}>Angle: {toText(content.angle)} {content.audience ? `| Audience: ${toText(content.audience)}` : ''}</div>
       <div style={S.previewBox}>
-        {content.headline && <div style={{ fontWeight: 600, color: C.text, marginBottom: '8px' }}>{content.headline}</div>}
-        <div style={{ color: C.muted, marginBottom: '8px' }}>{content.body}</div>
-        {content.cta && <div style={{ color: C.brand, fontWeight: 600, marginTop: '8px' }}>{content.cta}</div>}
+        {content.headline && <div style={{ fontWeight: 600, color: C.text, marginBottom: '8px' }}>{toText(content.headline)}</div>}
+        <div style={{ color: C.muted, marginBottom: '8px' }}>{toText(content.body)}</div>
+        {content.cta && <div style={{ color: C.brand, fontWeight: 600, marginTop: '8px' }}>{toText(content.cta)}</div>}
       </div>
       <CopyButton text={fullText} onCopy={onCopy} />
     </div>
@@ -523,9 +574,9 @@ function FacebookRenderer({ content, onCopy }: { content: any; onCopy: (text: st
 
 function YouTubeRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
   const descParts = [
-    content.openingHook,
+    toText(content.openingHook),
     '',
-    content.description,
+    toText(content.description),
     '',
     content.chapters?.length ? 'Chapters:' : '',
     ...(content.chapters || []).map((ch: any) => `${ch.timestamp} — ${ch.title}`),
@@ -535,13 +586,13 @@ function YouTubeRenderer({ content, onCopy }: { content: any; onCopy: (text: str
     '',
     content.hashtags?.length ? content.hashtags.join(' ') : '',
     '',
-    content.cta,
+    toText(content.cta),
   ].filter(Boolean).join('\n');
 
   return (
     <div style={S.card}>
       <div style={{ ...S.cardHeader, marginBottom: '4px' }}><Youtube size={18} style={{ color: C.critical }} /><span style={S.cardTitle}>YouTube Description</span></div>
-      <div style={{ fontSize: '13px', fontWeight: 700, color: C.text, marginBottom: '4px' }}>{content.title}</div>
+      <div style={{ fontSize: '13px', fontWeight: 700, color: C.text, marginBottom: '4px' }}>{toText(content.title)}</div>
       <div style={S.previewBox}>
         <div style={{ color: C.muted, whiteSpace: 'pre-wrap' }}>{descParts}</div>
       </div>
@@ -556,41 +607,42 @@ function YouTubeRenderer({ content, onCopy }: { content: any; onCopy: (text: str
 }
 
 function EmailRenderer({ content, onCopy, selectedChatId, onAddToCampaign }: { content: any; onCopy: (text: string) => void; selectedChatId?: string; onAddToCampaign?: (assetId: string) => void }) {
+  const safe = (v: any) => typeof v === 'string' ? v : toText(v);
   const rendered = [
-    `Subject: ${content.subject}`,
-    content.previewText ? `Preview text: ${content.previewText}` : '',
+    `Subject: ${safe(content.subject)}`,
+    content.previewText ? `Preview text: ${safe(content.previewText)}` : '',
     '',
-    content.greeting,
+    safe(content.greeting),
     '',
-    content.opening,
+    safe(content.opening),
     '',
-    ...content.bodyParagraphs.map((p: string) => p + '\n'),
-    content.bulletPoints?.length ? content.bulletPoints.map((b: string) => `• ${b}`).join('\n') : '',
+    ...(content.bodyParagraphs || []).map((p: any) => safe(p) + '\n'),
+    content.bulletPoints?.length ? content.bulletPoints.map((b: any) => `• ${safe(b)}`).join('\n') : '',
     '',
-    content.ctaText,
+    safe(content.ctaText),
     '',
-    content.closing,
+    safe(content.closing),
     '',
-    content.signature,
-    content.complianceNote ? `\n${content.complianceNote}` : '',
+    safe(content.signature),
+    content.complianceNote ? `\n${safe(content.complianceNote)}` : '',
   ].filter(Boolean).join('\n');
 
   return (
     <div style={S.card}>
       <div style={{ ...S.cardHeader, marginBottom: '4px' }}><Mail size={18} style={{ color: C.purple }} /><span style={S.cardTitle}>Email Copy</span></div>
       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '8px' }}>
-        <span style={S.tag(C.purple)}>{content.emailType?.replace(/_/g, ' ')}</span>
-        {content.personalizationFields?.map((f: string, i: number) => <span key={i} style={S.tag(C.needsImprovement)}>{f}</span>)}
+        <span style={S.tag(C.purple)}>{safe(content.emailType)?.replace(/_/g, ' ')}</span>
+        {content.personalizationFields?.map((f: any, i: number) => <span key={i} style={S.tag(C.needsImprovement)}>{safe(f)}</span>)}
       </div>
       <div style={S.previewBox}>
-        <div style={{ fontSize: '14px', fontWeight: 700, color: C.text, marginBottom: '4px' }}>{content.subject}</div>
-        {content.previewText && <div style={{ fontSize: '11px', color: C.dim, marginBottom: '12px' }}>{content.previewText}</div>}
+        <div style={{ fontSize: '14px', fontWeight: 700, color: C.text, marginBottom: '4px' }}>{safe(content.subject)}</div>
+        {content.previewText && <div style={{ fontSize: '11px', color: C.dim, marginBottom: '12px' }}>{safe(content.previewText)}</div>}
         <div style={{ whiteSpace: 'pre-wrap', color: C.muted, lineHeight: 1.7 }}>{rendered}</div>
       </div>
       <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
         <CopyButton text={rendered} onCopy={onCopy} />
         {content._assetId && selectedChatId && onAddToCampaign && (
-          <button onClick={() => onAddToCampaign(content._assetId)} style={{ ...S.smallButton, background: `${C.purple}15`, color: C.purple, border: `1px solid ${C.purple}30` }}>
+          <button onClick={() => onAddToCampaign(content._assetId)} className="primary-btn small">
             <Mail size={12} /> Add to Email Campaign
           </button>
         )}
@@ -600,15 +652,16 @@ function EmailRenderer({ content, onCopy, selectedChatId, onAddToCampaign }: { c
 }
 
 function CreativeBriefRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
+  const safe = (v: any) => typeof v === 'string' ? v : toText(v);
   const fullText = [
-    `Objective: ${content.objective}`,
-    `Audience: ${content.audience}`,
-    `Message: ${content.message}`,
-    `Visual: ${content.visualDirection}`,
-    `Brand signals: ${content.brandSignals?.join(', ')}`,
-    `Required text: ${content.requiredText}`,
-    `CTA: ${content.cta}`,
-    `Format: ${content.format}`,
+    `Objective: ${safe(content.objective)}`,
+    `Audience: ${safe(content.audience)}`,
+    `Message: ${safe(content.message)}`,
+    `Visual: ${safe(content.visualDirection)}`,
+    `Brand signals: ${(content.brandSignals || []).map(safe).join(', ')}`,
+    `Required text: ${safe(content.requiredText)}`,
+    `CTA: ${safe(content.cta)}`,
+    `Format: ${safe(content.format)}`,
     content.evidenceLimitations?.length ? `Limitations: ${content.evidenceLimitations.join('; ')}` : '',
   ].filter(Boolean).join('\n');
 
@@ -617,14 +670,14 @@ function CreativeBriefRenderer({ content, onCopy }: { content: any; onCopy: (tex
       <div style={{ ...S.cardHeader, marginBottom: '4px' }}><PenTool size={18} style={{ color: C.needsImprovement }} /><span style={S.cardTitle}>Creative Brief</span></div>
       <div style={S.previewBox}>
         <div style={{ display: 'grid', gap: '10px' }}>
-          {content.objective && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>OBJECTIVE</span><span style={{ color: C.text }}>{content.objective}</span></div>}
-          {content.audience && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>AUDIENCE</span><span style={{ color: C.text }}>{content.audience}</span></div>}
-          {content.message && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>MESSAGE</span><span style={{ color: C.text }}>{content.message}</span></div>}
-          {content.visualDirection && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>VISUAL DIRECTION</span><span style={{ color: C.text }}>{content.visualDirection}</span></div>}
-          {content.brandSignals?.length > 0 && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>BRAND SIGNALS</span><span style={{ color: C.text }}>{content.brandSignals.join(', ')}</span></div>}
-          {content.requiredText && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>REQUIRED TEXT</span><span style={{ color: C.accent, fontWeight: 600 }}>{content.requiredText}</span></div>}
-          {content.format && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>FORMAT</span><span style={S.tag(C.needsImprovement)}>{content.format}</span></div>}
-          {content.evidenceLimitations?.length > 0 && <div><span style={{ color: C.critical, fontSize: '10px', display: 'block' }}>LIMITATIONS</span>{content.evidenceLimitations.map((l: string, i: number) => <div key={i} style={{ color: C.muted, fontSize: '11px' }}>⚠ {l}</div>)}</div>}
+          {content.objective && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>OBJECTIVE</span><span style={{ color: C.text }}>{safe(content.objective)}</span></div>}
+          {content.audience && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>AUDIENCE</span><span style={{ color: C.text }}>{safe(content.audience)}</span></div>}
+          {content.message && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>MESSAGE</span><span style={{ color: C.text }}>{safe(content.message)}</span></div>}
+          {content.visualDirection && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>VISUAL DIRECTION</span><span style={{ color: C.text }}>{safe(content.visualDirection)}</span></div>}
+          {content.brandSignals?.length > 0 && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>BRAND SIGNALS</span><span style={{ color: C.text }}>{(content.brandSignals || []).map(safe).join(', ')}</span></div>}
+          {content.requiredText && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>REQUIRED TEXT</span><span style={{ color: C.accent, fontWeight: 600 }}>{safe(content.requiredText)}</span></div>}
+          {content.format && <div><span style={{ color: C.dim, fontSize: '10px', display: 'block' }}>FORMAT</span><span style={S.tag(C.needsImprovement)}>{safe(content.format)}</span></div>}
+          {content.evidenceLimitations?.length > 0 && <div><span style={{ color: C.critical, fontSize: '10px', display: 'block' }}>LIMITATIONS</span>{content.evidenceLimitations.map((l: any, i: number) => <div key={i} style={{ color: C.muted, fontSize: '11px' }}>⚠ {safe(l)}</div>)}</div>}
         </div>
       </div>
       <CopyButton text={fullText} onCopy={onCopy} />
@@ -665,7 +718,7 @@ function VideoScriptRenderer({ content, onCopy }: { content: any; onCopy: (text:
 function CopyButton({ text, onCopy }: { text: string; onCopy: (text: string) => void }) {
   return (
     <div style={{ marginTop: '8px', display: 'flex', gap: '4px' }}>
-      <button onClick={() => onCopy(text)} style={S.btn(C.accent)}><Copy size={12} /> Copy</button>
+      <button onClick={() => onCopy(text)} className="primary-btn small"><Copy size={12} /> Copy</button>
     </div>
   );
 }
@@ -701,7 +754,7 @@ function ContentPreview({ content, selectedChatId, onAddToCampaign }: { content:
   } else if (contentType === 'youtube_description' || (content.openingHook && content.description)) {
     renderer = <YouTubeRenderer content={content} onCopy={handleCopy} />;
   } else if (contentType === 'email_copy' || (content.emailType && content.subject)) {
-    renderer = <EmailRenderer content={content} onCopy={handleCopy} selectedChatId={selectedChatId} onAddToCampaign={onAddToCampaign} />;
+    renderer = <EmailWorkflow content={content} />;
   } else if (contentType === 'creative_brief' || (content.objective && content.visualDirection)) {
     renderer = <CreativeBriefRenderer content={content} onCopy={handleCopy} />;
   } else if (contentType === 'video_script' || (content.duration && content.scenes)) {
@@ -836,7 +889,7 @@ function AssetDetailPanel({ asset, onClose, onRegenerate }: { asset: any; onClos
       </div>
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-        <button onClick={() => onRegenerate(asset)} style={S.btn(C.brand)}><RefreshCw size={12} /> Regenerate</button>
+        <button onClick={() => onRegenerate(asset)} className="primary-btn small"><RefreshCw size={12} /> Regenerate</button>
       </div>
 
       <div>
@@ -870,10 +923,10 @@ function AssetDetailPanel({ asset, onClose, onRegenerate }: { asset: any; onClos
 }
 
 function AssetLibraryPanel({
-  selectedChatId, onRegenerate, onAssetOpen, selectedAsset, onCloseAsset, view
+  selectedChatId, onRegenerate, onAssetOpen, selectedAsset, onCloseAsset, view, refreshKey
 }: {
   selectedChatId: string; onRegenerate: (asset: any) => void;
-  onAssetOpen: (asset: any) => void; selectedAsset: any; onCloseAsset: () => void; view: string;
+  onAssetOpen: (asset: any) => void; selectedAsset: any; onCloseAsset: () => void; view: string; refreshKey?: number;
 }) {
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -905,7 +958,7 @@ function AssetLibraryPanel({
     setSelectedAssetId(null);
     onCloseAsset();
     if (selectedChatId) loadAssets();
-  }, [selectedChatId, loadAssets, onCloseAsset]);
+  }, [selectedChatId, loadAssets, onCloseAsset, refreshKey]);
 
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
 
@@ -1054,7 +1107,10 @@ export default function AIContentStudio() {
   const [readiness, setReadiness] = useState<any>(null);
   const [readinessLoading, setReadinessLoading] = useState(false);
   const [addingToCampaign, setAddingToCampaign] = useState(false);
+  const [assetRefreshKey, setAssetRefreshKey] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
+  const requestVersionRef = useRef(0);
+  const pendingRequestsRef = useRef<Set<string>>(new Set());
 
   const handleAddToEmailCampaign = useCallback(async (assetId: string) => {
     if (!selectedChatId || addingToCampaign) return;
@@ -1074,6 +1130,34 @@ export default function AIContentStudio() {
     }
   }, [selectedChatId, addingToCampaign]);
 
+  const safeFetch = useCallback(async <T extends unknown>(
+    key: string,
+    fetcher: (signal: AbortSignal) => Promise<T>,
+    setter: (data: T | null) => void,
+    onFinally?: () => void
+  ) => {
+    const version = requestVersionRef.current;
+    const requestId = `${selectedChatId}:${key}`;
+
+    if (!selectedChatId) return;
+    if (pendingRequestsRef.current.has(requestId)) return;
+
+    pendingRequestsRef.current.add(requestId);
+    if (abortRef.current?.signal.aborted) return;
+
+    try {
+      const data = await fetcher(abortRef.current.signal);
+      if (!abortRef.current.signal.aborted && requestVersionRef.current === version) {
+        setter(data ?? null);
+      }
+    } catch {
+      if (!abortRef.current?.signal.aborted) setter(null);
+    } finally {
+      pendingRequestsRef.current.delete(requestId);
+      onFinally?.();
+    }
+  }, [selectedChatId]);
+
   useEffect(() => {
     setBrief(null);
     setGeneratedContent(null);
@@ -1088,58 +1172,40 @@ export default function AIContentStudio() {
       return;
     }
 
+    requestVersionRef.current++;
     if (abortRef.current) abortRef.current.abort();
     abortRef.current = new AbortController();
+    pendingRequestsRef.current.clear();
 
     setContextLoading(true);
     setBriefLoading(true);
     setReadinessLoading(true);
 
-    getEvidenceContext(selectedChatId)
-      .then(ctx => {
-        if (ctx && typeof ctx === 'object') setEvidenceContext(ctx);
-        else setEvidenceContext(null);
-      })
-      .catch(() => setEvidenceContext(null))
-      .finally(() => setContextLoading(false));
+    safeFetch('evidenceContext',
+      () => getEvidenceContext(selectedChatId),
+      (d) => setEvidenceContext(d),
+      () => setContextLoading(false)
+    );
 
-    getContentBrief(selectedChatId)
-      .then(res => {
-        if (res && typeof res === 'object') setBrief(res);
-        else setBrief(null);
-      })
-      .catch(() => setBrief(null))
-      .finally(() => setBriefLoading(false));
+    safeFetch('contentBrief',
+      () => getContentBrief(selectedChatId) as Promise<any>,
+      (d) => setBrief(d),
+      () => setBriefLoading(false)
+    );
 
-    // Source of truth for content readiness is the backend evidence-readiness endpoint.
-    // PART 10: Preserve previous readiness during refetch to prevent flicker
-    setReadinessLoading(true);
-    api.get(`/chats/${selectedChatId}/evidence-readiness`)
-      .then((res: any) => {
-        console.info("[Content Studio] Evidence-readiness response", {
-          chatId: selectedChatId,
-          responseType: typeof res,
-          responseKeys: res ? Object.keys(res) : null,
-          contentGenerationReady: res?.contentGenerationReady,
-          hasProductIntelligence: res?.hasProductIntelligence,
-          fullResponse: res
-        });
-        // Handle both wrapped and unwrapped response shapes
-        const readinessData = res?.data || res;
-        if (readinessData && typeof readinessData === 'object') {
-          setReadiness(readinessData);
-        }
-      })
-      .catch((err) => {
-        console.error("[Content Studio] Evidence-readiness fetch failed", err);
-        // Don't setReadiness(null) on error - preserve previous value
-      })
-      .finally(() => setReadinessLoading(false));
+    safeFetch('evidenceReadiness',
+      (signal) => api.get(`/chats/${selectedChatId}/evidence-readiness`, signal) as Promise<any>,
+      (d) => {
+        const readinessData = d?.data || d;
+        if (readinessData && typeof readinessData === 'object') setReadiness(readinessData);
+      },
+      () => setReadinessLoading(false)
+    );
 
     return () => {
       if (abortRef.current) abortRef.current.abort();
     };
-  }, [selectedChatId]);
+  }, [selectedChatId, safeFetch]);
 
   const handleGenerated = useCallback((result: any) => {
     if (!result) {
@@ -1162,6 +1228,7 @@ export default function AIContentStudio() {
     if (result.asset || result._assetId) {
       setSelectedAsset(result.asset || null);
     }
+    setAssetRefreshKey(k => k + 1);
   }, []);
 
   const handleRegenerate = useCallback((asset: any) => {
@@ -1177,6 +1244,7 @@ export default function AIContentStudio() {
           setGeneratedContent(res.data.content || res.data);
           setQualityScore(res.data.qualityScore || null);
           setActiveTab('content');
+          setAssetRefreshKey(k => k + 1);
         }
       })
       .catch(err => {
@@ -1192,13 +1260,19 @@ export default function AIContentStudio() {
     brief?.product?.name ||
     fullResults?.hasProductIntelligence === true
   );
-  console.info("[Content Studio Readiness]", {
-    chatId: selectedChatId,
-    hasProductIntelligence: fullResults?.hasProductIntelligence,
-    contentGenerationReady: backendReady,
-    readiness,
-    hasEvidence,
-    sourceComponent: "AIContentStudio.tsx"
+  const readinessLogChatRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (readinessLogChatRef.current !== selectedChatId || backendReady !== readiness?.contentGenerationReady) {
+      readinessLogChatRef.current = selectedChatId;
+      console.info("[Content Studio Readiness]", {
+        chatId: selectedChatId,
+        hasProductIntelligence: fullResults?.hasProductIntelligence,
+        contentGenerationReady: backendReady,
+        readiness,
+        hasEvidence,
+        sourceComponent: "AIContentStudio.tsx"
+      });
+    }
   });
 
   const tabs = [
@@ -1225,6 +1299,7 @@ export default function AIContentStudio() {
           selectedAsset={selectedAsset}
           onCloseAsset={() => setSelectedAsset(null)}
           view="grid"
+          refreshKey={assetRefreshKey}
         />
       );
     }

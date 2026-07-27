@@ -1,4 +1,4 @@
-import { prisma } from "../../config/prisma.js";
+import prisma from "../../config/prisma.js";
 import { collectEvidence } from "./evidence.service.js";
 
 export const collectEvidenceHandler = async (req, res) => {

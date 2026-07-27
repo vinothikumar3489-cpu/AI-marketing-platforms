@@ -1,24 +1,31 @@
-import { scrapeWebsite } from '../scraping/unified-scraper.service.js';
-import { scrapeWebsite as scrapeWithExtraction } from '../scraper.service.js';
-import { researchCompetitors } from '../tavily.service.js';
-import { getSerpCompetitors, getKeywordMetrics, normalizeSerpCompetitors, isDataForSEOConfigured } from '../dataforseo.service.js';
-import { collectResearchData } from './research-orchestrator.service.js';
-import { collectCompanyIntelligence } from './company-intelligence.service.js';
-import { collectMarketIntelligence } from './market-intelligence.service.js';
-import { collectCompetitorIntelligence } from './competitor-intelligence.service.js';
-import { collectAudienceIntelligence } from './audience-intelligence.service.js';
-import { generateExecutiveStory } from './executive-story.service.js';
-import { generateActionPlan } from './action-plan.service.js';
-import { deriveWebsiteIdentity } from '../../utils/seo-identity.util.js';
+import { getLatestEvidenceSnapshot } from "../../domains/research/services/evidence.service.js";
+import { researchCompetitors } from "../../providers/tavily.service.js";
+import { getSerpCompetitors, getKeywordMetrics, normalizeSerpCompetitors, isDataForSEOConfigured } from "../../providers/dataforseo.service.js";
+import { collectCompanyIntelligence } from "./company-intelligence.service.js";
+import { collectMarketIntelligence } from "./market-intelligence.service.js";
+import { collectCompetitorIntelligence } from "./competitor-intelligence.service.js";
+import { collectAudienceIntelligence } from "./audience-intelligence.service.js";
+import { generateExecutiveStory } from "./executive-story.service.js";
+import { generateActionPlan } from "./action-plan.service.js";
+import { deriveWebsiteIdentity } from "../../utils/seo-identity.util.js";
 import {
   logCompanyCollected, logTechnologyCollected, logPricingCollected,
   logCompetitorsCollected, logMarketCollected, logAudienceCollected,
   logStrategyGenerated, logReportGenerated
-} from './business-intelligence-logger.js';
+} from "./business-intelligence-logger.js";
 
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 
-export async function collectBusinessIntelligence({ websiteUrl, productName, companyName, industry, targetCountry }) {
+function extractDomainSimple(url) {
+  if (!url) return '';
+  try {
+    return new URL(url.startsWith('http') ? url : `https://${url}`).hostname.replace('www.', '');
+  } catch {
+    return url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+  }
+}
+
+export async function collectBusinessIntelligence({ chatId, websiteUrl, productName, companyName, industry, targetCountry, category, domain }) {
   console.log('[Business Intelligence] Starting enterprise-grade intelligence collection for:', websiteUrl);
 
   const evidence = {
@@ -33,36 +40,44 @@ export async function collectBusinessIntelligence({ websiteUrl, productName, com
   };
 
   try {
-    // Phase 1: Website scraping for raw data
-    console.log('[Business Intelligence] Phase 1: Website scraping');
+    // Phase 1: Evidence Snapshot Loading
+    console.log('[Business Intelligence] Phase 1: Loading Evidence Snapshot');
     let scrapedData = null;
     let scrapedWithExtraction = null;
 
     try {
-      const unifiedResult = await scrapeWebsite(websiteUrl, {
-        timeout: 25000,
-        extractSchema: true,
-        extractImages: false,
-        extractLinks: true
-      });
-      if (unifiedResult?.success && unifiedResult?.data) {
-        scrapedData = unifiedResult.data;
-        evidence.sources.push({ type: 'website_scrape', source: 'firecrawl', success: true });
-      }
-    } catch (e) {
-      evidence.warnings.push(`Website scrape failed: ${e.message}`);
-    }
-
-    try {
-      const legacyResult = await scrapeWithExtraction({ websiteUrl, productName, companyName });
-      if (legacyResult?.success && legacyResult?.scrapedData) {
-        scrapedWithExtraction = legacyResult.scrapedData;
-        if (!scrapedData) {
-          evidence.sources.push({ type: 'website_scrape', source: legacyResult.source, success: true });
+      if (chatId) {
+        const evidenceReq = await getLatestEvidenceSnapshot(chatId);
+        if (evidenceReq.success && evidenceReq.snapshot) {
+          const snap = evidenceReq.snapshot;
+          const txt = snap.contentEvidence?.cleanedText || snap.rawEvidence?.rawMarkdown || '';
+          
+          scrapedData = {
+            html: snap.rawEvidence?.rawHtml || '',
+            text: txt,
+            metadata: {
+              title: snap.websiteEvidence?.title || '',
+              description: snap.websiteEvidence?.metaDescription || ''
+            },
+            title: snap.websiteEvidence?.title || ''
+          };
+          
+          scrapedWithExtraction = {
+            rawMarkdown: snap.rawEvidence?.rawMarkdown || '',
+            cleanedText: txt,
+            pricingText: snap.websiteEvidence?.pricingText || '',
+            scrapeQuality: snap.sourceSummary
+          };
+          
+          evidence.sources.push({ type: 'evidence_snapshot', source: snap.source || 'canonical', success: true });
         }
       }
+      
+      if (!scrapedData) {
+         throw new Error("No EvidenceSnapshot found. Scraping must run first.");
+      }
     } catch (e) {
-      evidence.warnings.push(`Legacy scrape failed: ${e.message}`);
+      evidence.warnings.push(`Evidence load failed: ${e.message}`);
     }
 
     // Phase 2: Company Intelligence
@@ -90,7 +105,9 @@ export async function collectBusinessIntelligence({ websiteUrl, productName, com
       websiteUrl,
       productName: companyIntel.name || productName,
       industry: companyIntel.industry || industry,
-      targetCountry
+      targetCountry,
+      category: category || companyIntel.category,
+      domain: domain || extractDomainSimple(websiteUrl),
     });
     evidence.market = marketIntel;
     logMarketCollected(marketIntel);
@@ -106,7 +123,9 @@ export async function collectBusinessIntelligence({ websiteUrl, productName, com
       productName: companyIntel.name || productName,
       companyName: companyIntel.name || companyName,
       industry: companyIntel.industry || industry,
-      marketData: marketIntel
+      marketData: marketIntel,
+      category: category || companyIntel.category,
+      domain: domain || extractDomainSimple(websiteUrl),
     });
     evidence.competitors = competitorIntel;
     logCompetitorsCollected(competitorIntel);

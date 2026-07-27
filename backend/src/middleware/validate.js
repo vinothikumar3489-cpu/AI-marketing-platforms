@@ -1,4 +1,4 @@
-import { validationErrorResponse } from '../utils/response.util.js';
+import { validationErrorResponse } from "../utils/response.util.js";
 
 export function validate(schema) {
   return (req, res, next) => {

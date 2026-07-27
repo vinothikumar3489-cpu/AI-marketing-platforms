@@ -20,7 +20,7 @@ export function getEvidenceLabel(level: string): string {
   return EVIDENCE_LABELS[level] || EVIDENCE_LABELS.not_verified;
 }
 
-export const NOT_MEASURED = "Not measured";
+export const NOT_MEASURED = "—";
 export const NOT_ENOUGH_EVIDENCE = "Not enough evidence";
 export const DATA_UNAVAILABLE = "Data unavailable";
 

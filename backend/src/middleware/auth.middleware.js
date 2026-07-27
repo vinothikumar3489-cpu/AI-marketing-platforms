@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import { prisma } from "../config/prisma.js";
+import prisma from "../config/prisma.js";
 
 const secret = process.env.JWT_SECRET;
 if (secret && (secret.length < 32 || /^\d+$/.test(secret))) {

@@ -1,13 +1,14 @@
-import { generateContentStudioPlan } from './content-studio.service.js';
-import { generateEmailCampaignPlan } from './email-campaign.service.js';
-import { generateCreativeStudioPlan } from './creative-studio.service.js';
-import { generateVideoStudioPlan } from './video-studio.service.js';
-import { generateCampaignPlannerPlan } from './campaign-planner.service.js';
-import { generateSocialCalendarPlan } from './social-calendar.service.js';
+import { generateContentStudioPlan } from "./content-studio.service.js";
+import { generateEmailCampaignPlan } from '../email/email-campaign-types.service.js';
+import { generateCreativeStudioPlan } from "./creative-studio.service.js";
+import { generateVideoStudioPlan } from "./video-studio.service.js";
+import { generateCampaignPlannerPlan } from "./campaign-planner.service.js";
+import { generateSocialCalendarPlan } from "./social-calendar.service.js";
 
 function buildExecutionContext(context) {
   const ec = context.evidenceContext || {};
   return {
+    evidenceSnapshotId: context.evidenceContext?.evidenceSnapshotId || null,
     productName: context.productName || ec.product?.name || 'N/A',
     companyName: context.companyName || ec.company?.name || null,
     targetAudience: context.targetAudience || ec.product?.targetAudience || ec.audience?.primary || null,
@@ -124,6 +125,7 @@ export async function generateAllExecutionModules(context) {
       totalAssetsGenerated: totalAssets,
       generatedAt: new Date().toISOString(),
       evidenceVersion: '2.0.0',
+      evidenceSnapshotId: context.evidenceContext?.evidenceSnapshotId || null,
       analyticsConnected,
     },
   };

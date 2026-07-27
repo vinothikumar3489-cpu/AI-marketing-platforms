@@ -6,10 +6,18 @@
  */
 
 import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
+import { validateEmailCopyDTO } from "../../dto/email-copy.dto.js";
 
 const INVALID_PRODUCT_IDENTITIES = new Set([
-  'unknown product', 'new analysis', 'new & featured', 'untitled',
-  'new project', 'growth analysis', 'featured', 'home',
+  'unknown product', 'unknown company', 'unknown',
+  'new analysis', 'new growth analysis', 'new seo analysis', 'new campaign',
+  'growth analysis', 'seo analysis', 'campaign analysis',
+  'untitled project', 'untitled', 'new project',
+  'new & featured', 'featured', 'home', 'courses',
+  'project', 'analysis', 'my', 'the', 'test', 'demo', 'sample',
+  'product', 'website', 'landing', 'page',
+  'www', 'app', 'login', 'signin', 'signup',
+  'general', 'technology', 'saas', 'none',
 ]);
 
 const QUALITY_CHECKS = {
@@ -51,18 +59,70 @@ const QUALITY_CHECKS = {
       const totalMentions = productMentions + brandMentions + featureMentions;
       
       if (totalMentions === 0) {
-        return { status: 'blocked', detail: `Product "${productName}" or brand "${brandName}" not mentioned in content` };
+        return { status: 'blocked', detail: 'No product mentions found' };
       }
+      
       if (totalMentions < 2) {
-        return { status: 'needs_review', detail: `Product/brand mentioned only ${totalMentions} time(s)` };
+        return { status: 'needs_review', detail: 'Insufficient product mentions' };
       }
       
-      const evidence = [];
-      if (productMentions > 0) evidence.push(`product "${productName}" (${productMentions}x)`);
-      if (brandMentions > 0) evidence.push(`brand "${brandName}" (${brandMentions}x)`);
-      if (featureMentions > 0) evidence.push(`features (${featureMentions}x)`);
+      return { status: 'passed', detail: `Product mentioned ${totalMentions} times` };
+    },
+  },
+  // PART 7: Email-specific schema and quality checks
+  emailCopySchema: {
+    label: 'Email copy schema validation',
+    check: (content, brief, assetType) => {
+      if (assetType !== 'email_copy') return { status: 'passed', detail: 'Not applicable for this content type' };
       
-      return { status: 'passed', detail: `Product identity mentioned ${totalMentions} times: ${evidence.join(', ')}` };
+      // PART 7: Validate against DTO schema
+      const validationResult = validateEmailCopyDTO(content);
+      
+      if (!validationResult.valid) {
+        return { 
+          status: 'blocked', 
+          detail: `Schema validation failed: ${validationResult.errors.join(', ')}` 
+        };
+      }
+      
+      return { status: 'passed', detail: 'Email copy schema valid' };
+    },
+  },
+  emailProductSpecificity: {
+    label: 'Email product specificity',
+    check: (content, brief, assetType) => {
+      if (assetType !== 'email_copy') return { status: 'passed', detail: 'Not applicable for this content type' };
+      
+      const productIdentity = brief?._productIdentity || resolveProductIdentity({
+        chat: brief?._chat,
+        productIntelligence: brief?._productIntel,
+        evidenceSnapshot: brief?._evidenceSnapshot,
+        websiteEvidence: brief?.website
+      });
+      
+      const displayName = productIdentity?.displayName || productIdentity?.productName;
+      
+      if (!displayName) return { status: 'blocked', detail: 'No product name available' };
+      
+      const contentStr = JSON.stringify(content).toLowerCase();
+      const productMentions = (contentStr.match(new RegExp(displayName.toLowerCase(), 'g')) || []).length;
+      
+      // PART 7: Block emails that don't mention the product
+      if (productMentions === 0) {
+        return { status: 'blocked', detail: 'Email does not mention the product' };
+      }
+      
+      // Check for generic placeholders
+      const genericPlaceholders = ['our product', 'the platform', 'this solution', 'our solution'];
+      const hasGeneric = genericPlaceholders.some(placeholder => 
+        contentStr.includes(placeholder.toLowerCase())
+      );
+      
+      if (hasGeneric) {
+        return { status: 'needs_review', detail: 'Email uses generic product placeholders' };
+      }
+      
+      return { status: 'passed', detail: `Product mentioned ${productMentions} times` };
     },
   },
   evidenceCoverage: {
@@ -460,6 +520,207 @@ const QUALITY_CHECKS = {
       return { status: 'passed', detail: `Product identity verified: ${identity?.productName}` };
     },
   },
+  contentCompleteness: {
+    label: 'Content completeness',
+    check: (content, brief, assetType) => {
+      const required = COMPLETENESS_RULES[assetType];
+      if (!required) return { status: 'not_applicable', detail: 'No completeness rules for this type' };
+      const missing = required.filter(field => {
+        const val = content[field];
+        if (val === null || val === undefined) return true;
+        if (typeof val === 'string' && val.trim().length === 0) return true;
+        if (Array.isArray(val) && val.length === 0) return true;
+        return false;
+      });
+      if (missing.length === 0) return { status: 'passed', detail: `All ${required.length} required fields present` };
+      if (missing.length > required.length / 2) return { status: 'blocked', detail: `${missing.length}/${required.length} required fields missing: ${missing.join(', ')}` };
+      return { status: 'needs_review', detail: `${missing.length}/${required.length} fields missing: ${missing.join(', ')}` };
+    },
+  },
+  platformSpecificQuality: {
+    label: 'Platform-specific quality',
+    check: (content, brief, assetType) => {
+      const rule = PLATFORM_QUALITY_RULES[assetType];
+      if (!rule) return { status: 'not_applicable', detail: 'No platform-specific rules' };
+      return rule(content);
+    },
+  },
+  storytellingQuality: {
+    label: 'Storytelling quality',
+    check: (content, brief, assetType) => {
+      const text = JSON.stringify(content).toLowerCase();
+      const hookIndicators = ['imagine', 'picture this', 'have you ever', 'what if', 'the problem', 'struggle', 'frustrat', 'challenge'];
+      const problemIndicators = ['problem', 'issue', 'pain point', 'struggle with', 'difficult', 'hard to', 'waste'];
+      const solutionIndicators = ['solution', 'solves', 'resolves', 'fix', 'address', 'platform', 'tool', 'approach', 'method'];
+      const outcomeIndicators = ['result', 'outcome', 'benefit', 'improve', 'increase', 'reduce', 'save', 'achieve', 'success'];
+      const emotionalLanguage = ['frustrat', 'excit', 'amaz', 'transform', 'empower', 'struggle', 'delight', 'surpris', 'inspire'];
+      const hooks = hookIndicators.filter(w => text.includes(w)).length;
+      const problems = problemIndicators.filter(w => text.includes(w)).length;
+      const solutions = solutionIndicators.filter(w => text.includes(w)).length;
+      const outcomes = outcomeIndicators.filter(w => text.includes(w)).length;
+      const emotions = emotionalLanguage.filter(w => text.includes(w)).length;
+      const evidence = [];
+      if (hooks > 0) evidence.push('hook present');
+      if (problems > 0) evidence.push('problem stated');
+      if (solutions > 0) evidence.push('solution presented');
+      if (outcomes > 0) evidence.push('outcome described');
+      if (emotions > 0) evidence.push('emotional language');
+      const narrativeScore = hooks + problems + solutions + outcomes + emotions;
+      if (narrativeScore === 0) return { status: 'needs_review', detail: 'No narrative elements detected — content lacks storytelling structure' };
+      if (narrativeScore < 4) return { status: 'needs_review', detail: `Weak storytelling: ${evidence.join(', ')}` };
+      return { status: 'passed', detail: `Strong storytelling: ${evidence.join(', ')}` };
+    },
+  },
+  persuasiveness: {
+    label: 'Persuasiveness',
+    check: (content, brief, assetType) => {
+      const text = JSON.stringify(content).toLowerCase();
+      const benefitWords = ['benefit', 'advantage', 'value', 'roi', 'save', 'increase', 'improve', 'grow', 'accelerate', 'optimize'];
+      const valueProps = ['because', 'which means', 'so you can', 'enables', 'allows', 'helps', 'empowers'];
+      const credibilitySignals = ['researched', 'study', 'survey', 'data', 'industry report', 'analyst', 'certified', 'award', 'patent', 'tested', 'proven'];
+      const benefits = benefitWords.filter(w => text.includes(w)).length;
+      const props = valueProps.filter(w => text.includes(w)).length;
+      const credibility = credibilitySignals.filter(w => text.includes(w)).length;
+      const evidence = [];
+      if (benefits > 0) evidence.push(`${benefits} benefit statement(s)`);
+      if (props > 0) evidence.push(`${props} value proposition(s)`);
+      if (credibility > 0) evidence.push(`${credibility} credibility signal(s)`);
+      const total = benefits + props + credibility;
+      if (total === 0) return { status: 'needs_review', detail: 'No persuasive elements found — add benefit-driven arguments and value propositions' };
+      if (total < 3) return { status: 'needs_review', detail: `Weak persuasiveness: ${evidence.join(', ')}` };
+      return { status: 'passed', detail: `Strong persuasiveness: ${evidence.join(', ')}` };
+    },
+  },
+  originalityScore: {
+    label: 'Originality',
+    check: (content, brief, assetType) => {
+      const contentStr = JSON.stringify(content).toLowerCase();
+      const fillerPhrases = [
+        "in today's world", "in today's digital", "in today's fast-paced",
+        'as we all know', "it's no secret",
+        'when it comes to', 'in the realm of',
+        "it's important to note", 'it goes without saying',
+        'needless to say', 'at the end of the day',
+        "it's worth mentioning", 'in conclusion',
+        'to sum up', 'in summary',
+        'revolutionary', 'game-changing', 'game changer',
+        'cutting-edge', 'state-of-the-art',
+        'thought leader', 'thought leadership',
+        'paradigm shift', 'disruptive',
+        'empower', 'synergy', 'leverage', 'holistic',
+        'robust', 'streamline', 'scalable',
+      ];
+      const foundFillers = fillerPhrases.filter(phrase => contentStr.includes(phrase));
+      const sentences = contentStr.split(/[.!?]+/).filter(Boolean);
+      let repetitiveCount = 0;
+      const starts = sentences.map(s => s.trim().split(/\s+/).slice(0, 3).join(' '));
+      const startCounts = {};
+      starts.forEach(s => { startCounts[s] = (startCounts[s] || 0) + 1; });
+      repetitiveCount = Object.values(startCounts).filter(c => c > 2).length;
+      if (foundFillers.length > 3) return { status: 'needs_review', detail: `${foundFillers.length} generic AI phrases detected — rewrite for originality` };
+      if (repetitiveCount > 2) return { status: 'needs_review', detail: `${repetitiveCount} repetitive sentence structures detected` };
+      if (foundFillers.length > 0 || repetitiveCount > 0) {
+        return { status: 'passed', detail: `Minor originality concerns: ${foundFillers.length} filler(s), ${repetitiveCount} repetitive structure(s)` };
+      }
+      return { status: 'passed', detail: 'Content appears original with no generic AI language' };
+    },
+  },
+};
+
+const COMPLETENESS_RULES = {
+  linkedin_post: ['hook', 'bodyParagraphs', 'insight', 'proof', 'cta', 'hashtags', 'visualBrief'],
+  instagram_post: ['hook', 'caption', 'visualBrief', 'hashtags'],
+  twitter_post: ['post'],
+  facebook_post: ['headline', 'body', 'cta', 'visualBrief'],
+  youtube_description: ['openingHook', 'description', 'title', 'cta'],
+  email_copy: ['subject', 'greeting', 'bodyParagraphs', 'ctaText', 'closing', 'preheader'],
+  blog_article: ['title', 'introduction', 'sections', 'conclusion', 'cta'],
+  landing_page: ['headline', 'heroCTA', 'features', 'benefits', 'socialProof'],
+  creative_brief: ['objective', 'audience', 'visualDirection', 'tone', 'keyMessage'],
+  video_script: ['duration', 'scenes', 'title', 'cta'],
+  faq_page: ['headline', 'faqs', 'introduction'],
+  comparison_page: ['headline', 'comparisonTable', 'features', 'cta'],
+};
+
+const PLATFORM_QUALITY_RULES = {
+  facebook_post: (content) => {
+    const body = content.body || '';
+    if (!body.includes(content.productName || '') && !body.includes('value') && !body.includes('benefit') && !body.includes('solve')) {
+      return { status: 'blocked', detail: 'Facebook posts must explain product value or benefit to the audience' };
+    }
+    if (!content.cta) return { status: 'needs_review', detail: 'Facebook post missing call-to-action' };
+    const contentStr = JSON.stringify(content).toLowerCase();
+    const audienceTerms = ['you', 'your', 'audience', 'customer', 'user', 'team', 'business'];
+    const hasAudience = audienceTerms.some(t => contentStr.includes(t));
+    if (!hasAudience) return { status: 'needs_review', detail: 'Facebook post lacks audience relevance language' };
+    return { status: 'passed', detail: 'Facebook quality checks passed' };
+  },
+  instagram_post: (content) => {
+    const caption = content.caption || '';
+    if (caption.length < 10) return { status: 'blocked', detail: 'Instagram caption too short' };
+    if (caption.length > 2200) return { status: 'needs_review', detail: `Instagram caption ${caption.length} chars — max recommended 2200` };
+    const hashtags = content.hashtags || [];
+    if (hashtags.length === 0) return { status: 'needs_review', detail: 'Instagram post missing hashtags' };
+    if (hashtags.length > 30) return { status: 'needs_review', detail: `${hashtags.length} hashtags — Instagram max is 30` };
+    if (!content.visualBrief && !content.imagePrompt && !content.visualConcept) {
+      return { status: 'needs_review', detail: 'Instagram post missing visual direction' };
+    }
+    return { status: 'passed', detail: `Instagram checks passed: ${caption.length} chars, ${hashtags.length} hashtags` };
+  },
+  twitter_post: (content) => {
+    const post = content.post || '';
+    if (!post) return { status: 'blocked', detail: 'Twitter post body required' };
+    if (post.length > 280) return { status: 'blocked', detail: `Twitter post exceeds 280 char limit (${post.length} chars)` };
+    if (!content.hook && post.split(/[.!?]+/).filter(Boolean).length < 2) {
+      return { status: 'needs_review', detail: 'Twitter post lacks a strong hook' };
+    }
+    return { status: 'passed', detail: `Twitter checks passed: ${post.length} chars` };
+  },
+  youtube_description: (content) => {
+    if (content.timestamps && Array.isArray(content.timestamps)) {
+      for (const ts of content.timestamps) {
+        if (typeof ts.time === 'string' && ts.time.length > 8) {
+          return { status: 'blocked', detail: `Suspicious timestamp format: "${ts.time}" — timestamps should be MM:SS or HH:MM:SS` };
+        }
+      }
+    }
+    if (!content.description || content.description.length < 100) {
+      return { status: 'needs_review', detail: 'YouTube description should be at least 100 chars for SEO' };
+    }
+    return { status: 'passed', detail: 'YouTube quality checks passed' };
+  },
+  linkedin_post: (content) => {
+    if (!content.insight || content.insight.length < 20) return { status: 'needs_review', detail: 'LinkedIn post missing substantial insight' };
+    if (!content.proof) return { status: 'needs_review', detail: 'LinkedIn post missing proof or evidence' };
+    return { status: 'passed', detail: 'LinkedIn quality checks passed' };
+  },
+  email_copy: (content) => {
+    if (!content.subject) return { status: 'blocked', detail: 'Email subject line required' };
+    if (!content.preheader && !content.previewText) return { status: 'needs_review', detail: 'Email missing preheader text' };
+    if (!content.bodyParagraphs || content.bodyParagraphs.length === 0) return { status: 'blocked', detail: 'Email body paragraphs required' };
+    if (!content.ctaText && !content.primaryCta && !content.callToAction) return { status: 'blocked', detail: 'Email missing call-to-action' };
+    if (!content.greeting) return { status: 'needs_review', detail: 'Email missing greeting' };
+    if (!content.closing) return { status: 'needs_review', detail: 'Email missing closing' };
+    return { status: 'passed', detail: 'Email quality checks passed' };
+  },
+  blog_article: (content) => {
+    if (!content.headline && !content.title) return { status: 'blocked', detail: 'Blog article missing headline' };
+    if (!content.introduction) return { status: 'needs_review', detail: 'Blog article missing introduction' };
+    if (!content.sections || content.sections.length < 2) return { status: 'needs_review', detail: 'Blog article needs at least 2 sections' };
+    if (!content.conclusion) return { status: 'needs_review', detail: 'Blog article missing conclusion' };
+    if (!content.cta) return { status: 'needs_review', detail: 'Blog article missing call-to-action' };
+    const hasEvidence = content.evidenceUsed && content.evidenceUsed.length > 0;
+    if (!hasEvidence) return { status: 'needs_review', detail: 'Blog article missing evidence sources' };
+    return { status: 'passed', detail: 'Blog quality checks passed' };
+  },
+  landing_page: (content) => {
+    if (!content.headline) return { status: 'blocked', detail: 'Landing page missing headline' };
+    if (!content.heroCTA) return { status: 'blocked', detail: 'Landing page missing hero CTA' };
+    if (!content.features || content.features.length < 2) return { status: 'needs_review', detail: 'Landing page needs at least 2 features' };
+    if (!content.benefits || content.benefits.length === 0) return { status: 'needs_review', detail: 'Landing page missing benefits' };
+    if (!content.socialProof || content.socialProof.length === 0) return { status: 'needs_review', detail: 'Landing page missing social proof' };
+    return { status: 'passed', detail: 'Landing page quality checks passed' };
+  },
 };
 
 export function scoreContentQuality(content, brief, assetType) {
@@ -491,5 +752,5 @@ export function scoreContentQuality(content, brief, assetType) {
   };
 }
 
-export { QUALITY_CHECKS };
+export { QUALITY_CHECKS, PLATFORM_QUALITY_RULES };
 export default { scoreContentQuality };

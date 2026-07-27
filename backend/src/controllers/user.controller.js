@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { prisma } from "../config/prisma.js";
+import prisma from "../config/prisma.js";
 
 export const getCurrentUser = async (req, res) => {
   try {

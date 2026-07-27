@@ -8,10 +8,41 @@
 
 export async function saveContentAsset(prisma, { userId, chatId, contentType, briefSnapshot, evidenceSnapshot, provider, content, metadata, qualityScore }) {
   if (!userId || !chatId || !contentType || !content) {
+    console.error('[Asset Save] Missing required params', { hasUserId: !!userId, hasChatId: !!chatId, hasContentType: !!contentType, hasContent: !!content });
     throw new Error('userId, chatId, contentType, and content required');
   }
 
+  console.info('[Asset Save] Starting', { contentType, provider, hasContent: !!content, hasMetadata: !!metadata, contentKeys: Object.keys(content).filter(k => !/^\d+$/.test(k)).slice(0, 15) });
+
   const claimStatus = metadata?.claimStatus || 'passed';
+
+  // PART 9: Email asset persistence verification
+  if (contentType === 'email_copy') {
+    const requiredFields = ['subject', 'previewText', 'greeting', 'opening', 'solution', 'benefits', 'cta'];
+    const missingFields = requiredFields.filter(field => !content[field]);
+    
+    if (missingFields.length > 0) {
+      console.error('[Asset Save] Email missing required fields', { missingFields, availableFields: Object.keys(content).filter(k => !/^\d+$/.test(k)) });
+      throw new Error(`Email asset missing required fields: ${missingFields.join(', ')}`);
+    }
+
+    // Verify benefits is an array with at least 3 items
+    if (!Array.isArray(content.benefits) || content.benefits.length < 3) {
+      console.error('[Asset Save] Email insufficient benefits', { benefits: content.benefits, isArray: Array.isArray(content.benefits), count: content.benefits?.length });
+      throw new Error('Email asset must have at least 3 benefits');
+    }
+
+    // Verify CTA has label (accept cta string, cta object, or callToAction object)
+    const cta = content.cta || content.callToAction;
+    if (!cta) {
+      console.error('[Asset Save] Email missing CTA', { cta: content.cta, callToAction: content.callToAction });
+      throw new Error('Email asset must have CTA with label');
+    }
+    if (typeof cta === 'object' && !cta.label && !cta.text) {
+      console.error('[Asset Save] Email CTA object missing label/text', { cta });
+      throw new Error('Email asset CTA must have label or text');
+    }
+  }
 
   // Find existing plan or create one
   let plan = await prisma.automationPlan.findFirst({ where: { chatId, userId } });
@@ -35,7 +66,9 @@ export async function saveContentAsset(prisma, { userId, chatId, contentType, br
   const version = existing ? (existing.assetContent?.version || 0) + 1 : 1;
 
   // Extract SEO keywords from evidence snapshot for storage
-  const seoKeywords = evidenceSnapshot?.keywords || evidenceSnapshot?.verifiedKeywords || [];
+  // Normalize: ensure we always have an array, never an object (crash prevention)
+  const rawSeoKeywords = evidenceSnapshot?.keywords || evidenceSnapshot?.verifiedKeywords || [];
+  const seoKeywords = Array.isArray(rawSeoKeywords) ? rawSeoKeywords : [];
   const seoScore = qualityScore?.checks?.seoAlignment?.detail || null;
 
   // Extract brief summary for quick reference
@@ -60,11 +93,19 @@ export async function saveContentAsset(prisma, { userId, chatId, contentType, br
     topicCount: evidenceSnapshot.topicIdeas?.length || 0,
   } : null;
 
+  // PART 9: Title priority for email_copy (subject first, then fallback)
+  let assetTitle;
+  if (contentType === 'email_copy') {
+    assetTitle = content.subject || content.title || content.headline || `Email Copy v${version}`;
+  } else {
+    assetTitle = content.title || content.headline || content.subjectLine || `${contentType} v${version}`;
+  }
+
   const asset = await prisma.automationAsset.create({
     data: {
       automationPlanId: plan.id,
       assetType: `content_${contentType}`,
-      assetTitle: content.title || content.headline || content.subjectLine || `${contentType} v${version}`,
+      assetTitle,
       assetContent: {
         content,
         metadata: {
@@ -82,7 +123,7 @@ export async function saveContentAsset(prisma, { userId, chatId, contentType, br
         },
         briefSnapshot: briefSummary,
         evidenceSnapshot: evidenceSummary,
-        seoKeywords: seoKeywords.slice(0, 10).map(k => typeof k === 'string' ? k : k.keyword),
+        seoKeywords: Array.isArray(seoKeywords) ? seoKeywords.slice(0, 10).map(k => typeof k === 'string' ? k : (k?.keyword || k?.phrase || '')) : [],
         seoScore,
         version,
         prevVersionId: existing?.id || null,
@@ -213,4 +254,71 @@ export async function regenerateAsset(prisma, assetId, newResult) {
   return newAsset;
 }
 
-export default { saveContentAsset, getContentAssets, getAssetVersions, regenerateAsset };
+export async function verifyAssetPersistence(prisma, assetId) {
+  const asset = await prisma.automationAsset.findUnique({ where: { id: assetId } });
+  if (!asset) return { verified: false, error: 'Asset not found' };
+
+  const content = asset.assetContent?.content;
+  const checks = {
+    id: !!asset.id,
+    assetType: !!asset.assetType,
+    assetTitle: !!asset.assetTitle,
+    contentPresent: !!content,
+    htmlPresent: !!(content?._htmlTemplate || content?.html),
+    plainTextPresent: !!(content?._plainText || content?.plainText),
+    subjectPresent: !!(content?.subject || content?.subjectLine),
+    approvalStatus: !!(content?._approvalStatus || asset.status),
+    versionPresent: !!(content?._version || asset.assetContent?.version),
+    identityPresent: !!(content?.productName || content?.brandName || asset.assetTitle),
+    generationMetadata: !!asset.assetContent?.generationMetadata,
+    briefSnapshot: !!asset.assetContent?.briefSnapshot,
+    evidenceSnapshot: !!asset.assetContent?.evidenceSnapshot,
+  };
+
+  const missing = Object.entries(checks).filter(([, v]) => !v).map(([k]) => k);
+  const verified = missing.length === 0;
+
+  if (asset.assetContent?.generationMetadata?.provider === 'brevo') {
+    checks.brevoCampaignId = !!(content?._brevoCampaignId || content?.providerCampaignId);
+  }
+
+  return {
+    verified,
+    assetId: asset.id,
+    assetType: asset.assetType,
+    version: asset.assetContent?.version || 1,
+    checks,
+    missingFields: missing,
+    errors: verified ? [] : [`Missing fields: ${missing.join(', ')}`],
+  };
+}
+
+export async function verifyBrevoOperationPersistence(prisma, assetId, operation) {
+  const asset = await prisma.automationAsset.findUnique({ where: { id: assetId } });
+  if (!asset) return { verified: false, error: 'Asset not found' };
+
+  const content = asset.assetContent?.content || {};
+  const campaignId = content._brevoCampaignId || content.providerCampaignId;
+  const requestStatus = content._brevoRequestStatus || content.providerStatus;
+
+  const checks = {
+    providerCampaignId: !!campaignId,
+    requestStatus: !!requestStatus,
+    operation,
+    timestamp: !!(content._brevoTimestamp || content.providerTimestamp),
+    userSafe: !requestStatus?.includes('error') && !requestStatus?.includes('fail'),
+  };
+
+  const missing = Object.entries(checks).filter(([, v]) => !v).map(([k]) => k);
+  return {
+    verified: missing.length === 0,
+    assetId: asset.id,
+    operation,
+    campaignId,
+    requestStatus,
+    checks,
+    missingFields: missing,
+  };
+}
+
+export default { saveContentAsset, getContentAssets, getAssetVersions, regenerateAsset, verifyAssetPersistence, verifyBrevoOperationPersistence };
