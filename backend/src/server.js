@@ -1,4 +1,4 @@
-console.log("🚀 Starting AI Marketing Platform Backend...");
+console.log("[1/8] Environment — loading modules...");
 import express from "express";
 import "express-async-errors";
 import cors from "cors";
@@ -37,6 +37,7 @@ import { emailCampaignRouter, brevoWebhookRouter } from "./domains/email/routes/
 import { crmRouter } from "./domains/crm/routes/crm.routes.js";
 import { salesCopilotRouter } from "./routes/sales-copilot.routes.js";
 
+console.log("[2/8] Environment — loading config...");
 dotenv.config();
 
 // Build metadata logging
@@ -76,10 +77,12 @@ if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
   console.warn('⚠️ JWT_SECRET is too short (< 32 chars). Use a random 64-character string.');
 }
 
+console.log("[3/8] Environment — validating variables...");
 logProviderConfig();
 
 const execAsync = promisify(exec);
 const app = express();
+console.log("[4/8] Middleware — configuring...");
 const REQUIRED_PORT = parseInt(process.env.PORT || '5000', 10);
 
 /**
@@ -309,6 +312,7 @@ app.use(cors({
 app.options("*", cors());
 
 app.use(express.json({ limit: isProduction ? "1mb" : "10mb" }));
+console.log("[7/8] Health endpoint — registering...");
 
 app.get("/api/health", async (req, res) => {
   let dbStatus = "ok";
@@ -335,6 +339,7 @@ app.get("/api/version", (req, res) => {
   });
 });
 
+console.log("[5/8] Routes — registering...");
 app.use("/api/auth", authLimiter, authRouter);
 app.use("/api/chats", chatRouter);
 app.use("/api/dashboard", dashboardRouter);
@@ -393,6 +398,8 @@ app.use((err, req, res, _next) => {
   });
 });
 
+console.log("[6/8] Startup — preparing to listen...");
+
 // Graceful shutdown handlers (module-level ref filled after server starts)
 let runningServer;
 function shutdownGracefully(signal) {
@@ -415,6 +422,7 @@ process.on('SIGINT', () => shutdownGracefully('SIGINT'));
 (async () => {
   try {
     runningServer = await startServer(app);
+    console.log("[8/8] Startup Complete — ready for requests");
   } catch (error) {
     console.error('❌ Failed to start backend server:', error.message);
     process.exit(1);

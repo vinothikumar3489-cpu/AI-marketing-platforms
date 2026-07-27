@@ -1,10 +1,19 @@
 import puppeteer from 'puppeteer-core';
 
-let chromium;
-try {
-  chromium = (await import('@sparticuz/chromium')).default;
-} catch {
-  chromium = null;
+let chromiumPromise = null;
+
+async function getChromium() {
+  if (chromiumPromise === null) {
+    chromiumPromise = (async () => {
+      try {
+        const mod = await import('@sparticuz/chromium');
+        return mod.default;
+      } catch {
+        return null;
+      }
+    })();
+  }
+  return chromiumPromise;
 }
 
 function getExecutablePath() {
@@ -14,6 +23,8 @@ function getExecutablePath() {
 async function resolveExecutablePath() {
   const configured = getExecutablePath();
   if (configured) return configured;
+
+  const chromium = await getChromium();
 
   if (chromium && typeof chromium.executablePath === 'function') {
     try {
@@ -37,6 +48,7 @@ async function resolveExecutablePath() {
 }
 
 async function createLaunchOptions() {
+  const chromium = await getChromium();
   const executablePath = await resolveExecutablePath();
 
   const args = chromium && Array.isArray(chromium.args)
