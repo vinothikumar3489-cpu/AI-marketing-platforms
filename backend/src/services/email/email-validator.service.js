@@ -188,7 +188,7 @@ function checkAudienceRelevance(emailData, audienceIntelligence) {
  * Ensures CTA is clear, actionable, and has a valid URL
  */
 function checkCtaClarity(emailData) {
-  const cta = emailData.primaryCta;
+  const cta = emailData.callToAction || emailData.primaryCta;
 
   if (!cta || !cta.label) {
     return {
@@ -737,8 +737,8 @@ function checkBrokenLinks(emailData) {
   const links = [];
 
   // Extract links from CTA
-  if (emailData.primaryCta?.url) {
-    links.push(emailData.primaryCta.url);
+  if (emailData.callToAction?.url || emailData.primaryCta?.url) {
+    links.push(emailData.callToAction?.url || emailData.primaryCta?.url);
   }
   if (emailData.secondaryCta?.url) {
     links.push(emailData.secondaryCta.url);

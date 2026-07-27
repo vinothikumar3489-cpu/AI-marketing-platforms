@@ -240,7 +240,7 @@ export const youtubeDescriptionSchema = z.object({
   claimsRequiringReview,
 });
 
-// ---------- EMAIL COPY ----------
+// ---------- EMAIL COPY (Canonical Model) ----------
 export const emailCopySchema = z.object({
   _type: z.string().optional(),
   emailType: z.string().optional(),
@@ -253,10 +253,10 @@ export const emailCopySchema = z.object({
   painPoint: z.string().optional(),
   solution: z.string().optional(),
   bodyParagraphs: z.array(z.string()).min(1),
-  features: z.array(z.string()).default([]),
+  featureHighlights: z.array(z.string()).default([]),
   benefits: z.array(z.string()).default([]),
   socialProof: z.string().nullable().optional(),
-  primaryCta: z.object({ label: z.string(), url: z.string().nullable().optional() }).optional(),
+  callToAction: z.object({ label: z.string(), url: z.string().nullable().optional() }).optional(),
   secondaryCta: z.object({ label: z.string(), url: z.string().nullable().optional() }).nullable().optional(),
   closing: z.string().optional(),
   signature: z.string().optional(),

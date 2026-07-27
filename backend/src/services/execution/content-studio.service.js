@@ -205,10 +205,10 @@ REQUIREMENTS:
 - painPoint: Specific pain point from brief
 - solution: 2-3 sentences on how ${displayName} solves it with specific features
 - bodyParagraphs: Array of 3-5 body paragraphs, each a coherent section
-- features: Array of 3-5 feature highlights with benefit (NOT featureHighlights)
+- featureHighlights: Array of 3-5 feature highlights with benefit
 - benefits: Array of 3-5 key benefits
 - socialProof: Evidence-based social proof only (or null if none)
-- primaryCta: Object with label (button text) and url (NOT callToAction)
+- callToAction: Object with label (button text) and url
 - secondaryCta: Object with label and url, or null
 - closing: Closing paragraph
 - signature: Professional sender signature
@@ -235,10 +235,10 @@ Return valid JSON:
   "painPoint": "string — specific pain point from brief",
   "solution": "string — how ${displayName} solves it with specific features",
   "bodyParagraphs": ["array of 3-5 body paragraphs, each a coherent section"],
-  "features": ["3-5 feature highlights with benefit"],
+  "featureHighlights": ["3-5 feature highlights with benefit"],
   "benefits": ["3-5 key benefits"],
   "socialProof": "string or null — evidence-based social proof only",
-  "primaryCta": {"label": "button text", "url": "CTA URL"},
+  "callToAction": {"label": "button text", "url": "CTA URL"},
   "secondaryCta": {"label": "button text", "url": "CTA URL"} or null,
   "closing": "string — closing paragraph",
   "signature": "string — professional sender signature",
@@ -288,18 +288,18 @@ Return valid JSON:
         painPoint: normalized.painPoint || '',
         solution: normalized.solution || '',
         bodyParagraphs: normalized.bodyParagraphs,
-        features: normalized.features,
+        featureHighlights: normalized.featureHighlights,
         benefits: normalized.benefits,
         socialProof: normalized.socialProof || '',
-        primaryCta: normalized.primaryCta,
+        callToAction: normalized.callToAction,
         secondaryCta: normalized.secondaryCta,
         closing: normalized.closing || '',
         signature: normalized.signature || sender.name,
-        postscript: normalized.postscript || null,
-        complianceFooter: normalized.complianceFooter || null,
+        postscript: normalized.postscript || '',
+        complianceFooter: normalized.complianceFooter || '',
         unsubscribeText: normalized.unsubscribeText || 'To unsubscribe, reply with UNSUBSCRIBE',
         footer: normalized.footer || `© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
-        compliance: normalized.compliance || null,
+        compliance: normalized.compliance || '',
         variables: normalized.variables,
         html: normalized.html || '',
         plainText: normalized.plainText || '',
@@ -360,7 +360,7 @@ function generateEmailCopyFallback(displayName, internalName, brandName, domain,
       painPoint || 'Many professionals struggle with inefficient workflows and limited visibility.',
       `${displayName} provides a comprehensive solution that addresses these challenges directly.`
     ],
-    features: [
+    featureHighlights: [
       `Advanced ${goal.toLowerCase()} capabilities`,
       `Intuitive ${tone.toLowerCase()} interface`,
       `Seamless integration with existing tools`
@@ -373,15 +373,15 @@ function generateEmailCopyFallback(displayName, internalName, brandName, domain,
       `Easy implementation and adoption`
     ],
     socialProof: '',
-    primaryCta: { label: 'Get Started', url: ctaUrl },
+    callToAction: { label: 'Get Started', url: ctaUrl },
     secondaryCta: null,
     closing: `We're excited to help you achieve your goals with ${displayName}.`,
     signature: sender.name,
-    postscript: null,
-    complianceFooter: null,
+    postscript: '',
+    complianceFooter: '',
     unsubscribeText: 'To unsubscribe, reply with UNSUBSCRIBE',
     footer: `© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
-    compliance: null,
+    compliance: '',
     variables: ['firstName', 'lastName', 'companyName'],
     html: generateFallbackHtml(displayName, sender, ctaUrl),
     plainText: generateFallbackPlainText(displayName, sender, ctaUrl),
@@ -1051,11 +1051,11 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
   const solution = sanitizeText(norm.solution || '');
   const bodyParagraphs = Array.isArray(norm.bodyParagraphs) ? norm.bodyParagraphs : [];
   const bulletPoints = Array.isArray(norm.bulletPoints) ? norm.bulletPoints : [];
-  const features = norm.features || [];
+  const features = norm.featureHighlights || [];
   const benefits = Array.isArray(norm.benefits) ? norm.benefits : [];
   const socialProof = sanitizeText(norm.socialProof || '');
   const variables = Array.isArray(norm.variables) ? norm.variables : [];
-  const ctaData = norm.primaryCta || {};
+  const ctaData = norm.callToAction || {};
   const ctaText = sanitizeText(ctaData.label || '');
   const ctaUrl = ctaData.url || '#';
   const secondaryCta = norm.secondaryCta || null;

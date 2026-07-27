@@ -44,7 +44,7 @@ function scoreProductAccuracy(content) {
   if (mentions === 0) score -= 20;
   else if (mentions >= 3) score += 15;
   else if (mentions >= 1) score += 10;
-  const features = content.features || [];
+  const features = content.features || content.featureHighlights || [];
   if (features.length > 0) score += Math.min(features.length * 5, 15);
   return clamp(score);
 }
@@ -151,21 +151,32 @@ function scorePersuasiveness(content) {
   score += benefits * 6;
   score += props * 6;
   score += pain * 4;
-  const ctas = [content.cta, content.callToAction, content.heroCTA, content.finalCTA].filter(Boolean);
-  if (ctas.length > 0) score += 10;
+  const hasCta = [content.cta, content.callToAction, content.primaryCta, content.heroCTA, content.finalCTA].some(Boolean);
+  if (hasCta) score += 10;
   return clamp(score);
+}
+
+function getCtaLabel(candidate) {
+  if (!candidate) return '';
+  if (typeof candidate === 'string') return candidate;
+  if (typeof candidate === 'object') return candidate.label || candidate.text || candidate.title || '';
+  return String(candidate);
 }
 
 function scoreCtaStrength(content) {
   let score = 60;
-  const ctas = [];
-  if (content.cta) ctas.push(typeof content.cta === 'string' ? content.cta : content.cta.label || content.cta.text || '');
-  if (content.callToAction) ctas.push(typeof content.callToAction === 'string' ? content.callToAction : content.callToAction.label || content.callToAction.text || '');
-  if (content.heroCTA) ctas.push(content.heroCTA);
-  if (content.finalCTA) ctas.push(content.finalCTA);
-  if (content.primaryCta) ctas.push(content.primaryCta);
-  if (content.ctaText) ctas.push(content.ctaText);
-  const unique = [...new Set(ctas.filter(Boolean))];
+  const labels = [];
+  const pushLabel = (field) => {
+    const label = getCtaLabel(field);
+    if (label) labels.push(label);
+  };
+  pushLabel(content.cta);
+  pushLabel(content.callToAction);
+  pushLabel(content.primaryCta);
+  pushLabel(content.heroCTA);
+  pushLabel(content.finalCTA);
+  if (content.ctaText && typeof content.ctaText === 'string') labels.push(content.ctaText);
+  const unique = [...new Set(labels.filter(Boolean))];
   if (unique.length === 0) return 10;
   score += 15;
   const weakCtas = ['learn more', 'click here', 'read more', 'see more', 'get started'];
@@ -245,11 +256,11 @@ function scoreEvidenceCoverage(content) {
 function scoreMarketingImpact(content) {
   let score = 55;
   if (content.headline || content.hook || content.title) score += 10;
-  if (content.cta || content.callToAction || content.heroCTA || content.finalCTA) score += 12;
+  if (content.cta || content.callToAction || content.primaryCta || content.heroCTA || content.finalCTA) score += 12;
   if (content.socialProof?.length > 0) score += 8;
   if (content.benefits?.length > 0) score += 8;
   if (content.solution || content.body?.length > 100) score += 7;
-  if (content.headline && content.cta) score += 5;
+  if (content.headline && (content.cta || content.callToAction || content.primaryCta)) score += 5;
   return clamp(score);
 }
 

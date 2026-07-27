@@ -55,66 +55,80 @@ function generateSummary(content, maxLength = 200) {
   return str.substring(0, maxLength - 3) + '...';
 }
 
+const EMAIL_CTA_DEFAULTS = { label: 'Learn More', url: '#' };
+
+function extractString(val, fallback = '') {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'string') return val;
+  return String(val);
+}
+
+function extractCtaObject(candidate, ctaUrlFallback) {
+  if (!candidate) return null;
+  if (typeof candidate === 'string') return { label: candidate, url: ctaUrlFallback || '#' };
+  if (typeof candidate === 'object') {
+    return {
+      label: extractString(candidate.label || candidate.text || candidate.title, 'Learn More'),
+      url: extractString(candidate.url || candidate.destination || ctaUrlFallback, '#'),
+    };
+  }
+  return null;
+}
+
 /**
  * Normalize email content to canonical field names.
- * Bridges AI-generator output, DTO, Zod schema, frontend, and Brevo.
- * Accepts any shape and returns a unified EmailContent object.
+ * Canonical uses: featureHighlights (not features), callToAction (not primaryCta/cta/ctaText),
+ * bodyParagraphs (not body), secondaryCta (not secondaryCallToAction).
+ * Auto-generates html from bodyParagraphs, plainText from html.
+ * Converts null/undefined to "" for all string fields.
  */
 export function normalizeEmailContent(data) {
   if (!data || typeof data !== 'object') return data || {};
   const n = { ...data };
 
-  // Features: canonical = features, alias = featureHighlights
-  if (Array.isArray(n.featureHighlights) && !Array.isArray(n.features)) {
-    n.features = n.featureHighlights;
-  }
+  // === CANONICAL: featureHighlights (NOT features) ===
   if (Array.isArray(n.features) && !Array.isArray(n.featureHighlights)) {
     n.featureHighlights = n.features;
   }
-  n.features = Array.isArray(n.features) ? n.features : [];
-  n.featureHighlights = Array.isArray(n.featureHighlights) ? n.featureHighlights : n.features;
+  n.featureHighlights = Array.isArray(n.featureHighlights) ? n.featureHighlights : [];
+  delete n.features;
 
-  // CTA: canonical = primaryCta, aliases = callToAction, ctaText+ctaUrl, cta
-  if (n.callToAction && !n.primaryCta) {
-    n.primaryCta = typeof n.callToAction === 'object' ? n.callToAction : { label: String(n.callToAction), url: '#' };
-  }
-  if (n.primaryCta && !n.callToAction) {
-    n.callToAction = n.primaryCta;
-  }
-  if (!n.primaryCta && n.cta) {
-    n.primaryCta = typeof n.cta === 'object' ? n.cta : { label: String(n.cta), url: '#' };
-  }
-  if (!n.primaryCta && n.ctaText) {
-    n.primaryCta = { label: n.ctaText, url: n.ctaUrl || '#' };
-  }
-  n.primaryCta = n.primaryCta && typeof n.primaryCta === 'object'
-    ? { label: n.primaryCta.label || n.ctaText || 'Learn More', url: n.primaryCta.url || n.ctaUrl || '#' }
-    : { label: n.ctaText || 'Learn More', url: n.ctaUrl || '#' };
-  n.callToAction = n.callToAction && typeof n.callToAction === 'object'
-    ? { label: n.callToAction.label || n.ctaText || 'Learn More', url: n.callToAction.url || n.ctaUrl || '#' }
-    : { label: n.ctaText || 'Learn More', url: n.ctaUrl || '#' };
+  // === CANONICAL: callToAction (NOT primaryCta, cta, ctaText+ctaUrl) ===
+  const ctaUrlFallback = n.ctaUrl || '#';
+  const ctaSources = [
+    extractCtaObject(n.callToAction, ctaUrlFallback),
+    extractCtaObject(n.primaryCta, ctaUrlFallback),
+    extractCtaObject(n.cta, ctaUrlFallback),
+    n.ctaText ? { label: n.ctaText, url: ctaUrlFallback } : null,
+  ].filter(Boolean);
 
-  // secondaryCta
-  n.secondaryCta = n.secondaryCta && typeof n.secondaryCta === 'object' && n.secondaryCta.label
-    ? n.secondaryCta : null;
+  n.callToAction = ctaSources[0] || EMAIL_CTA_DEFAULTS;
+  delete n.primaryCta;
+  delete n.cta;
+  delete n.ctaText;
+  delete n.ctaUrl;
 
-  // Pain point: canonical = painPoint, alias = problem
+  // secondaryCta (support both naming conventions)
+  if (n.secondaryCallToAction && !n.secondaryCta) {
+    n.secondaryCta = n.secondaryCallToAction;
+  }
+  delete n.secondaryCallToAction;
+  n.secondaryCta = extractCtaObject(n.secondaryCta, '#');
+
+  // === CANONICAL: painPoint (NOT problem) ===
   if (n.problem && !n.painPoint) n.painPoint = n.problem;
-  if (n.painPoint && !n.problem) n.problem = n.painPoint;
-  n.painPoint = n.painPoint || '';
-  n.problem = n.problem || n.painPoint;
+  n.painPoint = extractString(n.painPoint);
+  delete n.problem;
 
-  // Variables: canonical = variables, alias = personalizationVariables
+  // === CANONICAL: variables (NOT personalizationVariables) ===
   if (Array.isArray(n.personalizationVariables) && !Array.isArray(n.variables)) {
     n.variables = n.personalizationVariables;
   }
-  if (Array.isArray(n.variables) && !Array.isArray(n.personalizationVariables)) {
-    n.personalizationVariables = n.variables;
-  }
   n.variables = Array.isArray(n.variables) ? n.variables : [];
+  delete n.personalizationVariables;
 
-  // Body: canonical = bodyParagraphs, fall back to body array or build from parts
-  if (!n.bodyParagraphs || !Array.isArray(n.bodyParagraphs) || n.bodyParagraphs.length === 0) {
+  // === CANONICAL: bodyParagraphs (NOT body) ===
+  if (!Array.isArray(n.bodyParagraphs) || n.bodyParagraphs.length === 0) {
     if (Array.isArray(n.body)) {
       n.bodyParagraphs = n.body;
     } else if (typeof n.body === 'string') {
@@ -127,42 +141,71 @@ export function normalizeEmailContent(data) {
   }
   delete n.body;
 
-  // Build html from bodyParagraphs if missing
-  if (!n.html) {
-    n.html = '';
+  // === AUTO-GENERATE html from bodyParagraphs if missing ===
+  if (!n.html && n.bodyParagraphs.length > 0) {
+    const bodyHtml = n.bodyParagraphs.map(p =>
+      `<p style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 16px 0;">${extractString(p)}</p>`
+    ).join('\n    ');
+    const ctaLabel = n.callToAction?.label || 'Learn More';
+    const ctaUrl = n.callToAction?.url || '#';
+    const footerText = n.footer || n.complianceFooter || `© ${new Date().getFullYear()}. All rights reserved.`;
+    n.html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${extractString(n.subject)}</title></head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+    <tr><td align="center" style="padding:20px 10px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="background-color:#ffffff;border-radius:8px;">
+        ${n.headline ? `<tr><td style="padding:28px 32px 0 32px;text-align:center;"><h1 style="font-size:24px;color:#1e293b;margin:0;">${extractString(n.headline)}</h1></td></tr>` : ''}
+        ${n.greeting ? `<tr><td style="padding:20px 32px 0 32px;"><p style="font-size:16px;color:#333;margin:0;">${extractString(n.greeting)}</p></td></tr>` : ''}
+        <tr><td style="padding:20px 32px 24px 32px;">${bodyHtml}
+        ${ctaLabel ? `<div style="text-align:center;margin:24px 0;"><a href="${ctaUrl}" style="background-color:#2563eb;color:#ffffff;padding:12px 32px;text-decoration:none;border-radius:6px;display:inline-block;font-size:16px;font-weight:600;">${ctaLabel}</a></div>` : ''}
+        </td></tr>
+        <tr><td style="background-color:#f8fafc;padding:24px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+          <p style="font-size:12px;color:#888;margin:0;">${footerText}</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
   }
+  n.html = n.html || '';
 
-  // Build plainText from html if missing
+  // === AUTO-GENERATE plainText from html if missing ===
   if (!n.plainText && n.html) {
-    n.plainText = n.html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+    n.plainText = n.html.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
   }
   n.plainText = n.plainText || '';
 
-  // Footer/compliance
-  n.footer = n.footer || n.complianceFooter || `© ${new Date().getFullYear()}. All rights reserved.`;
-  n.complianceFooter = n.complianceFooter || n.footer;
-  n.unsubscribeText = n.unsubscribeText || 'To unsubscribe, reply with UNSUBSCRIBE';
+  // === Strings: never null, always "" ===
+  n.subject = extractString(n.subject || n.subjectLine);
+  n.previewText = extractString(n.previewText || n.preheader);
+  n.greeting = extractString(n.greeting || n.greetingText, 'Hi {{firstName}},');
+  n.headline = extractString(n.headline || n.subject);
+  n.opening = extractString(n.opening || n.introduction);
+  n.solution = extractString(n.solution);
+  n.closing = extractString(n.closing);
+  n.signature = extractString(n.signature);
+  n.postscript = extractString(n.postscript);
+  n.compliance = extractString(n.compliance);
+  n.socialProof = extractString(n.socialProof);
+  n.emailType = extractString(n.emailType, 'Product Announcement');
+  n.footer = extractString(n.footer || n.complianceFooter, `© ${new Date().getFullYear()}. All rights reserved.`);
+  n.complianceFooter = extractString(n.complianceFooter);
+  n.unsubscribeText = extractString(n.unsubscribeText, 'To unsubscribe, reply with UNSUBSCRIBE');
+  delete n.subjectLine;
+  delete n.preheader;
+  delete n.greetingText;
+  delete n.introduction;
 
-  // Strings with defaults
-  n.subject = n.subject || n.subjectLine || '';
-  n.previewText = n.previewText || n.preheader || '';
-  n.greeting = n.greeting || n.greetingText || 'Hi {{firstName}},';
-  n.headline = n.headline || n.subject || '';
-  n.opening = n.opening || n.introduction || '';
-  n.solution = n.solution || '';
-  n.closing = n.closing || '';
-  n.signature = n.signature || '';
-  n.postscript = n.postscript || null;
-  n.compliance = n.compliance || null;
-  n.socialProof = n.socialProof || '';
-  n.emailType = n.emailType || 'Product Announcement';
-
-  // Arrays with defaults
+  // === Arrays with defaults ===
   n.benefits = Array.isArray(n.benefits) ? n.benefits : [];
   n.bodyParagraphs = Array.isArray(n.bodyParagraphs) ? n.bodyParagraphs : [];
   n.subjectAlternatives = Array.isArray(n.subjectAlternatives) ? n.subjectAlternatives : [];
 
-  // Evidence
+  // === Evidence ===
   n.evidenceUsed = Array.isArray(n.evidenceUsed) ? n.evidenceUsed : [];
   n.claimsRequiringReview = Array.isArray(n.claimsRequiringReview) ? n.claimsRequiringReview : [];
 

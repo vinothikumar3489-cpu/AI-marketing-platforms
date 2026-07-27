@@ -24,7 +24,7 @@ export async function saveContentAsset(prisma, { userId, chatId, contentType, br
     const opening = content.opening || content.introduction || '';
     const solution = content.solution || '';
     const benefits = Array.isArray(content.benefits) ? content.benefits : [];
-    const cta = content.primaryCta || content.callToAction || content.cta;
+    const cta = content.callToAction || content.primaryCta || content.cta;
 
     const missingFields = [];
     if (!subject) missingFields.push('subject/subjectLine');
