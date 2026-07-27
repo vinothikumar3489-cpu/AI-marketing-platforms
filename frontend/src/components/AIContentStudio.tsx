@@ -281,31 +281,33 @@ function ContentGeneratorPanel({
       if (signal.aborted) return;
       
       if (res?.success !== false && res?.data) {
-        setStatusMessage('Repairing...');
-        await new Promise(r => setTimeout(r, 200));
-        setStatusMessage('Improving quality...');
-        await new Promise(r => setTimeout(r, 200));
-        setStatusMessage('Finalizing...');
-        onGenerated(res.data);
-        setStatusMessage(null);
+        if (res.data?.content?._status === 'generation_failed' || res.data?.content?._status === 'blocked') {
+          setError(res.data.content?._reason || `Generation ${res.data.content?._status}`);
+          setStatusMessage(null);
+        } else {
+          setStatusMessage('Repairing...');
+          await new Promise(r => setTimeout(r, 200));
+          setStatusMessage('Improving quality...');
+          await new Promise(r => setTimeout(r, 200));
+          setStatusMessage('Finalizing...');
+          onGenerated(res.data);
+          setStatusMessage(null);
+        }
       } else if (res?.success !== false && res?.content) {
         setStatusMessage('Finalizing...');
         onGenerated(res);
         setStatusMessage(null);
-      } else if (res?.content?._status === 'enrichment_failed' || res?._status === 'enrichment_failed') {
-        const reqCheck = res?.content?._requirements || res?._requirements;
-        const failureDetail = reqCheck?.failures?.length ? `Missing: ${reqCheck.failures.join(', ')}` : '';
-        setError(`Content generation failed because required fields were missing. Auto-repair attempted. ${failureDetail}`);
+      } else if (res?.success === false && res?.error) {
+        const errMsg = typeof res.error === 'string' ? res.error : res.error?.message || res.error?.code || 'Generation failed';
+        const stage = res.error?.stage ? ` [${res.error.stage}]` : '';
+        const code = res.code || res.error?.code || '';
+        setError(`${errMsg}${code ? ` (${code})` : ''}${stage}`);
         setStatusMessage(null);
       } else if (res?.content?._status === 'generation_failed' || res?._status === 'generation_failed') {
-        setStatusMessage('Repairing...');
-        await new Promise(r => setTimeout(r, 300));
-        setStatusMessage('Improving quality...');
-        await new Promise(r => setTimeout(r, 300));
-        setStatusMessage('Finalizing...');
-        setError(res?.content?._reason || 'Content generation failed. Retrying...');
+        setError(res?.content?._reason || res?._reason || 'Content generation failed');
+        setStatusMessage(null);
       } else {
-        setError('Content generation failed. Auto-repair attempted. Retrying...');
+        setError(res?.error?.message || res?.error || res?.message || 'Generation failed. Check server logs.');
         setStatusMessage(null);
       }
     } catch (err: any) {

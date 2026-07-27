@@ -50,8 +50,16 @@ Return valid JSON:
 
   try {
     const result = await aiFunction(prompt);
-    if (result.success && result.data) return { ...result.data, _provider: result.provider };
-  } catch (e) { }
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[VideoScript Agent] AI success', { hasTitle: !!result.data.title, scenes: result.data.scenes?.length, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[VideoScript Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[VideoScript Agent] AI generation error:', e.message);
+  }
   return generateVideoScriptFallback(brief, productName, persona, painPoint);
 }
 
@@ -161,8 +169,16 @@ Return valid JSON:
 
   try {
     const result = await aiFunction(prompt);
-    if (result.success && result.data) return { ...result.data, _provider: result.provider };
-  } catch (e) { }
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[CreativeBrief Agent] AI success', { hasObjective: !!result.data.objective, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[CreativeBrief Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[CreativeBrief Agent] AI generation error:', e.message);
+  }
   return generateCreativeBriefFallback(brief, productName, persona, painPoint);
 }
 

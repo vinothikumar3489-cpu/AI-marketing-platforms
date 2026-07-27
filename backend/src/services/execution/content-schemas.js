@@ -124,6 +124,13 @@ export function validateContentOutput(raw, assetType) {
     .filter(i => i.code === 'invalid_type' && i.received === 'undefined' || (i.message.toLowerCase().includes('required')))
     .map(i => i.path.join('.'));
 
+  console.warn('[Schema Validation Failed]', {
+    assetType,
+    issues: issues.slice(0, 10),
+    missingFields: missingFields.slice(0, 10),
+    receivedKeys: Object.keys(raw).filter(k => !/^\d+$/.test(k)).slice(0, 30),
+  });
+
   return { valid: false, errors: issues, missingFields, issues, raw: normalized };
 }
 

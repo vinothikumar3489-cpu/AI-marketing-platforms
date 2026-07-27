@@ -8,8 +8,11 @@
 
 export async function saveContentAsset(prisma, { userId, chatId, contentType, briefSnapshot, evidenceSnapshot, provider, content, metadata, qualityScore }) {
   if (!userId || !chatId || !contentType || !content) {
+    console.error('[Asset Save] Missing required params', { hasUserId: !!userId, hasChatId: !!chatId, hasContentType: !!contentType, hasContent: !!content });
     throw new Error('userId, chatId, contentType, and content required');
   }
+
+  console.info('[Asset Save] Starting', { contentType, provider, hasContent: !!content, hasMetadata: !!metadata, contentKeys: Object.keys(content).filter(k => !/^\d+$/.test(k)).slice(0, 15) });
 
   const claimStatus = metadata?.claimStatus || 'passed';
 
@@ -19,16 +22,19 @@ export async function saveContentAsset(prisma, { userId, chatId, contentType, br
     const missingFields = requiredFields.filter(field => !content[field]);
     
     if (missingFields.length > 0) {
+      console.error('[Asset Save] Email missing required fields', { missingFields, availableFields: Object.keys(content).filter(k => !/^\d+$/.test(k)) });
       throw new Error(`Email asset missing required fields: ${missingFields.join(', ')}`);
     }
 
     // Verify benefits is an array with at least 3 items
     if (!Array.isArray(content.benefits) || content.benefits.length < 3) {
+      console.error('[Asset Save] Email insufficient benefits', { benefits: content.benefits, isArray: Array.isArray(content.benefits), count: content.benefits?.length });
       throw new Error('Email asset must have at least 3 benefits');
     }
 
     // Verify CTA has label
     if (!content.cta || !content.cta.label) {
+      console.error('[Asset Save] Email missing CTA label', { cta: content.cta });
       throw new Error('Email asset must have CTA with label');
     }
   }

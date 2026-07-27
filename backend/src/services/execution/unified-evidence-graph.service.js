@@ -249,4 +249,19 @@ export async function buildUnifiedEvidenceGraph(prisma, userId, chatId) {
   return graph;
 }
 
-export default { buildUnifiedEvidenceGraph, invalidateCache };
+/**
+ * Get or create a single immutable EvidenceGraph for the given chat.
+ * Returns the cached graph if it exists and is still valid.
+ * All modules (Growth, SEO, Campaign, Audience, Executive, Content Studio) consume this same instance.
+ */
+export async function getOrCreateEvidenceGraph(prisma, userId, chatId) {
+  const cached = getCached(userId, chatId);
+  if (cached) {
+    console.info(`[EvidenceGraph] Returning cached graph for ${userId}:${chatId} (built at ${cached._builtAt})`);
+    return cached;
+  }
+  console.info(`[EvidenceGraph] Building new graph for ${userId}:${chatId}`);
+  return buildUnifiedEvidenceGraph(prisma, userId, chatId);
+}
+
+export default { buildUnifiedEvidenceGraph, getOrCreateEvidenceGraph, invalidateCache };

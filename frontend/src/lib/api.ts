@@ -82,7 +82,7 @@ async function request<T>(method: Method, path: string, body?: any, signal?: Abo
   }
 
   // Unwrap standardized { success: true, data: ... } format
-  if (data && data.success && data.data !== undefined) {
+  if (data && data.success === true && data.data !== undefined) {
     data = data.data as T;
   }
 

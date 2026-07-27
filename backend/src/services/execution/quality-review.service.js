@@ -199,20 +199,52 @@ export function buildRewritePrompt(content, qualityResult, assetType, brief) {
     .filter(d => d.score < 70)
     .map(d => `${d.dimension} (${d.score}/100)`);
 
-  const prompt = `Improve the following ${assetType} content for quality.
+  const productName = brief?._productName || brief?.product?.name || 'this solution';
+  const persona = brief?.targetPersonas?.[0]?.name || brief?.targetPersonas?.[0]?.role || 'target audience';
+  const painPoint = brief?._painPoint || brief?.painPoints?.[0] || 'key challenges';
+
+  let qualityInstructions = '';
+  if (lowDimensions.some(d => d.startsWith('professionalism'))) {
+    qualityInstructions += '\n- Remove any unsubstantiated claims, generic statements, or vague language. Be specific and evidence-driven.';
+  }
+  if (lowDimensions.some(d => d.startsWith('seo'))) {
+    qualityInstructions += '\n- Include relevant keywords naturally throughout. Ensure headline is SEO-optimized (10-70 chars).';
+  }
+  if (lowDimensions.some(d => d.startsWith('readability'))) {
+    qualityInstructions += '\n- Improve readability: shorter sentences, better paragraph structure, clearer flow. Aim for <20 words per sentence average.';
+  }
+  if (lowDimensions.some(d => d.startsWith('marketing'))) {
+    qualityInstructions += '\n- Strengthen marketing impact. Clear problem → solution → benefit progression. Include specific value propositions.';
+  }
+  if (lowDimensions.some(d => d.startsWith('cta'))) {
+    qualityInstructions += '\n- Make CTA more specific, action-oriented, and compelling. Avoid "Learn More" or "Click Here".';
+  }
+  if (lowDimensions.some(d => d.startsWith('platform'))) {
+    qualityInstructions += '\n- Better align content format and style with the platform requirements and best practices.';
+  }
+  if (lowDimensions.some(d => d.startsWith('brand'))) {
+    qualityInstructions += '\n- Strengthen brand voice consistency. Use language that reflects the brand personality and values.';
+  }
+  if (lowDimensions.some(d => d.startsWith('grammar'))) {
+    qualityInstructions += '\n- Fix grammar issues: remove double spaces, check apostrophes, ensure professional formatting.';
+  }
+
+  const prompt = `You are a senior content quality editor for ${productName}.
+
+Improve the following ${assetType} content. Maintain the EXACT same JSON structure.
+
+PRODUCT: ${productName}
+TARGET AUDIENCE: ${persona}
+PAIN POINT: ${painPoint}
 
 CURRENT CONTENT:
 ${JSON.stringify(content, null, 2)}
 
 QUALITY SCORE: ${qualityResult.overall}/100
-DIMENSIONS BELOW 70: ${lowDimensions.join(', ') || 'None — slight improvement needed'}
+LOW SCORING DIMENSIONS: ${lowDimensions.join(', ') || 'None — slight improvement needed'}
+${qualityInstructions}
 
-REWRITE INSTRUCTIONS:
-${lowDimensions.map(d => `- Improve "${d}" dimension`).join('\n')}
-
-${brief?._retryInstructions ? `\nADDITIONAL: ${brief._retryInstructions}` : ''}
-
-Return the EXACT SAME JSON structure with improvements applied. Only change content, not the schema.`;
+Return ONLY valid JSON matching the original schema exactly. Improve the content quality, do NOT change the structure.`;
 
   return prompt;
 }

@@ -50,8 +50,16 @@ Return valid JSON:
 
   try {
     const result = await aiFunction(prompt);
-    if (result.success && result.data) return { ...result.data, _provider: result.provider };
-  } catch (e) { }
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[LandingPage Agent] AI success', { hasHeadline: !!result.data.headline, features: result.data.features?.length, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[LandingPage Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[LandingPage Agent] AI generation error:', e.message);
+  }
   return generateLandingPageFallback(brief, productName, persona, painPoint);
 }
 
@@ -125,8 +133,16 @@ Return valid JSON:
 
   try {
     const result = await aiFunction(prompt);
-    if (result.success && result.data) return { ...result.data, _provider: result.provider };
-  } catch (e) { }
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[ProductPage Agent] AI success', { productName: result.data.productName, features: result.data.keyFeatures?.length, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[ProductPage Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[ProductPage Agent] AI generation error:', e.message);
+  }
   return generateProductPageFallback(brief, productName, persona, painPoint);
 }
 
@@ -202,8 +218,16 @@ Return valid JSON:
 
   try {
     const result = await aiFunction(prompt);
-    if (result.success && result.data) return { ...result.data, _provider: result.provider };
-  } catch (e) { }
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[ComparisonPage Agent] AI success', { hasHeadline: !!result.data.headline, rows: result.data.comparisonTable?.rows?.length, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[ComparisonPage Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[ComparisonPage Agent] AI generation error:', e.message);
+  }
   return generateComparisonPageFallback(brief, productName, persona);
 }
 

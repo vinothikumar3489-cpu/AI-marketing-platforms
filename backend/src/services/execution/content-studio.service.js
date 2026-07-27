@@ -151,7 +151,8 @@ Return valid JSON:
 
   try {
     const result = await aiFunction(prompt);
-    if (result.success && result.data) {
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[Email Agent] AI success', { hasSubject: !!result.data.subject, provider: result.provider });
       const data = result.data;
       const featureHighlights = Array.isArray(data.featureHighlights) ? data.featureHighlights : [];
       const benefits = Array.isArray(data.benefits) ? data.benefits : [];
@@ -205,8 +206,11 @@ Return valid JSON:
         _provider: result.provider,
       };
     }
+    console.warn('[Email Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
   } catch (e) { 
-    console.error('[Email Copy] AI generation failed, using fallback:', e.message);
+    console.error('[Email Agent] AI generation error, using fallback:', e.message);
   }
 
   // PART 5: Deterministic complete fallback when AI parsing fails

@@ -1010,14 +1010,25 @@ export const generateContentItem = async (req, res) => {
 
     // Stage 4: Generate content using canonical type
     const effectiveType = getCanonicalContentType(contentType) || contentType;
+    console.info(`[Controller] Calling generateContent`, { effectiveType, generatorName, hasBrief: !!brief, hasEvidence: !!evidenceContext });
     const result = await generateContent(effectiveType, brief, evidenceContext, callAI, userId, chatId, prisma);
     const contentBody = result?.content || result;
     const meta = result?.metadata || {};
 
+    console.info(`[Controller] generateContent returned`, {
+      hasContent: !!contentBody,
+      status: contentBody?._status || meta?.status || 'unknown',
+      type: contentBody?._type || effectiveType,
+      hasMeta: !!result?.metadata,
+      provider: meta?.provider || contentBody?._provider || 'unknown',
+    });
+
     if (!contentBody) {
+      const reason = meta?.error || meta?.status || 'Content generation returned no data';
+      console.error(`[Controller] Content generation failed`, { reason, metaStatus: meta?.status });
       return res.status(500).json({
         success: false,
-        error: { code: "CONTENT_GENERATION_FAILED", message: "Content generation returned no data", retryable: true, stage: "GENERATION" }
+        error: { code: "CONTENT_GENERATION_FAILED", message: reason, retryable: true, stage: meta?.status || "GENERATION" }
       });
     }
 
@@ -1044,7 +1055,8 @@ export const generateContentItem = async (req, res) => {
     if (meta?.status === 'schema_rejected') {
       const typeLabel = CONTENT_TYPES[effectiveType]?.label || contentType;
       const errorDetails = (meta.schemaErrors || []).join('; ');
-      const userMessage = `${typeLabel} did not match the required format. Please try again.`;
+      const missingFields = (meta.missingFields || []).join(', ');
+      const userMessage = `Schema validation failed for ${typeLabel}. ${errorDetails ? 'Errors: ' + errorDetails : ''}${missingFields ? ' Missing: ' + missingFields : ''}`.trim();
       console.error("[Content Studio] Schema rejected", {
         chatId, userId, effectiveType,
         errors: meta.schemaErrors,
@@ -1066,13 +1078,14 @@ export const generateContentItem = async (req, res) => {
     const qualityScore = scoreContentQuality(contentBody, brief, effectiveType);
 
     // Stage 6: Persist asset
+    const provider = meta?.provider || contentBody?._provider || 'content_studio_ai';
     const asset = await saveContentAsset(prisma, {
       userId,
       chatId,
       contentType: effectiveType,
       briefSnapshot: brief,
       evidenceSnapshot: evidenceContext,
-      provider: 'groq',
+      provider,
       content: contentBody,
       metadata: meta,
       qualityScore,

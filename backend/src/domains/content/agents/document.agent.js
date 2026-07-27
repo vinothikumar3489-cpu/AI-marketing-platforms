@@ -43,8 +43,16 @@ Return valid JSON:
 
   try {
     const result = await aiFunction(prompt);
-    if (result.success && result.data) return { ...result.data, _provider: result.provider };
-  } catch (e) { }
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[FeatureAnnouncement Agent] AI success', { hasHeadline: !!result.data.headline, benefits: result.data.benefits?.length, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[FeatureAnnouncement Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[FeatureAnnouncement Agent] AI generation error:', e.message);
+  }
   return generateFeatureAnnouncementFallback(brief, productName, persona, feature);
 }
 
@@ -109,8 +117,16 @@ Return valid JSON:
 
   try {
     const result = await aiFunction(prompt);
-    if (result.success && result.data) return { ...result.data, _provider: result.provider };
-  } catch (e) { }
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[Whitepaper Agent] AI success', { hasTitle: !!result.data.title, sections: result.data.sections?.length, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[Whitepaper Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[Whitepaper Agent] AI generation error:', e.message);
+  }
   return generateWhitepaperFallback(brief, productName, persona, painPoint);
 }
 

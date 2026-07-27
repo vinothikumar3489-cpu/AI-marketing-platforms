@@ -202,8 +202,18 @@ export function getAIProviderDiagnostics() {
 
 export async function callAI(prompt, options = {}) {
   const systemPrompt = options.systemPrompt || 'You are a helpful AI assistant. Output JSON if requested.';
+  const traceId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   try {
     const preferredProvider = options.provider || 'groq';
+    console.info(`[AI:${traceId}] REQUEST`, JSON.stringify({
+      contentType: options.contentType || 'unknown',
+      provider: preferredProvider,
+      promptLength: prompt?.length || 0,
+      promptPreview: prompt?.substring(0, 200),
+      model: options.model || undefined,
+      chatId: options.chatId || 'system',
+      temperature: options.temperature ?? undefined,
+    }));
     const response = await getAIOrchestrator().generateCompletion({
       userId: 'system',
       chatId: 'system',
@@ -213,10 +223,44 @@ export async function callAI(prompt, options = {}) {
       model: options.model || undefined,
       schema: null,
     });
-    return { success: response.success, data: response.success ? response.data : null, provider: response.provider, error: response.error };
+    if (!response.success) {
+      console.error(`[AI:${traceId}] FAILED`, response.error);
+      return { success: false, error: response.error, provider: response.provider, traceId };
+    }
+    const rawText = response.data;
+    console.info(`[AI:${traceId}] RAW RESPONSE`, JSON.stringify({
+      text: rawText?.substring(0, 500),
+      finishReason: response.finishReason || 'unknown',
+      usage: response.usage,
+      provider: response.provider,
+      model: response.model,
+    }));
+    let parsed = rawText;
+    if (typeof rawText === 'string') {
+      const trimmed = rawText.trim();
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        try { parsed = JSON.parse(trimmed); }
+        catch (e) {
+          const jsonMatch = trimmed.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+          if (jsonMatch) {
+            try { parsed = JSON.parse(jsonMatch[0]); }
+            catch (e2) {
+              console.warn(`[AI:${traceId}] JSON PARSE FAILED`, { error: e2.message, text: trimmed.substring(0, 300) });
+            }
+          } else {
+            console.warn(`[AI:${traceId}] NOT JSON, returning raw string`, { preview: trimmed.substring(0, 200) });
+          }
+        }
+      } else if (trimmed.startsWith('```')) {
+        const codeBlock = trimmed.replace(/```(?:json)?\n?/g, '').trim();
+        try { parsed = JSON.parse(codeBlock); }
+        catch (e) { console.warn(`[AI:${traceId}] CODEBLOCK PARSE FAILED`, { error: e.message }); }
+      }
+    }
+    return { success: true, data: parsed, provider: response.provider, model: response.model, usage: response.usage, rawText, traceId };
   } catch (error) {
-    console.error('callAI shim failed:', error);
-    return { success: false, error: error.message };
+    console.error(`[AI:${traceId}] callAI failed:`, error);
+    return { success: false, error: error.message, traceId };
   }
 }
 

@@ -50,8 +50,16 @@ Return valid JSON:
 
   try {
     const result = await aiFunction(prompt);
-    if (result.success && result.data) return { ...result.data, _provider: result.provider };
-  } catch (e) { }
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[Blog Agent] AI success', { hasHeadline: !!result.data.headline, sections: result.data.sections?.length, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[Blog Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[Blog Agent] AI generation error:', e.message);
+  }
   return generateBlogArticleFallback(brief, productName, persona, painPoint, keyword);
 }
 
@@ -127,8 +135,16 @@ Return valid JSON:
 
   try {
     const result = await aiFunction(prompt);
-    if (result.success && result.data) return { ...result.data, _provider: result.provider };
-  } catch (e) { }
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[FAQ Agent] AI success', { hasHeadline: !!result.data.headline, faqs: result.data.faqs?.length, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[FAQ Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[FAQ Agent] AI generation error:', e.message);
+  }
   return generateFAQFallback(brief, productName, persona, painPoint);
 }
 

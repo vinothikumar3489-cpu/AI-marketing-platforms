@@ -46,8 +46,16 @@ Return valid JSON:
 
   try {
     const result = await aiFunction(prompt);
-    if (result.success && result.data) return { ...result.data, _provider: result.provider };
-  } catch (e) { }
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[LinkedIn Agent] AI success', { hasHook: !!result.data.hook, hasBody: !!result.data.body, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[LinkedIn Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[LinkedIn Agent] AI generation error:', e.message);
+  }
   return generateLinkedInPostFallback(brief, productName, persona, painPoint, usp);
 }
 
@@ -116,8 +124,16 @@ Return valid JSON:
 
   try {
     const result = await aiFunction(prompt);
-    if (result.success && result.data) return { ...result.data, _provider: result.provider };
-  } catch (e) { }
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[Instagram Agent] AI success', { hasCaption: !!result.data.caption, hasHook: !!result.data.hook, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[Instagram Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[Instagram Agent] AI generation error:', e.message);
+  }
   return generateInstagramPostFallback(brief, productName, persona, painPoint);
 }
 
@@ -185,8 +201,16 @@ Return valid JSON:
 
   try {
     const result = await aiFunction(prompt);
-    if (result.success && result.data) return { ...result.data, _provider: result.provider };
-  } catch (e) { }
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[Twitter Agent] AI success', { hasPost: !!result.data.post, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[Twitter Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[Twitter Agent] AI generation error:', e.message);
+  }
   return generateTwitterPostFallback(brief, productName, persona, painPoint);
 }
 
@@ -245,8 +269,16 @@ Return valid JSON:
 
   try {
     const result = await aiFunction(prompt);
-    if (result.success && result.data) return { ...result.data, _provider: result.provider };
-  } catch (e) { }
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[Facebook Agent] AI success', { hasHeadline: !!result.data.headline, hasBody: !!result.data.body, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[Facebook Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[Facebook Agent] AI generation error:', e.message);
+  }
   return generateFacebookPostFallback(brief, productName, persona, painPoint);
 }
 
@@ -311,8 +343,16 @@ Return valid JSON:
 
   try {
     const result = await aiFunction(prompt);
-    if (result.success && result.data) return { ...result.data, _provider: result.provider };
-  } catch (e) { }
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[YouTube Agent] AI success', { hasTitle: !!result.data.title, hasDescription: !!result.data.description, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[YouTube Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[YouTube Agent] AI generation error:', e.message);
+  }
   return generateYouTubeDescriptionFallback(brief, productName, persona, painPoint);
 }
 
