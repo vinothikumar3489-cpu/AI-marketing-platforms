@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
-import { getSerpCompetitors, normalizeSerpCompetitors, separateCompetitorsByType, isDataForSEOConfigured, getDomainData } from '../dataforseo.service.js';
-import { researchCompetitors } from '../tavily.service.js';
+import { getSerpCompetitors, normalizeSerpCompetitors, separateCompetitorsByType, isDataForSEOConfigured, getDomainData } from '../../providers/dataforseo.service.js';
+import { researchCompetitors } from '../../providers/tavily.service.js';
 import { asArray } from '../../utils/text.util.js';
 import { prisma } from '../../config/prisma.js';
 
