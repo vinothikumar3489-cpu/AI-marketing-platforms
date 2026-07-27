@@ -102,6 +102,9 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
         emailType: emailConfig.emailType, goal: emailConfig.goal,
         tone: emailConfig.tone, audience: emailConfig.audience,
         sender: emailConfig.sender, recipient,
+        senderName: emailConfig.sender.name,
+        senderEmail: emailConfig.sender.email,
+        ctaUrl: window.location.origin,
       });
       if (result.success) {
         setEmailData(result.email);

@@ -194,62 +194,67 @@ EMAIL CONFIGURATION:
 - Key Benefits: ${benefitTexts.join(', ') || 'N/A'}
 
 REQUIREMENTS:
-- Word count: ${wc.min}-${wc.max} words total
+- Word count: ${wc.min}-${wc.max} words total (MANDATORY)
 - Use "${displayName}" consistently (NOT "${internalName}")
 - subject: Compelling subject line, max 70 chars, include product name
 - subjectAlternatives: 3 alternative subject lines for A/B testing
-- previewText: Compelling preview text, max 150 chars
-- greeting: Professional greeting with personalization (e.g., "Hi {{firstName}},")
-- headline: Hero section headline, max 80 chars
-- opening: Strong opening paragraph addressing pain point "${painPoint}"
-- painPoint: Specific pain point from brief
-- solution: 2-3 sentences on how ${displayName} solves it with specific features
-- bodyParagraphs: Array of 3-5 body paragraphs, each a coherent section
-- featureHighlights: Array of 3-5 feature highlights with benefit
-- benefits: Array of 3-5 key benefits
-- socialProof: Evidence-based social proof only (or null if none)
-- callToAction: Object with label (button text) and url
+- previewText: Compelling preview text, max 150 chars (MANDATORY)
+- greeting: Professional greeting with personalization (e.g., "Hi {{firstName}},") (MANDATORY)
+- headline: Hero section headline, max 80 chars (MANDATORY)
+- opening: Strong opening paragraph addressing pain point "${painPoint}" (MANDATORY)
+- painPoint: Specific pain point from brief (MANDATORY)
+- solution: 2-3 sentences on how ${displayName} solves it with specific features (MANDATORY)
+- bodyParagraphs: Array of 3-5 body paragraphs, each a coherent section (MANDATORY, min 3)
+- featureHighlights: Array of 3-5 feature highlights with benefit (MANDATORY, min 3)
+- benefits: Array of 3-5 key benefits (MANDATORY, min 3)
+- socialProof: Evidence-based social proof (MANDATORY - use empty string if none)
+- callToAction: Object with label (button text) and url (MANDATORY)
 - secondaryCta: Object with label and url, or null
-- closing: Closing paragraph
-- signature: Professional sender signature
-- postscript: P.S. line if applicable, or null
-- complianceFooter: Legal/compliance info, or null
-- unsubscribeText: Unsubscribe instructions
-- footer: Copyright and company details
-- compliance: Additional compliance info, or null
-- variables: Array of variable names used (firstName, companyName, etc.) (NOT personalizationVariables)
-- plainText: Plain text version
-- html: NOT required, skip if not generating
+- closing: Closing paragraph (MANDATORY)
+- signature: Professional sender signature (MANDATORY)
+- postscript: P.S. line if applicable, or empty string
+- body: Array of body paragraphs (MANDATORY, min 3)
+- complianceFooter: Legal/compliance info (MANDATORY - use empty string if none)
+- unsubscribeText: Unsubscribe instructions (MANDATORY)
+- footer: Copyright and company details (MANDATORY)
+- compliance: Additional compliance info, or empty string
+- variables: Array of variable names used (firstName, companyName, etc.) (MANDATORY)
+- plainText: Plain text version (MANDATORY)
+- html: HTML version (MANDATORY)
+- evidenceUsed: Array of evidence sources (MANDATORY - use [] if none)
+- claimsRequiringReview: Array of claims flagged for review (MANDATORY - use [] if none)
+- quality: Object with score, checks, warnings (MANDATORY)
+- approvalStatus: "DRAFT" (MANDATORY)
 
 EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 Do NOT use: fake stats, invented testimonials, ROI claims, competitor bashing, generic placeholders.
 
-Return valid JSON:
+Return valid JSON with ALL fields populated:
 {
-  "subject": "string — max 70 chars, include product name",
-  "subjectAlternatives": ["3 alternative subject lines for A/B testing"],
-  "previewText": "string — max 150 chars",
-  "greeting": "string — with {{firstName}}",
-  "headline": "string — hero section headline, max 80 chars",
-  "opening": "string — strong opening addressing pain point",
-  "painPoint": "string — specific pain point from brief",
-  "solution": "string — how ${displayName} solves it with specific features",
-  "bodyParagraphs": ["array of 3-5 body paragraphs, each a coherent section"],
-  "featureHighlights": ["3-5 feature highlights with benefit"],
-  "benefits": ["3-5 key benefits"],
-  "socialProof": "string or null — evidence-based social proof only",
-  "callToAction": {"label": "button text", "url": "CTA URL"},
-  "secondaryCta": {"label": "button text", "url": "CTA URL"} or null,
-  "closing": "string — closing paragraph",
-  "signature": "string — professional sender signature",
-  "postscript": "string or null — P.S. line if applicable",
-  "complianceFooter": "string or null — legal/compliance info",
-  "unsubscribeText": "string — unsubscribe instructions",
-  "footer": "string — copyright and company details",
-  "compliance": "string or null — additional compliance",
-  "variables": ["{{firstName}}", "{{companyName}}"],
-  "plainText": "string — plain text version",
-  "html": "string — NOT required, AI can skip",
+  "subject": "Compelling subject line max 70 chars",
+  "subjectAlternatives": ["Alt 1", "Alt 2", "Alt 3"],
+  "previewText": "Compelling preview max 150 chars",
+  "greeting": "Hi {{firstName}},",
+  "headline": "Hero headline max 80 chars",
+  "opening": "Strong opening addressing the pain point",
+  "painPoint": "Specific pain point from brief",
+  "solution": "How ${displayName} solves it with specific features",
+  "bodyParagraphs": ["Para 1 with details", "Para 2 with benefits", "Para 3 with proof"],
+  "featureHighlights": ["Feature 1 with benefit", "Feature 2 with benefit", "Feature 3 with benefit"],
+  "benefits": ["Benefit 1", "Benefit 2", "Benefit 3"],
+  "socialProof": "Evidence-based social proof or empty string",
+  "callToAction": {"label": "Get Started", "url": "https://example.com/cta"},
+  "secondaryCta": {"label": "Learn More", "url": "https://example.com"} or null,
+  "closing": "Best regards",
+  "signature": "Sender Name",
+  "postscript": "P.S. line or empty string",
+  "complianceFooter": "Legal/compliance info or empty string",
+  "unsubscribeText": "To unsubscribe, reply with UNSUBSCRIBE",
+  "footer": "Copyright company details",
+  "compliance": "Additional compliance or empty string",
+  "variables": ["firstName", "companyName"],
+  "plainText": "Full plain text version of the email",
+  "html": "Full HTML version of the email",
   "evidenceUsed": [],
   "claimsRequiringReview": []
 }`;
@@ -259,9 +264,15 @@ Return valid JSON:
     if (result.success && result.data && typeof result.data === 'object') {
       console.info('[Email Agent] AI success', { hasSubject: !!result.data.subject, provider: result.provider });
 
-      // Canonical normalization: bridges AI output, DTO, Zod schema, frontend, Brevo
-      const normalized = normalizeEmailContent(result.data);
-      normalized.emailType = emailType;
+      const normalized = normalizeEmailContent({
+        ...result.data,
+        _productName: displayName,
+        emailType,
+        goal, tone, audience, language,
+        sender,
+        recipient,
+        productIdentity: { internalName, displayName, brandName, domain },
+      });
 
       const validationResult = validateEmailCopyDTO(normalized);
       if (!validationResult.valid) {
@@ -271,39 +282,12 @@ Return valid JSON:
       return {
         id: `email_${Date.now()}`,
         contentType: 'email_copy',
+        ...normalized,
         emailType,
-        goal,
-        tone,
-        audience,
-        language,
+        goal, tone, audience, language,
         sender,
         recipient,
         productIdentity: { internalName, displayName, brandName, domain },
-        subject: normalized.subject || `${displayName}: ${goal}`,
-        subjectAlternatives: normalized.subjectAlternatives,
-        previewText: normalized.previewText || `Discover how ${displayName} can help you`,
-        greeting: normalized.greeting || 'Hi {{firstName}},',
-        headline: normalized.headline || '',
-        opening: normalized.opening || '',
-        painPoint: normalized.painPoint || '',
-        solution: normalized.solution || '',
-        bodyParagraphs: normalized.bodyParagraphs,
-        featureHighlights: normalized.featureHighlights,
-        benefits: normalized.benefits,
-        socialProof: normalized.socialProof || '',
-        callToAction: normalized.callToAction,
-        secondaryCta: normalized.secondaryCta,
-        closing: normalized.closing || '',
-        signature: normalized.signature || sender.name,
-        postscript: normalized.postscript || '',
-        complianceFooter: normalized.complianceFooter || '',
-        unsubscribeText: normalized.unsubscribeText || 'To unsubscribe, reply with UNSUBSCRIBE',
-        footer: normalized.footer || `© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
-        compliance: normalized.compliance || '',
-        variables: normalized.variables,
-        html: normalized.html || '',
-        plainText: normalized.plainText || '',
-        evidenceUsed: normalized.evidenceUsed || [],
         quality: {
           score: validationResult.valid ? 1 : 0.5,
           checks: validationResult.errors || [],
@@ -336,30 +320,36 @@ function generateEmailCopyFallback(displayName, internalName, brandName, domain,
   if (!displayName || displayName === 'this solution' || displayName === 'N/A') {
     return { _insufficientEvidence: true, _message: 'Additional verified product information is required. No product name identified.', _provider: 'evidence_gate' };
   }
+  const now = new Date().getFullYear();
+  const fallbackSubject = `${displayName}: A Solution for ${persona}`;
+  const fallbackPreview = `Learn how ${displayName} can help ${persona} overcome ${painPoint}`;
+  const fallbackOpening = `As a ${persona}, you understand the challenge of ${painPoint}.`;
+  const fallbackSolution = `${displayName} provides a comprehensive solution that addresses these challenges directly.`;
+  const fallbackBody = [
+    `As a ${persona}, you understand the challenge of ${painPoint}.`,
+    painPoint || 'Many professionals struggle with inefficient workflows and limited visibility.',
+    `${displayName} provides a comprehensive solution that addresses these challenges directly.`,
+    `With ${goal} at the core, ${displayName} helps teams achieve better results through intuitive ${tone.toLowerCase()} interfaces and seamless integrations.`
+  ];
+  const fallbackHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${fallbackSubject}</title></head><body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,sans-serif;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td align="center" style="padding:20px 10px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="background-color:#ffffff;border-radius:8px;"><tr><td style="padding:20px 32px;"><p style="font-size:16px;color:#333;margin:0 0 16px 0;">Hi {{firstName}},</p>${fallbackBody.map(p => `<p style="font-family:Arial,sans-serif;font-size:16px;line-height:1.6;color:#333;margin:0 0 16px 0;">${p}</p>`).join('')}<div style="text-align:center;margin:24px 0;"><a href="${ctaUrl}" style="background-color:#2563eb;color:#fff;padding:12px 32px;text-decoration:none;border-radius:6px;display:inline-block;font-size:16px;font-weight:600;">Get Started</a></div></td></tr><tr><td style="background-color:#f8fafc;padding:24px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="font-size:12px;color:#888;margin:0;">© ${now} ${brandName || displayName}. All rights reserved.<br>To unsubscribe, reply with UNSUBSCRIBE</p></td></tr></table></td></tr></table></body></html>`;
+  const fallbackPlain = fallbackHtml.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+
   const fallbackData = {
     id: `email_fallback_${Date.now()}`,
     contentType: 'email_copy',
-    emailType,
-    goal,
-    tone,
-    audience,
-    language: 'en',
+    emailType, goal, tone, audience, language: 'en',
     sender,
     recipient: { email: '', firstName: '', lastName: '', companyName: '' },
     productIdentity: { internalName, displayName, brandName, domain },
-    subject: `${displayName}: A Solution for ${persona}`,
+    subject: fallbackSubject.length > 70 ? fallbackSubject.substring(0, 67) + '...' : fallbackSubject,
     subjectAlternatives: [],
-    previewText: `Learn how ${displayName} can help ${persona} overcome ${painPoint}`,
+    previewText: fallbackPreview.length > 150 ? fallbackPreview.substring(0, 147) + '...' : fallbackPreview,
     greeting: 'Hi {{firstName}},',
-    headline: '',
-    opening: `As a ${persona}, you understand the challenge of ${painPoint}.`,
+    headline: `Introducing ${displayName}`,
+    opening: fallbackOpening,
     painPoint: painPoint || 'Many professionals struggle with inefficient workflows and limited visibility.',
-    solution: `${displayName} provides a comprehensive solution that addresses these challenges directly.`,
-    bodyParagraphs: [
-      `As a ${persona}, you understand the challenge of ${painPoint}.`,
-      painPoint || 'Many professionals struggle with inefficient workflows and limited visibility.',
-      `${displayName} provides a comprehensive solution that addresses these challenges directly.`
-    ],
+    solution: fallbackSolution,
+    bodyParagraphs: fallbackBody,
     featureHighlights: [
       `Advanced ${goal.toLowerCase()} capabilities`,
       `Intuitive ${tone.toLowerCase()} interface`,
@@ -369,23 +359,22 @@ function generateEmailCopyFallback(displayName, internalName, brandName, domain,
       `Streamlined workflows for ${persona}`,
       `Enhanced visibility and control`,
       `Improved productivity and efficiency`,
-      `Cost-effective solution`,
-      `Easy implementation and adoption`
     ],
     socialProof: '',
-    callToAction: { label: 'Get Started', url: ctaUrl },
+    callToAction: { label: 'Get Started', url: ctaUrl || '#' },
     secondaryCta: null,
     closing: `We're excited to help you achieve your goals with ${displayName}.`,
-    signature: sender.name,
+    signature: sender.name || 'The Team',
     postscript: '',
     complianceFooter: '',
     unsubscribeText: 'To unsubscribe, reply with UNSUBSCRIBE',
-    footer: `© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
+    footer: `© ${now} ${brandName || displayName}. All rights reserved.`,
     compliance: '',
     variables: ['firstName', 'lastName', 'companyName'],
-    html: generateFallbackHtml(displayName, sender, ctaUrl),
-    plainText: generateFallbackPlainText(displayName, sender, ctaUrl),
+    html: fallbackHtml,
+    plainText: fallbackPlain,
     evidenceUsed: [],
+    claimsRequiringReview: [],
     quality: {
       score: 0.5,
       checks: ['fallback_used'],

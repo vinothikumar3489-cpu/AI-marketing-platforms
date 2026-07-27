@@ -386,7 +386,8 @@ function checkPersonalizationValidity(emailData) {
 
 /**
  * Check 8: Unresolved Placeholders
- * Blocks sending if personalization placeholders remain unresolved
+ * Checks for unknown personalization placeholders (not in PERSONALIZATION_VARIABLES).
+ * Known variables like {{firstName}} are intentional and should be replaced at send time.
  */
 function checkUnresolvedPlaceholders(emailData) {
   const text = [
@@ -400,24 +401,27 @@ function checkUnresolvedPlaceholders(emailData) {
     emailData.signature
   ].filter(Boolean).join(' ');
 
-  const unresolved = [];
-  PERSONALIZATION_VARIABLES.forEach(variable => {
-    if (text.includes(variable)) {
-      unresolved.push(variable);
+  const unknownPlaceholders = [];
+  const placeholderPattern = /\{\{(\w+)\}\}/g;
+  let match;
+  while ((match = placeholderPattern.exec(text)) !== null) {
+    const varName = `{{${match[1]}}}`;
+    if (!PERSONALIZATION_VARIABLES.includes(varName)) {
+      unknownPlaceholders.push(varName);
     }
-  });
+  }
 
-  if (unresolved.length > 0) {
+  if (unknownPlaceholders.length > 0) {
     return {
       status: 'blocked',
-      message: `Unresolved personalization placeholders: ${unresolved.join(', ')}`,
+      message: `Unknown personalization placeholders: ${unknownPlaceholders.join(', ')}`,
       score: 0
     };
   }
 
   return {
     status: 'passed',
-    message: 'No unresolved personalization placeholders',
+    message: 'No unknown personalization placeholders',
     score: 100
   };
 }
