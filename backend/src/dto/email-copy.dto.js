@@ -216,62 +216,107 @@ export const PERSONALIZATION_VARIABLES = [
 ];
 
 /**
+ * Normalize email data to canonical field names
+ * Supports both AI-generator naming (features, primaryCta, painPoint, variables)
+ * and legacy DTO naming (featureHighlights, callToAction, problem, personalizationVariables)
+ */
+function normalizeEmailData(data) {
+  if (!data || typeof data !== 'object') return data;
+  const n = { ...data };
+
+  if (Array.isArray(n.featureHighlights) && !Array.isArray(n.features)) {
+    n.features = n.featureHighlights;
+  }
+  if (Array.isArray(n.features) && !Array.isArray(n.featureHighlights)) {
+    n.featureHighlights = n.features;
+  }
+
+  if (n.callToAction && !n.primaryCta) {
+    n.primaryCta = typeof n.callToAction === 'object' ? n.callToAction : { label: String(n.callToAction), url: '#' };
+  }
+  if (n.primaryCta && !n.callToAction) {
+    n.callToAction = n.primaryCta;
+  }
+
+  if (n.problem && !n.painPoint) n.painPoint = n.problem;
+  if (n.painPoint && !n.problem) n.problem = n.painPoint;
+
+  if (Array.isArray(n.personalizationVariables) && !Array.isArray(n.variables)) {
+    n.variables = n.personalizationVariables;
+  }
+  if (Array.isArray(n.variables) && !Array.isArray(n.personalizationVariables)) {
+    n.personalizationVariables = n.variables;
+  }
+
+  if (n.cta && !n.callToAction) {
+    n.callToAction = typeof n.cta === 'object' ? n.cta : { label: String(n.cta), url: '#' };
+  }
+
+  return n;
+}
+
+/**
  * Validate email copy DTO against schema
+ * Accepts both canonical (features, primaryCta) and legacy (featureHighlights, callToAction) naming
  */
 export function validateEmailCopyDTO(data) {
+  const normalized = normalizeEmailData(data);
   const errors = [];
   const warnings = [];
 
-  if (!data.subject || typeof data.subject !== 'string') {
+  if (!normalized.subject || typeof normalized.subject !== 'string') {
     errors.push('subject is required and must be a string');
-  } else if (data.subject.length > 70) {
+  } else if (normalized.subject.length > 70) {
     errors.push('subject must be max 70 characters');
   }
 
-  if (!data.previewText || typeof data.previewText !== 'string') {
+  if (!normalized.previewText || typeof normalized.previewText !== 'string') {
     errors.push('previewText is required and must be a string');
-  } else if (data.previewText.length > 150) {
+  } else if (normalized.previewText.length > 150) {
     errors.push('previewText must be max 150 characters');
   }
 
-  if (!data.emailType || !EMAIL_WORD_COUNT_LIMITS[data.emailType]) {
+  if (!normalized.emailType || !EMAIL_WORD_COUNT_LIMITS[normalized.emailType]) {
     errors.push(`emailType must be one of: ${Object.keys(EMAIL_WORD_COUNT_LIMITS).join(', ')}`);
   }
 
-  if (!Array.isArray(data.featureHighlights) || data.featureHighlights.length < 2) {
-    errors.push('featureHighlights must be an array with at least 2 items');
+  const features = normalized.features || normalized.featureHighlights || [];
+  if (!Array.isArray(features) || features.length < 2) {
+    errors.push('features/featureHighlights must be an array with at least 2 items');
   }
 
-  if (!Array.isArray(data.benefits) || data.benefits.length < 2) {
+  if (!Array.isArray(normalized.benefits) || normalized.benefits.length < 2) {
     errors.push('benefits must be an array with at least 2 items');
   }
 
-  if (!data.callToAction || typeof data.callToAction !== 'object' || !data.callToAction.label) {
-    errors.push('callToAction is required and must have a label');
+  const cta = normalized.callToAction || normalized.primaryCta;
+  if (!cta || typeof cta !== 'object' || !cta.label) {
+    errors.push('callToAction/primaryCta is required and must have a label');
   }
 
-  if (!data.callToAction || !data.callToAction.url) {
-    warnings.push('callToAction.url is recommended');
+  const ctaUrl = cta?.url || normalized.ctaUrl;
+  if (!ctaUrl) {
+    warnings.push('callToAction.url or ctaUrl is recommended');
   }
 
   // Check word count
-  const wordCount = countWords(data);
-  const limits = EMAIL_WORD_COUNT_LIMITS[data.emailType] || { min: 200, max: 500 };
+  const wordCount = countWords(normalized);
+  const limits = EMAIL_WORD_COUNT_LIMITS[normalized.emailType] || { min: 200, max: 500 };
   if (wordCount < limits.min || wordCount > limits.max) {
     errors.push(`word count must be between ${limits.min} and ${limits.max} (actual: ${wordCount})`);
   }
 
   // Check required email fields
-  if (!data.html) {
+  if (!normalized.html) {
     errors.push('html content is required');
   }
 
-  if (!data.plainText) {
+  if (!normalized.plainText) {
     errors.push('plainText content is required');
   }
 
-  if (!data.footer) {
-    errors.push('footer is required');
+  if (!normalized.footer && !normalized.complianceFooter) {
+    warnings.push('footer or complianceFooter is recommended');
   }
 
   return {
@@ -285,18 +330,21 @@ export function validateEmailCopyDTO(data) {
  * Count words in email copy
  */
 function countWords(data) {
+  const features = data.features || data.featureHighlights || [];
+  const footer = data.footer || data.complianceFooter || '';
   const text = [
     data.subject,
     data.previewText,
     data.greeting,
     data.opening,
-    data.problem,
+    data.painPoint || data.problem,
     data.solution,
-    data.featureHighlights?.join(' '),
+    features?.join(' '),
     data.benefits?.join(' '),
+    ...(Array.isArray(data.bodyParagraphs) ? data.bodyParagraphs : []),
     data.socialProof,
     data.signature,
-    data.footer
+    footer
   ].filter(Boolean).join(' ');
 
   return text.split(/\s+/).filter(word => word.length > 0).length;

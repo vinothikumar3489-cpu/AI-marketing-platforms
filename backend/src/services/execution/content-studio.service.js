@@ -7,7 +7,7 @@ import { generateVideoScript, generateCreativeBrief } from '../../domains/conten
 import { buildProductEvidenceContext, getPersonaName, getFirstPainPoint, checkEvidenceSufficiency } from '../../domains/content/agents/agent.utils.js';
 import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
 import { validateContentClaims, validateBriefContent } from "./claim-validator.service.js";
-import { validateContentOutput, repairAIOutput } from "./content-schemas.js";
+import { validateContentOutput, repairAIOutput, normalizeEmailContent } from "./content-schemas.js";
 import { SCHEMA_REGISTRY } from "../../shared/schemas/content-types.schema.js";
 import { CONTENT_TYPES, CONTENT_TYPES_LIST } from "../../constants/content-types.js";
 import { EMAIL_WORD_COUNT_LIMITS, validateEmailCopyDTO, createEmptyEmailCopyDTO } from "../../dto/email-copy.dto.js";
@@ -205,10 +205,10 @@ REQUIREMENTS:
 - painPoint: Specific pain point from brief
 - solution: 2-3 sentences on how ${displayName} solves it with specific features
 - bodyParagraphs: Array of 3-5 body paragraphs, each a coherent section
-- features: Array of 3-5 feature highlights with benefit
+- features: Array of 3-5 feature highlights with benefit (NOT featureHighlights)
 - benefits: Array of 3-5 key benefits
 - socialProof: Evidence-based social proof only (or null if none)
-- primaryCta: Object with label (button text) and url
+- primaryCta: Object with label (button text) and url (NOT callToAction)
 - secondaryCta: Object with label and url, or null
 - closing: Closing paragraph
 - signature: Professional sender signature
@@ -217,7 +217,7 @@ REQUIREMENTS:
 - unsubscribeText: Unsubscribe instructions
 - footer: Copyright and company details
 - compliance: Additional compliance info, or null
-- variables: Array of variable names used (firstName, companyName, etc.)
+- variables: Array of variable names used (firstName, companyName, etc.) (NOT personalizationVariables)
 - plainText: Plain text version
 - html: NOT required, skip if not generating
 
@@ -258,23 +258,15 @@ Return valid JSON:
     const result = await aiFunction(prompt);
     if (result.success && result.data && typeof result.data === 'object') {
       console.info('[Email Agent] AI success', { hasSubject: !!result.data.subject, provider: result.provider });
-      const data = result.data;
-      const features = Array.isArray(data.features) ? data.features : (Array.isArray(data.featureHighlights) ? data.featureHighlights : []);
-      const benefits = Array.isArray(data.benefits) ? data.benefits : [];
-      const variables = Array.isArray(data.variables) ? data.variables : (Array.isArray(data.personalizationVariables) ? data.personalizationVariables : []);
-      const bodyParagraphs = Array.isArray(data.bodyParagraphs) && data.bodyParagraphs.length > 0 ? data.bodyParagraphs : (
-        data.opening || data.problem || data.solution ? [data.opening || '', data.problem || data.painPoint || '', data.solution || ''].filter(Boolean) : []
-      );
 
-      const validationResult = validateEmailCopyDTO(data);
+      // Canonical normalization: bridges AI output, DTO, Zod schema, frontend, Brevo
+      const normalized = normalizeEmailContent(result.data);
+      normalized.emailType = emailType;
+
+      const validationResult = validateEmailCopyDTO(normalized);
       if (!validationResult.valid) {
         console.warn('[Email Copy] DTO validation failed:', validationResult.errors);
       }
-
-      const primaryCta = {
-        label: data.primaryCta?.label || data.callToAction?.label || 'Get Started',
-        url: data.primaryCta?.url || data.callToAction?.url || ctaUrl
-      };
 
       return {
         id: `email_${Date.now()}`,
@@ -287,31 +279,31 @@ Return valid JSON:
         sender,
         recipient,
         productIdentity: { internalName, displayName, brandName, domain },
-        subject: data.subject || `${displayName}: ${goal}`,
-        subjectAlternatives: Array.isArray(data.subjectAlternatives) ? data.subjectAlternatives : [],
-        previewText: data.previewText || `Discover how ${displayName} can help you`,
-        greeting: data.greeting || 'Hi {{firstName}},',
-        headline: data.headline || '',
-        opening: data.opening || '',
-        painPoint: data.painPoint || data.problem || '',
-        solution: data.solution || '',
-        bodyParagraphs,
-        features,
-        benefits,
-        socialProof: data.socialProof || '',
-        primaryCta,
-        secondaryCta: data.secondaryCta || null,
-        closing: data.closing || '',
-        signature: data.signature || sender.name,
-        postscript: data.postscript || null,
-        complianceFooter: data.complianceFooter || null,
-        unsubscribeText: data.unsubscribeText || 'To unsubscribe, reply with UNSUBSCRIBE',
-        footer: data.footer || data.complianceFooter || `© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
-        compliance: data.compliance || null,
-        variables,
-        html: data.html || '',
-        plainText: data.plainText || '',
-        evidenceUsed: data.evidenceUsed || [],
+        subject: normalized.subject || `${displayName}: ${goal}`,
+        subjectAlternatives: normalized.subjectAlternatives,
+        previewText: normalized.previewText || `Discover how ${displayName} can help you`,
+        greeting: normalized.greeting || 'Hi {{firstName}},',
+        headline: normalized.headline || '',
+        opening: normalized.opening || '',
+        painPoint: normalized.painPoint || '',
+        solution: normalized.solution || '',
+        bodyParagraphs: normalized.bodyParagraphs,
+        features: normalized.features,
+        benefits: normalized.benefits,
+        socialProof: normalized.socialProof || '',
+        primaryCta: normalized.primaryCta,
+        secondaryCta: normalized.secondaryCta,
+        closing: normalized.closing || '',
+        signature: normalized.signature || sender.name,
+        postscript: normalized.postscript || null,
+        complianceFooter: normalized.complianceFooter || null,
+        unsubscribeText: normalized.unsubscribeText || 'To unsubscribe, reply with UNSUBSCRIBE',
+        footer: normalized.footer || `© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.`,
+        compliance: normalized.compliance || null,
+        variables: normalized.variables,
+        html: normalized.html || '',
+        plainText: normalized.plainText || '',
+        evidenceUsed: normalized.evidenceUsed || [],
         quality: {
           score: validationResult.valid ? 1 : 0.5,
           checks: validationResult.errors || [],
@@ -320,8 +312,8 @@ Return valid JSON:
         approvalStatus: 'DRAFT',
         deliveryStatus: null,
         createdAt: new Date().toISOString(),
-        spamScore: calculateSpamScore(data),
-        readabilityScore: calculateReadabilityScore(data),
+        spamScore: calculateSpamScore(normalized),
+        readabilityScore: calculateReadabilityScore(normalized),
         _provider: result.provider,
       };
     }
@@ -1048,30 +1040,32 @@ function sanitizeText(text) {
 }
 
 function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '', unsubscribeUrl = null) {
-  const subject = sanitizeText(emailData.subject || '');
-  const previewText = sanitizeText(emailData.previewText || emailData.subject || '');
-  const headline = sanitizeText(emailData.headline || emailData.subject || '');
-  const greeting = sanitizeText(emailData.greeting || (emailData.sections && emailData.sections.greeting) || '');
-  const opening = sanitizeText(emailData.opening || (emailData.sections && emailData.sections.openingHook) || '');
-  const painPoint = sanitizeText(emailData.painPoint || emailData.problem || '');
-  const solution = sanitizeText(emailData.solution || '');
-  const bodyParagraphs = Array.isArray(emailData.bodyParagraphs) ? emailData.bodyParagraphs : [];
-  const bulletPoints = Array.isArray(emailData.bulletPoints) ? emailData.bulletPoints : [];
-  const features = Array.isArray(emailData.features || emailData.featureHighlights) ? (emailData.features || emailData.featureHighlights) : [];
-  const benefits = Array.isArray(emailData.benefits) ? emailData.benefits : [];
-  const socialProof = sanitizeText(emailData.socialProof || '');
-  const variables = Array.isArray(emailData.variables) ? emailData.variables : [];
-  const ctaData = emailData.primaryCta || emailData.callToAction || {};
-  const ctaText = sanitizeText(emailData.ctaText || ctaData.label || '');
-  const ctaUrl = emailData.ctaUrl || ctaData.url || ctaData.destination || '#';
-  const secondaryCta = emailData.secondaryCta || null;
-  const closing = sanitizeText(emailData.closing || '');
-  const postscript = sanitizeText(emailData.postscript || '');
-  const signature = sanitizeText(emailData.signature || '');
-  const complianceNote = sanitizeText(emailData.complianceNote || emailData.complianceFooter || emailData.footer || '');
+  // Normalize to canonical field names
+  const norm = normalizeEmailContent(emailData);
+  const subject = sanitizeText(norm.subject || '');
+  const previewText = sanitizeText(norm.previewText || norm.subject || '');
+  const headline = sanitizeText(norm.headline || norm.subject || '');
+  const greeting = sanitizeText(norm.greeting || '');
+  const opening = sanitizeText(norm.opening || '');
+  const painPoint = sanitizeText(norm.painPoint || '');
+  const solution = sanitizeText(norm.solution || '');
+  const bodyParagraphs = Array.isArray(norm.bodyParagraphs) ? norm.bodyParagraphs : [];
+  const bulletPoints = Array.isArray(norm.bulletPoints) ? norm.bulletPoints : [];
+  const features = norm.features || [];
+  const benefits = Array.isArray(norm.benefits) ? norm.benefits : [];
+  const socialProof = sanitizeText(norm.socialProof || '');
+  const variables = Array.isArray(norm.variables) ? norm.variables : [];
+  const ctaData = norm.primaryCta || {};
+  const ctaText = sanitizeText(ctaData.label || '');
+  const ctaUrl = ctaData.url || '#';
+  const secondaryCta = norm.secondaryCta || null;
+  const closing = sanitizeText(norm.closing || '');
+  const postscript = sanitizeText(norm.postscript || '');
+  const signature = sanitizeText(norm.signature || '');
+  const complianceNote = sanitizeText(norm.complianceFooter || norm.footer || '');
   const company = sanitizeText(companyName || 'Our Company');
   const baseUrl = companyWebsite || '#';
-  const unsubscribeText = sanitizeText(emailData.unsubscribeText || '');
+  const unsubscribeText = sanitizeText(norm.unsubscribeText || '');
 
   const bodyHtml = `
     ${headline ? `<h1 style="font-family: Arial, sans-serif; font-size: 24px; line-height: 1.3; color: #1e293b; margin: 0 0 20px 0; font-weight: 700;">${headline}</h1>` : ''}

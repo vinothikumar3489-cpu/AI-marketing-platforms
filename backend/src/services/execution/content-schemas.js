@@ -55,6 +55,120 @@ function generateSummary(content, maxLength = 200) {
   return str.substring(0, maxLength - 3) + '...';
 }
 
+/**
+ * Normalize email content to canonical field names.
+ * Bridges AI-generator output, DTO, Zod schema, frontend, and Brevo.
+ * Accepts any shape and returns a unified EmailContent object.
+ */
+export function normalizeEmailContent(data) {
+  if (!data || typeof data !== 'object') return data || {};
+  const n = { ...data };
+
+  // Features: canonical = features, alias = featureHighlights
+  if (Array.isArray(n.featureHighlights) && !Array.isArray(n.features)) {
+    n.features = n.featureHighlights;
+  }
+  if (Array.isArray(n.features) && !Array.isArray(n.featureHighlights)) {
+    n.featureHighlights = n.features;
+  }
+  n.features = Array.isArray(n.features) ? n.features : [];
+  n.featureHighlights = Array.isArray(n.featureHighlights) ? n.featureHighlights : n.features;
+
+  // CTA: canonical = primaryCta, aliases = callToAction, ctaText+ctaUrl, cta
+  if (n.callToAction && !n.primaryCta) {
+    n.primaryCta = typeof n.callToAction === 'object' ? n.callToAction : { label: String(n.callToAction), url: '#' };
+  }
+  if (n.primaryCta && !n.callToAction) {
+    n.callToAction = n.primaryCta;
+  }
+  if (!n.primaryCta && n.cta) {
+    n.primaryCta = typeof n.cta === 'object' ? n.cta : { label: String(n.cta), url: '#' };
+  }
+  if (!n.primaryCta && n.ctaText) {
+    n.primaryCta = { label: n.ctaText, url: n.ctaUrl || '#' };
+  }
+  n.primaryCta = n.primaryCta && typeof n.primaryCta === 'object'
+    ? { label: n.primaryCta.label || n.ctaText || 'Learn More', url: n.primaryCta.url || n.ctaUrl || '#' }
+    : { label: n.ctaText || 'Learn More', url: n.ctaUrl || '#' };
+  n.callToAction = n.callToAction && typeof n.callToAction === 'object'
+    ? { label: n.callToAction.label || n.ctaText || 'Learn More', url: n.callToAction.url || n.ctaUrl || '#' }
+    : { label: n.ctaText || 'Learn More', url: n.ctaUrl || '#' };
+
+  // secondaryCta
+  n.secondaryCta = n.secondaryCta && typeof n.secondaryCta === 'object' && n.secondaryCta.label
+    ? n.secondaryCta : null;
+
+  // Pain point: canonical = painPoint, alias = problem
+  if (n.problem && !n.painPoint) n.painPoint = n.problem;
+  if (n.painPoint && !n.problem) n.problem = n.painPoint;
+  n.painPoint = n.painPoint || '';
+  n.problem = n.problem || n.painPoint;
+
+  // Variables: canonical = variables, alias = personalizationVariables
+  if (Array.isArray(n.personalizationVariables) && !Array.isArray(n.variables)) {
+    n.variables = n.personalizationVariables;
+  }
+  if (Array.isArray(n.variables) && !Array.isArray(n.personalizationVariables)) {
+    n.personalizationVariables = n.variables;
+  }
+  n.variables = Array.isArray(n.variables) ? n.variables : [];
+
+  // Body: canonical = bodyParagraphs, fall back to body array or build from parts
+  if (!n.bodyParagraphs || !Array.isArray(n.bodyParagraphs) || n.bodyParagraphs.length === 0) {
+    if (Array.isArray(n.body)) {
+      n.bodyParagraphs = n.body;
+    } else if (typeof n.body === 'string') {
+      n.bodyParagraphs = [n.body];
+    } else if (n.opening || n.painPoint || n.solution) {
+      n.bodyParagraphs = [n.opening || '', n.painPoint || '', n.solution || ''].filter(Boolean);
+    } else {
+      n.bodyParagraphs = [];
+    }
+  }
+  delete n.body;
+
+  // Build html from bodyParagraphs if missing
+  if (!n.html) {
+    n.html = '';
+  }
+
+  // Build plainText from html if missing
+  if (!n.plainText && n.html) {
+    n.plainText = n.html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  }
+  n.plainText = n.plainText || '';
+
+  // Footer/compliance
+  n.footer = n.footer || n.complianceFooter || `© ${new Date().getFullYear()}. All rights reserved.`;
+  n.complianceFooter = n.complianceFooter || n.footer;
+  n.unsubscribeText = n.unsubscribeText || 'To unsubscribe, reply with UNSUBSCRIBE';
+
+  // Strings with defaults
+  n.subject = n.subject || n.subjectLine || '';
+  n.previewText = n.previewText || n.preheader || '';
+  n.greeting = n.greeting || n.greetingText || 'Hi {{firstName}},';
+  n.headline = n.headline || n.subject || '';
+  n.opening = n.opening || n.introduction || '';
+  n.solution = n.solution || '';
+  n.closing = n.closing || '';
+  n.signature = n.signature || '';
+  n.postscript = n.postscript || null;
+  n.compliance = n.compliance || null;
+  n.socialProof = n.socialProof || '';
+  n.emailType = n.emailType || 'Product Announcement';
+
+  // Arrays with defaults
+  n.benefits = Array.isArray(n.benefits) ? n.benefits : [];
+  n.bodyParagraphs = Array.isArray(n.bodyParagraphs) ? n.bodyParagraphs : [];
+  n.subjectAlternatives = Array.isArray(n.subjectAlternatives) ? n.subjectAlternatives : [];
+
+  // Evidence
+  n.evidenceUsed = Array.isArray(n.evidenceUsed) ? n.evidenceUsed : [];
+  n.claimsRequiringReview = Array.isArray(n.claimsRequiringReview) ? n.claimsRequiringReview : [];
+
+  return n;
+}
+
 /** Normalize legacy stored assets to match current schema */
 export function normalizeLegacyAsset(raw, assetType) {
   if (!raw || typeof raw !== 'object') return raw;
@@ -112,7 +226,12 @@ export function validateContentOutput(raw, assetType) {
     return { valid: false, errors: [`No schema for content type: ${assetType}`] };
   }
 
-  const normalized = normalizeLegacyAsset(raw, assetType);
+  let normalized = normalizeLegacyAsset(raw, assetType);
+
+  // Run normalizeEmailContent for all email types to bridge AI output, DTO, schema, frontend, Brevo
+  if (assetType === 'email_copy' || assetType.startsWith('email_')) {
+    normalized = normalizeEmailContent(normalized);
+  }
 
   const result = entry.schema.safeParse(normalized);
   if (result.success) {
@@ -280,45 +399,31 @@ export function repairAIOutput(raw, assetType) {
   }
 
   if (assetType === 'email_copy' || assetType.startsWith('email_')) {
-    // Map generator field names to Zod schema field names
-    if (repaired.problem && !repaired.painPoint) { repaired.painPoint = repaired.problem; delete repaired.problem; }
-    if (repaired.featureHighlights && !repaired.features) { repaired.features = repaired.featureHighlights; delete repaired.featureHighlights; }
-    if (repaired.personalizationVariables && !repaired.variables) { repaired.variables = repaired.personalizationVariables; delete repaired.personalizationVariables; }
-    if (repaired.callToAction && !repaired.primaryCta) { 
-      repaired.primaryCta = typeof repaired.callToAction === 'object' ? repaired.callToAction : { label: repaired.callToAction, url: '#' };
-      delete repaired.callToAction;
-    }
-    // Combine opening/problem/solution into bodyParagraphs if bodyParagraphs is empty
-    if ((!repaired.bodyParagraphs || repaired.bodyParagraphs.length === 0) && (repaired.opening || repaired.problem || repaired.solution)) {
-      repaired.bodyParagraphs = [repaired.opening || '', repaired.problem || '', repaired.solution || ''].filter(Boolean);
-      delete repaired.opening;
-      delete repaired.solution;
-    }
+    const normalized = normalizeEmailContent(repaired);
+    const now = new Date().getFullYear();
+    const pn = normalized._productName || normalized.productIdentity?.displayName || 'this solution';
+    const pp = normalized._painPoint || 'common challenges';
 
-    repaired.subject = repaired.subject || repaired.subjectLine || generateHeadline(repaired._productName, repaired._painPoint);
-    if (repaired.subjectLine && !repaired.subject) { repaired.subject = repaired.subjectLine; delete repaired.subjectLine; }
-    repaired.previewText = repaired.previewText || `Discover how ${repaired._productName || 'our solution'} can help your team.`;
-    repaired.greeting = repaired.greeting || 'Hi there,';
-    repaired.opening = repaired.opening || repaired.introduction || `We wanted to share how ${repaired._productName || 'our platform'} can help you overcome ${repaired._painPoint || 'common challenges'}.`;
-    if (!repaired.bodyParagraphs || repaired.bodyParagraphs.length === 0) {
-      if (repaired.body) { repaired.bodyParagraphs = [repaired.body]; delete repaired.body; }
-      else if (repaired.content) { repaired.bodyParagraphs = [repaired.content]; delete repaired.content; }
-      else { repaired.bodyParagraphs = [`${repaired._productName || 'Our solution'} provides the tools and capabilities your team needs to succeed.`]; }
-    }
-    repaired.ctaText = repaired.ctaText || repaired.cta || generateCallToAction();
-    if (repaired.cta && !repaired.ctaText) { repaired.ctaText = repaired.cta; delete repaired.cta; }
-    repaired.callToAction = typeof repaired.callToAction === 'object' ? repaired.callToAction : (repaired.primaryCta || { label: repaired.ctaText || generateCallToAction(), url: repaired.ctaUrl || '#' });
-    repaired.closing = repaired.closing || 'Best regards,';
-    repaired.signature = repaired.signature || 'The Team';
-    repaired.footer = repaired.footer || `© ${new Date().getFullYear()} ${repaired._brandName || repaired._productName || 'Our Company'}. All rights reserved.`;
-    repaired.html = repaired.html || '';
-    repaired.plainText = repaired.plainText || '';
-    if (!repaired.benefits || repaired.benefits.length < 3) {
-      repaired.benefits = repaired.benefits || [];
-      while (repaired.benefits.length < 3) {
-        repaired.benefits.push('Key benefit of the platform');
-      }
-    }
+    // Merge normalized fields back, preserving _ prefixed meta
+    Object.assign(repaired, normalized, {
+      subject: normalized.subject || generateHeadline(pn, pp),
+      previewText: normalized.previewText || `Discover how ${pn} can help your team.`,
+      greeting: normalized.greeting || 'Hi there,',
+      opening: normalized.opening || `We wanted to share how ${pn} can help you overcome ${pp}.`,
+      bodyParagraphs: normalized.bodyParagraphs.length > 0 ? normalized.bodyParagraphs : [`${pn} provides the tools and capabilities your team needs to succeed.`],
+      closing: normalized.closing || 'Best regards,',
+      signature: normalized.signature || 'The Team',
+      footer: normalized.footer || `© ${now} All rights reserved.`,
+      html: normalized.html || '',
+      plainText: normalized.plainText || '',
+      benefits: normalized.benefits.length >= 3 ? normalized.benefits : [
+        ...normalized.benefits,
+        'Key benefit of the platform',
+        'Key benefit of the platform',
+        'Key benefit of the platform',
+      ].slice(0, 5),
+    });
+
     fillCommon(repaired);
   }
 

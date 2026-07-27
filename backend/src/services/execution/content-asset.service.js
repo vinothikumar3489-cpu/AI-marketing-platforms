@@ -16,10 +16,20 @@ export async function saveContentAsset(prisma, { userId, chatId, contentType, br
 
   const claimStatus = metadata?.claimStatus || 'passed';
 
-  // PART 9: Email asset persistence verification
+  // PART 9: Email asset persistence verification (canonical naming)
   if (contentType === 'email_copy') {
-    const requiredFields = ['subject', 'previewText', 'greeting', 'opening', 'solution', 'benefits', 'cta'];
-    const missingFields = requiredFields.filter(field => !content[field]);
+    const subject = content.subject || content.subjectLine || '';
+    const previewText = content.previewText || content.preheader || '';
+    const greeting = content.greeting || content.greetingText || '';
+    const opening = content.opening || content.introduction || '';
+    const solution = content.solution || '';
+    const benefits = Array.isArray(content.benefits) ? content.benefits : [];
+    const cta = content.primaryCta || content.callToAction || content.cta;
+
+    const missingFields = [];
+    if (!subject) missingFields.push('subject/subjectLine');
+    if (!previewText) missingFields.push('previewText/preheader');
+    if (!greeting) missingFields.push('greeting/greetingText');
     
     if (missingFields.length > 0) {
       console.error('[Asset Save] Email missing required fields', { missingFields, availableFields: Object.keys(content).filter(k => !/^\d+$/.test(k)) });
@@ -27,15 +37,14 @@ export async function saveContentAsset(prisma, { userId, chatId, contentType, br
     }
 
     // Verify benefits is an array with at least 3 items
-    if (!Array.isArray(content.benefits) || content.benefits.length < 3) {
-      console.error('[Asset Save] Email insufficient benefits', { benefits: content.benefits, isArray: Array.isArray(content.benefits), count: content.benefits?.length });
+    if (benefits.length < 3) {
+      console.error('[Asset Save] Email insufficient benefits', { benefits, isArray: Array.isArray(content.benefits), count: benefits.length });
       throw new Error('Email asset must have at least 3 benefits');
     }
 
-    // Verify CTA has label (accept cta string, cta object, or callToAction object)
-    const cta = content.cta || content.callToAction;
+    // Verify CTA has label (accept primaryCta, callToAction, or cta)
     if (!cta) {
-      console.error('[Asset Save] Email missing CTA', { cta: content.cta, callToAction: content.callToAction });
+      console.error('[Asset Save] Email missing CTA', { primaryCta: content.primaryCta, callToAction: content.callToAction, cta: content.cta });
       throw new Error('Email asset must have CTA with label');
     }
     if (typeof cta === 'object' && !cta.label && !cta.text) {
