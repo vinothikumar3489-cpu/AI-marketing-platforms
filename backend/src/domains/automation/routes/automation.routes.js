@@ -20,6 +20,8 @@ import {
   getContentAssetList,
   getAssetVersionHistory,
   regenerateContentAsset,
+  deployAssetToBrevo,
+  getBrevoLists,
 } from "../controllers/automation.controller.js";
 import { validate } from "../../../middleware/validate.js";
 
@@ -73,3 +75,7 @@ automationRouter.post("/:chatId/content/plan", generateAllContent);
 automationRouter.get("/:chatId/content/assets", getContentAssetList);
 automationRouter.get("/content/assets/:assetId/versions", getAssetVersionHistory);
 automationRouter.post("/content/assets/:assetId/regenerate", regenerateContentAsset);
+
+// Brevo campaign deployment
+automationRouter.post("/content/assets/:assetId/deploy-brevo", deployAssetToBrevo);
+automationRouter.get("/brevo-lists", getBrevoLists);

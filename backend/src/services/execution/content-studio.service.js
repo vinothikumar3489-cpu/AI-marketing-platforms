@@ -444,12 +444,19 @@ const GENERATORS = {
   linkedin_post: generateLinkedInPost,
   instagram_post: generateInstagramPost,
   twitter_post: generateTwitterPost,
+  x_post: generateTwitterPost,
   facebook_post: generateFacebookPost,
   youtube_description: generateYouTubeDescription,
   email_copy: generateEmailCopy,
   email_campaign: generateEmailCopy,
   email_nurture: generateEmailCopy,
   email_newsletter: generateEmailCopy,
+  email_welcome: generateEmailCopy,
+  email_promotional: generateEmailCopy,
+  email_follow_up: generateEmailCopy,
+  email_event_invitation: generateEmailCopy,
+  email_reengagement: generateEmailCopy,
+  email_final_cta: generateEmailCopy,
   blog_article: generateBlogArticle,
   faq_page: generateFAQ,
   landing_page: generateLandingPage,
@@ -661,7 +668,7 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
     _painPoint: painPoint,
   };
 
-  if (assetType === 'email_copy' || assetType === 'email_campaign') {
+  if (assetType.startsWith('email_')) {
     const companyName = enriched?.company?.name || enriched?.product?.name || '';
     const companyWebsite = enriched?.company?.websiteUrl || '';
     const renderedEmail = renderEmailHtmlTemplate(validatedContent, companyName, companyWebsite);
@@ -705,7 +712,7 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
         _productName: productDisplayName,
         _painPoint: painPoint,
       };
-      if (assetType === 'email_copy' || assetType === 'email_campaign') {
+      if (assetType.startsWith('email_')) {
         const companyName = enriched?.company?.name || enriched?.product?.name || '';
         const companyWebsite = enriched?.company?.websiteUrl || '';
         const renderedEmail = renderEmailHtmlTemplate(rewrittenContent, companyName, companyWebsite);

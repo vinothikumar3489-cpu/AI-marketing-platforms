@@ -155,13 +155,14 @@ export class AIOrchestrator {
   }
 
   async _callOpenAICompatible(client, { prompt, systemPrompt, model, schema }) {
+    const messages = [
+      { role: 'system', content: systemPrompt || 'You are a helpful assistant. Always respond with valid JSON.' },
+      { role: 'user', content: prompt + '\n\nRespond ONLY with valid JSON. No markdown, no explanation.' },
+    ];
     const response = await client.chat.completions.create({
       model: model || 'gemini-1.5-flash',
-      messages: [
-        { role: 'system', content: systemPrompt || 'You are a helpful assistant.' },
-        { role: 'user', content: prompt },
-      ],
-      response_format: schema ? { type: 'json_object' } : undefined,
+      messages,
+      response_format: { type: 'json_object' },
     });
     return {
       content: response.choices[0].message.content,
@@ -173,9 +174,12 @@ export class AIOrchestrator {
   }
 
   async _callGemini(client, { prompt, systemPrompt, model, schema }) {
-    const aiModel = client.getGenerativeModel({ model: model || 'gemini-1.5-flash' });
-    const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
-    const result = await aiModel.generateContent(schema ? `${fullPrompt}\n\nRETURN ONLY VALID JSON MATCHING THIS TASK.` : fullPrompt);
+    const genModel = client.getGenerativeModel({
+      model: model || 'gemini-1.5-flash',
+      generationConfig: { responseMimeType: 'application/json' },
+    });
+    const fullPrompt = `${systemPrompt || 'You are a helpful assistant. Always respond with valid JSON.'}\n\n${prompt}\n\nRespond ONLY with valid JSON. No markdown, no explanation.`;
+    const result = await genModel.generateContent(fullPrompt);
     const response = await result.response;
     return {
       content: response.text(),
@@ -237,25 +241,65 @@ export async function callAI(prompt, options = {}) {
     }));
     let parsed = rawText;
     if (typeof rawText === 'string') {
-      const trimmed = rawText.trim();
-      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-        try { parsed = JSON.parse(trimmed); }
-        catch (e) {
-          const jsonMatch = trimmed.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-          if (jsonMatch) {
-            try { parsed = JSON.parse(jsonMatch[0]); }
-            catch (e2) {
-              console.warn(`[AI:${traceId}] JSON PARSE FAILED`, { error: e2.message, text: trimmed.substring(0, 300) });
-            }
-          } else {
-            console.warn(`[AI:${traceId}] NOT JSON, returning raw string`, { preview: trimmed.substring(0, 200) });
-          }
-        }
-      } else if (trimmed.startsWith('```')) {
-        const codeBlock = trimmed.replace(/```(?:json)?\n?/g, '').trim();
-        try { parsed = JSON.parse(codeBlock); }
-        catch (e) { console.warn(`[AI:${traceId}] CODEBLOCK PARSE FAILED`, { error: e.message }); }
+      let candidate = rawText.trim();
+      // Step 1: Strip markdown code fences
+      candidate = candidate.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/g, '').trim();
+      // Step 2: Extract first {…} or […] block if surrounded by text
+      const jsonBraces = candidate.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+      if (jsonBraces && jsonBraces[0].length < candidate.length) {
+        candidate = jsonBraces[0];
       }
+      // Step 3: Attempt parse with progressive repair
+      const tryParse = (text) => {
+        try { return JSON.parse(text); }
+        catch (e) { return null; }
+      };
+      parsed = tryParse(candidate);
+      if (!parsed) {
+        // Step 4: Fix truncated JSON — add missing closing brackets
+        let repaired = candidate;
+        const openBraces = (repaired.match(/\{/g) || []).length;
+        const closeBraces = (repaired.match(/\}/g) || []).length;
+        const openBrackets = (repaired.match(/\[/g) || []).length;
+        const closeBrackets = (repaired.match(/\]/g) || []).length;
+        for (let i = 0; i < openBraces - closeBraces; i++) repaired += '}';
+        for (let i = 0; i < openBrackets - closeBrackets; i++) repaired += ']';
+        if (repaired !== candidate) {
+          parsed = tryParse(repaired);
+          if (parsed) console.info(`[AI:${traceId}] REPAIRED TRUNCATED JSON (added ${openBraces - closeBraces} braces, ${openBrackets - closeBrackets} brackets)`);
+        }
+      }
+      if (!parsed) {
+        // Step 5: Fix single quotes to double quotes
+        const singleQuoteFix = candidate.replace(/'/g, '"').replace(/(\w+):/g, '"$1":');
+        parsed = tryParse(singleQuoteFix);
+        if (parsed) console.info(`[AI:${traceId}] REPAIRED SINGLE-QUOTE JSON`);
+      }
+      if (!parsed) {
+        // Step 6: Fix trailing commas
+        const noTrailing = candidate.replace(/,\s*([}\]])/g, '$1');
+        parsed = tryParse(noTrailing);
+        if (parsed) console.info(`[AI:${traceId}] REPAIRED TRAILING COMMAS`);
+      }
+      if (!parsed) {
+        // Step 7: Strip unescaped control characters
+        const cleaned = candidate.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+        parsed = tryParse(cleaned);
+        if (parsed) console.info(`[AI:${traceId}] REPAIRED CONTROL CHARS`);
+      }
+      if (!parsed) {
+        // Step 8: Try matching the deepest balanced JSON object
+        const deep = candidate.match(/\{(?:[^{}]|(?:\{[^{}]*\}))*\}/);
+        if (deep) { parsed = tryParse(deep[0]); if (parsed) console.info(`[AI:${traceId}] EXTRACTED DEEP JSON`); }
+      }
+      if (!parsed) {
+        console.warn(`[AI:${traceId}] All parse attempts failed. Preview: ${candidate.substring(0, 200)}`);
+      } else if (typeof parsed !== 'object') {
+        console.warn(`[AI:${traceId}] Parsed result is not object: ${typeof parsed}`);
+        parsed = null;
+      }
+    } else if (typeof rawText === 'object' && rawText !== null) {
+      parsed = rawText; // already an object
     }
     return { success: true, data: parsed, provider: response.provider, model: response.model, usage: response.usage, rawText, traceId };
   } catch (error) {

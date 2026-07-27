@@ -1310,3 +1310,108 @@ export const regenerateContentAsset = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message || 'Failed to regenerate asset' });
   }
 };
+
+/**
+ * POST /api/automation/content/assets/:assetId/deploy-brevo
+ * Deploy an approved email asset to Brevo as a campaign
+ */
+export const deployAssetToBrevo = async (req, res) => {
+  const { assetId } = req.params;
+  const userId = req.user.id;
+  const { listIds, scheduledAt } = req.body || {};
+
+  try {
+    const asset = await prisma.automationAsset.findUnique({
+      where: { id: assetId },
+      include: { automationPlan: true }
+    });
+
+    if (!asset) return res.status(404).json({ success: false, error: 'Asset not found' });
+    if (asset.automationPlan.userId !== userId) return res.status(403).json({ success: false, error: 'Unauthorized' });
+
+    const content = asset.assetContent?.content || {};
+    const isEmail = asset.assetType?.startsWith('content_email_');
+    if (!isEmail) return res.status(400).json({ success: false, error: 'Only email assets can be deployed to Brevo' });
+
+    const subject = content.subject || content._subject || content.subjectLine || '';
+    const htmlContent = content._htmlTemplate || content.html || '';
+    const plainTextContent = content._plainText || content.plainText || '';
+
+    if (!subject || (!htmlContent && !plainTextContent)) {
+      return res.status(400).json({ success: false, error: 'Email asset missing subject or content' });
+    }
+
+    const { createCampaign, sendCampaignNow, scheduleCampaign } = await import('../../../services/providers/brevo/brevo.provider.js');
+    const { getBrevoHealth } = await import('../../../services/providers/email/brevo.provider.js');
+    const health = getBrevoHealth();
+    if (!health.configured) {
+      return res.status(400).json({ success: false, error: 'Brevo not configured. Set BREVO_API_KEY and BREVO_SENDER_EMAIL.' });
+    }
+
+    const targetListIds = listIds && listIds.length > 0 ? listIds : [];
+
+    const campaignResult = await createCampaign({
+      name: asset.assetTitle || `Campaign: ${subject}`,
+      subject,
+      htmlContent,
+      plainTextContent,
+      senderId: 1,
+      listIds: targetListIds,
+      scheduledAt: scheduledAt || null,
+    });
+
+    if (!campaignResult.success) {
+      return res.status(500).json({ success: false, error: campaignResult.error || 'Failed to create Brevo campaign' });
+    }
+
+    const brevoCampaignId = campaignResult.data?.id;
+
+    await prisma.automationLog.create({
+      data: {
+        userId,
+        chatId: asset.automationPlan.chatId,
+        assetId,
+        action: 'deployed_to_brevo',
+        message: `Asset "${asset.assetTitle}" deployed to Brevo campaign #${brevoCampaignId}`,
+        metadata: { brevoCampaignId, provider: 'brevo', deployedAt: new Date().toISOString() },
+      }
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        brevoCampaignId,
+        campaignName: asset.assetTitle,
+        subject,
+        status: scheduledAt ? 'SCHEDULED' : 'DRAFT',
+        scheduledAt: scheduledAt || null,
+      }
+    });
+  } catch (error) {
+    console.error('[DeployToBrevo] Error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * GET /api/automation/brevo-lists
+ * Get available Brevo contact lists
+ */
+export const getBrevoLists = async (req, res) => {
+  try {
+    const brevo = await import('../../../services/providers/brevo/brevo.provider.js');
+    const result = await brevo.listContactLists(50, 0);
+    if (!result.success) {
+      return res.json({ success: true, data: [], lists: [], message: 'No Brevo lists available' });
+    }
+    const lists = (result.data?.lists || result.data?.lists || []).map(l => ({
+      id: l.id,
+      name: l.name,
+      totalSubscribers: l.totalSubscribers || l.uniqueSubscribers || 0,
+    }));
+    return res.json({ success: true, data: lists });
+  } catch (error) {
+    console.error('[GetBrevoLists] Error:', error);
+    return res.json({ success: true, data: [], lists: [] });
+  }
+};

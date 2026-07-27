@@ -32,10 +32,15 @@ export async function saveContentAsset(prisma, { userId, chatId, contentType, br
       throw new Error('Email asset must have at least 3 benefits');
     }
 
-    // Verify CTA has label
-    if (!content.cta || !content.cta.label) {
-      console.error('[Asset Save] Email missing CTA label', { cta: content.cta });
+    // Verify CTA has label (accept cta string, cta object, or callToAction object)
+    const cta = content.cta || content.callToAction;
+    if (!cta) {
+      console.error('[Asset Save] Email missing CTA', { cta: content.cta, callToAction: content.callToAction });
       throw new Error('Email asset must have CTA with label');
+    }
+    if (typeof cta === 'object' && !cta.label && !cta.text) {
+      console.error('[Asset Save] Email CTA object missing label/text', { cta });
+      throw new Error('Email asset CTA must have label or text');
     }
   }
 

@@ -84,7 +84,7 @@ export function normalizeLegacyAsset(raw, assetType) {
     }
   }
 
-  if (assetType === 'email_copy' || assetType === 'email_campaign' || assetType === 'email_nurture' || assetType === 'email_newsletter') {
+  if (assetType.startsWith('email_')) {
     if (raw.subjectLine && !raw.subject) raw.subject = raw.subjectLine;
     if (raw.preheader && !raw.previewText) raw.previewText = raw.preheader;
     if (raw.greetingText && !raw.greeting) raw.greeting = raw.greetingText;
@@ -218,6 +218,7 @@ export function repairAIOutput(raw, assetType) {
   }
 
   if (assetType === 'twitter_post' || assetType === 'x_post') {
+    // already handled above
     repaired.post = repaired.post || repaired.content || repaired.text || repaired.body || '';
     if (repaired.content && !repaired.post) { repaired.post = repaired.content; delete repaired.content; }
     if (repaired.body && !repaired.post) { repaired.post = repaired.body; delete repaired.body; }

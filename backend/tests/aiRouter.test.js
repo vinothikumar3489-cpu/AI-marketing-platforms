@@ -51,7 +51,7 @@ describe('aiRouter - provider fallback chain', () => {
     const result = await mod.callAI('test');
     assert.equal(result.success, true);
     assert.equal(result.provider, 'groq');
-    assert.deepEqual(JSON.parse(result.data), { msg: 'ok' });
+    assert.deepEqual(result.data, { msg: 'ok' });
 
     mock.restoreAll();
   });
@@ -80,9 +80,8 @@ describe('aiRouter - provider fallback chain', () => {
 
     const result = await mod.callAI('test');
     assert.equal(result.success, true);
-    // Depending on the fallback chain, it might hit cerebras, deepseek, openrouter before gemini, but eventually hits gemini.
     assert.equal(result.provider, 'gemini');
-    assert.deepEqual(JSON.parse(result.data), { msg: 'gemini-ok' });
+    assert.deepEqual(result.data, { msg: 'gemini-ok' });
 
     mock.restoreAll();
   });
