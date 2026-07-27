@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Mail, Loader2, Sparkles, AlertTriangle } from 'lucide-react';
+import { Mail, Loader2, Sparkles, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Send, Save, Eye, Smartphone, Code, FileText, ThumbsUp, RefreshCw, Calendar, Activity, User, Building } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import {
   generateEmailContent,
-  validateEmailContent,
   saveEmailDraft,
   updateEmailTemplate,
   approveEmailTemplate,
@@ -16,35 +15,50 @@ import {
   generateEmailHtml,
   generateEmailPlainText,
 } from '../../lib/api';
-import { EmailConfiguration } from './EmailConfiguration';
-import { RecipientEntry } from './RecipientEntry';
 import { EmailEditor } from './EmailEditor';
-import { EmailRenderer } from './EmailRenderer';
-import { PersonalizationPreview } from './PersonalizationPreview';
-import { QualityCheck } from './QualityCheck';
-import { ApprovalFlow } from './ApprovalFlow';
-import { SendTest } from './SendTest';
-import { SendSchedule } from './SendSchedule';
-import { DeliveryStatus } from './DeliveryStatus';
+
+const FIELD_LABELS: Record<string, string> = {
+  greeting: 'Greeting', headline: 'Headline', opening: 'Opening',
+  bodyParagraphs: 'Body', callToAction: 'CTA', closing: 'Closing',
+  signature: 'Signature', footer: 'Footer', subject: 'Subject',
+  previewText: 'Preview Text', painPoint: 'Pain Point', solution: 'Solution',
+  benefits: 'Benefits', socialProof: 'Social Proof', complianceFooter: 'Compliance Footer',
+  unsubscribeText: 'Unsubscribe Text', postscript: 'Postscript',
+};
+
+const EMAIL_TYPES = ['Product Announcement', 'Promotional', 'Newsletter', 'Welcome', 'Re-engagement', 'Abandoned Cart', 'Transactional', 'Nurture', 'Event Invitation', 'Survey'];
+const GOALS = ['Product Adoption', 'Lead Generation', 'Brand Awareness', 'Customer Retention', 'Sales Conversion', 'Event Registration', 'Feedback Collection', 'Content Promotion'];
+const TONES = ['Professional', 'Friendly', 'Formal', 'Casual', 'Urgent', 'Inspirational', 'Educational', 'Persuasive'];
+
+function SectionCard({ title, icon, defaultOpen = true, children }: { title: string; icon?: React.ReactNode; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ background: '#151d2b', borderRadius: '8px', border: '1px solid #293245', overflow: 'hidden' }}>
+      <div onClick={() => setOpen(!open)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 16px', cursor: 'pointer', borderBottom: open ? '1px solid #293245' : 'none' }}>
+        {icon}<span style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: '#e5e7eb' }}>{title}</span>
+        {open ? <ChevronUp size={14} color="#9aa7bd" /> : <ChevronDown size={14} color="#9aa7bd" />}
+      </div>
+      {open && <div style={{ padding: '16px' }}>{children}</div>}
+    </div>
+  );
+}
+
+function replacePersonalization(text: string, vars: Record<string, string>): string {
+  if (!text) return '';
+  return Object.entries(vars).reduce((t, [k, v]) => t.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), v || `{{${k}}}`), text);
+}
 
 export function EmailWorkflow({ content: initialContent }: { content?: any }) {
   const { selectedChatId } = useProject();
-  const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Email data state
   const [emailConfig, setEmailConfig] = useState({
     emailType: initialContent?.emailType || 'Product Announcement',
     goal: initialContent?.goal || 'Product Adoption',
     tone: initialContent?.tone || 'Professional',
     audience: initialContent?.audience || '',
-    language: initialContent?.language || 'en',
-    sender: {
-      name: initialContent?.sender?.name || '',
-      email: initialContent?.sender?.email || '',
-      replyTo: initialContent?.sender?.replyTo || '',
-    },
+    sender: { name: initialContent?.sender?.name || '', email: initialContent?.sender?.email || '', replyTo: initialContent?.sender?.replyTo || '' },
   });
 
   const [recipient, setRecipient] = useState({
@@ -55,395 +69,301 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
   });
 
   const [emailData, setEmailData] = useState<any>(initialContent || null);
-  const [html, setHtml] = useState(initialContent?.html || '');
-  const [plainText, setPlainText] = useState(initialContent?.plainText || '');
-  const [validation, setValidation] = useState<any>(initialContent?.validation || null);
+  const [html, setHtml] = useState(initialContent?._htmlTemplate || initialContent?.html || '');
+  const [plainText, setPlainText] = useState(initialContent?._plainText || initialContent?.plainText || '');
   const [templateId, setTemplateId] = useState<string | null>(initialContent?.templateId || null);
-  const [approvalStatus, setApprovalStatus] = useState<'DRAFT' | 'APPROVED' | 'REJECTED'>(initialContent?.approvalStatus || 'DRAFT');
+  const [approvalStatus, setApprovalStatus] = useState<'DRAFT' | 'APPROVED' | 'REJECTED'>(initialContent?._approvalStatus || initialContent?.approvalStatus || 'DRAFT');
+  const [previewTab, setPreviewTab] = useState<'visual' | 'mobile' | 'html' | 'plain'>('visual');
 
-  // Generate email content
-  const handleGenerate = async () => {
-    if (!selectedChatId) return;
+  const [editMode, setEditMode] = useState<'edit' | 'preview'>('edit');
+  const [sendMode, setSendMode] = useState<'now' | 'schedule' | 'test'>('now');
+  const [sendEmail, setSendEmail] = useState('');
+  const [sendDate, setSendDate] = useState('');
+  const [sendTime, setSendTime] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null);
 
-    setGenerating(true);
-    setError(null);
+  const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [deliveryLoading, setDeliveryLoading] = useState(false);
 
-    try {
-      const brief = {
-        productIdentity: { displayName: 'Your Product' }, // This would come from analysis
-        emailType: emailConfig.emailType,
-        goal: emailConfig.goal,
-        tone: emailConfig.tone,
-        audience: emailConfig.audience,
-        language: emailConfig.language,
-        sender: emailConfig.sender,
-        recipient,
-      };
-
-      const result = await generateEmailContent(selectedChatId, brief);
-
-      if (result.success) {
-        setEmailData(result.email);
-        setValidation(result.validation);
-
-        // Generate HTML and plain text
-        const htmlResult = await generateEmailHtml(result.email);
-        if (htmlResult.success) {
-          setHtml(htmlResult.html);
-        }
-
-        const plainResult = await generateEmailPlainText(result.email);
-        if (plainResult.success) {
-          setPlainText(plainResult.plainText);
-        }
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate email');
-    } finally {
-      setGenerating(false);
-    }
+  const personalizationVars: Record<string, string> = {
+    firstName: recipient.firstName, lastName: recipient.lastName,
+    company: recipient.companyName, companyName: recipient.companyName,
+    sender: emailConfig.sender.name, senderName: emailConfig.sender.name,
+    product: '', website: '',
   };
 
-  // Initialize with existing content if provided
+  const handleGenerate = async () => {
+    if (!selectedChatId) return;
+    setGenerating(true); setError(null);
+    try {
+      const result = await generateEmailContent(selectedChatId, {
+        productIdentity: {},
+        emailType: emailConfig.emailType, goal: emailConfig.goal,
+        tone: emailConfig.tone, audience: emailConfig.audience,
+        sender: emailConfig.sender, recipient,
+      });
+      if (result.success) {
+        setEmailData(result.email);
+        const h = await generateEmailHtml(result.email);
+        if (h.success) setHtml(h.html);
+        const p = await generateEmailPlainText(result.email);
+        if (p.success) setPlainText(p.plainText);
+      }
+    } catch (err: any) { setError(err.message || 'Failed to generate email'); }
+    finally { setGenerating(false); }
+  };
+
   useEffect(() => {
     if (initialContent && !emailData) {
       setEmailData(initialContent);
-      setHtml(initialContent.html || '');
-      setPlainText(initialContent.plainText || '');
-      setValidation(initialContent.validation || null);
+      setHtml(initialContent._htmlTemplate || initialContent.html || '');
+      setPlainText(initialContent._plainText || initialContent.plainText || '');
       setTemplateId(initialContent.templateId || null);
-      setApprovalStatus(initialContent.approvalStatus || 'DRAFT');
-      
-      // Also update email config from initial content
-      if (initialContent.emailType) {
-        setEmailConfig(prev => ({
-          ...prev,
-          emailType: initialContent.emailType,
-          goal: initialContent.goal || prev.goal,
-          tone: initialContent.tone || prev.tone,
-          audience: initialContent.audience || prev.audience,
-          language: initialContent.language || prev.language,
-        }));
-      }
+      setApprovalStatus(initialContent._approvalStatus || initialContent.approvalStatus || 'DRAFT');
+      if (initialContent.emailType) setEmailConfig(p => ({ ...p, emailType: initialContent.emailType, goal: initialContent.goal || p.goal, tone: initialContent.tone || p.tone, audience: initialContent.audience || p.audience }));
     }
   }, [initialContent]);
 
-  // Auto-generate HTML when email data changes
   useEffect(() => {
-    if (emailData && !html && emailData !== initialContent) {
-      const generateHtmlFromData = async () => {
-        try {
-          const htmlResult = await generateEmailHtml(emailData);
-          if (htmlResult.success) {
-            setHtml(htmlResult.html);
-          }
-        } catch (err) {
-          console.error('Failed to generate HTML:', err);
-        }
-      };
-      
-      const generateTextFromData = async () => {
-        try {
-          const plainResult = await generateEmailPlainText(emailData);
-          if (plainResult.success) {
-            setPlainText(plainResult.plainText);
-          }
-        } catch (err) {
-          console.error('Failed to generate plain text:', err);
-        }
-      };
-      
-      generateHtmlFromData();
-      generateTextFromData();
-    }
-  }, [emailData]);
+    if (emailData && templateId) loadDeliveries();
+  }, [templateId]);
 
-  // Save draft
+  const loadDeliveries = async () => {
+    if (!templateId) return;
+    setDeliveryLoading(true);
+    try { const r = await getEmailDeliveryStatus(templateId); if (r.success) setDeliveries(r.data || []); }
+    finally { setDeliveryLoading(false); }
+  };
+
   const handleSaveDraft = async () => {
     if (!selectedChatId || !emailData) return;
-
     try {
-      const dataToSave = {
-        ...emailData,
-        html,
-        plainText,
-        config: emailConfig,
-        recipient,
-      };
-
-      const result = templateId
-        ? await updateEmailTemplate(templateId, dataToSave)
-        : await saveEmailDraft(selectedChatId, dataToSave);
-
-      if (result.success) {
-        setTemplateId(result.template.id);
-        setApprovalStatus('DRAFT');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to save draft');
-    }
+      const dataToSave = { ...emailData, html, plainText, config: emailConfig, recipient };
+      const result = templateId ? await updateEmailTemplate(templateId, dataToSave) : await saveEmailDraft(selectedChatId, dataToSave);
+      if (result.success) { setTemplateId(result.template?.id || result.data?.id); setApprovalStatus('DRAFT'); }
+    } catch (err: any) { setError(err.message || 'Failed to save draft'); }
   };
 
-  // Approve email
   const handleApprove = async () => {
     if (!templateId) return;
-
     try {
-      const result = await approveEmailTemplate(templateId);
-      if (result.success) {
-        setApprovalStatus('APPROVED');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to approve email');
-    }
+      const r = await approveEmailTemplate(templateId);
+      if (r.success) setApprovalStatus('APPROVED');
+    } catch (err: any) { setError(err.message || 'Approve failed'); }
   };
 
-  // Reject email
-  const handleReject = async (reason: string) => {
+  const handleReject = async () => {
     if (!templateId) return;
-
     try {
-      const result = await rejectEmailTemplate(templateId, reason);
-      if (result.success) {
-        setApprovalStatus('REJECTED');
+      const r = await rejectEmailTemplate(templateId, 'Rejected by user');
+      if (r.success) setApprovalStatus('REJECTED');
+    } catch (err: any) { setError(err.message || 'Reject failed'); }
+  };
+
+  const handleSendAction = async () => {
+    if (!selectedChatId || !templateId || !sendEmail) return;
+    setSending(true); setSendResult(null);
+    try {
+      if (sendMode === 'test') {
+        await sendTestEmailContent(selectedChatId, { templateId, recipientEmail: sendEmail });
+        setSendResult({ success: true, message: 'Test email sent' });
+      } else if (sendMode === 'now') {
+        await sendEmailNow(selectedChatId, { templateId, recipientEmail: sendEmail });
+        setSendResult({ success: true, message: 'Email sent' });
+      } else {
+        const scheduledAt = `${sendDate}T${sendTime}:00`;
+        await scheduleEmailContent(selectedChatId, { templateId, recipientEmail: sendEmail, scheduledAt });
+        setSendResult({ success: true, message: `Scheduled for ${scheduledAt}` });
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to reject email');
-    }
+    } catch { setSendResult({ success: false, message: 'Send failed' }); }
+    finally { setSending(false); }
   };
 
-  // Regenerate email
-  const handleRegenerate = async () => {
-    await handleGenerate();
-  };
+  const isApproved = approvalStatus === 'APPROVED';
+  const canSend = isApproved && !!templateId;
 
-  // Send test email
-  const handleSendTest = async (testEmail: string) => {
-    if (!selectedChatId || !templateId) return;
-
-    try {
-      await sendTestEmailContent(selectedChatId, {
-        templateId,
-        recipientEmail: testEmail,
-      });
-    } catch (err: any) {
-      setError(err.message || 'Failed to send test email');
-    }
-  };
-
-  // Send email now
-  const handleSendNow = async (email: string) => {
-    if (!selectedChatId || !templateId) return;
-
-    try {
-      await sendEmailNow(selectedChatId, {
-        templateId,
-        recipientEmail: email,
-      });
-    } catch (err: any) {
-      setError(err.message || 'Failed to send email');
-    }
-  };
-
-  // Schedule email
-  const handleSchedule = async (email: string, scheduledAt: string) => {
-    if (!selectedChatId || !templateId) return;
-
-    try {
-      await scheduleEmailContent(selectedChatId, {
-        templateId,
-        recipientEmail: email,
-        scheduledAt,
-      });
-    } catch (err: any) {
-      setError(err.message || 'Failed to schedule email');
-    }
-  };
-
-  // Cancel scheduled email
-  const handleCancelSchedule = async (scheduledId: string) => {
-    try {
-      await cancelScheduledEmail(scheduledId);
-    } catch (err: any) {
-      setError(err.message || 'Failed to cancel scheduled email');
-    }
-  };
-
-  // Refresh delivery status
-  const handleRefreshDeliveryStatus = async () => {
-    if (!templateId) return;
-
-    try {
-      await getEmailDeliveryStatus(templateId);
-    } catch (err: any) {
-      setError(err.message || 'Failed to refresh delivery status');
-    }
-  };
-
-  const canApprove = validation?.valid && validation?.blockingIssues?.length === 0;
-
-  if (!selectedChatId) {
-    return (
-      <div style={{
-        padding: '40px',
-        textAlign: 'center',
-        color: '#9aa7bd',
-      }}>
-        <Mail size={48} style={{ marginBottom: '16px', display: 'block', margin: '0 auto 16px' }} />
-        <div style={{ fontSize: '16px', marginBottom: '8px' }}>No chat selected</div>
-        <div style={{ fontSize: '13px' }}>Select a chat to create emails</div>
-      </div>
-    );
-  }
+  if (!selectedChatId) return (
+    <div style={{ padding: '40px', textAlign: 'center', color: '#9aa7bd' }}>
+      <Mail size={48} style={{ margin: '0 auto 16px', display: 'block' }} />
+      <div style={{ fontSize: '16px', marginBottom: '8px' }}>No chat selected</div>
+      <div style={{ fontSize: '13px' }}>Select a chat to create emails</div>
+    </div>
+  );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Error Display */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {error && (
-        <div style={{
-          padding: '12px 16px',
-          background: 'rgba(255, 71, 87, 0.1)',
-          borderRadius: '6px',
-          border: '1px solid #ff4757',
-          color: '#ff4757',
-          fontSize: '13px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-        }}>
-          <AlertTriangle size={16} />
-          {error}
-          <button
-            onClick={() => setError(null)}
-            style={{
-              marginLeft: 'auto',
-              background: 'none',
-              border: 'none',
-              color: '#ff4757',
-              cursor: 'pointer',
-              fontSize: '12px',
-            }}
-          >
-            Dismiss
-          </button>
+        <div style={{ padding: '10px 14px', background: 'rgba(255,71,87,0.1)', borderRadius: '6px', border: '1px solid #ff4757', color: '#ff4757', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <AlertTriangle size={16} />{error}
+          <button onClick={() => setError(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#ff4757', cursor: 'pointer', fontSize: '12px' }}>Dismiss</button>
         </div>
       )}
 
-      {/* Configuration Section */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        <EmailConfiguration
-          config={emailConfig}
-          onChange={setEmailConfig}
-        />
-        <RecipientEntry
-          recipient={recipient}
-          onChange={setRecipient}
-          onValidate={(r) => {
-            const errors = [];
-            if (!r.email) errors.push('Email is required');
-            else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email)) {
-              errors.push('Invalid email format');
-            }
-            return { valid: errors.length === 0, errors };
-          }}
-        />
-      </div>
+      {/* SECTION 1: Header */}
+      <SectionCard title="Header" icon={<Mail size={14} />}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+          <div>
+            <label style={{ fontSize: '11px', color: '#9aa7bd', marginBottom: '4px', display: 'block' }}>Subject</label>
+            <input type="text" value={emailData?.subject || ''} onChange={e => setEmailData(p => ({ ...p, subject: e.target.value }))} placeholder="Email subject" style={{ width: '100%', padding: '8px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: '11px', color: '#9aa7bd', marginBottom: '4px', display: 'block' }}>Preview Text</label>
+            <input type="text" value={emailData?.previewText || ''} onChange={e => setEmailData(p => ({ ...p, previewText: e.target.value }))} placeholder="Preview text" style={{ width: '100%', padding: '8px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px' }} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <span style={{ fontSize: '11px', color: '#9aa7bd' }}>Status:</span>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: isApproved ? '#10e18b' : approvalStatus === 'REJECTED' ? '#ff4757' : '#ffb347', padding: '3px 8px', background: isApproved ? 'rgba(16,225,139,0.1)' : approvalStatus === 'REJECTED' ? 'rgba(255,71,87,0.1)' : 'rgba(255,179,71,0.1)', borderRadius: '4px', border: `1px solid ${isApproved ? '#10e18b' : approvalStatus === 'REJECTED' ? '#ff4757' : '#ffb347'}` }}>
+            {approvalStatus}
+          </span>
+          <span style={{ fontSize: '11px', color: '#9aa7bd', marginLeft: '12px' }}>Type: {emailConfig.emailType}</span>
+        </div>
+      </SectionCard>
+
+      {/* SECTION 2: Email Config + Recipient */}
+      <SectionCard title="Configuration" icon={<User size={14} />}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+          <select value={emailConfig.emailType} onChange={e => setEmailConfig(p => ({ ...p, emailType: e.target.value }))} style={{ padding: '8px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '12px' }}>{EMAIL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
+          <select value={emailConfig.goal} onChange={e => setEmailConfig(p => ({ ...p, goal: e.target.value }))} style={{ padding: '8px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '12px' }}>{GOALS.map(g => <option key={g} value={g}>{g}</option>)}</select>
+          <select value={emailConfig.tone} onChange={e => setEmailConfig(p => ({ ...p, tone: e.target.value }))} style={{ padding: '8px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '12px' }}>{TONES.map(t => <option key={t} value={t}>{t}</option>)}</select>
+          <input type="text" value={emailConfig.audience} onChange={e => setEmailConfig(p => ({ ...p, audience: e.target.value }))} placeholder="Target audience" style={{ padding: '8px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '12px' }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+          <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Sender Name</label><input type="text" value={emailConfig.sender.name} onChange={e => setEmailConfig(p => ({ ...p, sender: { ...p.sender, name: e.target.value } }))} style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
+          <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Sender Email</label><input type="text" value={emailConfig.sender.email} onChange={e => setEmailConfig(p => ({ ...p, sender: { ...p.sender, email: e.target.value } }))} style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
+          <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Reply-To</label><input type="text" value={emailConfig.sender.replyTo} onChange={e => setEmailConfig(p => ({ ...p, sender: { ...p.sender, replyTo: e.target.value } }))} style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
+        </div>
+      </SectionCard>
 
       {/* Generate Button */}
-      {(!emailData || initialContent) && (
-        <button
-          onClick={handleGenerate}
-          disabled={generating}
-          style={{
-            width: '100%',
-            padding: '14px 20px',
-            background: '#53a7ff',
-            border: '1px solid #53a7ff',
-            borderRadius: '8px',
-            color: 'white',
-            cursor: generating ? 'not-allowed' : 'pointer',
-            fontSize: '14px',
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            opacity: generating ? 0.5 : 1,
-          }}
-        >
+      {!emailData && (
+        <button onClick={handleGenerate} disabled={generating} style={{ padding: '14px', background: '#53a7ff', border: '1px solid #53a7ff', borderRadius: '8px', color: 'white', cursor: generating ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: generating ? 0.5 : 1 }}>
           {generating ? <Loader2 size={18} className="spin" /> : <Sparkles size={18} />}
-          {generating ? 'Generating Email...' : initialContent ? 'Regenerate Email' : 'Generate Email'}
+          {generating ? 'Generating...' : 'Generate Email'}
         </button>
       )}
 
-      {/* Email Content Section */}
-      {emailData && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          {/* Left Column: Editor and Configuration */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <EmailEditor
-              emailData={emailData}
-              onChange={(field, value) => setEmailData({ ...emailData, [field]: value })}
-              onSave={handleSaveDraft}
-            />
-
-            <PersonalizationPreview
-              emailContent={emailData}
-              recipient={recipient}
-              sender={emailConfig.sender?.name}
-              productName="Your Product"
-            />
-
-            <QualityCheck
-              validation={validation || {}}
-            />
-
-            <ApprovalFlow
-              emailData={emailData}
-              approvalStatus={approvalStatus}
-              onSaveDraft={handleSaveDraft}
-              onApprove={handleApprove}
-              onReject={handleReject}
-              onRegenerate={handleRegenerate}
-              canApprove={canApprove}
-            />
+      {emailData && <>
+        {/* SECTION 3: Preview Tabs */}
+        <SectionCard title="Preview" icon={<Eye size={14} />}>
+          <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', borderBottom: '1px solid #293245' }}>
+            {(['visual', 'mobile', 'html', 'plain'] as const).map(tab => (
+              <button key={tab} onClick={() => setPreviewTab(tab)} style={{ padding: '8px 14px', background: previewTab === tab ? '#1e293b' : 'transparent', border: 'none', borderBottom: previewTab === tab ? '2px solid #53a7ff' : '2px solid transparent', borderRadius: '6px 6px 0 0', color: previewTab === tab ? '#e5e7eb' : '#9aa7bd', cursor: 'pointer', fontSize: '12px', fontWeight: previewTab === tab ? 600 : 400, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {tab === 'visual' && <Eye size={13} />}{tab === 'mobile' && <Smartphone size={13} />}{tab === 'html' && <Code size={13} />}{tab === 'plain' && <FileText size={13} />}
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
           </div>
+          {previewTab === 'visual' || previewTab === 'mobile' ? (
+            <div style={{ maxWidth: previewTab === 'mobile' ? '375px' : '600px', margin: '0 auto', background: '#fff', borderRadius: '8px', overflow: 'hidden', border: '1px solid #293245' }}>
+              <iframe srcDoc={html} title="Email Preview" style={{ width: '100%', height: '500px', border: 'none' }} sandbox="allow-same-origin" />
+            </div>
+          ) : previewTab === 'html' ? (
+            <pre style={{ background: '#0f1729', color: '#e5e7eb', padding: '16px', borderRadius: '6px', fontSize: '12px', overflow: 'auto', maxHeight: '500px', whiteSpace: 'pre-wrap' }}>{html}</pre>
+          ) : (
+            <pre style={{ background: '#0f1729', color: '#e5e7eb', padding: '16px', borderRadius: '6px', fontSize: '13px', lineHeight: 1.6, overflow: 'auto', maxHeight: '500px', whiteSpace: 'pre-wrap' }}>{plainText}</pre>
+          )}
+        </SectionCard>
 
-          {/* Right Column: Preview and Actions */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <EmailRenderer
-              html={html}
-              plainText={plainText}
-              subject={emailData?.subject || ''}
-              previewText={emailData?.previewText || ''}
-              onApprove={templateId ? handleApprove : undefined}
-              onRegenerate={handleRegenerate}
-              approved={approvalStatus === 'APPROVED'}
-            />
+        {/* SECTION 3b: Content Editor */}
+        <SectionCard title="Content Editor" icon={<Save size={14} />}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            <button onClick={() => setEditMode('edit')} style={{ padding: '6px 14px', background: editMode === 'edit' ? '#53a7ff' : '#293245', border: 'none', borderRadius: '6px', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>Edit</button>
+            <button onClick={() => setEditMode('preview')} style={{ padding: '6px 14px', background: editMode === 'preview' ? '#53a7ff' : '#293245', border: 'none', borderRadius: '6px', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>Personalized Preview</button>
+          </div>
+          {editMode === 'edit' ? (
+            <EmailEditor emailData={emailData} onChange={(f, v) => setEmailData(p => ({ ...p, [f]: v }))} onSave={handleSaveDraft} />
+          ) : (
+            <div style={{ fontSize: '13px', lineHeight: 1.7, color: '#e5e7eb' }}>
+              <div style={{ marginBottom: '8px' }}><strong>Subject:</strong> {replacePersonalization(emailData?.subject || '', personalizationVars)}</div>
+              {emailData?.greeting && <div style={{ marginBottom: '4px' }}>{replacePersonalization(emailData.greeting, personalizationVars)}</div>}
+              {emailData?.headline && <div style={{ marginBottom: '4px', fontWeight: 600, fontSize: '15px' }}>{replacePersonalization(emailData.headline, personalizationVars)}</div>}
+              {emailData?.opening && <div style={{ marginBottom: '4px' }}>{replacePersonalization(emailData.opening, personalizationVars)}</div>}
+              {(emailData?.bodyParagraphs || []).map((p: string, i: number) => <div key={i} style={{ marginBottom: '4px' }}>{replacePersonalization(p, personalizationVars)}</div>)}
+              {emailData?.closing && <div style={{ marginBottom: '4px' }}>{replacePersonalization(emailData.closing, personalizationVars)}</div>}
+              {emailData?.signature && <div style={{ marginBottom: '4px' }}>{replacePersonalization(emailData.signature, personalizationVars)}</div>}
+              <div style={{ marginTop: '12px', padding: '10px', background: '#0f1729', borderRadius: '6px', fontSize: '11px', color: '#9aa7bd', fontFamily: 'monospace' }}>
+                {Object.entries(personalizationVars).map(([k, v]) => <div key={k}>{{`{{${k}}}`}} → {v || <span style={{ color: '#ffb347' }}>Not set</span>}</div>)}
+              </div>
+            </div>
+          )}
+        </SectionCard>
 
-            <SendTest
-              recipientEmail={recipient.email}
-              onSendTest={handleSendTest}
-              canSend={approvalStatus === 'APPROVED'}
-            />
+        {/* SECTION 4: Recipient + Variables */}
+        <SectionCard title="Recipient" icon={<User size={14} />}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Email *</label><input type="email" value={recipient.email} onChange={e => setRecipient(p => ({ ...p, email: e.target.value }))} placeholder="email@example.com" style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
+            <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>First Name</label><input type="text" value={recipient.firstName} onChange={e => setRecipient(p => ({ ...p, firstName: e.target.value }))} placeholder="John" style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
+            <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Last Name</label><input type="text" value={recipient.lastName} onChange={e => setRecipient(p => ({ ...p, lastName: e.target.value }))} placeholder="Smith" style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
+            <div><label style={{ fontSize: '10px', color: '#9aa7bd', marginBottom: '2px', display: 'block' }}>Company</label><input type="text" value={recipient.companyName} onChange={e => setRecipient(p => ({ ...p, companyName: e.target.value }))} placeholder="Acme Inc" style={{ width: '100%', padding: '6px 8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} /></div>
+          </div>
+        </SectionCard>
 
-            <SendSchedule
-              recipientEmail={recipient.email}
-              onSendNow={handleSendNow}
-              onSchedule={handleSchedule}
-              onCancelSchedule={handleCancelSchedule}
-              canSend={approvalStatus === 'APPROVED'}
-            />
+        {/* SECTION 5: Workflow */}
+        <SectionCard title="Workflow" icon={<ThumbsUp size={14} />}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button onClick={handleSaveDraft} style={{ padding: '8px 16px', background: '#293245', border: '1px solid #3b4d61', borderRadius: '6px', color: '#e5e7eb', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}><Save size={14} /> Save Draft</button>
+            {approvalStatus !== 'APPROVED' && <button onClick={handleApprove} disabled={!templateId} style={{ padding: '8px 16px', background: templateId ? '#10e18b' : '#293245', border: templateId ? '1px solid #10e18b' : '1px solid #3b4d61', borderRadius: '6px', color: templateId ? '#0f1729' : '#9aa7bd', cursor: templateId ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', opacity: templateId ? 1 : 0.5 }}><CheckCircle2 size={14} /> Approve</button>}
+            {approvalStatus !== 'REJECTED' && <button onClick={handleReject} disabled={!templateId} style={{ padding: '8px 16px', background: templateId ? '#ff4757' : '#293245', border: templateId ? '1px solid #ff4757' : '1px solid #3b4d61', borderRadius: '6px', color: templateId ? 'white' : '#9aa7bd', cursor: templateId ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', opacity: templateId ? 1 : 0.5 }}><XCircle size={14} /> Reject</button>}
+            <button onClick={handleGenerate} style={{ padding: '8px 16px', background: '#818cf8', border: '1px solid #818cf8', borderRadius: '6px', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}><RefreshCw size={14} /> Regenerate</button>
+          </div>
+          {approvalStatus !== 'APPROVED' && <div style={{ marginTop: '8px', fontSize: '11px', color: '#9aa7bd' }}>{!templateId ? 'Save a draft before approving' : 'Approve to enable Send & Schedule'}</div>}
+        </SectionCard>
 
-            {templateId && (
-              <DeliveryStatus
-                templateId={templateId}
-                onRefresh={handleRefreshDeliveryStatus}
-              />
+        {/* SECTION 5b: Send / Schedule (merged with test send) */}
+        <SectionCard title="Send & Schedule" icon={<Send size={14} />}>
+          <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', background: '#0f1729', padding: '3px', borderRadius: '6px' }}>
+            {(['test', 'now', 'schedule'] as const).map(m => (
+              <button key={m} onClick={() => { setSendMode(m); setSendResult(null); }} style={{ flex: 1, padding: '7px', background: sendMode === m ? '#53a7ff' : 'transparent', border: 'none', borderRadius: '4px', color: sendMode === m ? 'white' : '#9aa7bd', cursor: 'pointer', fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                {m === 'test' ? <Mail size={12} /> : m === 'now' ? <Send size={12} /> : <Calendar size={12} />}
+                {m === 'test' ? 'Test' : m === 'now' ? 'Send Now' : 'Schedule'}
+              </button>
+            ))}
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <input type="email" value={sendEmail || recipient.email} onChange={e => setSendEmail(e.target.value)} placeholder="recipient@example.com" style={{ width: '100%', padding: '8px 10px', background: '#0f1729', border: '1px solid #293245', borderRadius: '6px', color: '#e5e7eb', fontSize: '13px' }} />
+          </div>
+          {sendMode === 'schedule' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+              <input type="date" value={sendDate} onChange={e => setSendDate(e.target.value)} min={new Date().toISOString().split('T')[0]} style={{ padding: '8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} />
+              <input type="time" value={sendTime} onChange={e => setSendTime(e.target.value)} style={{ padding: '8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} />
+            </div>
+          )}
+          <button onClick={handleSendAction} disabled={!canSend || sending || !sendEmail} style={{ width: '100%', padding: '10px', background: canSend ? '#10e18b' : '#293245', border: canSend ? '1px solid #10e18b' : '1px solid #3b4d61', borderRadius: '6px', color: canSend ? '#0f1729' : '#9aa7bd', cursor: canSend ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: canSend ? 1 : 0.5 }}>
+            {sending ? <Loader2 size={16} className="spin" /> : sendMode === 'test' ? <Mail size={16} /> : sendMode === 'now' ? <Send size={16} /> : <Calendar size={16} />}
+            {sending ? 'Sending...' : sendMode === 'test' ? 'Send Test Email' : sendMode === 'now' ? 'Send Now' : 'Schedule Email'}
+          </button>
+          {!isApproved && <div style={{ marginTop: '8px', fontSize: '11px', color: '#ffb347', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={12} /> Approve the email before sending</div>}
+          {sendResult && <div style={{ marginTop: '8px', padding: '8px 12px', background: sendResult.success ? 'rgba(16,225,139,0.1)' : 'rgba(255,71,87,0.1)', borderRadius: '4px', border: `1px solid ${sendResult.success ? '#10e18b' : '#ff4757'}`, fontSize: '12px', color: sendResult.success ? '#10e18b' : '#ff4757', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {sendResult.success ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}{sendResult.message}
+          </div>}
+        </SectionCard>
+
+        {/* SECTION 6: Delivery Status */}
+        {templateId && (
+          <SectionCard title="Delivery" icon={<Activity size={14} />}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <span style={{ fontSize: '12px', color: '#9aa7bd' }}>Tracking for template #{templateId.slice(-8)}</span>
+              <button onClick={loadDeliveries} disabled={deliveryLoading} style={{ padding: '5px 10px', background: '#293245', border: '1px solid #3b4d61', borderRadius: '4px', color: '#e5e7eb', cursor: 'pointer', fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}><RefreshCw size={12} className={deliveryLoading ? 'spin' : ''} /> Refresh</button>
+            </div>
+            {deliveries.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#9aa7bd', fontSize: '12px' }}>No delivery records yet</div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px', marginBottom: '12px' }}>
+                {['QUEUED', 'SENT', 'DELIVERED', 'OPENED', 'CLICKED'].map(s => {
+                  const count = deliveries.filter((d: any) => d.status === s).length;
+                  const colors: Record<string, string> = { QUEUED: '#9aa7bd', SENT: '#53a7ff', DELIVERED: '#10e18b', OPENED: '#53a7ff', CLICKED: '#818cf8' };
+                  return <div key={s} style={{ padding: '10px', background: '#0f1729', borderRadius: '6px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 700, color: colors[s] }}>{count}</div>
+                    <div style={{ fontSize: '10px', color: '#9aa7bd', marginTop: '2px' }}>{s}</div>
+                  </div>;
+                })}
+              </div>
             )}
-          </div>
-        </div>
-      )}
+          </SectionCard>
+        )}
+      </>}
     </div>
   );
 }

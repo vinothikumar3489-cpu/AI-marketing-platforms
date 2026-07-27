@@ -34,6 +34,7 @@ import { reportRouter } from "./services/reporting/report.routes.js";
 import { evidenceRouter } from "./modules/evidence/evidence.routes.js";
 import { campaignRouter } from "./domains/campaign/routes/campaign.routes.js";
 import { emailCampaignRouter, brevoWebhookRouter } from "./domains/email/routes/email-campaign.routes.js";
+import { emailWorkflowRouter } from "./domains/email/routes/email-workflow.routes.js";
 import { crmRouter } from "./domains/crm/routes/crm.routes.js";
 import { salesCopilotRouter } from "./routes/sales-copilot.routes.js";
 
@@ -360,6 +361,7 @@ app.use("/api/chats", reportRouter);
 app.use("/api/chats", evidenceRouter);
 app.use("/api/campaign", automationLimiter, campaignRouter);
 app.use("/api/chats", automationLimiter, emailCampaignRouter);
+app.use("/api/content/email", emailWorkflowRouter);
 app.use("/api/chats", automationLimiter, crmRouter);
 app.use("/api/chats", automationLimiter, salesCopilotRouter);
 
