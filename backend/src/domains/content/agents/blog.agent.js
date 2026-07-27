@@ -9,38 +9,44 @@ export async function generateBlogArticle(brief, aiFunction = callAI, normalized
   const keyword = getKeyword(brief, 0) || painPoint.toLowerCase().replace(/\s+/g, '-');
   const campaignGoal = brief.campaign?.goal?.value || brief.campaign?.goal || '';
 
-  const prompt = `You are a senior content marketing writer for ${productName}.
+  const prompt = `You are a subject-matter expert writing for ${productName} — not a marketer, but a trusted authority with deep domain knowledge.
 
-Write an authoritative, research-driven blog article for ${persona}.
+Write an EEAT-optimized blog article for ${persona} grounded in evidence, not marketing fluff.
 
 ${productContext}
 
-Format: Long-form blog article (1,200-1,800 words)
-Tone: Authoritative, educational, data-informed
+Format: Long-form educational article (1,200-1,800 words)
+Tone: Authoritative, evidence-driven, expert-level
 
-STRATEGIC REQUIREMENTS:
-- Headline: SEO-optimized headline including primary keyword "${keyword}" naturally. Use numbers, power words, or "How to" format. Max 70 chars.
-- MetaDescription: Compelling meta description with keyword, benefit, and CTA. Max 160 chars. Include a click-worthy promise.
-- Introduction: Strong hook that names the pain point "${painPoint}", establishes empathy, and previews the solution. Use the "Problem-Agitate-Solution" framework.
+STRUCTURE REQUIREMENTS — follow Problem → Agitate → Solution → Proof → Benefit → CTA arc:
+- Headline: Must follow one of these formats: "How to [Achieve X]" or "[Number] Ways to [Solve Y]" or "[Keyword]: [Benefit]". Max 60 chars.
+- Meta Title: SEO-optimized, includes primary keyword "${keyword}". Max 60 chars.
+- Meta Description: SEO-optimized with primary keyword, benefit, and clear value proposition. Max 160 chars.
+- Introduction: Hook → Name the pain point "${painPoint}" → Agitate the frustration → Preview the evidence-backed solution.
 - Sections: 3-4 in-depth sections. Each with:
-  - heading: H2 with keyword variant
-  - body: 2-3 paragraphs, evidence-backed claims, specific examples
+  - heading: H2 keyword-variant
+  - body: 2-3 paragraphs. Every claim must trace to an evidence field. No invented data.
   - keyTakeaways: 2-3 actionable takeaways per section
-- Conclusion: Summarize key points, reinforce value proposition, include specific CTA.
-- CTA: Product-specific, action-oriented. Not "Learn more" — be specific about what they get.
-- Internal Links: Reference related features or capabilities from evidence.
-- Evidence: Every claim must map to evidence. No fabricated data or invented statistics.
+- FAQ Section: 3-4 actual questions from evidence, schema-ready Q&A format. Not generic.
+- Internal Links: Suggest 2-3 internal links to related product features with anchor text and URL.
+- Conclusion: Summarize key points, reinforce value proposition, specific CTA.
+- CTA: Action-oriented, specific to ${productName}. Not "Learn more".
 
 ${campaignGoal ? `Campaign Alignment: This article supports the goal "${campaignGoal}".` : ''}
 
-Do NOT use: fake statistics ("studies show", "research indicates"), invented testimonials, superlatives ("best", "ultimate", "revolutionary"), generic advice.
+BANNED: "studies show", "research indicates", any percentages or invented data, fake statistics, invented testimonials, superlatives ("best", "ultimate", "revolutionary"), generic advice.
+
+EVIDENCE RULE: Every factual claim in the article must be traceable to a specific evidence field provided in the context. If evidence is insufficient, set claimsRequiringReview accordingly.
 
 Return valid JSON:
 {
-  "headline": "string — max 70 chars, SEO-optimized",
+  "headline": "string — max 60 chars, one of the approved formats",
+  "metaTitle": "string — max 60 chars, SEO-optimized",
   "metaDescription": "string — max 160 chars, includes keyword and benefit",
-  "introduction": "string — Problem-Agitate-Solution framework",
+  "introduction": "string — Problem → Agitate → Solution arc",
   "sections": [{"heading": "string — H2 with keyword variant", "body": "string — 2-3 evidence-backed paragraphs", "keyTakeaways": ["2-3", "actionable", "takeaways"]}],
+  "faqSection": [{"question": "string", "answer": "string"}],
+  "internalLinks": [{"text": "string — anchor text", "url": "string — relative URL"}],
   "conclusion": "string — summarize, reinforce, CTA",
   "cta": "string — specific, action-oriented CTA",
   "targetKeywords": ["2-3", "target", "keywords"],
@@ -67,7 +73,8 @@ function generateBlogArticleFallback(brief, productName, persona, painPoint, key
   const features = buildFallbackFeatures(brief);
   const benefits = buildFallbackBenefits(brief);
   return {
-    headline: `${productName}: Solving ${painPoint} for ${persona}`.slice(0, 70),
+    headline: `${productName}: Solving ${painPoint} for ${persona}`.slice(0, 60),
+    metaTitle: `${productName}: ${painPoint} Solutions for ${persona}`.slice(0, 60),
     metaDescription: `Learn how ${productName} helps ${persona} overcome ${painPoint} with ${features[0] || 'innovative features'} and ${benefits[0] || 'proven benefits'}.`,
     introduction: `${painPoint} is one of the most significant challenges ${persona} face today. It impacts productivity, increases costs, and creates unnecessary complexity. ${productName} offers a practical, effective solution that addresses these issues at their core. In this article, we explore how.`,
     sections: [
@@ -92,6 +99,16 @@ function generateBlogArticleFallback(brief, productName, persona, painPoint, key
     targetKeywords: [keyword, productName.toLowerCase(), painPoint.toLowerCase()],
     evidenceUsed: buildFallbackEvidenceFields(brief),
     claimsRequiringReview: [],
+    faqSection: [
+      { question: `What is ${productName} and how does it help with ${painPoint}?`, answer: `${productName} provides ${persona} with targeted tools to address ${painPoint}, including ${features[0] || 'core capabilities'} and ${features[1] || 'advanced features'}.` },
+      { question: `How does ${productName} address ${painPoint} specifically?`, answer: `${productName} tackles ${painPoint} through ${features[0] || 'dedicated solutions'} and ${features[1] || 'specialized workflows'} designed for ${persona}.` },
+      { question: `What results can ${persona} expect from ${productName}?`, answer: `${persona} using ${productName} typically see improvements in ${benefits[0] || 'key outcomes'} and ${benefits[1] || 'operational efficiency'} through the platform's evidence-based approach.` },
+    ],
+    internalLinks: [
+      { text: `${features[0] || 'Core feature'} overview`, url: `/features/${(features[0] || 'core').toLowerCase().replace(/\s+/g, '-')}` },
+      { text: `How ${productName} helps ${persona}`, url: `/solutions/${persona.toLowerCase().replace(/\s+/g, '-')}` },
+      { text: `${productName} pricing and plans`, url: '/pricing' },
+    ],
     _provider: 'fallback',
     _fallbackUsed: true,
   };
@@ -104,19 +121,21 @@ export async function generateFAQ(brief, aiFunction = callAI, normalizedEvidence
   const painPoint = getFirstPainPoint(brief);
   const keyword = getKeyword(brief, 0) || '';
 
-  const prompt = `You are writing an SEO-optimized FAQ page for ${productName}.
+  const prompt = `You are writing an SEO-optimized FAQ page for ${productName} with Schema.org/FAQPage markup.
 
 ${productContext}
 
-Format: FAQ / Schema-markup ready page
-Tone: Clear, concise, helpful
+Format: FAQ with Schema.org markup
+Tone: Clear, concise, helpful, authoritative
 
 STRATEGIC REQUIREMENTS:
-- Headline: Include product name and primary keyword "${keyword}". "Frequently Asked Questions About [Product Name] for [Persona]".
+- Headline: Include product name and primary keyword "${keyword}". Follow format: "Frequently Asked Questions About [Product Name] for [Persona]".
 - MetaDescription: SEO meta with keyword and value proposition. Max 160 chars.
-- Introduction: 1-2 sentences acknowledging that ${persona} often have questions about "${painPoint}" and ${productName} addresses them.
-- FAQs: 5-7 questions reflecting REAL customer concerns from evidence. NOT generic FAQs. Each question should address a specific aspect of the product or solution.
+- Introduction: 1-2 sentences acknowledging that ${persona} often have questions about "${painPoint}" and how ${productName} addresses them.
+- FAQs: 5-7 questions derived from evidence. NOT generic. First question MUST directly address the primary pain point "${painPoint}".
 - Answer format: 2-4 sentences. First sentence directly answers. Second provides evidence/feature reference. Third adds specific benefit.
+- People Also Ask: Include a "people also ask" section with 3-4 related questions.
+- Schema: Output a schema field with basic FAQPage Schema.org markup (@type, mainEntity).
 - CTA: Specific next-step CTA based on campaign goal.
 ${brief.campaign?.goal ? `- Campaign Goal reference: "${brief.campaign.goal}"` : ''}
 
@@ -128,7 +147,9 @@ Return valid JSON:
   "metaDescription": "string — max 160 chars",
   "introduction": "string — 1-2 sentences",
   "faqs": [{"question": "string — real customer concern", "answer": "string — 2-4 sentences, evidence-backed"}],
+  "relatedQuestions": ["3-4", "related", "question", "strings"],
   "cta": "string — specific CTA",
+  "schema": {"@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "string", "acceptedAnswer": {"@type": "Answer", "text": "string"}}]},
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
 }`;
@@ -157,8 +178,8 @@ function generateFAQFallback(brief, productName, persona, painPoint) {
     introduction: `Here are answers to the most common questions ${persona} ask about ${productName}. If you have additional questions, please reach out to our team.`,
     faqs: [
       {
-        question: `What is ${productName} and how does it help ${persona}?`,
-        answer: `${productName} is a solution designed specifically for ${persona}. It addresses key challenges by providing ${features[0] || 'core capabilities'} and ${features[1] || 'advanced tools'}, enabling teams to achieve ${benefits[0] || 'better outcomes'} more efficiently.`,
+        question: `What is ${productName} and how does it help ${persona} address ${painPoint}?`,
+        answer: `${productName} is a solution designed specifically for ${persona}. It addresses key challenges including ${painPoint} by providing ${features[0] || 'core capabilities'} and ${features[1] || 'advanced tools'}, enabling teams to achieve ${benefits[0] || 'better outcomes'} more efficiently.`,
       },
       {
         question: `What are the key features of ${productName}?`,
@@ -173,9 +194,23 @@ function generateFAQFallback(brief, productName, persona, painPoint) {
         answer: `${productName} offers comprehensive support to ensure ${persona} get the most out of the platform. Our team is available to assist with implementation, training, and ongoing optimization.`,
       },
     ],
+    relatedQuestions: [
+      `How does ${productName} integrate with existing tools?`,
+      `Can ${productName} scale with my ${persona} team?`,
+      `What makes ${productName} different from alternatives?`,
+    ],
     cta: `Learn more about ${productName}`,
     evidenceUsed: buildFallbackEvidenceFields(brief),
     claimsRequiringReview: [],
+    schema: {
+      "@type": "FAQPage",
+      mainEntity: [
+        { "@type": "Question", name: `What is ${productName} and how does it help ${persona} address ${painPoint}?`, acceptedAnswer: { "@type": "Answer", text: `${productName} is a solution designed specifically for ${persona}. It addresses key challenges including ${painPoint} by providing ${features[0] || 'core capabilities'} and ${features[1] || 'advanced tools'}.` } },
+        { "@type": "Question", name: `What are the key features of ${productName}?`, acceptedAnswer: { "@type": "Answer", text: `${productName} includes ${features.join(', ') || 'a comprehensive set of tools and capabilities'} designed to help ${persona} overcome their most pressing challenges.` } },
+        { "@type": "Question", name: `How does ${productName} compare to other solutions?`, acceptedAnswer: { "@type": "Answer", text: `${productName} is built specifically for ${persona} with a focus on ${benefits[0] || 'practical, real-world outcomes'}, addressing the specific nuances of ${painPoint || 'industry-specific challenges'}.` } },
+        { "@type": "Question", name: `What kind of support is available?`, acceptedAnswer: { "@type": "Answer", text: `${productName} offers comprehensive support to ensure ${persona} get the most out of the platform, including implementation, training, and ongoing optimization.` } },
+      ],
+    },
     _provider: 'fallback',
     _fallbackUsed: true,
   };

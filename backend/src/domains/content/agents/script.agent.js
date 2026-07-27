@@ -21,15 +21,19 @@ STRATEGIC REQUIREMENTS:
 - Title: "[Product Name]: [Solution] for [Persona]" — include keyword "${keyword}" if natural.
 - Format: "Explainer" or "Demo".
 - Duration: "60-90 seconds" or "2-3 minutes" based on complexity.
-- Scenes: 5 scenes minimum.
-  - Scene 1: Hook — Open with the pain point "${painPoint}" in a relatable scenario. Show the struggle.
-  - Scene 2: Discovery — Introduce ${productName} as the solution. Show the "aha" moment.
-  - Scene 3: Features — Demonstrate 2-3 specific features from evidence. Show, don't tell.
-  - Scene 4: Benefits — Show the transformation. Before vs. after. End state.
+- targetDuration: Number of seconds (e.g., 90, 120).
+- hook: A single opening line (max 15 words) that creates a curiosity gap — makes the viewer need to know more.
+- musicGuidance: Genre, tempo, and mood suggestion for background music (e.g., "Upbeat electronic, 120 BPM, energetic and optimistic").
+- toneGuidance: Specific acting/delivery direction for the voiceover talent (e.g., "empathetic and understanding, then confident and authoritative").
+- Scenes: 5 scenes minimum. Must follow "Hook → Problem → Solution → Demo → CTA" beat structure.
+  - Scene 1: Hook — Open with a curiosity-grabbing hook. Not the pain point directly — a question, a surprising stat, or a relatable moment that pulls the viewer in.
+  - Scene 2: Problem — Show the struggle. Make the pain point "${painPoint}" visceral and relatable.
+  - Scene 3: Solution — Introduce ${productName} as the answer. The "aha" moment.
+  - Scene 4: Demo — Demonstrate 2-3 specific features from evidence. Show, don't tell.
   - Scene 5: CTA — Strong closing with specific call to action.
 - Each scene:
   - scene: sequential number starting at 1
-  - narration: natural, speakable dialogue. Not formal copy. Conversational.
+  - narration: natural, speakable dialogue. Not formal copy. Conversational. MAXIMUM 75 words per scene (under 30 seconds speaking time).
   - onScreenText: Key text overlay (headline, stat, or callout) or null
   - visual: Specific visual direction for video editor/animator
   - evidencePoint: Specific evidence field referenced or null
@@ -42,7 +46,11 @@ Return valid JSON:
   "title": "string — include product name and keyword",
   "format": "string — Explainer or Demo",
   "duration": "string — estimated duration",
-  "scenes": [{"scene": 1, "narration": "string — speakable dialogue", "onScreenText": "string or null", "visual": "string — specific visual direction", "evidencePoint": "string or null", "cta": "string or null"}],
+  "targetDuration": "number — duration in seconds",
+  "hook": "string — opening line, max 15 words, creates curiosity gap",
+  "musicGuidance": "string — genre, tempo, mood suggestion",
+  "toneGuidance": "string — specific acting/delivery direction",
+  "scenes": [{"scene": 1, "narration": "string — speakable dialogue, max 75 words", "onScreenText": "string or null", "visual": "string — specific visual direction", "evidencePoint": "string or null", "cta": "string or null"}],
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": [],
   "limitations": []
@@ -70,6 +78,10 @@ function generateVideoScriptFallback(brief, productName, persona, painPoint) {
     title: `${productName}: Solving ${painPoint} for ${persona}`.slice(0, 70),
     format: 'Explainer',
     duration: '60-90 seconds',
+    targetDuration: 90,
+    hook: `What if solving "${painPoint}" was easier than you think?`,
+    musicGuidance: 'Upbeat electronic, 110-120 BPM, energetic and optimistic',
+    toneGuidance: 'Empathetic and understanding in the opening, then confident and authoritative throughout the solution and demo',
     scenes: [
       {
         scene: 1,
@@ -141,6 +153,13 @@ STRATEGIC REQUIREMENTS:
 - Objective: Clear, measurable campaign objective. "Drive [metric] among [persona] by [value prop] through [channels]."
 - Audience: Target audience from evidence. Include persona name, role, pain point, buying stage.
 - Message: Single, powerful core message. "From [pain point] to [desired state] with [product name]."
+- creativeConcept: A single creative idea or theme that unifies the entire campaign. One sentence — the big idea.
+- channelStrategy: Specific channel breakdown describing what runs where. E.g., "LinkedIn for thought leadership (weekly articles), Instagram for brand awareness (behind-the-scenes reels), email for conversion (drip sequences with case studies)."
+- successMetrics: Array of 3 specific, measurable KPIs drawn from evidence. E.g., ["CTR ≥ 2.5%", "demo requests per week ≥ 10", "content engagement rate ≥ 5%"].
+- keyMessageHouse: Three-tier message hierarchy.
+  - primary: The core message (single sentence — what everyone must remember).
+  - secondary: Supporting messages that reinforce the primary.
+  - tertiary: Proof points — specific evidence-backed claims that prove the secondary.
 - VisualDirection: Comprehensive visual direction. Color palette, mood, typography, composition, photography style, motion guidelines.
 - BrandSignals: 5 specific brand elements that must be present. E.g., "gradient overlays", "case-study-blue accent", "icon system X".
 - RequiredText: Short tagline or product text that must appear in every piece.
@@ -157,6 +176,14 @@ Return valid JSON:
   "objective": "string — clear, measurable campaign objective",
   "audience": "string — persona description including role, pain point, stage",
   "message": "string — single core message, pain-point to solution",
+  "creativeConcept": "string — single creative idea that unifies the campaign",
+  "channelStrategy": "string — specific channel breakdown, what runs where",
+  "successMetrics": ["3 measurable KPIs from evidence"],
+  "keyMessageHouse": {
+    "primary": "string — core message, what everyone must remember",
+    "secondary": "string — supporting messages that reinforce primary",
+    "tertiary": "string — evidence-backed proof points"
+  },
   "visualDirection": "string — comprehensive visual direction paragraph",
   "brandSignals": ["5 specific brand elements that must be present"],
   "requiredText": "string — tagline or text that must appear",
@@ -189,6 +216,14 @@ function generateCreativeBriefFallback(brief, productName, persona, painPoint) {
     objective: `Drive awareness and adoption of ${productName} among ${persona} by demonstrating how it solves "${painPoint}" through ${features[0] || 'innovative capabilities'} and ${benefits[0] || 'proven outcomes'}.`,
     audience: persona,
     message: `${productName} helps ${persona} overcome ${painPoint} with ${features[0] || 'targeted solutions'} that deliver ${benefits[0] || 'real results'} — simply and effectively.`,
+    creativeConcept: `From frustration to flow: ${productName} makes ${painPoint} disappear for ${persona}.`,
+    channelStrategy: 'LinkedIn for thought leadership, Instagram for brand awareness, email for conversion',
+    successMetrics: ['Content engagement rate', 'Demo requests per week', 'Click-through rate on CTA'],
+    keyMessageHouse: {
+      primary: `${productName} eliminates ${painPoint} for ${persona}.`,
+      secondary: `${productName} delivers ${benefits[0] || 'proven outcomes'} through ${features[0] || 'powerful capabilities'} — faster and more reliably than alternative approaches.`,
+      tertiary: `${benefits[0] || 'Key benefit'} and ${benefits[1] || 'additional benefit'} backed by evidence from real implementations.`,
+    },
     visualDirection: `Clean, modern aesthetic with ${productName} brand colors. Imagery should show ${persona} in realistic work settings transitioning from frustration to success. Use product interface screenshots and data visualization elements.`,
     brandSignals: [
       `${productName} brand typography and color palette`,

@@ -21,7 +21,10 @@ Tone: Persuasive, benefit-driven, urgent without being pushy
 STRATEGIC REQUIREMENTS:
 - Headline: Single, powerful benefit-driven headline. Include primary value prop. Max 80 chars. Use the "So that" framework: [Feature] so that [Benefit].
 - Subheadline: Expand on the headline with a specific promise. Max 150 chars.
-- HeroCTA: Primary CTA button text. Action-oriented. Specific to ${productName}. ${primaryCTA ? `Recommended: "${primaryCTA}"` : ''}
+- HeroCTA: Primary CTA button text. Must be a specific action verb + value. NOT generic like "Get Started" — use "Start Your Free Trial" or "Book Your Demo" instead. ${primaryCTA ? `Recommended: "${primaryCTA}"` : ''}
+- HeroSubtext: Short line below CTA (e.g. "No credit card required. Free 14-day trial."). Use evidence if available.
+- TrustSignals: Array of evidence-backed trust indicators (e.g., "Used by [number] teams", "SOC 2 compliant"). Empty if not in evidence.
+- UrgencyMechanism: A single string with a time-limited offer or scarcity angle IF evidence supports it. Null otherwise.
 - PainPoints: 3 specific pain points from evidence that ${persona} experiences.
 - Solution: One compelling paragraph describing the solution. Specific features, not generic claims.
 - Features: 3 features with icon (emoji), title, and benefit-driven description. Use the "Feature → Benefit → Outcome" structure.
@@ -37,7 +40,10 @@ Return valid JSON:
 {
   "headline": "string — max 80 chars, benefit-driven, USP-focused",
   "subheadline": "string — max 150 chars, specific promise",
-  "heroCTA": "string — action-oriented button text",
+  "heroCTA": "string — specific action verb + value (e.g. 'Start Your Free Trial')",
+  "heroSubtext": "string — short line below CTA (e.g. 'No credit card required. Free 14-day trial.')",
+  "trustSignals": ["array of evidence-backed trust indicators, or empty"],
+  "urgencyMechanism": "string or null — time-limited offer or scarcity angle if in evidence",
   "painPoints": ["3", "specific", "pain", "points"],
   "solution": "string — one paragraph, specific, evidence-backed",
   "features": [{"icon": "emoji", "title": "string", "description": "string — Feature → Benefit → Outcome"}],
@@ -69,7 +75,10 @@ function generateLandingPageFallback(brief, productName, persona, painPoint) {
   return {
     headline: `Solve ${painPoint} with ${productName}`.slice(0, 80),
     subheadline: `${productName} helps ${persona} achieve ${benefits[0] || 'better outcomes'} through ${features[0] || 'innovative capabilities'}.`.slice(0, 150),
-    heroCTA: `See how ${productName} works`,
+    heroCTA: `Start Your Free Trial`,
+    heroSubtext: 'No credit card required. Free 14-day trial.',
+    trustSignals: [],
+    urgencyMechanism: null,
     painPoints: [
       painPoint,
       ...(brief.painPoints || []).slice(0, 2),
@@ -109,7 +118,10 @@ STRATEGIC REQUIREMENTS:
 - productName: "${productName}" — use exactly.
 - tagline: One-line value proposition. Reference USP from evidence. "The [category] for [persona] that [key benefit]."
 - overview: One paragraph. Problem (pain point) → Solution (product) → Outcome (benefits). Reference evidence.
-- keyFeatures: 4-5 features. Each: name, description (what it does), benefit (what it means for them). Map directly to evidence.
+- heroImage: A detailed Midjourney/DALL-E image prompt describing the product hero image. Include visual style, perspective, and mood.
+- keyFeatures: 4-5 features. Each description must use "Feature → Mechanism → Benefit" triple structure (what it is → how it works → what it means for them). Map directly to evidence.
+- integrationHighlights: Array of 2-3 integration names from evidence. Null if none found.
+- roiMetrics: Array of {metric, value, description} objects. ONLY include if evidence has ROI data. Empty otherwise.
 - useCases: 2-3 use cases. Each: scenario (when), solution (how), outcome (result). Relevant to ${persona}.
 - cta: Specific, confident CTA. Action + value.
 - pricing: null — do not invent.
@@ -122,7 +134,10 @@ Return valid JSON:
   "productName": "${productName}",
   "tagline": "string — one-line value proposition with USP",
   "overview": "string — Problem → Solution → Outcome paragraph",
-  "keyFeatures": [{"name": "string", "description": "string — what it does", "benefit": "string — what it means"}],
+  "heroImage": "string — detailed Midjourney/DALL-E prompt for product hero image",
+  "keyFeatures": [{"name": "string", "description": "string — Feature → Mechanism → Benefit", "benefit": "string — what it means"}],
+  "integrationHighlights": ["array of 2-3 integration names from evidence, or null"],
+  "roiMetrics": [{"metric": "string", "value": "string", "description": "string"}],
   "useCases": [{"scenario": "string — when", "solution": "string — how", "outcome": "string — result"}],
   "cta": "string — specific, confident CTA",
   "pricing": null,
@@ -153,11 +168,14 @@ function generateProductPageFallback(brief, productName, persona, painPoint) {
     productName,
     tagline: `The solution ${persona} need to overcome ${painPoint}`,
     overview: `${productName} is designed specifically for ${persona} dealing with "${painPoint}". The platform combines ${features[0] || 'powerful capabilities'} with ${features[1] || 'intuitive design'} to deliver ${benefits[0] || 'measurable results'}. Whether you are looking to ${benefits[1] || 'improve outcomes'} or ${benefits[2] || 'streamline operations'}, ${productName} provides the tools you need.`,
+    heroImage: `Product hero showcasing ${productName}'s interface with ${persona} using the platform — clean, modern SaaS dashboard style, warm lighting, focused professional environment`,
     keyFeatures: [
       { name: features[0] || 'Core Capabilities', description: `${features[0] || 'Core platform features'} purpose-built for ${persona}.`, benefit: benefits[0] || 'Achieve better results faster' },
       { name: features[1] || 'Intelligent Workflows', description: `${features[1] || 'Smart automation'} that reduces manual effort.`, benefit: benefits[1] || 'Save time and reduce errors' },
       { name: features[2] || 'Analytics Dashboard', description: `${features[2] || 'Comprehensive analytics'} for data-driven decisions.`, benefit: benefits[2] || 'Make informed decisions with confidence' },
     ],
+    integrationHighlights: null,
+    roiMetrics: [],
     useCases: [
       {
         scenario: `${persona} facing ${painPoint}`,
@@ -195,7 +213,10 @@ STRATEGIC REQUIREMENTS:
 - headline: "${productName} vs. [Competitor 1] vs. [Competitor 2]: [Category] Comparison for ${persona}".
 - introduction: 1-2 paragraphs. What's being compared, who it's for, criteria used. No bias.
 - comparisonTable: Object with headers [criteria, ${productName}, competitors...] and rows. Be OBJECTIVE. ${productName} does NOT need to win every row. Only use evidence-backed comparisons.
-- The table must have at least 5-7 rows comparing: Features, Ease of Use, Time to Value, Integration, Scalability, Support, Pricing (if known).
+- Each row in comparisonTable must have a "winner" field: "${productName}" or "competitor" or "tie".
+- The table must have at least 7 rows comparing different criteria. Use: Features, Ease of Use, Time to Value, Integration, Scalability, Security & Compliance, Support, Pricing (if known), Customization, Performance, Onboarding, Analytics, Automation, Reporting (select 7+).
+- verdict: One-sentence "who should choose [product]" recommendation. Tailored to ${persona}.
+- idealCustomerProfile: Brief description of who benefits most from ${productName}.
 - whyChooseUs: Evidence-based reasons to choose ${productName}. Specific features, capabilities.
 - competitorWeaknesses: ONLY if evidence supports. Empty array otherwise.
 - cta: Specific, helpful CTA.
@@ -208,7 +229,9 @@ Return valid JSON:
 {
   "headline": "string",
   "introduction": "string",
-  "comparisonTable": {"headers": ["string"], "rows": [{"feature": "string"}]},
+  "comparisonTable": {"headers": ["string"], "rows": [{"feature": "string", "winner": "productName or competitor or tie"}]},
+  "verdict": "string — one-sentence who should choose this product",
+  "idealCustomerProfile": "string — brief description of who benefits most",
   "whyChooseUs": "string — evidence-based differentiators",
   "cta": "string",
   "competitorWeaknesses": [{"competitor": "string", "weakness": "string"}],
@@ -241,12 +264,17 @@ function generateComparisonPageFallback(brief, productName, persona) {
     comparisonTable: {
       headers: ['Feature', productName, ...competitors.slice(0, 2)],
       rows: [
-        { feature: features[0] || 'Core capabilities', [productName]: '✓', [competitors[0] || 'Competitor A']: 'Limited', [competitors[1] || 'Competitor B']: 'Partial' },
-        { feature: features[1] || 'Ease of use', [productName]: '✓', [competitors[0] || 'Competitor A']: 'Moderate', [competitors[1] || 'Competitor B']: 'Complex' },
-        { feature: benefits[0] || 'Time to value', [productName]: 'Fast', [competitors[0] || 'Competitor A']: 'Slow', [competitors[1] || 'Competitor B']: 'Medium' },
-        { feature: benefits[1] || 'Integration', [productName]: 'Seamless', [competitors[0] || 'Competitor A']: 'Limited', [competitors[1] || 'Competitor B']: 'Requires custom work' },
+        { feature: features[0] || 'Core capabilities', [productName]: '✓', [competitors[0] || 'Competitor A']: 'Limited', [competitors[1] || 'Competitor B']: 'Partial', winner: productName },
+        { feature: features[1] || 'Ease of use', [productName]: '✓', [competitors[0] || 'Competitor A']: 'Moderate', [competitors[1] || 'Competitor B']: 'Complex', winner: productName },
+        { feature: benefits[0] || 'Time to value', [productName]: 'Fast', [competitors[0] || 'Competitor A']: 'Slow', [competitors[1] || 'Competitor B']: 'Medium', winner: productName },
+        { feature: benefits[1] || 'Integration', [productName]: 'Seamless', [competitors[0] || 'Competitor A']: 'Limited', [competitors[1] || 'Competitor B']: 'Requires custom work', winner: productName },
+        { feature: 'Scalability', [productName]: 'High', [competitors[0] || 'Competitor A']: 'Medium', [competitors[1] || 'Competitor B']: 'Low', winner: productName },
+        { feature: 'Support', [productName]: 'Dedicated', [competitors[0] || 'Competitor A']: 'Standard', [competitors[1] || 'Competitor B']: 'Limited', winner: productName },
+        { feature: 'Pricing', [productName]: 'Competitive', [competitors[0] || 'Competitor A']: 'Varies', [competitors[1] || 'Competitor B']: 'Premium', winner: 'tie' },
       ],
     },
+    verdict: `${productName} is the best choice for ${persona} who need ${features[0] || 'specialized capabilities'} with fast time to value and seamless integration.`,
+    idealCustomerProfile: `${persona} teams looking to address ${benefits[0] || 'key challenges'} with a purpose-built solution that combines ${features.join(' and ') || 'power and simplicity'}.`,
     whyChooseUs: `${productName} is purpose-built for ${persona} who need to address their specific challenges. Unlike generic alternatives, ${productName} delivers ${features.join(', ') || 'targeted capabilities'} with a focus on ${benefits[0] || 'practical outcomes'} and ${benefits[1] || 'measurable results'}. The platform's intuitive design and seamless integration capabilities make it the preferred choice for teams looking to make an immediate impact.`,
     cta: `Compare ${productName} for yourself`,
     competitorWeaknesses: competitors.slice(0, 2).map(c => ({

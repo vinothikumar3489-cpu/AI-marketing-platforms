@@ -21,9 +21,13 @@ STRATEGIC REQUIREMENTS:
 - Headline: Announcement headline featuring "${feature}" and ${productName}. "[Product Name] Launches [Feature Name]: [Key Benefit for Persona]".
 - Subheadline: Supporting subheadline explaining the "why" behind the feature. One sentence.
 - Body: 2-3 paragraphs. Context (problem → pain point "${painPoint}") → What we built (feature) → Why it matters (benefit for ${persona}). Specific, evidence-backed.
-- Benefits: 3 specific benefits from evidence. Not generic. "Benefit — Outcome" format.
+- Benefits: 3 specific benefits from evidence. Use "What → So What → Now What" format for each benefit.
 - CTA: Specific next step. "Try it now in [product]", "Enable [feature] in settings", "Learn how [feature] helps".
 - Availability: Evidence-based. "Available now" or specific timeline.
+- releaseVersion: Evidence-based version number or null if unknown.
+- impact: One sentence on business impact for ${persona}.
+- quote: Include only if evidence contains a real quote. Provide {name, role, text}. Otherwise null.
+- nextSteps: 2-3 concrete actions the user can take (e.g., "Enable in settings", "Watch tutorial", "Contact support").
 - TechnicalDetails: null unless evidence supports it.
 
 Do NOT: fake stats, testimonials, superlatives ("game-changing", "revolutionary"), invented quotes.
@@ -33,9 +37,13 @@ Return valid JSON:
   "headline": "string — [Product] launches [Feature]: [Benefit]",
   "subheadline": "string — one sentence, the 'why'",
   "body": "string — 2-3 paragraphs, problem → solution → benefit",
-  "benefits": ["3 specific benefits — Benefit: Outcome"],
+  "benefits": ["3 benefits in 'What → So What → Now What' format"],
   "cta": "string — specific next step",
   "availability": "string — evidence-based timeline",
+  "releaseVersion": "string or null — evidence-based version number",
+  "impact": "string — one sentence on business impact",
+  "quote": {"name": "string", "role": "string", "text": "string"} or null,
+  "nextSteps": ["2-3 concrete actions"],
   "technicalDetails": null,
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
@@ -65,6 +73,10 @@ function generateFeatureAnnouncementFallback(brief, productName, persona, featur
     benefits: benefits.slice(0, 3),
     cta: `Explore ${feature} in ${productName}`,
     availability: 'Available now',
+    releaseVersion: null,
+    impact: `${feature} enables ${persona} to ${benefits[0] || 'achieve better outcomes'} efficiently.`,
+    quote: null,
+    nextSteps: [`Explore ${feature} in ${productName}`, 'Review the documentation', 'Contact support for guidance'],
     technicalDetails: null,
     evidenceUsed: buildFallbackEvidenceFields(brief),
     claimsRequiringReview: [],
@@ -91,11 +103,15 @@ Tone: Authoritative, research-driven, data-informed
 STRATEGIC REQUIREMENTS:
 - Title: "Overcoming [Pain Point]: A [Product Name] Whitepaper for [Persona]". Include key theme.
 - Subtitle: "Strategies, Insights, and Best Practices for [Persona]".
+- targetAudience: Specific roles/industries this is for, derived from evidence.
+- keyStatistic: One evidence-backed statistic or insight. Null if none available.
+- methodology: One paragraph on how findings were gathered. Only from evidence. Null if insufficient evidence.
 - ExecutiveSummary: 3-5 sentences. Problem statement, why it matters, what this whitepaper covers, key finding.
-- Sections: 4-5 sections minimum. Each with:
+- Sections: Must follow this order: industry context → problem analysis → solution approach → implementation → measurement. Each with:
   - heading: Research-driven section title
   - body: 2-3 paragraphs, evidence-backed claims, industry context
   - keyFindings: 3 bullet points per section
+- actionFramework: 3-step actionable framework derived from evidence (as a single string describing the framework).
 - Conclusion: Recommendations based on evidence. Call to action.
 - References: Empty array — do not invent.
 - CTA: Specific. "Download the full whitepaper", "Access the complete research".
@@ -106,8 +122,12 @@ Return valid JSON:
 {
   "title": "string — including pain point and product name",
   "subtitle": "string — strategies and insights positioning",
+  "targetAudience": "string — specific roles/industries from evidence",
+  "keyStatistic": "string or null — one evidence-backed stat or insight",
+  "methodology": "string or null — one paragraph on how findings were gathered",
   "executiveSummary": "string — 3-5 sentences",
   "sections": [{"heading": "string", "body": "string — 2-3 paragraphs", "keyFindings": ["3", "findings"]}],
+  "actionFramework": "string — 3-step actionable framework",
   "conclusion": "string — recommendations and CTA",
   "references": [],
   "cta": "string — download or access CTA",
@@ -136,6 +156,9 @@ function generateWhitepaperFallback(brief, productName, persona, painPoint) {
   return {
     title: `Overcoming ${painPoint}: A ${productName} Whitepaper for ${persona}`,
     subtitle: `Strategies, insights, and practical approaches to addressing ${painPoint} with ${productName}`,
+    targetAudience: `${persona} professionals and decision-makers in relevant industries`,
+    keyStatistic: null,
+    methodology: null,
     executiveSummary: `This whitepaper explores how ${persona} can overcome "${painPoint}" using ${productName}. Drawing on ${features[0] || 'industry best practices'} and ${features[1] || 'real-world applications'}, we provide a comprehensive framework for achieving ${benefits[0] || 'measurable improvements'} and ${benefits[1] || 'sustainable results'}.`,
     sections: [
       {
@@ -154,6 +177,7 @@ function generateWhitepaperFallback(brief, productName, persona, painPoint) {
         keyFindings: ['Follow a structured implementation approach', 'Engage stakeholders early and often', 'Measure and iterate for continuous improvement'],
       },
     ],
+    actionFramework: `1) Assess current state and identify gaps related to ${painPoint}. 2) Implement ${productName} solutions tailored to ${persona} needs. 3) Measure outcomes and iterate based on ${benefits[0] || 'key metrics'}.`,
     conclusion: `${painPoint} does not have to limit what ${persona} can achieve. ${productName} provides a comprehensive, proven approach to overcoming this challenge. By leveraging ${features[0] || 'targeted capabilities'} and following the strategies outlined in this whitepaper, organizations can achieve ${benefits[0] || 'meaningful improvements'} and ${benefits[1] || 'lasting results'}.`,
     references: [],
     cta: `Download the full ${productName} whitepaper`,

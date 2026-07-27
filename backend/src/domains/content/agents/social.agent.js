@@ -11,37 +11,39 @@ export async function generateLinkedInPost(brief, aiFunction = callAI, normalize
   const campaignGoal = brief.campaign?.goal?.value || brief.campaign?.goal || '';
   const brandVoice = brief.campaign?.brandVoice?.value || brief.campaign?.brandVoice || brief.brandVoice?.value || brief.brandVoice || 'professional';
 
-  const prompt = `You are a senior LinkedIn content strategist writing for ${productName}.
+  const prompt = `You are an executive thought-leadership strategist advising the C-suite at ${productName}. Your audience is ${persona} — senior leaders who evaluate decisions on strategic impact and ROI.
 
-Write a thought-leadership LinkedIn post that positions ${productName} as the solution for ${persona}.
+Write a LinkedIn post that establishes the author as a peer-level authority for ${persona}.
 
 ${productContext}
 
 Platform: LinkedIn
-Format: Professional long-form post (1,300-2,000 characters)
-Tone: ${brandVoice || 'Professional, authoritative, data-driven'}
+Format: Executive insight post (1,300-2,000 characters)
+Tone: ${brandVoice || 'Executive, authoritative, contrarian'}
 
 STRATEGIC REQUIREMENTS:
-- Hook: Open with a provocative industry insight, contrarian take, or data-backed observation about "${painPoint}". Max 200 chars. Must stop the scroll.
-- Body: 3-4 short paragraphs. Educate, don't sell. Share a specific framework, methodology, or insight. Reference ${productName}'s capabilities naturally within the narrative. Use line breaks between paragraphs.
-- Social Proof: Reference industry trends or market shifts — never invent testimonials. Use "forward-thinking organizations" or "industry leaders" style language.
-- CTA: Discussion-oriented. Ask a question or invite debate. Examples: "What's your experience with this?", "How is your team handling this?", "Thoughts below."
-- Hashtags: Max 3 branded and industry hashtags. Place only at the end.
-- Evidence Reference: Reference specific features, benefits, or data points from the evidence above.
+- Hook: Open with a provocative industry insight, contrarian take, or an observation that challenges a widely held assumption about "${painPoint}". Max 200 chars. Must stop the scroll. No questions — state a thesis.
+- Body: 3-4 tight paragraphs, separated by line breaks. Educate through a specific framework, methodology, or approach. Reference ${productName}'s features and benefits organically as proof points. Every paragraph must tie back to a business outcome — efficiency gain, revenue impact, cost reduction, or strategic advantage.
+- Evidence Anchoring: Every substantive claim must reference a specific feature, benefit, pain point, or campaign goal from the evidence above. Use natural language, not bullet lists.
+- CTA: Discussion-oriented. Invite debate or ask a question that positions the author as a leader willing to challenge convention. Examples: "I'd push back on that — here is why.", "What is your team doing differently?", "The data I have seen suggests otherwise — agree or disagree?"
+- Hashtags: Max 3. Branded + industry. Place only at the end of the post.
 ${campaignGoal ? `- Campaign Alignment: Align with the goal: "${campaignGoal}"` : ''}
 
-Do NOT include: fake statistics (no "studies show", "research finds", "87% of"), invented testimonials, competitor bashing, superlatives ("best", "leading", "#1"), generic openers ("In today's world", "In the modern era").
+CRITICAL CONSTRAINTS:
+- You MUST NOT include: fake statistics, percentages, "studies show", "research finds", "data shows", invented testimonials, competitor bashing, superlatives ("best", "leading", "#1"), cliché openers ("In today's world", "The modern era", "It's no secret").
+- You MUST use only evidence explicitly present in the brief above.
+- Any claim not directly supported by the brief MUST be listed in claimsRequiringReview.
 
 Return valid JSON:
 {
-  "hook": "string — strong, scroll-stopping opening, max 200 chars",
-  "body": "string — 3-4 paragraphs with line breaks, educational content",
-  "cta": "string or null — discussion-oriented question or invite",
+  "hook": "string — provocative thesis, max 200 chars",
+  "body": "string — 3-4 paragraphs, each tied to business outcome, separated by \\n\\n",
+  "cta": "string or null — discussion-oriented, invites debate or alternative views",
   "hashtags": ["max", "3", "hashtags"],
-  "audience": "string — target persona name from evidence",
+  "audience": "string — target persona from evidence",
   "angle": "string — the specific thought-leadership angle used",
-  "evidenceUsed": ["list evidence fields referenced"],
-  "claimsRequiringReview": []
+  "evidenceUsed": ["list of evidence fields referenced in the post"],
+  "claimsRequiringReview": ["list claims that lack direct evidence support, or empty array"]
 }`;
 
   try {
@@ -63,12 +65,12 @@ function generateLinkedInPostFallback(brief, productName, persona, painPoint, us
   const features = buildFallbackFeatures(brief);
   const benefits = buildFallbackBenefits(brief);
   return {
-    hook: `${persona} still dealing with ${painPoint}? Here is how leading teams are solving it.`,
-    body: `For too long, ${persona} have accepted "${painPoint}" as just part of the workflow. Forward-thinking organizations are taking a new approach with ${productName}.\n\nBy leveraging ${features[0]} and ${features[1]}, teams unlock ${benefits[0]} and ${benefits[1]} — without the overhead of traditional solutions.\n\nThe shift is clear: ${benefits[2] || 'better outcomes'} is achievable with the right foundation.`,
-    cta: 'What approach has worked for your team? Share below.',
-    hashtags: ['#Productivity', '#Innovation', '#Strategy'],
+    hook: `Most ${persona} treat "${painPoint}" as an operational given. That assumption is costing them.`,
+    body: `For most organizations, "${painPoint}" has been accepted as an inevitability — a line item budgeted for rather than eliminated. The teams that break from this pattern do not just reduce friction; they reallocate resources toward strategic advantage.\n\n${productName} challenges that default. By applying ${features[0]} and ${features[1]}, leaders convert a cost center into a capability — unlocking ${benefits[0]} and ${benefits[1]} that directly impact the bottom line.\n\nThe distinction between teams that manage ${painPoint.toLowerCase()} and teams that eliminate it is not budget — it is architecture. The latter group treats ${painPoint.toLowerCase()} as a design problem, not an operational one.`,
+    cta: 'If your team has found a way to turn this pain point into a strategic lever, I would like to hear your approach.',
+    hashtags: ['#Leadership', '#Strategy', '#ExecutiveInsight'],
     audience: persona,
-    angle: usp ? 'product differentiation' : 'trend insight',
+    angle: usp ? 'product differentiation' : 'contrarian take',
     evidenceUsed: buildFallbackEvidenceFields(brief),
     claimsRequiringReview: [],
     _provider: 'fallback',
@@ -84,9 +86,9 @@ export async function generateInstagramPost(brief, aiFunction = callAI, normaliz
   const trendNote = getEvidenceForTrend(brief);
   const brandVoice = brief.campaign?.brandVoice?.value || brief.campaign?.brandVoice || brief.brandVoice?.value || brief.brandVoice || 'professional';
 
-  const prompt = `You are a senior Instagram content creator for ${productName}.
+  const prompt = `You are a senior Instagram content strategist for ${productName}.
 
-Create a high-engagement Instagram carousel post for ${persona}.
+Create a high-engagement Instagram carousel post for ${persona}. Use a carousel-first strategy — a minimum of 5 slides.
 
 ${productContext}
 
@@ -96,13 +98,14 @@ Visual Style: Clean, modern, brand-consistent
 
 STRATEGIC REQUIREMENTS:
 - Hook: Ultra-short attention grabber, max 100 chars. Must stop the scroll instantly.
-- Caption: 4-6 lines with emojis, line breaks, storytelling format. Hook → Problem → Solution → CTA structure.
-- Carousel Slides: 4-5 slides. Each slide: headline (bold value prop), body (1-2 sentences), visualHint (describe image for designer/photographer).
-- VisualConcept: Full paragraph describing the overall visual direction (color palette, mood, composition, typography).
-- ImagePrompt: Detailed text-to-image prompt for DALL-E/Midjourney/Leonardo. Include specific visual elements, lighting, color scheme.
-- CallToAction: Platform-appropriate. "Link in bio", "Save for later", "Share with a teammate", "Comment your thoughts".
-- Hashtags: 8-10 highly relevant, mix of branded + industry + niche tags.
-- Evidence Reference: Every slide should reference specific evidence (features, benefits, pain points).
+- Caption: Follow this exact structure: Hook → Problem → Solution → CTA → Hashtags. Use emojis and line breaks for readability. Do not exceed 6 lines.
+- Carousel Slides: Minimum 5 slides. Each slide must include: headline (bold value prop), body (1-2 sentences), visualHint (describe image for designer/photographer).
+- Visual Brief: Write a detailed paragraph for the designer covering color palette, mood, composition, and typography.
+- Image Prompt: Write a detailed DALL-E/Midjourney-style prompt for the cover image. Include specific visual elements, lighting, color scheme, camera angle, and mood.
+- Reel Idea: Include a "reelIdea" field with a short script outline, suggested duration (15-30s), and music suggestion.
+- CallToAction: Use one of these exact CTAs — "Save for later", "Share with a teammate", "Comment your thoughts".
+- Hashtags: 8-10 hashtags — mix of branded + industry + niche tags.
+- Evidence Reference: EVERY slide must reference specific evidence (features, benefits, pain points, data points from the brief above).
 ${trendNote ? `\nNOTE: ${trendNote}` : ''}
 
 Do NOT use: fake stats, testimonials, awards, ROI claims, "stay ahead of the curve", "go viral", "revolutionary".
@@ -110,12 +113,13 @@ Do NOT use: fake stats, testimonials, awards, ROI claims, "stay ahead of the cur
 Return valid JSON:
 {
   "hook": "string — max 100 chars, scroll-stopping",
-  "caption": "string — 4-6 lines with emojis, storytelling format",
-  "visualConcept": "string — detailed visual direction paragraph",
+  "caption": "string — Hook → Problem → Solution → CTA → Hashtags, emojis, line breaks",
+  "visualConcept": "string — detailed visual brief for designer (color palette, mood, composition, typography)",
   "carouselSlides": [{"headline": "string — bold value prop", "body": "string — 1-2 sentences", "visualHint": "string or null"}],
-  "imagePrompt": "string — detailed text-to-image prompt",
-  "callToAction": "string — platform-appropriate CTA",
-  "hashtags": ["8-10", "highly", "relevant", "hashtags"],
+  "imagePrompt": "string — detailed DALL-E/Midjourney-style prompt for cover image",
+  "reelIdea": "string — script outline, duration (15-30s), music suggestion",
+  "callToAction": "string — one of: Save for later, Share with a teammate, Comment your thoughts",
+  "hashtags": ["8-10", "mix", "branded", "industry", "niche"],
   "audience": "string — target persona",
   "angle": "string — creative angle used",
   "evidenceUsed": ["list evidence fields referenced"],
@@ -150,7 +154,8 @@ function generateInstagramPostFallback(brief, productName, persona, painPoint) {
       { headline: 'Key Benefit', body: benefits[0] || 'Primary value proposition', visualHint: 'Benefit visualization graphic' },
     ],
     imagePrompt: `Product screenshot of ${productName} dashboard, clean UI, modern design, technology context, professional lighting`,
-    callToAction: 'Link in bio to learn more',
+    reelIdea: `Quick-cut reel (20s): Open with "${painPoint} — sound familiar?" → show ${persona} struggling → transition to ${productName} solving it → feature close-ups → end card "Save for later". Music: upbeat lo-fi / trending instrumental.`,
+    callToAction: 'Save for later',
     hashtags: ['#' + productName.toLowerCase().replace(/\s+/g, ''), '#Productivity', '#Innovation', '#Tech', '#Growth', '#Efficiency', '#Digital', '#FutureOfWork', '#Platform', '#Solution'].slice(0, 10),
     audience: persona,
     angle: 'feature highlight',
@@ -167,32 +172,39 @@ export async function generateTwitterPost(brief, aiFunction = callAI, normalized
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
 
-  const prompt = `You are a senior X (Twitter) writer for ${productName}.
-
-Write a concise, high-impact post for ${persona}.
+  const prompt = `You are a senior X (Twitter) strategist for ${productName}, writing viral, high-engagement posts for ${persona}.
 
 ${productContext}
 
 Platform: X (Twitter)
-Format: Single post or thread (indicate [1/n] for threads)
-Tone: Sharp, insightful, value-dense
+Format: Short-form posts (max 280 chars each)
+Tone: Sharp, contrarian, conversational
 
-STRICT REQUIREMENTS:
-- Must be under 280 characters total including hashtags.
-- One clear, powerful idea per post.
-- If the concept needs more space, start with "[1/3]" and structure as a thread.
-- Hook in first sentence. Immediate value perception.
-- CTA can be "RT/follow/link" or discussion prompt.
-- Max 1 hashtag, preferably branded.
+VIRAL STRUCTURE REQUIREMENTS:
+- Hook in the FIRST 60 characters. Open with a question, bold claim, or contrarian take.
+- Create a curiosity gap — make them need the next line.
+- Short, punchy sentences. One idea per sentence.
+- Max 280 characters per post including hashtags.
+- HIGH engagement mechanics: include a question, poll suggestion, or opinion that invites replies.
+
+OUTPUT REQUIREMENTS:
+- Generate 3 different tweet variants (different angles, same core message).
+- Max 2 hashtags: 1 branded + 1 trending/niche.
 - Reference a specific pain point or insight from evidence.
+- No filler words, no "In today's world", no generic statements.
 
-CRITICAL: Every character counts. No fluff, no filler, no "In today's world".
+CRITICAL: Every character must earn its place.
 
 Return valid JSON:
 {
-  "post": "string — max 280 chars total, thread-ready format if needed",
-  "cta": "string or null",
-  "hashtags": ["max", "1"],
+  "post": "string — primary tweet, max 280 chars",
+  "variants": [
+    "string — alternative tweet 1, different angle, max 280 chars",
+    "string — alternative tweet 2, different angle, max 280 chars",
+    "string — alternative tweet 3, different angle, max 280 chars"
+  ],
+  "cta": "string or null — question, poll suggestion, or reply-bait",
+  "hashtags": ["branded", "niche"],
   "audience": "string — target persona",
   "angle": "string — concise angle description",
   "evidenceUsed": ["list evidence fields referenced"],
@@ -216,10 +228,17 @@ Return valid JSON:
 
 function generateTwitterPostFallback(brief, productName, persona, painPoint) {
   const benefits = buildFallbackBenefits(brief);
+  const features = buildFallbackFeatures(brief);
+  const tag = '#' + productName.toLowerCase().replace(/\s+/g, '');
   return {
     post: `Tired of ${painPoint}? ${productName} helps ${persona} achieve ${benefits[0] || 'better outcomes'} — without the complexity.`,
-    cta: 'Learn how →',
-    hashtags: ['#' + productName.toLowerCase().replace(/\s+/g, '')],
+    variants: [
+      `${painPoint} eating your team's time? ${productName} flips it. ${benefits[0] || 'Better outcomes'} in half the effort.`,
+      `Most ${persona} accept ${painPoint} as normal. We don't. ${productName} ${features[0] || 'changes the game'}.`,
+      `Stop fighting ${painPoint}. ${productName} ${benefits[1] || 'streamlines everything'} for ${persona}. Question is — can you afford not to?`
+    ],
+    cta: "What's your biggest challenge with this? Drop it below.",
+    hashtags: [tag, '#' + (brief.trend || painPoint.toLowerCase().replace(/\s+/g, ''))],
     audience: persona,
     angle: 'pain point solution',
     evidenceUsed: buildFallbackEvidenceFields(brief),
@@ -236,31 +255,32 @@ export async function generateFacebookPost(brief, aiFunction = callAI, normalize
   const painPoint = getFirstPainPoint(brief);
   const brandVoice = brief.campaign?.brandVoice?.value || brief.campaign?.brandVoice || brief.brandVoice?.value || brief.brandVoice || 'professional';
 
-  const prompt = `You are a senior Facebook content writer for ${productName}.
+  const prompt = `You are a community manager writing a Facebook group conversation starter for ${productName}.
 
-Write an engaging, community-focused Facebook post for ${persona}.
+Write a Facebook post that reads like a community discussion starter — not a broadcast — for ${persona}.
 
 ${productContext}
 
 Platform: Facebook
-Format: Long-form community post (3-5 paragraphs)
+Format: Community discussion post (3-5 short paragraphs)
 Tone: ${brandVoice || 'Conversational, community-driven, authentic'}
 
 STRATEGIC REQUIREMENTS:
-- Headline: Benefit-driven headline referencing the pain point or solution. Max 150 chars. Use { } around the hook for emphasis if needed.
-- Body: 3-5 short paragraphs. Storytelling format: Situation → Challenge → Solution → Outcome. Use "we" and "you" language. Build community connection.
-- Engagement: Ask a specific, answerable question to drive comments. Not "What do you think?" but something specific to their experience.
-- CTA: Specific, actionable engagement CTA. "Tag a teammate who needs to see this", "Drop your biggest challenge with [painPoint] below", "Comment your score out of 10".
-- Evidence: Reference specific features or benefits naturally. Every claim should trace back to evidence.
+- Emotional Hook: Open with a relatable scenario or personal anecdote about "${painPoint}". Make it feel like a conversation between peers.
+- Body (Situation → Challenge → Solution → Outcome): 3-5 short paragraphs. Use "we" and "you" language. Build community connection.
+- Comment CTA: A specific question that drives comments. NOT "What do you think?" — instead ask something like "Tag a teammate who struggles with [specific problem]" or "Drop a 🙋 if this hits close to home."
+- Share CTA: Include a share-worthy angle. Something like "Share this with someone who needs to hear it."
+- Evidence: Every claim must trace back to evidence from the brief. Reference specific features and benefits naturally.
 ${brief.campaign?.goal ? `- Align with campaign goal: "${brief.campaign.goal}"` : ''}
 
-Do NOT: fake stats, invented testimonials, superlatives, competitor bashing, fake engagement claims.
+Do NOT: fake stats, invented testimonials, superlatives, competitor bashing, fake engagement claims, generic openers.
 
 Return valid JSON:
 {
-  "headline": "string — max 150 chars, benefit-driven",
-  "body": "string — 3-5 paragraphs, community-focused storytelling",
-  "cta": "string — specific engagement CTA, not generic",
+  "headline": "string — max 150 chars, conversation hook",
+  "body": "string — 3-5 paragraphs, Situation → Challenge → Solution → Outcome",
+  "cta": "string — specific comment-driving question, NOT generic",
+  "shareCta": "string — share invitation, e.g. 'Share this with someone who needs to hear it'",
   "audience": "string — target persona",
   "angle": "string — community engagement angle",
   "evidenceUsed": ["list evidence fields referenced"],
@@ -286,11 +306,12 @@ function generateFacebookPostFallback(brief, productName, persona, painPoint) {
   const features = buildFallbackFeatures(brief);
   const benefits = buildFallbackBenefits(brief);
   return {
-    headline: `How ${productName} Helps ${persona} Overcome ${painPoint}`,
-    body: `We know that ${painPoint} is a real challenge for ${persona}. It affects productivity, team morale, and ultimately your bottom line.\n\nThat is why we built ${productName} — to provide a practical, proven solution.\n\nWith features like ${features[0]} and ${features[1]}, our users are experiencing ${benefits[0]} and ${benefits[1]} every day.\n\n${persona} who have made the switch tell us the biggest difference is ${benefits[2] || 'the simplicity and effectiveness of the platform'}.\n\nWhat challenges have you faced with ${painPoint}? We would love to hear your story.`,
-    cta: 'Share your experience in the comments below',
+    headline: `We have all been there — ${painPoint} is real. Here is how we are fixing it.`,
+    body: `You know that feeling when ${painPoint.toLowerCase()} keeps slowing you down? We have been there too.\n\nIt starts small — just another task on the list. But before you know it, it is eating into your team's time, energy, and morale.\n\nThat is why we built ${productName}. With ${features[0]} and ${features[1]}, we are helping ${persona} cut through the noise and focus on what actually matters.\n\nThe result? ${benefits[0]} and ${benefits[1]} — without the headache.\n\nThis is not just another tool. It is a different way of working together.`,
+    cta: 'Tag a teammate who deals with this every day 👇',
+    shareCta: 'Share this with someone who needs to hear it.',
     audience: persona,
-    angle: 'community engagement',
+    angle: 'community conversation starter',
     evidenceUsed: buildFallbackEvidenceFields(brief),
     claimsRequiringReview: [],
     _provider: 'fallback',
@@ -307,36 +328,52 @@ export async function generateYouTubeDescription(brief, aiFunction = callAI, nor
 
   const prompt = `You are a senior YouTube SEO strategist for ${productName}.
 
-Write a video title and description optimized for search and click-through.
+Write a video title and description optimized for search, CTR, and retention.
 
 ${productContext}
 
 Platform: YouTube
 Format: Video description with SEO optimization
+Estimated video length: 6–10 minutes
 
-STRATEGIC REQUIREMENTS:
-- Title: Click-optimized title. Include target keyword "${keyword}" naturally. Max 70 chars. Use brackets or parentheses for CTAs: [2025 Guide] or (Step-by-Step).
-- Description: 4-6 paragraph description. First 2 paragraphs above the fold (visible without clicking "more"). Include:
-  1. Hook paragraph with target keyword
-  2. What viewers will learn (3-4 bullet points)
-  3. Who this is for (persona + pain point)
-  4. CTA (subscribe, comment, watch next)
-- OpeningHook: One compelling sentence for the video intro. Must create curiosity gap.
-- Chapters: 4-5 timestamped chapters with realistic timestamps that match the estimated video length.
-- Keywords: 3-5 video-specific keywords from evidence for tags. Use the keyword tool to find exact match.
-- CTA: Subscribe + specific next video suggestion.
+REQUIREMENTS:
+
+1. SEO TITLE — Include primary keyword "${keyword}" naturally. Max 70 chars. Use brackets or parentheses for CTAs like [2025 Guide] or (Step-by-Step). First 3 words must create urgency or curiosity using power words (e.g., "Stop Wasting Time", "The Secret To", "Why Your Team", "Never Do This").
+
+2. RETENTION-FOCUSED DESCRIPTION — 4–6 SEO paragraphs. First 2 paragraphs above the fold must hook immediately:
+   - Para 1: Hook paragraph with target keyword, addressing pain point "${painPoint}"
+   - Para 2: What viewers will learn (3–4 bullet points previewing value)
+   - Para 3: Who this is for (${persona})
+   - Para 4–6: Deep dive, credibility, social proof, mention ${productName} features naturally
+   - Final para: Transition to CTA
+
+3. OPENING HOOK — One compelling sentence for the video intro. Must create a curiosity gap that makes viewers want to keep watching.
+
+4. CHAPTERS — 5–7 timestamped chapters. Timestamps must match estimated video length (6–10 min). Use realistic, sequential timestamps. Each chapter title must be specific and keyword-rich.
+
+5. PINNED COMMENT — An engagement prompt or discussion starter to pin under the video.
+
+6. SUGGESTED NEXT VIDEO — A recommended next video title or topic to drive watch time.
+
+7. CTA — Subscribe + like/comment + specific next video mention. Natural and not forced.
+
+8. TAGS / KEYWORDS — 5–7 video-specific keywords from evidence.
+
+9. HASHTAGS — Max 4 relevant, branded or industry hashtags.
 
 Do NOT: invent URLs, fake stats, testimonials, superlatives in title ("best", "ultimate").
 
 Return valid JSON:
 {
-  "title": "string — max 70 chars, click-optimized",
-  "description": "string — 4-6 paragraphs, SEO-optimized",
-  "openingHook": "string — one compelling sentence, curiosity gap",
-  "chapters": [{"timestamp": "0:00", "title": "string"}, {"timestamp": "string", "title": "string"}],
-  "cta": "string — subscribe CTA with specific suggestion",
-  "hashtags": ["max", "4", "relevant"],
-  "keywords": ["3-5", "video", "keywords"],
+  "title": "string — max 70 chars, CTR-optimized, first 3 words create urgency",
+  "description": "string — 4-6 SEO paragraphs, hook above the fold",
+  "openingHook": "string — one sentence, curiosity gap",
+  "chapters": [{"timestamp": "string", "title": "string"}],
+  "pinnedComment": "string — engagement prompt or discussion starter",
+  "suggestedNextVideo": "string — title or topic of recommended next video",
+  "cta": "string — subscribe + like/comment + next video",
+  "hashtags": ["max", "4", "hashtags"],
+  "keywords": ["5-7", "video", "keywords"],
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
 }`;
@@ -370,6 +407,8 @@ function generateYouTubeDescriptionFallback(brief, productName, persona, painPoi
       { timestamp: '4:15', title: 'Key Features Overview' },
       { timestamp: '6:00', title: 'Getting Started' },
     ],
+    pinnedComment: `What has been your biggest struggle with ${painPoint}? Let us know below.`,
+    suggestedNextVideo: `How to Maximize ${productName} for ${persona}`,
     cta: 'Subscribe for more insights on ' + productName,
     hashtags: ['#' + productName.toLowerCase().replace(/\s+/g, ''), '#Productivity', '#Tutorial', '#HowTo'],
     keywords: [productName, painPoint.toLowerCase(), persona.toLowerCase(), features[0].toLowerCase(), benefits[0].toLowerCase()],

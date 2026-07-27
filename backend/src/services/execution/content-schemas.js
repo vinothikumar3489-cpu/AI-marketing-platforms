@@ -280,6 +280,21 @@ export function repairAIOutput(raw, assetType) {
   }
 
   if (assetType === 'email_copy' || assetType.startsWith('email_')) {
+    // Map generator field names to Zod schema field names
+    if (repaired.problem && !repaired.painPoint) { repaired.painPoint = repaired.problem; delete repaired.problem; }
+    if (repaired.featureHighlights && !repaired.features) { repaired.features = repaired.featureHighlights; delete repaired.featureHighlights; }
+    if (repaired.personalizationVariables && !repaired.variables) { repaired.variables = repaired.personalizationVariables; delete repaired.personalizationVariables; }
+    if (repaired.callToAction && !repaired.primaryCta) { 
+      repaired.primaryCta = typeof repaired.callToAction === 'object' ? repaired.callToAction : { label: repaired.callToAction, url: '#' };
+      delete repaired.callToAction;
+    }
+    // Combine opening/problem/solution into bodyParagraphs if bodyParagraphs is empty
+    if ((!repaired.bodyParagraphs || repaired.bodyParagraphs.length === 0) && (repaired.opening || repaired.problem || repaired.solution)) {
+      repaired.bodyParagraphs = [repaired.opening || '', repaired.problem || '', repaired.solution || ''].filter(Boolean);
+      delete repaired.opening;
+      delete repaired.solution;
+    }
+
     repaired.subject = repaired.subject || repaired.subjectLine || generateHeadline(repaired._productName, repaired._painPoint);
     if (repaired.subjectLine && !repaired.subject) { repaired.subject = repaired.subjectLine; delete repaired.subjectLine; }
     repaired.previewText = repaired.previewText || `Discover how ${repaired._productName || 'our solution'} can help your team.`;
