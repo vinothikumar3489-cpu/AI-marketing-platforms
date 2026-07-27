@@ -1,25 +1,51 @@
 import { useState } from 'react';
-import { Eye, Code, FileText, Smartphone, Monitor, Moon, Copy, Check } from 'lucide-react';
+import { Eye, Code, FileText, Smartphone, Monitor, Moon, Copy, Check, Download, ThumbsUp, RefreshCw } from 'lucide-react';
 
 interface EmailRendererProps {
   html: string;
   plainText: string;
   subject: string;
+  previewText?: string;
   previewMode?: 'desktop' | 'mobile' | 'dark';
+  onApprove?: () => void;
+  onRegenerate?: () => void;
+  approved?: boolean;
 }
 
-export function EmailRenderer({ html, plainText, subject, previewMode = 'desktop' }: EmailRendererProps) {
+function downloadFile(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  URL.revokeObjectURL(url);
+  a.remove();
+}
+
+export function EmailRenderer({
+  html, plainText, subject, previewText = '',
+  previewMode = 'desktop',
+  onApprove, onRegenerate, approved = false,
+}: EmailRendererProps) {
   const [activeTab, setActiveTab] = useState<'visual' | 'html' | 'plain' | 'mobile'>('visual');
   const [copied, setCopied] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  const handleCopy = async (content: string) => {
+  const handleCopy = async (content: string, field?: string) => {
     await navigator.clipboard.writeText(content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (field) {
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    } else {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const getPreviewStyle = () => {
-    const baseStyle = {
+    const baseStyle: React.CSSProperties = {
       width: '100%',
       minHeight: '400px',
       borderRadius: '8px',
@@ -53,8 +79,59 @@ export function EmailRenderer({ html, plainText, subject, previewMode = 'desktop
     };
   };
 
+  const renderCopyButton = (content: string, label: string, field: string) => (
+    <button
+      onClick={() => handleCopy(content, field)}
+      style={{
+        padding: '4px 10px',
+        background: copiedField === field ? '#10b981' : '#818cf8',
+        border: 'none',
+        borderRadius: '4px',
+        color: 'white',
+        cursor: 'pointer',
+        fontSize: '11px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        transition: 'background 0.2s',
+      }}
+    >
+      {copiedField === field ? <Check size={12} /> : <Copy size={12} />}
+      {copiedField === field ? 'Copied' : `Copy ${label}`}
+    </button>
+  );
+
   return (
     <div style={{ width: '100%' }}>
+      {/* Subject & Preview Text Header */}
+      <div style={{
+        marginBottom: '12px',
+        padding: '12px 16px',
+        background: '#151d2b',
+        borderRadius: '8px',
+        border: '1px solid #293245',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '11px', color: '#9aa7bd', marginBottom: '2px' }}>Subject Line</div>
+            <div style={{ fontSize: '14px', color: '#e5e7eb', fontWeight: 600 }}>{subject}</div>
+          </div>
+          {renderCopyButton(subject, 'Subject', 'subject')}
+        </div>
+        {previewText && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '11px', color: '#9aa7bd', marginBottom: '2px' }}>Preview Text</div>
+              <div style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>{previewText}</div>
+            </div>
+            {renderCopyButton(previewText, 'Preview', 'preview')}
+          </div>
+        )}
+      </div>
+
       {/* Tab Navigation */}
       <div style={{
         display: 'flex',
@@ -86,6 +163,55 @@ export function EmailRenderer({ html, plainText, subject, previewMode = 'desktop
           icon={<FileText size={16} />}
           label="Plain Text"
         />
+      </div>
+
+      {/* Action Buttons */}
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        marginBottom: '12px',
+        flexWrap: 'wrap',
+      }}>
+        <ActionButton
+          onClick={() => downloadFile(html, `${subject || 'email'}.html`, 'text/html')}
+          icon={<Download size={14} />}
+          label="Download HTML"
+          disabled={!html}
+        />
+        <ActionButton
+          onClick={() => downloadFile(plainText, `${subject || 'email'}.txt`, 'text/plain')}
+          icon={<FileText size={14} />}
+          label="Download Plain Text"
+          disabled={!plainText}
+        />
+        <ActionButton
+          onClick={() => handleCopy(html, 'html')}
+          icon={copiedField === 'html' ? <Check size={14} /> : <Copy size={14} />}
+          label={copiedField === 'html' ? 'Copied HTML' : 'Copy HTML'}
+          disabled={!html}
+        />
+        <ActionButton
+          onClick={() => handleCopy(plainText, 'plain')}
+          icon={copiedField === 'plain' ? <Check size={14} /> : <Copy size={14} />}
+          label={copiedField === 'plain' ? 'Copied Text' : 'Copy Plain Text'}
+          disabled={!plainText}
+        />
+        {onApprove && (
+          <ActionButton
+            onClick={onApprove}
+            icon={<ThumbsUp size={14} />}
+            label={approved ? 'Approved' : 'Approve'}
+            style={approved ? { background: '#10b981', color: '#fff' } : undefined}
+            disabled={approved}
+          />
+        )}
+        {onRegenerate && (
+          <ActionButton
+            onClick={onRegenerate}
+            icon={<RefreshCw size={14} />}
+            label="Regenerate"
+          />
+        )}
       </div>
 
       {/* Preview Content */}
@@ -124,28 +250,6 @@ export function EmailRenderer({ html, plainText, subject, previewMode = 'desktop
 
         {activeTab === 'html' && (
           <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => handleCopy(html)}
-              style={{
-                position: 'absolute',
-                top: '8px',
-                right: '8px',
-                padding: '6px 12px',
-                background: '#818cf8',
-                border: 'none',
-                borderRadius: '6px',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                zIndex: 10,
-              }}
-            >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-              {copied ? 'Copied' : 'Copy'}
-            </button>
             <pre style={{
               background: '#0f1729',
               color: '#e5e7eb',
@@ -164,28 +268,6 @@ export function EmailRenderer({ html, plainText, subject, previewMode = 'desktop
 
         {activeTab === 'plain' && (
           <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => handleCopy(plainText)}
-              style={{
-                position: 'absolute',
-                top: '8px',
-                right: '8px',
-                padding: '6px 12px',
-                background: '#818cf8',
-                border: 'none',
-                borderRadius: '6px',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                zIndex: 10,
-              }}
-            >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-              {copied ? 'Copied' : 'Copy'}
-            </button>
             <pre style={{
               background: '#0f1729',
               color: '#e5e7eb',
@@ -202,18 +284,6 @@ export function EmailRenderer({ html, plainText, subject, previewMode = 'desktop
             </pre>
           </div>
         )}
-      </div>
-
-      {/* Subject Line Display */}
-      <div style={{
-        marginTop: '12px',
-        padding: '12px',
-        background: '#151d2b',
-        borderRadius: '8px',
-        border: '1px solid #293245',
-      }}>
-        <div style={{ fontSize: '11px', color: '#9aa7bd', marginBottom: '4px' }}>Subject Line</div>
-        <div style={{ fontSize: '14px', color: '#e5e7eb', fontWeight: 500 }}>{subject}</div>
       </div>
     </div>
   );
@@ -244,6 +314,41 @@ function TabButton({ active, onClick, icon, label }: TabButtonProps) {
         alignItems: 'center',
         gap: '6px',
         transition: 'all 0.2s',
+      }}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+interface ActionButtonProps {
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  disabled?: boolean;
+  style?: React.CSSProperties;
+}
+
+function ActionButton({ onClick, icon, label, disabled, style }: ActionButtonProps) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: '6px 12px',
+        background: disabled ? '#1e293b' : '#1e293b',
+        border: '1px solid #293245',
+        borderRadius: '6px',
+        color: disabled ? '#475569' : '#e5e7eb',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        fontSize: '12px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '5px',
+        transition: 'all 0.2s',
+        opacity: disabled ? 0.5 : 1,
+        ...style,
       }}
     >
       {icon}

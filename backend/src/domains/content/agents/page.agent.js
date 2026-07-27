@@ -1,8 +1,13 @@
 import { callAI } from "../../../domains/ai/services/aiOrchestrator.service.js";
-import { buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getKeyword, getEvidenceForTrend, buildFallbackFeatures, buildFallbackBenefits, buildFallbackEvidenceFields } from "./agent.utils.js";
+import { buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getKeyword, getEvidenceForTrend, buildFallbackFeatures, buildFallbackBenefits, buildFallbackEvidenceFields, checkEvidenceSufficiency } from "./agent.utils.js";
 
 export async function generateLandingPage(brief, aiFunction = callAI, normalizedEvidence) {
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
+  const evidenceCheck = checkEvidenceSufficiency(brief, normalizedEvidence);
+  if (evidenceCheck) {
+    console.warn(`[LandingPage Agent] Insufficient evidence: ${evidenceCheck}`);
+    return { _insufficientEvidence: true, _message: evidenceCheck, _provider: 'evidence_gate' };
+  }
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
@@ -34,6 +39,7 @@ STRATEGIC REQUIREMENTS:
 
 ${campaignGoal ? `- Campaign Goal: "${campaignGoal}"` : ''}
 
+EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 Do NOT: invent testimonials, fake stats, ROI claims, pricing, superlatives, generic stock photography references.
 
 Return valid JSON:
@@ -70,6 +76,10 @@ Return valid JSON:
 }
 
 function generateLandingPageFallback(brief, productName, persona, painPoint) {
+  const fallbackEvidenceCheck = checkEvidenceSufficiency(brief);
+  if (fallbackEvidenceCheck) {
+    return { _insufficientEvidence: true, _message: fallbackEvidenceCheck, _provider: 'evidence_gate' };
+  }
   const features = buildFallbackFeatures(brief);
   const benefits = buildFallbackBenefits(brief);
   return {
@@ -101,6 +111,11 @@ function generateLandingPageFallback(brief, productName, persona, painPoint) {
 
 export async function generateProductPage(brief, aiFunction = callAI, normalizedEvidence) {
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
+  const evidenceCheck = checkEvidenceSufficiency(brief, normalizedEvidence);
+  if (evidenceCheck) {
+    console.warn(`[ProductPage Agent] Insufficient evidence: ${evidenceCheck}`);
+    return { _insufficientEvidence: true, _message: evidenceCheck, _provider: 'evidence_gate' };
+  }
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
@@ -127,6 +142,7 @@ STRATEGIC REQUIREMENTS:
 - pricing: null — do not invent.
 - faqs: 3-4 FAQs addressing real customer concerns from evidence. Not generic.
 
+EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 Do NOT: invent pricing, testimonials, fake data, superlatives, competitor bashing.
 
 Return valid JSON:
@@ -162,6 +178,10 @@ Return valid JSON:
 }
 
 function generateProductPageFallback(brief, productName, persona, painPoint) {
+  const fallbackEvidenceCheck = checkEvidenceSufficiency(brief);
+  if (fallbackEvidenceCheck) {
+    return { _insufficientEvidence: true, _message: fallbackEvidenceCheck, _provider: 'evidence_gate' };
+  }
   const features = buildFallbackFeatures(brief);
   const benefits = buildFallbackBenefits(brief);
   return {
@@ -198,6 +218,11 @@ function generateProductPageFallback(brief, productName, persona, painPoint) {
 
 export async function generateComparisonPage(brief, aiFunction = callAI, normalizedEvidence) {
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
+  const evidenceCheck = checkEvidenceSufficiency(brief, normalizedEvidence);
+  if (evidenceCheck) {
+    console.warn(`[ComparisonPage Agent] Insufficient evidence: ${evidenceCheck}`);
+    return { _insufficientEvidence: true, _message: evidenceCheck, _provider: 'evidence_gate' };
+  }
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const competitors = brief.validatedCompetitors?.slice(0, 3).map(c => c.name) || [];
@@ -223,6 +248,7 @@ STRATEGIC REQUIREMENTS:
 
 ${competitors.length ? `Competitors from evidence: ${competitors.join(', ')}` : 'No competitor evidence — use generic categories.'}
 
+EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 Do NOT: bash competitors without evidence, make superlative claims, use fake data, invent competitor weaknesses.
 
 Return valid JSON:
@@ -255,6 +281,10 @@ Return valid JSON:
 }
 
 function generateComparisonPageFallback(brief, productName, persona) {
+  const fallbackEvidenceCheck = checkEvidenceSufficiency(brief);
+  if (fallbackEvidenceCheck) {
+    return { _insufficientEvidence: true, _message: fallbackEvidenceCheck, _provider: 'evidence_gate' };
+  }
   const features = buildFallbackFeatures(brief);
   const benefits = buildFallbackBenefits(brief);
   const competitors = brief.validatedCompetitors?.slice(0, 3).map(c => c.name) || ['Alternative solutions'];

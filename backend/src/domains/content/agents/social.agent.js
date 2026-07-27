@@ -1,8 +1,13 @@
 import { callAI } from "../../../domains/ai/services/aiOrchestrator.service.js";
-import { buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getKeyword, getEvidenceForTrend, buildFallbackFeatures, buildFallbackBenefits, buildFallbackEvidenceFields } from "./agent.utils.js";
+import { buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getKeyword, getEvidenceForTrend, buildFallbackFeatures, buildFallbackBenefits, buildFallbackEvidenceFields, checkEvidenceSufficiency } from "./agent.utils.js";
 
 export async function generateLinkedInPost(brief, aiFunction = callAI, normalizedEvidence) {
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
+  const evidenceCheck = checkEvidenceSufficiency(brief, normalizedEvidence);
+  if (evidenceCheck) {
+    console.warn(`[LinkedIn Agent] Insufficient evidence: ${evidenceCheck}`);
+    return { _insufficientEvidence: true, _message: evidenceCheck, _provider: 'evidence_gate' };
+  }
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
@@ -33,6 +38,7 @@ CRITICAL CONSTRAINTS:
 - You MUST NOT include: fake statistics, percentages, "studies show", "research finds", "data shows", invented testimonials, competitor bashing, superlatives ("best", "leading", "#1"), cliché openers ("In today's world", "The modern era", "It's no secret").
 - You MUST use only evidence explicitly present in the brief above.
 - Any claim not directly supported by the brief MUST be listed in claimsRequiringReview.
+- EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 
 Return valid JSON:
 {
@@ -62,6 +68,10 @@ Return valid JSON:
 }
 
 function generateLinkedInPostFallback(brief, productName, persona, painPoint, usp) {
+  const fallbackEvidenceCheck = checkEvidenceSufficiency(brief);
+  if (fallbackEvidenceCheck) {
+    return { _insufficientEvidence: true, _message: fallbackEvidenceCheck, _provider: 'evidence_gate' };
+  }
   const features = buildFallbackFeatures(brief);
   const benefits = buildFallbackBenefits(brief);
   return {
@@ -80,6 +90,11 @@ function generateLinkedInPostFallback(brief, productName, persona, painPoint, us
 
 export async function generateInstagramPost(brief, aiFunction = callAI, normalizedEvidence) {
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
+  const evidenceCheck = checkEvidenceSufficiency(brief, normalizedEvidence);
+  if (evidenceCheck) {
+    console.warn(`[Instagram Agent] Insufficient evidence: ${evidenceCheck}`);
+    return { _insufficientEvidence: true, _message: evidenceCheck, _provider: 'evidence_gate' };
+  }
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
@@ -108,6 +123,7 @@ STRATEGIC REQUIREMENTS:
 - Evidence Reference: EVERY slide must reference specific evidence (features, benefits, pain points, data points from the brief above).
 ${trendNote ? `\nNOTE: ${trendNote}` : ''}
 
+EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 Do NOT use: fake stats, testimonials, awards, ROI claims, "stay ahead of the curve", "go viral", "revolutionary".
 
 Return valid JSON:
@@ -142,6 +158,10 @@ Return valid JSON:
 }
 
 function generateInstagramPostFallback(brief, productName, persona, painPoint) {
+  const fallbackEvidenceCheck = checkEvidenceSufficiency(brief);
+  if (fallbackEvidenceCheck) {
+    return { _insufficientEvidence: true, _message: fallbackEvidenceCheck, _provider: 'evidence_gate' };
+  }
   const features = buildFallbackFeatures(brief);
   const benefits = buildFallbackBenefits(brief);
   return {
@@ -168,6 +188,11 @@ function generateInstagramPostFallback(brief, productName, persona, painPoint) {
 
 export async function generateTwitterPost(brief, aiFunction = callAI, normalizedEvidence) {
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
+  const evidenceCheck = checkEvidenceSufficiency(brief, normalizedEvidence);
+  if (evidenceCheck) {
+    console.warn(`[Twitter Agent] Insufficient evidence: ${evidenceCheck}`);
+    return { _insufficientEvidence: true, _message: evidenceCheck, _provider: 'evidence_gate' };
+  }
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
@@ -193,6 +218,7 @@ OUTPUT REQUIREMENTS:
 - Reference a specific pain point or insight from evidence.
 - No filler words, no "In today's world", no generic statements.
 
+EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 CRITICAL: Every character must earn its place.
 
 Return valid JSON:
@@ -227,6 +253,10 @@ Return valid JSON:
 }
 
 function generateTwitterPostFallback(brief, productName, persona, painPoint) {
+  const fallbackEvidenceCheck = checkEvidenceSufficiency(brief);
+  if (fallbackEvidenceCheck) {
+    return { _insufficientEvidence: true, _message: fallbackEvidenceCheck, _provider: 'evidence_gate' };
+  }
   const benefits = buildFallbackBenefits(brief);
   const features = buildFallbackFeatures(brief);
   const tag = '#' + productName.toLowerCase().replace(/\s+/g, '');
@@ -250,6 +280,11 @@ function generateTwitterPostFallback(brief, productName, persona, painPoint) {
 
 export async function generateFacebookPost(brief, aiFunction = callAI, normalizedEvidence) {
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
+  const evidenceCheck = checkEvidenceSufficiency(brief, normalizedEvidence);
+  if (evidenceCheck) {
+    console.warn(`[Facebook Agent] Insufficient evidence: ${evidenceCheck}`);
+    return { _insufficientEvidence: true, _message: evidenceCheck, _provider: 'evidence_gate' };
+  }
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
@@ -273,6 +308,7 @@ STRATEGIC REQUIREMENTS:
 - Evidence: Every claim must trace back to evidence from the brief. Reference specific features and benefits naturally.
 ${brief.campaign?.goal ? `- Align with campaign goal: "${brief.campaign.goal}"` : ''}
 
+EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 Do NOT: fake stats, invented testimonials, superlatives, competitor bashing, fake engagement claims, generic openers.
 
 Return valid JSON:
@@ -303,6 +339,10 @@ Return valid JSON:
 }
 
 function generateFacebookPostFallback(brief, productName, persona, painPoint) {
+  const fallbackEvidenceCheck = checkEvidenceSufficiency(brief);
+  if (fallbackEvidenceCheck) {
+    return { _insufficientEvidence: true, _message: fallbackEvidenceCheck, _provider: 'evidence_gate' };
+  }
   const features = buildFallbackFeatures(brief);
   const benefits = buildFallbackBenefits(brief);
   return {
@@ -321,6 +361,11 @@ function generateFacebookPostFallback(brief, productName, persona, painPoint) {
 
 export async function generateYouTubeDescription(brief, aiFunction = callAI, normalizedEvidence) {
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
+  const evidenceCheck = checkEvidenceSufficiency(brief, normalizedEvidence);
+  if (evidenceCheck) {
+    console.warn(`[YouTube Agent] Insufficient evidence: ${evidenceCheck}`);
+    return { _insufficientEvidence: true, _message: evidenceCheck, _provider: 'evidence_gate' };
+  }
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
@@ -361,6 +406,7 @@ REQUIREMENTS:
 
 9. HASHTAGS — Max 4 relevant, branded or industry hashtags.
 
+EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 Do NOT: invent URLs, fake stats, testimonials, superlatives in title ("best", "ultimate").
 
 Return valid JSON:
@@ -394,6 +440,10 @@ Return valid JSON:
 }
 
 function generateYouTubeDescriptionFallback(brief, productName, persona, painPoint) {
+  const fallbackEvidenceCheck = checkEvidenceSufficiency(brief);
+  if (fallbackEvidenceCheck) {
+    return { _insufficientEvidence: true, _message: fallbackEvidenceCheck, _provider: 'evidence_gate' };
+  }
   const features = buildFallbackFeatures(brief);
   const benefits = buildFallbackBenefits(brief);
   return {

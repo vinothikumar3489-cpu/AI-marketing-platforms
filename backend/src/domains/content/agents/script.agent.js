@@ -1,8 +1,13 @@
 import { callAI } from "../../../domains/ai/services/aiOrchestrator.service.js";
-import { buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getKeyword, getEvidenceForTrend, buildFallbackFeatures, buildFallbackBenefits, buildFallbackEvidenceFields } from "./agent.utils.js";
+import { buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getKeyword, getEvidenceForTrend, buildFallbackFeatures, buildFallbackBenefits, buildFallbackEvidenceFields, checkEvidenceSufficiency } from "./agent.utils.js";
 
 export async function generateVideoScript(brief, aiFunction = callAI, normalizedEvidence) {
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
+  const evidenceCheck = checkEvidenceSufficiency(brief, normalizedEvidence);
+  if (evidenceCheck) {
+    console.warn(`[VideoScript Agent] Insufficient evidence: ${evidenceCheck}`);
+    return { _insufficientEvidence: true, _message: evidenceCheck, _provider: 'evidence_gate' };
+  }
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
@@ -39,6 +44,7 @@ STRATEGIC REQUIREMENTS:
   - evidencePoint: Specific evidence field referenced or null
   - cta: null except final scene
 
+EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 Do NOT: invent testimonials, fake data, unverifiable claims, superlatives, "revolutionary".
 
 Return valid JSON:
@@ -72,6 +78,10 @@ Return valid JSON:
 }
 
 function generateVideoScriptFallback(brief, productName, persona, painPoint) {
+  const fallbackEvidenceCheck = checkEvidenceSufficiency(brief);
+  if (fallbackEvidenceCheck) {
+    return { _insufficientEvidence: true, _message: fallbackEvidenceCheck, _provider: 'evidence_gate' };
+  }
   const features = buildFallbackFeatures(brief);
   const benefits = buildFallbackBenefits(brief);
   return {
@@ -134,6 +144,11 @@ function generateVideoScriptFallback(brief, productName, persona, painPoint) {
 
 export async function generateCreativeBrief(brief, aiFunction = callAI, normalizedEvidence) {
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
+  const evidenceCheck = checkEvidenceSufficiency(brief, normalizedEvidence);
+  if (evidenceCheck) {
+    console.warn(`[CreativeBrief Agent] Insufficient evidence: ${evidenceCheck}`);
+    return { _insufficientEvidence: true, _message: evidenceCheck, _provider: 'evidence_gate' };
+  }
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
@@ -169,6 +184,7 @@ STRATEGIC REQUIREMENTS:
 ${campaignGoal ? `Campaign Alignment: "${campaignGoal}"` : ''}
 ${brandVoice ? `Brand Voice: "${brandVoice}"` : ''}
 
+EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 Do NOT: invent budget, timeline beyond evidence, fake testimonials, or generic advice.
 
 Return valid JSON:
@@ -210,6 +226,10 @@ Return valid JSON:
 }
 
 function generateCreativeBriefFallback(brief, productName, persona, painPoint) {
+  const fallbackEvidenceCheck = checkEvidenceSufficiency(brief);
+  if (fallbackEvidenceCheck) {
+    return { _insufficientEvidence: true, _message: fallbackEvidenceCheck, _provider: 'evidence_gate' };
+  }
   const features = buildFallbackFeatures(brief);
   const benefits = buildFallbackBenefits(brief);
   return {

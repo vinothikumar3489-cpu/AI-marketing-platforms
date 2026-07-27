@@ -270,6 +270,17 @@ export const emailCopySchema = z.object({
   html: z.string().nullable().optional(),
   evidenceUsed,
   claimsRequiringReview,
+  spamScore: z.object({
+    score: z.number(),
+    triggers: z.array(z.string()),
+    flag: z.string(),
+  }).optional(),
+  readabilityScore: z.object({
+    score: z.number(),
+    grade: z.string(),
+    avgSentenceLength: z.number(),
+    flag: z.string(),
+  }).optional(),
 });
 
 // ---------- CREATIVE BRIEF ----------

@@ -4,7 +4,7 @@ import { generateBlogArticle, generateFAQ } from '../../domains/content/agents/b
 import { generateLandingPage, generateProductPage, generateComparisonPage } from '../../domains/content/agents/page.agent.js';
 import { generateFeatureAnnouncement, generateWhitepaper } from '../../domains/content/agents/document.agent.js';
 import { generateVideoScript, generateCreativeBrief } from '../../domains/content/agents/script.agent.js';
-import { buildProductEvidenceContext, getPersonaName, getFirstPainPoint } from '../../domains/content/agents/agent.utils.js';
+import { buildProductEvidenceContext, getPersonaName, getFirstPainPoint, checkEvidenceSufficiency } from '../../domains/content/agents/agent.utils.js';
 import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
 import { validateContentClaims, validateBriefContent } from "./claim-validator.service.js";
 import { validateContentOutput, repairAIOutput } from "./content-schemas.js";
@@ -53,6 +53,87 @@ const INVALID_PRODUCT_LABELS = new Set([
 
 
 
+function calculateSpamScore(emailData) {
+  let score = 0;
+  const text = JSON.stringify(emailData).toLowerCase();
+
+  const spamTriggers = [
+    'free', 'act now', 'limited time', 'click here', 'buy now',
+    'exclusive offer', 'don\'t miss out', 'guaranteed', 'congratulations',
+    'you won', 'winner', 'prize', 'cash', '$$$', 'urgent', 'immediately',
+    'once in a lifetime', 'amazing', 'incredible', 'order now', 'limited supply',
+    'no obligation', 'risk-free', 'satisfaction guaranteed', 'unlimited',
+    'great offer', 'best price', 'lowest price', 'while supplies last',
+    'double your', 'earn extra', 'extra cash', 'additional income',
+    'debt', 'credit', 'loan', 'mortgage', 'refinance',
+    'work from home', 'make money', 'passwords', 'social security',
+    'bank account', 'credit card', 'log in', 'verify account',
+  ];
+
+  const foundTriggers = spamTriggers.filter(t => text.includes(t));
+
+  const capsWords = text.match(/\b[A-Z]{4,}\b/g) || [];
+
+  const exclamationCount = (text.match(/!/g) || []).length;
+
+  const excessivePunct = (text.match(/[!?]{2,}/g) || []).length;
+
+  const linkCount = (text.match(/https?:\/\/[^\s"'>]+/g) || []).length;
+
+  score += foundTriggers.length * 5;
+  score += Math.min(capsWords.length * 3, 15);
+  score += Math.min(exclamationCount * 2, 10);
+  score += excessivePunct * 5;
+  score += Math.max(0, (linkCount - 3) * 5);
+
+  return {
+    score: Math.min(score, 100),
+    triggers: foundTriggers.slice(0, 10),
+    flag: score > 40 ? 'high' : score > 20 ? 'medium' : 'low',
+  };
+}
+
+function calculateReadabilityScore(emailData) {
+  const textFields = [];
+  if (emailData.subject) textFields.push(emailData.subject);
+  if (emailData.greeting) textFields.push(emailData.greeting);
+  if (emailData.headline) textFields.push(emailData.headline);
+  if (emailData.opening) textFields.push(emailData.opening);
+  if (emailData.bodyParagraphs) textFields.push(...emailData.bodyParagraphs);
+  if (emailData.closing) textFields.push(emailData.closing);
+  if (emailData.signature) textFields.push(emailData.signature);
+
+  const fullText = textFields.join(' ');
+  if (fullText.length < 20) return { score: 50, grade: 'N/A', avgSentenceLength: 0, flag: 'low' };
+
+  const sentences = fullText.split(/[.!?]+/).filter(Boolean);
+  const words = fullText.split(/\s+/).filter(w => w.length > 0);
+  const avgSentenceLength = sentences.length > 0 ? Math.round(words.length / sentences.length) : 0;
+  const syllables = words.reduce((count, word) => count + Math.max(1, Math.floor(word.length / 3)), 0);
+
+  const gradeLevel = sentences.length > 0 && words.length > 0
+    ? Math.round(0.39 * (words.length / sentences.length) + 11.8 * (syllables / words.length) - 15.59)
+    : 0;
+
+  let score = 60;
+  if (avgSentenceLength <= 15) score += 15;
+  else if (avgSentenceLength <= 20) score += 10;
+  else if (avgSentenceLength <= 25) score += 5;
+  else score -= Math.min((avgSentenceLength - 25) * 2, 20);
+
+  if (gradeLevel >= 8 && gradeLevel <= 12) score += 10;
+  else if (gradeLevel > 16) score -= 10;
+
+  if (sentences.length >= 5 && sentences.length <= 20) score += 10;
+
+  return {
+    score: Math.min(Math.max(score, 0), 100),
+    grade: gradeLevel <= 6 ? '6th grade' : gradeLevel <= 8 ? '8th grade' : gradeLevel <= 10 ? '10th grade' : gradeLevel <= 12 ? '12th grade' : 'College',
+    avgSentenceLength,
+    flag: score < 50 ? 'low' : score < 70 ? 'medium' : 'high',
+  };
+}
+
 async function generateEmailCopy(brief, aiFunction = callAI, normalizedEvidence) {
   const productIdentity = brief?.productIdentity || {};
   const displayName = productIdentity.displayName || brief?.product?.name || brief?.product?.brandName || brief?.company?.name || 'this solution';
@@ -60,6 +141,11 @@ async function generateEmailCopy(brief, aiFunction = callAI, normalizedEvidence)
   const brandName = productIdentity.brandName || brief?.product?.brandName || '';
   const domain = productIdentity.domain || '';
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
+  const emailEvidenceCheck = checkEvidenceSufficiency(brief, normalizedEvidence);
+  if (emailEvidenceCheck) {
+    console.warn(`[Email Agent] Insufficient evidence: ${emailEvidenceCheck}`);
+    return { _insufficientEvidence: true, _message: emailEvidenceCheck, _provider: 'evidence_gate' };
+  }
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
 
@@ -135,6 +221,7 @@ REQUIREMENTS:
 - plainText: Plain text version
 - html: NOT required, skip if not generating
 
+EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 Do NOT use: fake stats, invented testimonials, ROI claims, competitor bashing, generic placeholders.
 
 Return valid JSON:
@@ -233,6 +320,8 @@ Return valid JSON:
         approvalStatus: 'DRAFT',
         deliveryStatus: null,
         createdAt: new Date().toISOString(),
+        spamScore: calculateSpamScore(data),
+        readabilityScore: calculateReadabilityScore(data),
         _provider: result.provider,
       };
     }
@@ -252,6 +341,9 @@ Return valid JSON:
  * Returns complete, valid email structure with metadata marking
  */
 function generateEmailCopyFallback(displayName, internalName, brandName, domain, emailType, persona, painPoint, goal, tone, audience, sender, ctaUrl) {
+  if (!displayName || displayName === 'this solution' || displayName === 'N/A') {
+    return { _insufficientEvidence: true, _message: 'Additional verified product information is required. No product name identified.', _provider: 'evidence_gate' };
+  }
   const fallbackData = {
     id: `email_fallback_${Date.now()}`,
     contentType: 'email_copy',
@@ -310,6 +402,8 @@ function generateEmailCopyFallback(displayName, internalName, brandName, domain,
     approvalStatus: 'DRAFT',
     deliveryStatus: null,
     createdAt: new Date().toISOString(),
+    spamScore: calculateSpamScore(fallbackData),
+    readabilityScore: calculateReadabilityScore(fallbackData),
     _fallbackUsed: true,
     _provider: 'fallback',
   };
@@ -628,6 +722,17 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
     resultType: result ? (result._type || typeof result) : 'null',
   });
 
+  if (result && result._insufficientEvidence) {
+    console.warn('[Pipeline] Insufficient evidence, skipping generation', { reason: result._message });
+    return {
+      _type: assetType,
+      _label: typeConfig.label,
+      _status: 'insufficient_evidence',
+      _reason: result._message,
+      _generatedAt: new Date().toISOString(),
+    };
+  }
+
   if (!result) {
     const missingReasons = [];
     if (!enriched.product?.features?.length) missingReasons.push('Missing Product Benefits');
@@ -945,24 +1050,52 @@ function sanitizeText(text) {
 function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '', unsubscribeUrl = null) {
   const subject = sanitizeText(emailData.subject || '');
   const previewText = sanitizeText(emailData.previewText || emailData.subject || '');
+  const headline = sanitizeText(emailData.headline || emailData.subject || '');
   const greeting = sanitizeText(emailData.greeting || (emailData.sections && emailData.sections.greeting) || '');
   const opening = sanitizeText(emailData.opening || (emailData.sections && emailData.sections.openingHook) || '');
+  const painPoint = sanitizeText(emailData.painPoint || emailData.problem || '');
+  const solution = sanitizeText(emailData.solution || '');
   const bodyParagraphs = Array.isArray(emailData.bodyParagraphs) ? emailData.bodyParagraphs : [];
   const bulletPoints = Array.isArray(emailData.bulletPoints) ? emailData.bulletPoints : [];
-  const features = Array.isArray(emailData.features) ? emailData.features : [];
+  const features = Array.isArray(emailData.features || emailData.featureHighlights) ? (emailData.features || emailData.featureHighlights) : [];
+  const benefits = Array.isArray(emailData.benefits) ? emailData.benefits : [];
+  const socialProof = sanitizeText(emailData.socialProof || '');
   const variables = Array.isArray(emailData.variables) ? emailData.variables : [];
-  const ctaText = sanitizeText(emailData.ctaText || (emailData.primaryCta && emailData.primaryCta.label) || '');
-  const ctaUrl = emailData.ctaUrl || (emailData.primaryCta && emailData.primaryCta.destination) || '#';
+  const ctaData = emailData.primaryCta || emailData.callToAction || {};
+  const ctaText = sanitizeText(emailData.ctaText || ctaData.label || '');
+  const ctaUrl = emailData.ctaUrl || ctaData.url || ctaData.destination || '#';
+  const secondaryCta = emailData.secondaryCta || null;
   const closing = sanitizeText(emailData.closing || '');
+  const postscript = sanitizeText(emailData.postscript || '');
   const signature = sanitizeText(emailData.signature || '');
-  const complianceNote = sanitizeText(emailData.complianceNote || '');
+  const complianceNote = sanitizeText(emailData.complianceNote || emailData.complianceFooter || emailData.footer || '');
   const company = sanitizeText(companyName || 'Our Company');
   const baseUrl = companyWebsite || '#';
+  const unsubscribeText = sanitizeText(emailData.unsubscribeText || '');
 
   const bodyHtml = `
+    ${headline ? `<h1 style="font-family: Arial, sans-serif; font-size: 24px; line-height: 1.3; color: #1e293b; margin: 0 0 20px 0; font-weight: 700;">${headline}</h1>` : ''}
     ${greeting ? `<p style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 16px 0;">${greeting}</p>` : ''}
     ${opening ? `<p style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 16px 0;">${opening}</p>` : ''}
+    ${painPoint ? `<table cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 16px 0; background-color: #fef2f2; border-left: 4px solid #ef4444; border-radius: 4px;"><tr><td style="padding: 16px; font-family: Arial, sans-serif; font-size: 15px; line-height: 1.5; color: #991b1b;">${painPoint}</td></tr></table>` : ''}
+    ${solution ? `<p style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 16px 0;"><strong>${solution}</strong></p>` : ''}
     ${bodyParagraphs.map(p => `<p style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 16px 0;">${sanitizeText(p)}</p>`).join('\n    ')}
+    ${features.length > 0 ? `
+    <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 16px 0; background-color: #f8fafc; border-radius: 6px;">
+      <tr><td style="padding: 16px 16px 8px 16px; font-family: Arial, sans-serif; font-size: 15px; font-weight: 600; color: #1e293b;">Key Features</td></tr>
+      ${features.map(f => `
+      <tr>
+        <td style="font-family: Arial, sans-serif; font-size: 15px; line-height: 1.5; color: #333333; padding: 0 16px 8px 16px; vertical-align: top; padding-left: 32px;">✦ ${sanitizeText(f)}</td>
+      </tr>`).join('\n      ')}
+    </table>` : ''}
+    ${benefits.length > 0 ? `
+    <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 16px 0; background-color: #f0fdf4; border-radius: 6px;">
+      <tr><td style="padding: 16px 16px 8px 16px; font-family: Arial, sans-serif; font-size: 15px; font-weight: 600; color: #166534;">Benefits</td></tr>
+      ${benefits.map(b => `
+      <tr>
+        <td style="font-family: Arial, sans-serif; font-size: 15px; line-height: 1.5; color: #333333; padding: 0 16px 8px 16px; vertical-align: top; padding-left: 32px;">✓ ${sanitizeText(b)}</td>
+      </tr>`).join('\n      ')}
+    </table>` : ''}
     ${bulletPoints.length > 0 ? `
     <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 16px 0;">
       ${bulletPoints.map(b => `
@@ -971,14 +1104,7 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
         <td style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; padding: 0 0 8px 0;">${sanitizeText(b)}</td>
       </tr>`).join('\n      ')}
     </table>` : ''}
-    ${features.length > 0 ? `
-    <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 16px 0;">
-      ${features.map(f => `
-      <tr>
-        <td style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; padding: 0 0 8px 0; vertical-align: top; width: 20px;">✦</td>
-        <td style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; padding: 0 0 8px 0;">${sanitizeText(f)}</td>
-      </tr>`).join('\n      ')}
-    </table>` : ''}
+    ${socialProof ? `<table cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 16px 0; background-color: #f9f9f9; border-left: 3px solid #0066cc; border-radius: 3px;"><tr><td style="padding: 16px; font-family: Arial, sans-serif; font-size: 15px; font-style: italic; line-height: 1.5; color: #555555;">${socialProof}</td></tr></table>` : ''}
     ${ctaText ? `
     <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px 0;">
       <tr>
@@ -987,12 +1113,23 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
         </td>
       </tr>
     </table>` : ''}
+    ${secondaryCta ? `
+    <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px 0;">
+      <tr>
+        <td align="center">
+          <a href="${sanitizeText(secondaryCta.url || '#')}" target="_blank" style="font-family: Arial, sans-serif; font-size: 14px; font-weight: 500; color: #2563eb; text-decoration: none; border-bottom: 1px solid #2563eb;">${sanitizeText(secondaryCta.label || 'Learn More')}</a>
+        </td>
+      </tr>
+    </table>` : ''}
     ${closing ? `<p style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 16px 0;">${closing}</p>` : ''}
+    ${postscript ? `<p style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5; color: #555555; margin: 0 0 16px 0;"><strong>P.S.</strong> ${postscript}</p>` : ''}
     ${signature ? `<p style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 16px 0;">${signature}</p>` : ''}
     ${complianceNote ? `<p style="font-family: Arial, sans-serif; font-size: 12px; line-height: 1.4; color: #888888; margin: 16px 0 0 0; font-style: italic;">${complianceNote}</p>` : ''}
   `;
 
-  const unsubscribeHtml = unsubscribeUrl
+  const unsubscribeHtml = unsubscribeText
+    ? `<span style="color: #888888; font-size: 12px;">${unsubscribeText}</span>`
+    : unsubscribeUrl
     ? `<a href="${sanitizeText(unsubscribeUrl)}" target="_blank" style="color: #888888; text-decoration: underline; font-size: 12px;">Unsubscribe</a>`
     : `<span style="color: #888888; font-size: 12px;">To unsubscribe, reply with UNSUBSCRIBE</span>`;
 
@@ -1016,6 +1153,13 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
     </xml>
   </noscript>
   <![endif]-->
+  <style type="text/css">
+    @media screen and (max-width: 600px) {
+      .email-container { width: 100% !important; }
+      .email-content { padding: 16px !important; }
+      .email-header { padding: 16px !important; }
+    }
+  </style>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, sans-serif;">
   <!--[if mso]>
@@ -1032,18 +1176,34 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
     &nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;
   </div>
 
+  <!-- SUBJECT BAR -->
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #e2e8f0;">
+    <tr>
+      <td align="center" style="padding: 8px 10px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600">
+          <tr>
+            <td style="font-family: Arial, sans-serif; font-size: 13px; color: #475569; text-align: center;">
+              Subject: ${subject}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
   <!-- HEADER -->
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f4f4f4;">
     <tr>
       <td align="center" style="padding: 20px 10px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+        <table class="email-container" role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
           <tr>
-            <td style="background-color: #1e293b; padding: 24px 32px; text-align: center;">
+            <td class="email-header" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 28px 32px; text-align: center;">
               <a href="${sanitizeText(baseUrl)}" target="_blank" style="color: #ffffff; text-decoration: none; font-size: 20px; font-weight: 700; letter-spacing: 0.5px;">${company}</a>
+              ${previewText ? `<p style="color: rgba(255,255,255,0.8); margin: 6px 0 0 0; font-size: 13px; font-weight: 400;">${previewText}</p>` : ''}
             </td>
           </tr>
           <tr>
-            <td style="padding: 32px 32px 24px 32px;">
+            <td class="email-content" style="padding: 32px 32px 24px 32px;">
               ${bodyHtml}
             </td>
           </tr>
@@ -1080,20 +1240,26 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
     plainText: [
       subject ? `Subject: ${subject}` : '',
       '',
+      headline,
       greeting,
       opening,
+      painPoint ? `Problem: ${painPoint}` : '',
+      solution ? `Solution: ${solution}` : '',
       ...bodyParagraphs,
+      ...features.map(f => `- ${f}`),
+      ...benefits.map(b => `- ${b}`),
       ...bulletPoints.map(b => `- ${b}`),
-      '',
+      socialProof ? `"${socialProof}"` : '',
       ctaText ? `${ctaText}: ${ctaUrl}` : '',
-      '',
+      secondaryCta ? `${secondaryCta.label}: ${secondaryCta.url}` : '',
       closing,
+      postscript ? `P.S. ${postscript}` : '',
       signature,
       complianceNote,
       '',
       `--- ${company} ---`,
       baseUrl !== '#' ? `Website: ${baseUrl}` : '',
-      unsubscribeUrl ? `Unsubscribe: ${unsubscribeUrl}` : 'Reply UNSUBSCRIBE to opt out',
+      unsubscribeText || (unsubscribeUrl ? `Unsubscribe: ${unsubscribeUrl}` : 'Reply UNSUBSCRIBE to opt out'),
     ].filter(Boolean).join('\n'),
     sections: {
       preheader: previewText,

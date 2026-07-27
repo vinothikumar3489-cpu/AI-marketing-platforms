@@ -1,8 +1,13 @@
 import { callAI } from "../../../domains/ai/services/aiOrchestrator.service.js";
-import { buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getFirstFeature, getKeyword, getEvidenceForTrend, buildFallbackFeatures, buildFallbackBenefits, buildFallbackEvidenceFields } from "./agent.utils.js";
+import { buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getFirstFeature, getKeyword, getEvidenceForTrend, buildFallbackFeatures, buildFallbackBenefits, buildFallbackEvidenceFields, checkEvidenceSufficiency } from "./agent.utils.js";
 
 export async function generateFeatureAnnouncement(brief, aiFunction = callAI, normalizedEvidence) {
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
+  const evidenceCheck = checkEvidenceSufficiency(brief, normalizedEvidence);
+  if (evidenceCheck) {
+    console.warn(`[FeatureAnnouncement Agent] Insufficient evidence: ${evidenceCheck}`);
+    return { _insufficientEvidence: true, _message: evidenceCheck, _provider: 'evidence_gate' };
+  }
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const feature = getFirstFeature(brief);
@@ -30,6 +35,7 @@ STRATEGIC REQUIREMENTS:
 - nextSteps: 2-3 concrete actions the user can take (e.g., "Enable in settings", "Watch tutorial", "Contact support").
 - TechnicalDetails: null unless evidence supports it.
 
+EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 Do NOT: fake stats, testimonials, superlatives ("game-changing", "revolutionary"), invented quotes.
 
 Return valid JSON:
@@ -65,6 +71,10 @@ Return valid JSON:
 }
 
 function generateFeatureAnnouncementFallback(brief, productName, persona, feature) {
+  const fallbackEvidenceCheck = checkEvidenceSufficiency(brief);
+  if (fallbackEvidenceCheck) {
+    return { _insufficientEvidence: true, _message: fallbackEvidenceCheck, _provider: 'evidence_gate' };
+  }
   const benefits = buildFallbackBenefits(brief);
   return {
     headline: `Introducing ${feature}: A New Way for ${persona} to Achieve More with ${productName}`,
@@ -87,6 +97,11 @@ function generateFeatureAnnouncementFallback(brief, productName, persona, featur
 
 export async function generateWhitepaper(brief, aiFunction = callAI, normalizedEvidence) {
   const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
+  const evidenceCheck = checkEvidenceSufficiency(brief, normalizedEvidence);
+  if (evidenceCheck) {
+    console.warn(`[Whitepaper Agent] Insufficient evidence: ${evidenceCheck}`);
+    return { _insufficientEvidence: true, _message: evidenceCheck, _provider: 'evidence_gate' };
+  }
   const productName = getProductName(brief);
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
@@ -116,6 +131,7 @@ STRATEGIC REQUIREMENTS:
 - References: Empty array — do not invent.
 - CTA: Specific. "Download the full whitepaper", "Access the complete research".
 
+EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 Do NOT: invent statistics, references, testimonials, superlatives.
 
 Return valid JSON:
@@ -151,6 +167,10 @@ Return valid JSON:
 }
 
 function generateWhitepaperFallback(brief, productName, persona, painPoint) {
+  const fallbackEvidenceCheck = checkEvidenceSufficiency(brief);
+  if (fallbackEvidenceCheck) {
+    return { _insufficientEvidence: true, _message: fallbackEvidenceCheck, _provider: 'evidence_gate' };
+  }
   const features = buildFallbackFeatures(brief);
   const benefits = buildFallbackBenefits(brief);
   return {

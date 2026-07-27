@@ -7,28 +7,28 @@
  * Generate professional responsive HTML email template
  */
 export function generateEmailHtmlTemplate(emailData) {
-  const {
-    subject,
-    previewText,
-    greeting,
-    headline,
-    opening,
-    painPoint,
-    solution,
-    benefits,
-    bodyParagraphs,
-    socialProof,
-    primaryCta,
-    secondaryCta,
-    closing,
-    signature,
-    postscript,
-    complianceFooter,
-    unsubscribeText,
-    sender,
-    recipient,
-    productIdentity
-  } = emailData;
+  // Field name fallbacks for different schema versions
+  const subject = emailData.subject || '';
+  const previewText = emailData.previewText || '';
+  const greeting = emailData.greeting || '';
+  const headline = emailData.headline || emailData.subject || '';
+  const opening = emailData.opening || '';
+  const painPoint = emailData.painPoint || emailData.problem || '';
+  const solution = emailData.solution || '';
+  const benefits = Array.isArray(emailData.benefits) ? emailData.benefits : [];
+  const features = Array.isArray(emailData.features) ? emailData.features : [];
+  const bodyParagraphs = Array.isArray(emailData.bodyParagraphs) ? emailData.bodyParagraphs : [];
+  const socialProof = emailData.socialProof || '';
+  const primaryCta = emailData.primaryCta || emailData.callToAction || null;
+  const secondaryCta = emailData.secondaryCta || null;
+  const closing = emailData.closing || '';
+  const signature = emailData.signature || '';
+  const postscript = emailData.postscript || null;
+  const complianceFooter = emailData.complianceFooter || emailData.footer || '';
+  const unsubscribeText = emailData.unsubscribeText || 'Unsubscribe';
+  const sender = emailData.sender || {};
+  const recipient = emailData.recipient || {};
+  const productIdentity = emailData.productIdentity || {};
 
   // Apply personalization if recipient data is available
   const personalizedGreeting = recipient?.firstName 
@@ -47,6 +47,10 @@ export function generateEmailHtmlTemplate(emailData) {
 
   const benefitsHtml = benefits?.map(benefit => `
     <li style="margin: 8px 0; padding-left: 8px;">${benefit}</li>
+  `).join('') || '';
+
+  const featuresHtml = features?.map(f => `
+    <li style="margin: 8px 0; padding-left: 8px;"><strong>✦</strong> ${f}</li>
   `).join('') || '';
 
   const bodyParagraphsHtml = personalizedBody?.map(para => `
@@ -139,6 +143,16 @@ export function generateEmailHtmlTemplate(emailData) {
               <!-- Body paragraphs -->
               ${bodyParagraphsHtml}
               
+              <!-- Features -->
+              ${features && features.length > 0 ? `
+              <div style="background-color: #f8f9fa; padding: 24px; margin: 24px 0; border-radius: 8px; border: 1px solid #e9ecef;">
+                <h3 style="margin: 0 0 16px 0; color: ${brandColor}; font-size: 18px; font-weight: 600;">Key Features:</h3>
+                <ul style="margin: 0; padding-left: 20px; color: #333; line-height: 1.6;">
+                  ${featuresHtml}
+                </ul>
+              </div>
+              ` : ''}
+              
               <!-- Benefits -->
               ${benefits && benefits.length > 0 ? `
               <div style="background-color: #f8f9fa; padding: 24px; margin: 24px 0; border-radius: 8px; border: 1px solid #e9ecef;">
@@ -224,26 +238,26 @@ export function generateMobileEmailHtmlTemplate(emailData) {
  * Generate plain text version from email data
  */
 export function generatePlainTextFromEmailData(emailData) {
-  const {
-    subject,
-    greeting,
-    headline,
-    opening,
-    painPoint,
-    solution,
-    benefits,
-    bodyParagraphs,
-    socialProof,
-    primaryCta,
-    secondaryCta,
-    closing,
-    signature,
-    postscript,
-    complianceFooter,
-    unsubscribeText,
-    sender,
-    recipient
-  } = emailData;
+  // Field name fallbacks for different schema versions
+  const subject = emailData.subject || '';
+  const greeting = emailData.greeting || '';
+  const headline = emailData.headline || emailData.subject || '';
+  const opening = emailData.opening || '';
+  const painPoint = emailData.painPoint || emailData.problem || '';
+  const solution = emailData.solution || '';
+  const benefits = Array.isArray(emailData.benefits) ? emailData.benefits : [];
+  const features = Array.isArray(emailData.features) ? emailData.features : [];
+  const bodyParagraphs = Array.isArray(emailData.bodyParagraphs) ? emailData.bodyParagraphs : [];
+  const socialProof = emailData.socialProof || '';
+  const primaryCta = emailData.primaryCta || emailData.callToAction || null;
+  const secondaryCta = emailData.secondaryCta || null;
+  const closing = emailData.closing || '';
+  const signature = emailData.signature || '';
+  const postscript = emailData.postscript || null;
+  const complianceFooter = emailData.complianceFooter || emailData.footer || '';
+  const unsubscribeText = emailData.unsubscribeText || 'Unsubscribe';
+  const sender = emailData.sender || {};
+  const recipient = emailData.recipient || {};
 
   // Apply personalization
   const personalizedGreeting = recipient?.firstName 
@@ -260,6 +274,7 @@ export function generatePlainTextFromEmailData(emailData) {
   });
 
   const benefitsText = benefits?.map(benefit => `- ${benefit}`).join('\n') || '';
+  const featuresText = features?.map(f => `- ${f}`).join('\n') || '';
 
   const bodyText = personalizedBody?.join('\n\n') || '';
 
@@ -281,8 +296,8 @@ ${solution}
 
 ${bodyText}
 
-Key Benefits:
-${benefitsText}
+${featuresText ? `Key Features:\n${featuresText}\n` : ''}
+${benefitsText ? `Key Benefits:\n${benefitsText}\n` : ''}
 ${socialProofText}
 
 ${primaryCta?.label ? primaryCta.label.toUpperCase() : 'LEARN MORE'}: ${primaryCta?.url || '#'}${secondaryCtaText}

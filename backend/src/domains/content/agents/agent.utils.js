@@ -157,6 +157,30 @@ export function buildFallbackEvidenceFields(brief) {
   return fields;
 }
 
+export function checkEvidenceSufficiency(brief, normalizedEvidence, minFeatures = 1, minBenefits = 1) {
+  const evidence = normalizedEvidence || brief?.evidenceSnapshot || brief?.product;
+
+  const features = Array.isArray(evidence?.features) ? evidence.features :
+                   Array.isArray(brief?.product?.features) ? brief.product.features : [];
+  const benefits = Array.isArray(evidence?.benefits) ? evidence.benefits :
+                   Array.isArray(brief?.product?.benefits) ? brief.product.benefits : [];
+  const productName = brief?.product?.name || brief?.product?.displayName || brief?.productIdentity?.displayName || '';
+
+  if (!productName) {
+    return 'Additional verified product information is required. No product name identified.';
+  }
+
+  if (features.length < minFeatures) {
+    return 'Additional verified product information is required. Insufficient feature data for content generation.';
+  }
+
+  if (benefits.length < minBenefits) {
+    return 'Additional verified product information is required. Insufficient benefit data for content generation.';
+  }
+
+  return null;
+}
+
 export function getEvidenceForTrend(brief) {
   const hasTrendKeywords = brief.verifiedKeywords?.some(k => k.keyword && (k.volume || k.difficulty)) || false;
   const hasWebData = brief.evidenceSources?.websiteScrape || false;

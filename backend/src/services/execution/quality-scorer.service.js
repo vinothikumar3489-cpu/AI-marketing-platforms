@@ -539,19 +539,101 @@ const QUALITY_CHECKS = {
       return rule(content);
     },
   },
+  storytellingQuality: {
+    label: 'Storytelling quality',
+    check: (content, brief, assetType) => {
+      const text = JSON.stringify(content).toLowerCase();
+      const hookIndicators = ['imagine', 'picture this', 'have you ever', 'what if', 'the problem', 'struggle', 'frustrat', 'challenge'];
+      const problemIndicators = ['problem', 'issue', 'pain point', 'struggle with', 'difficult', 'hard to', 'waste'];
+      const solutionIndicators = ['solution', 'solves', 'resolves', 'fix', 'address', 'platform', 'tool', 'approach', 'method'];
+      const outcomeIndicators = ['result', 'outcome', 'benefit', 'improve', 'increase', 'reduce', 'save', 'achieve', 'success'];
+      const emotionalLanguage = ['frustrat', 'excit', 'amaz', 'transform', 'empower', 'struggle', 'delight', 'surpris', 'inspire'];
+      const hooks = hookIndicators.filter(w => text.includes(w)).length;
+      const problems = problemIndicators.filter(w => text.includes(w)).length;
+      const solutions = solutionIndicators.filter(w => text.includes(w)).length;
+      const outcomes = outcomeIndicators.filter(w => text.includes(w)).length;
+      const emotions = emotionalLanguage.filter(w => text.includes(w)).length;
+      const evidence = [];
+      if (hooks > 0) evidence.push('hook present');
+      if (problems > 0) evidence.push('problem stated');
+      if (solutions > 0) evidence.push('solution presented');
+      if (outcomes > 0) evidence.push('outcome described');
+      if (emotions > 0) evidence.push('emotional language');
+      const narrativeScore = hooks + problems + solutions + outcomes + emotions;
+      if (narrativeScore === 0) return { status: 'needs_review', detail: 'No narrative elements detected — content lacks storytelling structure' };
+      if (narrativeScore < 4) return { status: 'needs_review', detail: `Weak storytelling: ${evidence.join(', ')}` };
+      return { status: 'passed', detail: `Strong storytelling: ${evidence.join(', ')}` };
+    },
+  },
+  persuasiveness: {
+    label: 'Persuasiveness',
+    check: (content, brief, assetType) => {
+      const text = JSON.stringify(content).toLowerCase();
+      const benefitWords = ['benefit', 'advantage', 'value', 'roi', 'save', 'increase', 'improve', 'grow', 'accelerate', 'optimize'];
+      const valueProps = ['because', 'which means', 'so you can', 'enables', 'allows', 'helps', 'empowers'];
+      const credibilitySignals = ['researched', 'study', 'survey', 'data', 'industry report', 'analyst', 'certified', 'award', 'patent', 'tested', 'proven'];
+      const benefits = benefitWords.filter(w => text.includes(w)).length;
+      const props = valueProps.filter(w => text.includes(w)).length;
+      const credibility = credibilitySignals.filter(w => text.includes(w)).length;
+      const evidence = [];
+      if (benefits > 0) evidence.push(`${benefits} benefit statement(s)`);
+      if (props > 0) evidence.push(`${props} value proposition(s)`);
+      if (credibility > 0) evidence.push(`${credibility} credibility signal(s)`);
+      const total = benefits + props + credibility;
+      if (total === 0) return { status: 'needs_review', detail: 'No persuasive elements found — add benefit-driven arguments and value propositions' };
+      if (total < 3) return { status: 'needs_review', detail: `Weak persuasiveness: ${evidence.join(', ')}` };
+      return { status: 'passed', detail: `Strong persuasiveness: ${evidence.join(', ')}` };
+    },
+  },
+  originalityScore: {
+    label: 'Originality',
+    check: (content, brief, assetType) => {
+      const contentStr = JSON.stringify(content).toLowerCase();
+      const fillerPhrases = [
+        "in today's world", "in today's digital", "in today's fast-paced",
+        'as we all know', "it's no secret",
+        'when it comes to', 'in the realm of',
+        "it's important to note", 'it goes without saying',
+        'needless to say', 'at the end of the day',
+        "it's worth mentioning", 'in conclusion',
+        'to sum up', 'in summary',
+        'revolutionary', 'game-changing', 'game changer',
+        'cutting-edge', 'state-of-the-art',
+        'thought leader', 'thought leadership',
+        'paradigm shift', 'disruptive',
+        'empower', 'synergy', 'leverage', 'holistic',
+        'robust', 'streamline', 'scalable',
+      ];
+      const foundFillers = fillerPhrases.filter(phrase => contentStr.includes(phrase));
+      const sentences = contentStr.split(/[.!?]+/).filter(Boolean);
+      let repetitiveCount = 0;
+      const starts = sentences.map(s => s.trim().split(/\s+/).slice(0, 3).join(' '));
+      const startCounts = {};
+      starts.forEach(s => { startCounts[s] = (startCounts[s] || 0) + 1; });
+      repetitiveCount = Object.values(startCounts).filter(c => c > 2).length;
+      if (foundFillers.length > 3) return { status: 'needs_review', detail: `${foundFillers.length} generic AI phrases detected — rewrite for originality` };
+      if (repetitiveCount > 2) return { status: 'needs_review', detail: `${repetitiveCount} repetitive sentence structures detected` };
+      if (foundFillers.length > 0 || repetitiveCount > 0) {
+        return { status: 'passed', detail: `Minor originality concerns: ${foundFillers.length} filler(s), ${repetitiveCount} repetitive structure(s)` };
+      }
+      return { status: 'passed', detail: 'Content appears original with no generic AI language' };
+    },
+  },
 };
 
 const COMPLETENESS_RULES = {
   linkedin_post: ['hook', 'bodyParagraphs', 'insight', 'proof', 'cta', 'hashtags', 'visualBrief'],
-  instagram_post: ['hook', 'caption', 'visualBrief'],
+  instagram_post: ['hook', 'caption', 'visualBrief', 'hashtags'],
   twitter_post: ['post'],
-  facebook_post: ['headline', 'body', 'cta'],
-  youtube_description: ['openingHook', 'description'],
-  email_copy: ['subject', 'greeting', 'bodyParagraphs', 'ctaText', 'closing'],
-  blog_article: ['title', 'article'],
-  landing_page: ['headline', 'body', 'cta'],
-  creative_brief: ['objective', 'audience', 'visualDirection'],
-  video_script: ['duration', 'scenes'],
+  facebook_post: ['headline', 'body', 'cta', 'visualBrief'],
+  youtube_description: ['openingHook', 'description', 'title', 'cta'],
+  email_copy: ['subject', 'greeting', 'bodyParagraphs', 'ctaText', 'closing', 'preheader'],
+  blog_article: ['title', 'introduction', 'sections', 'conclusion', 'cta'],
+  landing_page: ['headline', 'heroCTA', 'features', 'benefits', 'socialProof'],
+  creative_brief: ['objective', 'audience', 'visualDirection', 'tone', 'keyMessage'],
+  video_script: ['duration', 'scenes', 'title', 'cta'],
+  faq_page: ['headline', 'faqs', 'introduction'],
+  comparison_page: ['headline', 'comparisonTable', 'features', 'cta'],
 };
 
 const PLATFORM_QUALITY_RULES = {
@@ -567,6 +649,27 @@ const PLATFORM_QUALITY_RULES = {
     if (!hasAudience) return { status: 'needs_review', detail: 'Facebook post lacks audience relevance language' };
     return { status: 'passed', detail: 'Facebook quality checks passed' };
   },
+  instagram_post: (content) => {
+    const caption = content.caption || '';
+    if (caption.length < 10) return { status: 'blocked', detail: 'Instagram caption too short' };
+    if (caption.length > 2200) return { status: 'needs_review', detail: `Instagram caption ${caption.length} chars — max recommended 2200` };
+    const hashtags = content.hashtags || [];
+    if (hashtags.length === 0) return { status: 'needs_review', detail: 'Instagram post missing hashtags' };
+    if (hashtags.length > 30) return { status: 'needs_review', detail: `${hashtags.length} hashtags — Instagram max is 30` };
+    if (!content.visualBrief && !content.imagePrompt && !content.visualConcept) {
+      return { status: 'needs_review', detail: 'Instagram post missing visual direction' };
+    }
+    return { status: 'passed', detail: `Instagram checks passed: ${caption.length} chars, ${hashtags.length} hashtags` };
+  },
+  twitter_post: (content) => {
+    const post = content.post || '';
+    if (!post) return { status: 'blocked', detail: 'Twitter post body required' };
+    if (post.length > 280) return { status: 'blocked', detail: `Twitter post exceeds 280 char limit (${post.length} chars)` };
+    if (!content.hook && post.split(/[.!?]+/).filter(Boolean).length < 2) {
+      return { status: 'needs_review', detail: 'Twitter post lacks a strong hook' };
+    }
+    return { status: 'passed', detail: `Twitter checks passed: ${post.length} chars` };
+  },
   youtube_description: (content) => {
     if (content.timestamps && Array.isArray(content.timestamps)) {
       for (const ts of content.timestamps) {
@@ -574,6 +677,9 @@ const PLATFORM_QUALITY_RULES = {
           return { status: 'blocked', detail: `Suspicious timestamp format: "${ts.time}" — timestamps should be MM:SS or HH:MM:SS` };
         }
       }
+    }
+    if (!content.description || content.description.length < 100) {
+      return { status: 'needs_review', detail: 'YouTube description should be at least 100 chars for SEO' };
     }
     return { status: 'passed', detail: 'YouTube quality checks passed' };
   },
@@ -583,10 +689,31 @@ const PLATFORM_QUALITY_RULES = {
     return { status: 'passed', detail: 'LinkedIn quality checks passed' };
   },
   email_copy: (content) => {
-    if (!content.ctaText) return { status: 'blocked', detail: 'Email missing call-to-action' };
-    if (!content.bodyParagraphs || content.bodyParagraphs.length === 0) return { status: 'blocked', detail: 'Email body paragraphs required' };
     if (!content.subject) return { status: 'blocked', detail: 'Email subject line required' };
+    if (!content.preheader && !content.previewText) return { status: 'needs_review', detail: 'Email missing preheader text' };
+    if (!content.bodyParagraphs || content.bodyParagraphs.length === 0) return { status: 'blocked', detail: 'Email body paragraphs required' };
+    if (!content.ctaText && !content.primaryCta && !content.callToAction) return { status: 'blocked', detail: 'Email missing call-to-action' };
+    if (!content.greeting) return { status: 'needs_review', detail: 'Email missing greeting' };
+    if (!content.closing) return { status: 'needs_review', detail: 'Email missing closing' };
     return { status: 'passed', detail: 'Email quality checks passed' };
+  },
+  blog_article: (content) => {
+    if (!content.headline && !content.title) return { status: 'blocked', detail: 'Blog article missing headline' };
+    if (!content.introduction) return { status: 'needs_review', detail: 'Blog article missing introduction' };
+    if (!content.sections || content.sections.length < 2) return { status: 'needs_review', detail: 'Blog article needs at least 2 sections' };
+    if (!content.conclusion) return { status: 'needs_review', detail: 'Blog article missing conclusion' };
+    if (!content.cta) return { status: 'needs_review', detail: 'Blog article missing call-to-action' };
+    const hasEvidence = content.evidenceUsed && content.evidenceUsed.length > 0;
+    if (!hasEvidence) return { status: 'needs_review', detail: 'Blog article missing evidence sources' };
+    return { status: 'passed', detail: 'Blog quality checks passed' };
+  },
+  landing_page: (content) => {
+    if (!content.headline) return { status: 'blocked', detail: 'Landing page missing headline' };
+    if (!content.heroCTA) return { status: 'blocked', detail: 'Landing page missing hero CTA' };
+    if (!content.features || content.features.length < 2) return { status: 'needs_review', detail: 'Landing page needs at least 2 features' };
+    if (!content.benefits || content.benefits.length === 0) return { status: 'needs_review', detail: 'Landing page missing benefits' };
+    if (!content.socialProof || content.socialProof.length === 0) return { status: 'needs_review', detail: 'Landing page missing social proof' };
+    return { status: 'passed', detail: 'Landing page quality checks passed' };
   },
 };
 
@@ -619,5 +746,5 @@ export function scoreContentQuality(content, brief, assetType) {
   };
 }
 
-export { QUALITY_CHECKS };
+export { QUALITY_CHECKS, PLATFORM_QUALITY_RULES };
 export default { scoreContentQuality };

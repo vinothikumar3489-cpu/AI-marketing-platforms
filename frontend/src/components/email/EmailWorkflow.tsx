@@ -415,6 +415,10 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
               html={html}
               plainText={plainText}
               subject={emailData?.subject || ''}
+              previewText={emailData?.previewText || ''}
+              onApprove={templateId ? handleApprove : undefined}
+              onRegenerate={handleRegenerate}
+              approved={approvalStatus === 'APPROVED'}
             />
 
             <SendTest
