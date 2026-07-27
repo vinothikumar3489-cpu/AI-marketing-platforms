@@ -1104,7 +1104,7 @@ function TimelineSection({
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div>
                   <div style={{ fontSize: '11px', color: '#6b7a93', fontWeight: 600, marginBottom: '2px' }}>{fieldLabels.primaryCta}</div>
-                  {renderField(item, 'primaryCta')}
+                  {(() => { const cta = item.callToAction || item.primaryCta; return cta?.label ? `${cta.label} → ${cta.url || '#'}` : (cta || ''); })()}
                 </div>
                 <div>
                   <div style={{ fontSize: '11px', color: '#6b7a93', fontWeight: 600, marginBottom: '2px' }}>Greeting</div>
