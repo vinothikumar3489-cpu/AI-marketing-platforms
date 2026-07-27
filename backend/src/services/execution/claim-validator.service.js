@@ -163,6 +163,29 @@ function autoRewrite(text) {
   return result;
 }
 
+function sentenceSplit(text) {
+  const sentences = [];
+  const re = /[^.!?\n]+[.!?]*(\s|$)/g;
+  let match;
+  while ((match = re.exec(text)) !== null) {
+    sentences.push(match[0].trim());
+  }
+  return sentences.length > 0 ? sentences : [text.trim()];
+}
+
+function removeOffendingSentences(text) {
+  if (typeof text !== 'string' || !text) return text;
+  const sentences = sentenceSplit(text);
+  const kept = sentences.filter(s => {
+    const trimmed = s.trim();
+    if (!trimmed) return false;
+    return !containsHallucination(trimmed) && !containsFakeMetric(trimmed);
+  });
+  if (kept.length === sentences.length) return text;
+  if (kept.length === 0) return null;
+  return kept.join(' ').trim();
+}
+
 function traverseAndClean(obj, path = '', findings = []) {
   if (!obj || typeof obj !== 'object') return findings;
 
@@ -181,14 +204,26 @@ function traverseAndClean(obj, path = '', findings = []) {
             action: 'rewritten',
           });
           obj[key] = rewritten;
-        } else if (containsHallucination(value)) {
-          obj[key] = '[Content removed — unsupported claim]';
-          findings.push({
-            path: currentPath,
-            issue: 'hallucinated_pattern',
-            text: value.substring(0, 100),
-            action: 'removed',
-          });
+        } else {
+          const cleaned = removeOffendingSentences(value);
+          if (cleaned === null) {
+            obj[key] = '[Content removed — unsupported claim]';
+            findings.push({
+              path: currentPath,
+              issue: 'all_sentences_removed',
+              text: value.substring(0, 100),
+              action: 'removed',
+            });
+          } else if (cleaned !== value) {
+            obj[key] = cleaned;
+            findings.push({
+              path: currentPath,
+              issue: 'hallucinated_pattern',
+              text: value.substring(0, 100),
+              rewritten: cleaned.substring(0, 100),
+              action: 'rewritten',
+            });
+          }
         }
       }
     } else if (Array.isArray(value)) {

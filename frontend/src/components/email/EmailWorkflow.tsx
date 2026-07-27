@@ -14,6 +14,7 @@ import {
   getEmailDeliveryStatus,
   generateEmailHtml,
   generateEmailPlainText,
+  getEmailTemplate,
 } from '../../lib/api';
 import { EmailEditor } from './EmailEditor';
 
@@ -90,7 +91,8 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
     firstName: recipient.firstName, lastName: recipient.lastName,
     company: recipient.companyName, companyName: recipient.companyName,
     sender: emailConfig.sender.name, senderName: emailConfig.sender.name,
-    product: '', website: '',
+    product: emailData?.productIdentity?.displayName || emailData?.productName || '',
+    website: emailData?.productIdentity?.domain || emailData?.website || '',
   };
 
   const handleGenerate = async () => {
@@ -119,12 +121,13 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
 
   useEffect(() => {
     if (initialContent && !emailData) {
-      setEmailData(initialContent);
       setHtml(initialContent._htmlTemplate || initialContent.html || '');
       setPlainText(initialContent._plainText || initialContent.plainText || '');
       setTemplateId(initialContent.templateId || null);
       setApprovalStatus(initialContent._approvalStatus || initialContent.approvalStatus || 'DRAFT');
       if (initialContent.emailType) setEmailConfig(p => ({ ...p, emailType: initialContent.emailType, goal: initialContent.goal || p.goal, tone: initialContent.tone || p.tone, audience: initialContent.audience || p.audience }));
+      const pf = initialContent.personalizationFields || {};
+      setEmailData({ ...initialContent, ...pf });
     }
   }, [initialContent]);
 
@@ -139,12 +142,32 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
     finally { setDeliveryLoading(false); }
   };
 
+  const mergeTemplateIntoEmailData(template: any) {
+    if (!template) return;
+    const pf = template.personalizationFields || {};
+    setEmailData(prev => ({
+      ...prev,
+      ...pf,
+      _approvalStatus: template.approvalStatus || pf.approvalStatus || 'DRAFT',
+      _htmlTemplate: template.emailBodyHtml || prev?._htmlTemplate || '',
+      _plainText: template.emailBodyText || prev?._plainText || '',
+      templateId: template.id,
+    }));
+    if (template.emailBodyHtml) setHtml(template.emailBodyHtml);
+    if (template.emailBodyText) setPlainText(template.emailBodyText);
+  }
+
   const handleSaveDraft = async () => {
     if (!selectedChatId || !emailData) return;
     try {
       const dataToSave = { ...emailData, html, plainText, config: emailConfig, recipient };
       const result = templateId ? await updateEmailTemplate(templateId, dataToSave) : await saveEmailDraft(selectedChatId, dataToSave);
-      if (result.success) { setTemplateId(result.template?.id || result.data?.id); setApprovalStatus('DRAFT'); }
+      if (result.success) {
+        const id = result.template?.id || result.data?.id;
+        setTemplateId(id);
+        if (result.template) mergeTemplateIntoEmailData(result.template);
+        if (!isApproved) setApprovalStatus('DRAFT');
+      }
     } catch (err: any) { setError(err.message || 'Failed to save draft'); }
   };
 
@@ -152,7 +175,12 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
     if (!templateId) return;
     try {
       const r = await approveEmailTemplate(templateId);
-      if (r.success) setApprovalStatus('APPROVED');
+      if (r.success) {
+        setApprovalStatus('APPROVED');
+        if (r.template) mergeTemplateIntoEmailData(r.template);
+        const refreshed = await getEmailTemplate(templateId);
+        if (refreshed.success && refreshed.template) mergeTemplateIntoEmailData(refreshed.template);
+      }
     } catch (err: any) { setError(err.message || 'Approve failed'); }
   };
 
