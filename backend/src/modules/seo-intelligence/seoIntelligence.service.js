@@ -1,6 +1,6 @@
 import { prisma } from '../../config/prisma.js';
 import fetch from 'node-fetch';
-import { scrapeWebsite } from '../../services/scraping/unified-scraper.service.js';
+import { scrapeWebsite } from '../../domains/research/services/scraper.service.js';
 import { analyzeTechnicalSeo } from '../../services/scraping/technical-seo-analyzer.service.js';
 import { calculateSeoScores, generatePriorityRecommendations } from '../../services/scoring/seo-scorer.service.js';
 import { generateKeywordIntelligence } from '../../services/seo/keyword-intelligence.service.js';

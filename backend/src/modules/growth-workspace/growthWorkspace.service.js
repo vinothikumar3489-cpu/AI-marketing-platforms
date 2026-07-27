@@ -1,6 +1,6 @@
 import { prisma } from '../../config/prisma.js';
 import fetch from 'node-fetch';
-import { scrapeWebsite } from '../../services/scraping/unified-scraper.service.js';
+import { scrapeWebsite } from '../../domains/research/services/scraper.service.js';
 import { 
   generateProductFallback, 
   generateMarketFallback, 
