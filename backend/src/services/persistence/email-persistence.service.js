@@ -35,7 +35,7 @@ export async function saveEmailDraft(userId, chatId, emailData) {
       userId,
       chatId,
       category: emailType,
-      subjectLine: subject,
+      subjectLine: subject || emailData.headline || emailData.subjectLine || 'Untitled',
       previewText,
       emailBodyText: plainText,
       emailBodyHtml: html,
@@ -106,7 +106,7 @@ export async function updateEmailTemplate(templateId, userId, emailData) {
       data: {
         name: subject || existing.name,
         category: emailType,
-        subjectLine: subject,
+        subjectLine: subject || emailData.headline || emailData.subjectLine || 'Untitled',
         previewText,
         emailBodyText: plainText,
         emailBodyHtml: html,

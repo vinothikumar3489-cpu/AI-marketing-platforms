@@ -22,7 +22,7 @@ export async function deliverEmail({ templateId, chatId, userId, recipientEmail,
     const pf = emailData.personalizationFields || emailData;
     const template = emailData;
 
-    const subject = template.subjectLine || template.subject || pf.subject || '';
+    const subject = template.subjectLine || template.subject || pf.subject || pf.headline || template.headline || '';
     let htmlContent = template.emailBodyHtml || template.html || pf.html || '';
     let textContent = template.emailBodyText || template.plainText || pf.plainText || '';
 
