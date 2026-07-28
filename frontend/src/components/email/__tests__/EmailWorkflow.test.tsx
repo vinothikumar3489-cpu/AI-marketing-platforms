@@ -500,8 +500,7 @@ describe('EmailWorkflow Integration', () => {
   test('should render complete email workflow', () => {
     const { getByText } = render(<EmailWorkflow />);
 
-    expect(getByText('Email Configuration')).toBeInTheDocument();
-    expect(getByText('Recipient Information')).toBeInTheDocument();
+    expect(getByText('Configuration')).toBeInTheDocument();
   });
 
   test('should generate email when generate button is clicked', async () => {

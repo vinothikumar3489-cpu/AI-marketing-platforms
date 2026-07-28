@@ -60,7 +60,7 @@ export default function EmailBuilderPage() {
         html: generateHtmlPreview()
       };
       
-      const res = await api.post(`/email/${selectedChatId}/draft`, emailData);
+      const res = await api.post(`/content/email/${selectedChatId}/draft`, emailData);
       if (res.success) {
         alert('Draft saved successfully!');
       } else {

@@ -12,6 +12,7 @@ const VALIDATION_RESULT = {
   valid: false,
   blockingIssues: [],
   warnings: [],
+  advisoryWarnings: [],
   score: 0,
   checks: {}
 };
@@ -79,12 +80,17 @@ export function validateEmail(emailData, context = {}) {
 
   // Aggregate results
   result.blockingIssues = Object.values(result.checks)
-    .filter(check => check.status === 'blocked')
+    .filter(check => check.isBlocking === true)
     .map(check => check.message);
-  
+
   result.warnings = Object.values(result.checks)
-    .filter(check => check.status === 'warning')
+    .filter(check => check.status === 'warning' && check.isBlocking !== true)
     .map(check => check.message);
+
+  result.advisoryWarnings = Object.values(result.checks)
+    .filter(check => check.status === 'warning' || check.status === 'passed')
+    .filter(check => !check.isBlocking)
+    .map(check => ({ message: check.message, score: check.score, severity: check.severity || 'ADVISORY' }));
 
   result.valid = result.blockingIssues.length === 0;
   result.score = calculateValidationScore(result.checks);
@@ -193,6 +199,8 @@ function checkCtaClarity(emailData) {
   if (!cta || !cta.label) {
     return {
       status: 'blocked',
+      isBlocking: true,
+      severity: 'BLOCKING',
       message: 'Primary CTA is missing or has no label',
       score: 0
     };
@@ -201,29 +209,33 @@ function checkCtaClarity(emailData) {
   if (!cta.url) {
     return {
       status: 'blocked',
+      isBlocking: true,
+      severity: 'BLOCKING',
       message: 'Primary CTA URL is missing',
       score: 0
     };
   }
 
-  // Check if URL is valid
   try {
     new URL(cta.url);
   } catch (e) {
     return {
       status: 'blocked',
+      isBlocking: true,
+      severity: 'BLOCKING',
       message: 'Primary CTA URL is invalid',
       score: 0
     };
   }
 
-  // Check CTA label clarity
   const actionWords = ['get', 'start', 'try', 'sign up', 'register', 'download', 'learn', 'discover', 'explore'];
   const hasActionWord = actionWords.some(word => cta.label.toLowerCase().includes(word));
 
   if (!hasActionWord) {
     return {
       status: 'warning',
+      isBlocking: false,
+      severity: 'ADVISORY',
       message: 'CTA label could be more action-oriented',
       score: 70
     };
@@ -231,6 +243,8 @@ function checkCtaClarity(emailData) {
 
   return {
     status: 'passed',
+    isBlocking: false,
+    severity: 'INFO',
     message: 'CTA is clear and actionable with valid URL',
     score: 100
   };
@@ -436,6 +450,8 @@ function checkSubjectQuality(emailData) {
   if (!subject) {
     return {
       status: 'blocked',
+      isBlocking: true,
+      severity: 'BLOCKING',
       message: 'Subject line is missing',
       score: 0
     };
@@ -443,27 +459,32 @@ function checkSubjectQuality(emailData) {
 
   if (subject.length > 70) {
     return {
-      status: 'blocked',
+      status: 'warning',
+      isBlocking: false,
+      severity: 'ADVISORY',
       message: 'Subject line exceeds 70 character limit',
-      score: 0
+      score: 50
     };
   }
 
   if (subject.length < 10) {
     return {
       status: 'warning',
+      isBlocking: false,
+      severity: 'ADVISORY',
       message: 'Subject line is too short',
       score: 50
     };
   }
 
-  // Check for compelling words
   const compellingWords = ['new', 'exclusive', 'limited', 'free', 'save', 'discover', 'unlock', 'get'];
   const hasCompellingWord = compellingWords.some(word => subject.toLowerCase().includes(word));
 
   if (hasCompellingWord) {
     return {
       status: 'passed',
+      isBlocking: false,
+      severity: 'INFO',
       message: 'Subject line is compelling and within limits',
       score: 100
     };
@@ -471,6 +492,8 @@ function checkSubjectQuality(emailData) {
 
   return {
     status: 'warning',
+    isBlocking: false,
+    severity: 'ADVISORY',
     message: 'Subject line could be more compelling',
     score: 75
   };
@@ -485,15 +508,19 @@ function checkPreviewTextQuality(emailData) {
 
   if (!previewText) {
     return {
-      status: 'blocked',
+      status: 'warning',
+      isBlocking: false,
+      severity: 'ADVISORY',
       message: 'Preview text is missing',
-      score: 0
+      score: 50
     };
   }
 
   if (previewText.length > 150) {
     return {
       status: 'blocked',
+      isBlocking: true,
+      severity: 'BLOCKING',
       message: 'Preview text exceeds 150 character limit',
       score: 0
     };
@@ -502,6 +529,8 @@ function checkPreviewTextQuality(emailData) {
   if (previewText.length < 20) {
     return {
       status: 'warning',
+      isBlocking: false,
+      severity: 'ADVISORY',
       message: 'Preview text is too short',
       score: 50
     };
@@ -509,6 +538,8 @@ function checkPreviewTextQuality(emailData) {
 
   return {
     status: 'passed',
+    isBlocking: false,
+    severity: 'INFO',
     message: 'Preview text is within limits and appropriate length',
     score: 100
   };
@@ -600,14 +631,18 @@ function checkSpamRisk(emailData) {
 function checkUnsubscribeText(emailData) {
   if (!emailData.unsubscribeText) {
     return {
-      status: 'blocked',
-      message: 'Unsubscribe text is missing (required for compliance)',
-      score: 0
+      status: 'warning',
+      isBlocking: false,
+      severity: 'ADVISORY',
+      message: 'Unsubscribe text is missing (recommended for compliance)',
+      score: 50
     };
   }
 
   return {
     status: 'passed',
+    isBlocking: false,
+    severity: 'INFO',
     message: 'Unsubscribe text is present',
     score: 100
   };
@@ -655,16 +690,19 @@ function checkRecipient(emailData) {
   if (!recipient || !recipient.email) {
     return {
       status: 'blocked',
+      isBlocking: true,
+      severity: 'BLOCKING',
       message: 'Recipient email is missing',
       score: 0
     };
   }
 
-  // Validate email format
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(recipient.email)) {
     return {
       status: 'blocked',
+      isBlocking: true,
+      severity: 'BLOCKING',
       message: 'Recipient email format is invalid',
       score: 0
     };
@@ -672,6 +710,8 @@ function checkRecipient(emailData) {
 
   return {
     status: 'passed',
+    isBlocking: false,
+    severity: 'INFO',
     message: 'Recipient email is present and valid',
     score: 100
   };
@@ -684,50 +724,58 @@ function checkRecipient(emailData) {
 function checkHtmlContent(emailData) {
   if (!emailData.html) {
     return {
-      status: 'blocked',
+      status: 'warning',
+      isBlocking: false,
+      severity: 'ADVISORY',
       message: 'HTML content is missing',
-      score: 0
+      score: 50
     };
   }
 
   if (emailData.html.length < 50) {
     return {
-      status: 'blocked',
+      status: 'warning',
+      isBlocking: false,
+      severity: 'ADVISORY',
       message: 'HTML content is too short',
-      score: 0
+      score: 50
     };
   }
 
   return {
     status: 'passed',
+    isBlocking: false,
+    severity: 'INFO',
     message: 'HTML content is present',
     score: 100
   };
 }
 
-/**
- * Check 17: Missing Plain Text
- * Ensures plain text content is present
- */
 function checkPlainTextContent(emailData) {
   if (!emailData.plainText) {
     return {
-      status: 'blocked',
+      status: 'warning',
+      isBlocking: false,
+      severity: 'ADVISORY',
       message: 'Plain text content is missing',
-      score: 0
+      score: 50
     };
   }
 
   if (emailData.plainText.length < 20) {
     return {
-      status: 'blocked',
+      status: 'warning',
+      isBlocking: false,
+      severity: 'ADVISORY',
       message: 'Plain text content is too short',
-      score: 0
+      score: 50
     };
   }
 
   return {
     status: 'passed',
+    isBlocking: false,
+    severity: 'INFO',
     message: 'Plain text content is present',
     score: 100
   };
@@ -799,13 +847,47 @@ function calculateValidationScore(checks) {
 
 /**
  * Quick validation for blocking issues only (used before sending)
+ * Only checks truly blocking criteria:
+ * - Missing subject
+ * - Missing body content
+ * - Missing CTA
+ * - Missing recipient
+ * Everything else is advisory and does not block sending
  */
 export function validateForSending(emailData) {
-  const fullValidation = validateEmail(emailData);
-  
+  const blockingIssues = [];
+
+  // Check subject
+  if (!emailData.subject || !emailData.subject.trim()) {
+    blockingIssues.push('Subject line is missing');
+  }
+
+  // Check body content
+  const hasBodyContent = (
+    (Array.isArray(emailData.bodyParagraphs) && emailData.bodyParagraphs.length > 0) ||
+    emailData.opening ||
+    emailData.emailBodyText ||
+    emailData.emailBodyHtml
+  );
+  if (!hasBodyContent) {
+    blockingIssues.push('Email body content is missing');
+  }
+
+  // Check CTA
+  const cta = emailData.callToAction || emailData.primaryCta;
+  if (!cta || !cta.label || !cta.url) {
+    blockingIssues.push('Primary CTA is missing or incomplete');
+  }
+
+  // Check recipient for sending
+  const recipient = emailData.recipient || {};
+  if (!recipient.email && !emailData.to) {
+    blockingIssues.push('Recipient email is missing');
+  }
+
   return {
-    canSend: fullValidation.valid,
-    blockingIssues: fullValidation.blockingIssues,
-    score: fullValidation.score
+    canSend: blockingIssues.length === 0,
+    blockingIssues,
+    score: blockingIssues.length > 0 ? 0 : 100
   };
 }

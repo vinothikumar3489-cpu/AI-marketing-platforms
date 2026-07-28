@@ -854,12 +854,48 @@ function localPolishContent(content, assetType, qualityResult, brief) {
         return text;
       });
     }
-    if (lowDims.includes('productAccuracy') && polished.bodyParagraphs) {
-      const productName = polished._productName || polished.productName;
-      if (productName) {
-        const nameCount = JSON.stringify(polished.bodyParagraphs).split(productName).length - 1;
-        if (nameCount < 2 && polished.bodyParagraphs.length > 1) {
-          polished.bodyParagraphs[1] = `${polished.bodyParagraphs[1]} ${productName} helps teams achieve better outcomes through its focused approach.`;
+    if (lowDims.includes('productAccuracy')) {
+      const productName = (polished._productName || polished.productName || polished.productIdentity?.displayName || '').toLowerCase();
+      if (productName && productName.length > 2 && productName !== 'n/a' && productName !== 'this solution') {
+        const allText = JSON.stringify(polished).toLowerCase();
+        const nameCount = (allText.match(new RegExp(productName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+        const totalWords = allText.split(/\s+/).length;
+        const maxMentions = totalWords < 300 ? 4 : totalWords < 500 ? 6 : 8;
+
+        if (nameCount > maxMentions) {
+          const alternatives = ['the platform', 'our solution', 'our platform', 'this solution', 'our software', 'the solution', 'this platform', 'our system'];
+          let altIdx = 0;
+
+          if (polished.bodyParagraphs) {
+            polished.bodyParagraphs = polished.bodyParagraphs.map(p => {
+              let text = p;
+              const re = new RegExp(`\\b${productName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+              const matches = text.match(re);
+              if (matches && matches.length > 1) {
+                text = text.replace(re, (match, offset) => {
+                  if (offset > 0 && altIdx < alternatives.length) {
+                    const alt = alternatives[altIdx % alternatives.length];
+                    altIdx++;
+                    return alt;
+                  }
+                  return match;
+                });
+              }
+              return text;
+            });
+          }
+          if (polished.opening) {
+            const re = new RegExp(`\\b${productName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+            const matches = polished.opening.match(re);
+            if (matches && matches.length > 1) {
+              polished.opening = polished.opening.replace(re, (match, offset) => {
+                if (offset > 10 && altIdx < alternatives.length) {
+                  return alternatives[altIdx++ % alternatives.length];
+                }
+                return match;
+              });
+            }
+          }
         }
       }
     }

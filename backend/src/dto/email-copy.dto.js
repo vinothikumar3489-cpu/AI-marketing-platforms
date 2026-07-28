@@ -220,7 +220,7 @@ export const PERSONALIZATION_VARIABLES = [
  * Supports both AI-generator naming (features, primaryCta, painPoint, variables)
  * and legacy DTO naming (featureHighlights, callToAction, problem, personalizationVariables)
  */
-function normalizeEmailData(data) {
+export function normalizeEmailData(data) {
   if (!data || typeof data !== 'object') return data;
   const n = { ...data };
 

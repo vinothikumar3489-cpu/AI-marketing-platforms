@@ -1243,6 +1243,12 @@ model EmailTemplate {
   emailBodyHtml         String? @db.Text
   responsiveHtml        String? @db.Text
   personalizationFields Json?
+  approvalStatus        String  @default("DRAFT")
+  approvedAt            DateTime?
+  quality               Json?
+  contentAssetId        String?
+  generationStatus      String  @default("pending")
+  lastError             String? @db.Text
 
   // Brand settings
   senderName     String?

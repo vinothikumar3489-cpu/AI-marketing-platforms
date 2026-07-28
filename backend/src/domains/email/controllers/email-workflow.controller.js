@@ -1,75 +1,56 @@
-/**
- * Email Workflow Controller
- * Handles email generation, validation, approval, sending, and scheduling
- */
-
 import { generateEmailCopy } from "../../../services/execution/content-studio.service.js";
 import { validateEmail, validateForSending } from "../../../services/email/email-validator.service.js";
 import { generateEmailHtmlTemplate, generatePlainTextFromEmailData } from "../../../services/email/email-html-generator.service.js";
 import { sendTransactionalEmail, sendTestEmail, scheduleEmail, cancelScheduledEmail, getDeliveryStatus as getBrevoDeliveryStatus } from '../../../services/providers/email/brevo.provider.js';
-import { 
-  saveEmailDraft, 
-  updateEmailTemplate, 
-  approveEmailTemplate, 
-  rejectEmailTemplate, 
-  getEmailTemplate, 
-  listEmailTemplates,
-  deleteEmailTemplate,
-  saveDeliveryRecord,
-  getDeliveryStatus
+import {
+  saveEmailDraft, updateEmailTemplate, approveEmailTemplate,
+  rejectEmailTemplate, getEmailTemplate, listEmailTemplates,
+  deleteEmailTemplate, saveDeliveryRecord, getDeliveryStatus
 } from "../../../services/persistence/email-persistence.service.js";
-import { replacePersonalizationVariables } from "../../../dto/email-copy.dto.js";
+import { replacePersonalizationVariables, normalizeEmailData } from "../../../dto/email-copy.dto.js";
 import prisma from "../../../config/prisma.js";
 
-/**
- * Generate email content
- */
 export async function generateEmail(req, res) {
   try {
     const { chatId } = req.params;
     const userId = req.user.id;
     const brief = req.body;
 
-    // Verify chat ownership
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
-    if (!chat) {
-      return res.status(404).json({ success: false, error: 'Chat not found' });
-    }
+    if (!chat) return res.status(404).json({ success: false, error: 'Chat not found' });
 
-    // Add product identity from chat if available
     if (!brief.productIdentity) {
       const analysis = await prisma.analysis.findFirst({
-        where: { chatId },
-        orderBy: { createdAt: 'desc' }
+        where: { chatId }, orderBy: { createdAt: 'desc' }
       });
       if (analysis) {
         brief.productIdentity = {
-          displayName: analysis.productName,
-          internalName: analysis.productName,
-          brandName: analysis.brandName,
-          domain: analysis.domain
+          displayName: analysis.productName, internalName: analysis.productName,
+          brandName: analysis.brandName, domain: analysis.domain
         };
       }
     }
 
     const emailContent = await generateEmailCopy(brief);
+    if (!emailContent) return res.status(500).json({ success: false, error: 'Email generation failed' });
 
-    if (!emailContent) {
-      return res.status(500).json({ success: false, error: 'Email generation failed' });
-    }
-
-    // Validate generated content
     const validation = validateEmail(emailContent, {
       productName: brief.productIdentity?.displayName,
       audienceIntelligence: brief.targetPersonas
     });
 
     emailContent.quality = validation;
+    emailContent._qualityScore = validation.score;
+    emailContent._qualityLabel = validation.score >= 87 ? 'Excellent' : validation.score >= 70 ? 'Good' : 'Needs Improvement';
+    emailContent._qualityDetails = validation.checks;
 
     return res.json({
       success: true,
+      status: 'generated',
       email: emailContent,
-      validation
+      validation,
+      quality: { score: validation.score, checks: validation.checks, warnings: validation.warnings },
+      approvalStatus: 'DRAFT'
     });
   } catch (error) {
     console.error('[EmailWorkflow] Generate error:', error.message);
@@ -77,9 +58,6 @@ export async function generateEmail(req, res) {
   }
 }
 
-/**
- * Validate email content
- */
 export async function validateEmailContent(req, res) {
   try {
     const emailData = req.body;
@@ -87,12 +65,13 @@ export async function validateEmailContent(req, res) {
       productName: emailData.productIdentity?.displayName,
       audienceIntelligence: req.body.audienceIntelligence
     };
-
     const validation = validateEmail(emailData, context);
 
     return res.json({
       success: true,
-      validation
+      validation,
+      quality: { score: validation.score, checks: validation.checks, warnings: validation.warnings },
+      approvalStatus: validation.valid ? 'DRAFT' : 'DRAFT'
     });
   } catch (error) {
     console.error('[EmailWorkflow] Validate error:', error.message);
@@ -100,27 +79,28 @@ export async function validateEmailContent(req, res) {
   }
 }
 
-/**
- * Save email draft
- */
 export async function saveDraft(req, res) {
   try {
     const { chatId } = req.params;
     const userId = req.user.id;
     const emailData = req.body;
 
-    // Verify chat ownership
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
-    if (!chat) {
-      return res.status(404).json({ success: false, error: 'Chat not found' });
-    }
+    if (!chat) return res.status(404).json({ success: false, error: 'Chat not found' });
 
     const result = await saveEmailDraft(userId, chatId, emailData);
-
     if (result.success) {
-      return res.json(result);
+      return res.json({
+        success: true,
+        status: 'saved',
+        assetId: result.assetId,
+        template: result.template,
+        approvalStatus: result.approvalStatus || 'DRAFT',
+        quality: result.template?.quality || null,
+        validation: result.template?.personalizationFields?.quality || null,
+        draftId: result.template?.id
+      });
     }
-
     return res.status(500).json(result);
   } catch (error) {
     console.error('[EmailWorkflow] Save draft error:', error.message);
@@ -128,9 +108,6 @@ export async function saveDraft(req, res) {
   }
 }
 
-/**
- * Update email template
- */
 export async function updateTemplate(req, res) {
   try {
     const { templateId } = req.params;
@@ -138,11 +115,16 @@ export async function updateTemplate(req, res) {
     const emailData = req.body;
 
     const result = await updateEmailTemplate(templateId, userId, emailData);
-
     if (result.success) {
-      return res.json(result);
+      return res.json({
+        success: true,
+        status: 'updated',
+        assetId: result.assetId,
+        template: result.template,
+        approvalStatus: result.approvalStatus || 'DRAFT',
+        quality: result.template?.quality || null
+      });
     }
-
     return res.status(400).json(result);
   } catch (error) {
     console.error('[EmailWorkflow] Update template error:', error.message);
@@ -150,20 +132,23 @@ export async function updateTemplate(req, res) {
   }
 }
 
-/**
- * Approve email template
- */
 export async function approveTemplate(req, res) {
   try {
     const { templateId } = req.params;
     const userId = req.user.id;
 
     const result = await approveEmailTemplate(templateId, userId);
-
     if (result.success) {
-      return res.json(result);
+      return res.json({
+        success: true,
+        status: 'approved',
+        approvalStatus: 'APPROVED',
+        assetId: result.assetId,
+        template: result.template,
+        quality: result.template?.quality || null,
+        message: result.message
+      });
     }
-
     return res.status(400).json(result);
   } catch (error) {
     console.error('[EmailWorkflow] Approve template error:', error.message);
@@ -171,9 +156,6 @@ export async function approveTemplate(req, res) {
   }
 }
 
-/**
- * Reject email template
- */
 export async function rejectTemplate(req, res) {
   try {
     const { templateId } = req.params;
@@ -181,11 +163,17 @@ export async function rejectTemplate(req, res) {
     const { reason } = req.body;
 
     const result = await rejectEmailTemplate(templateId, userId, reason);
-
     if (result.success) {
-      return res.json(result);
+      return res.json({
+        success: true,
+        status: 'rejected',
+        approvalStatus: 'REJECTED',
+        assetId: result.assetId,
+        template: result.template,
+        quality: result.template?.quality || null,
+        message: result.message
+      });
     }
-
     return res.status(400).json(result);
   } catch (error) {
     console.error('[EmailWorkflow] Reject template error:', error.message);
@@ -193,20 +181,23 @@ export async function rejectTemplate(req, res) {
   }
 }
 
-/**
- * Get email template
- */
 export async function getTemplate(req, res) {
   try {
     const { templateId } = req.params;
     const userId = req.user.id;
 
     const result = await getEmailTemplate(templateId, userId);
-
     if (result.success) {
-      return res.json(result);
+      return res.json({
+        success: true,
+        status: 'found',
+        template: result.template,
+        approvalStatus: result.approvalStatus,
+        assetId: result.assetId,
+        quality: result.quality,
+        validation: result.validation
+      });
     }
-
     return res.status(404).json(result);
   } catch (error) {
     console.error('[EmailWorkflow] Get template error:', error.message);
@@ -214,9 +205,6 @@ export async function getTemplate(req, res) {
   }
 }
 
-/**
- * List email templates
- */
 export async function listTemplates(req, res) {
   try {
     const { chatId } = req.params;
@@ -224,7 +212,6 @@ export async function listTemplates(req, res) {
     const filters = req.query;
 
     const result = await listEmailTemplates(userId, chatId, filters);
-
     return res.json(result);
   } catch (error) {
     console.error('[EmailWorkflow] List templates error:', error.message);
@@ -232,20 +219,13 @@ export async function listTemplates(req, res) {
   }
 }
 
-/**
- * Delete email template
- */
 export async function deleteTemplate(req, res) {
   try {
     const { templateId } = req.params;
     const userId = req.user.id;
 
     const result = await deleteEmailTemplate(templateId, userId);
-
-    if (result.success) {
-      return res.json(result);
-    }
-
+    if (result.success) return res.json(result);
     return res.status(400).json(result);
   } catch (error) {
     console.error('[EmailWorkflow] Delete template error:', error.message);
@@ -253,324 +233,219 @@ export async function deleteTemplate(req, res) {
   }
 }
 
-/**
- * Send test email
- */
 export async function sendTestEmailHandler(req, res) {
   try {
     const { chatId } = req.params;
     const userId = req.user.id;
     const { templateId, recipientEmail, senderOverride } = req.body;
 
-    // Verify chat ownership
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
-    if (!chat) {
-      return res.status(404).json({ success: false, error: 'Chat not found' });
-    }
+    if (!chat) return res.status(404).json({ success: false, error: 'Chat not found' });
 
-    // Get template
     const templateResult = await getEmailTemplate(templateId, userId);
-    if (!templateResult.success) {
-      return res.status(404).json({ success: false, error: 'Template not found' });
-    }
+    if (!templateResult.success) return res.status(404).json({ success: false, error: 'Template not found' });
 
     const template = templateResult.template;
-
-    // Check if template is approved
     if (template.approvalStatus !== 'APPROVED') {
       return res.status(400).json({ success: false, error: 'Template must be approved before sending' });
     }
 
-    // Validate for sending
-    const emailData = template.structuredContent || template;
+    const emailData = template.personalizationFields || template;
     const validation = validateForSending(emailData);
-
     if (!validation.canSend) {
       return res.status(400).json({ success: false, error: 'Email validation failed', blockingIssues: validation.blockingIssues });
     }
 
-    // Apply personalization
+    const pf = template.personalizationFields || {};
+    const recipient = pf.recipient || {};
+    const productName = pf.productIdentity?.displayName || '';
+
     const personalizedHtml = replacePersonalizationVariables(
-      template.htmlContent || template.emailBodyHtml,
-      template.recipients?.[0],
-      template,
-      template.productIdentity?.displayName
+      template.emailBodyHtml || '', recipient, { name: template.senderName }, productName
     );
-
     const personalizedPlainText = replacePersonalizationVariables(
-      template.plainTextContent || template.emailBodyText,
-      template.recipients?.[0],
-      template,
-      template.productIdentity?.displayName
+      template.emailBodyText || '', recipient, { name: template.senderName }, productName
     );
 
-    // Send test email
-    const sender = senderOverride || {
-      name: template.senderName,
-      email: template.senderEmail
-    };
-
+    const sender = senderOverride || { name: template.senderName, email: template.senderEmail };
     const result = await sendTestEmail({
-      to: recipientEmail,
-      subject: `[TEST] ${template.subject}`,
-      html: personalizedHtml,
-      text: personalizedPlainText,
-      senderName: sender.name,
-      replyTo: template.replyToEmail,
-      tags: ['TEST_EMAIL', template.emailType]
+      to: recipientEmail, subject: `[TEST] ${template.subjectLine}`,
+      html: personalizedHtml, text: personalizedPlainText,
+      senderName: sender.name, replyTo: template.replyToEmail,
+      tags: ['TEST_EMAIL', template.category]
     });
 
     if (result.success) {
-      // Log the test send
       await prisma.automationLog.create({
-        data: {
-          userId,
-          chatId,
-          action: 'email_test_sent',
+        data: { userId, chatId, action: 'email_test_sent',
           message: `Test email sent to ${result.maskedRecipient}`,
-          metadata: { templateId, providerMessageId: result.providerMessageId }
-        }
+          metadata: { templateId, providerMessageId: result.providerMessageId } }
       });
     }
 
-    return res.json(result);
+    return res.json({
+      success: result.success,
+      status: result.success ? 'test_sent' : 'failed',
+      messageId: result.providerMessageId,
+      maskedRecipient: result.maskedRecipient,
+      message: result.message || 'Test email sent'
+    });
   } catch (error) {
     console.error('[EmailWorkflow] Send test email error:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to send test email', details: error.message });
   }
 }
 
-/**
- * Send email now
- */
 export async function sendEmailNow(req, res) {
   try {
     const { chatId } = req.params;
     const userId = req.user.id;
     const { templateId, recipientEmail, senderOverride } = req.body;
 
-    // Verify chat ownership
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
-    if (!chat) {
-      return res.status(404).json({ success: false, error: 'Chat not found' });
-    }
+    if (!chat) return res.status(404).json({ success: false, error: 'Chat not found' });
 
-    // Get template
     const templateResult = await getEmailTemplate(templateId, userId);
-    if (!templateResult.success) {
-      return res.status(404).json({ success: false, error: 'Template not found' });
-    }
+    if (!templateResult.success) return res.status(404).json({ success: false, error: 'Template not found' });
 
     const template = templateResult.template;
-
-    // Check if template is approved
     if (template.approvalStatus !== 'APPROVED') {
       return res.status(400).json({ success: false, error: 'Template must be approved before sending' });
     }
 
-    // Validate for sending
-    const emailData = template.structuredContent || template;
-    const validation = validateForSending(emailData);
-
+    const pf = template.personalizationFields || {};
+    const validation = validateForSending(pf);
     if (!validation.canSend) {
       return res.status(400).json({ success: false, error: 'Email validation failed', blockingIssues: validation.blockingIssues });
     }
 
-    let recipient = template.recipients?.[0] || { email: recipientEmail, id: 'temp-recipient' };
+    const recipient = pf.recipient || { email: recipientEmail };
+    const productName = pf.productIdentity?.displayName || '';
 
-    // Apply personalization
     const personalizedHtml = replacePersonalizationVariables(
-      template.htmlContent || template.emailBodyHtml,
-      recipient,
-      template,
-      template.productIdentity?.displayName
+      template.emailBodyHtml || '', recipient, { name: template.senderName }, productName
     );
-
     const personalizedPlainText = replacePersonalizationVariables(
-      template.plainTextContent || template.emailBodyText,
-      recipient,
-      template,
-      template.productIdentity?.displayName
+      template.emailBodyText || '', recipient, { name: template.senderName }, productName
     );
 
-    // Send email
-    const sender = senderOverride || {
-      name: template.senderName,
-      email: template.senderEmail
-    };
-
+    const sender = senderOverride || { name: template.senderName, email: template.senderEmail };
     const result = await sendTransactionalEmail({
-      to: recipientEmail,
-      subject: template.subject,
-      html: personalizedHtml,
-      text: personalizedPlainText,
-      senderName: sender.name,
-      replyTo: template.replyToEmail,
-      tags: [template.emailType, template.approvalStatus],
-      metadata: { templateId, recipientId: recipient.id }
+      to: recipientEmail, subject: template.subjectLine,
+      html: personalizedHtml, text: personalizedPlainText,
+      senderName: sender.name, replyTo: template.replyToEmail,
+      tags: [template.category, template.approvalStatus],
+      metadata: { templateId }
     });
 
     if (result.success) {
-
-      // Log the send
+      await saveDeliveryRecord(templateId, recipientEmail, {
+        brevoMessageId: result.providerMessageId, status: 'SENT'
+      });
       await prisma.automationLog.create({
-        data: {
-          userId,
-          chatId,
-          action: 'email_sent',
+        data: { userId, chatId, action: 'email_sent',
           message: `Email sent to ${result.maskedRecipient}`,
-          metadata: { templateId, providerMessageId: result.providerMessageId }
-        }
+          metadata: { templateId, providerMessageId: result.providerMessageId } }
       });
     }
 
-    return res.json(result);
+    return res.json({
+      success: result.success,
+      status: result.success ? 'sent' : 'failed',
+      messageId: result.providerMessageId,
+      maskedRecipient: result.maskedRecipient,
+      message: result.success ? 'Email sent successfully' : 'Failed to send email'
+    });
   } catch (error) {
     console.error('[EmailWorkflow] Send email error:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to send email', details: error.message });
   }
 }
 
-/**
- * Schedule email
- */
 export async function scheduleEmailHandler(req, res) {
   try {
     const { chatId } = req.params;
     const userId = req.user.id;
     const { templateId, recipientEmail, scheduledAt, senderOverride } = req.body;
 
-    // Verify chat ownership
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
-    if (!chat) {
-      return res.status(404).json({ success: false, error: 'Chat not found' });
-    }
+    if (!chat) return res.status(404).json({ success: false, error: 'Chat not found' });
 
-    // Get template
     const templateResult = await getEmailTemplate(templateId, userId);
-    if (!templateResult.success) {
-      return res.status(404).json({ success: false, error: 'Template not found' });
-    }
+    if (!templateResult.success) return res.status(404).json({ success: false, error: 'Template not found' });
 
     const template = templateResult.template;
-
-    // Check if template is approved
     if (template.approvalStatus !== 'APPROVED') {
       return res.status(400).json({ success: false, error: 'Template must be approved before scheduling' });
     }
 
-    // Validate for sending
-    const emailData = template.structuredContent || template;
-    const validation = validateForSending(emailData);
-
+    const pf = template.personalizationFields || {};
+    const validation = validateForSending(pf);
     if (!validation.canSend) {
       return res.status(400).json({ success: false, error: 'Email validation failed', blockingIssues: validation.blockingIssues });
     }
 
-    // Ensure recipient exists
-    let recipient = template.recipients[0];
-    if (!recipient || recipient.email !== recipientEmail) {
-      recipient = await prisma.emailRecipient.upsert({
-        where: { id: recipient?.id || '' },
-        update: { email: recipientEmail },
-        create: {
-          emailTemplateId: templateId,
-          email: recipientEmail
-        }
-      });
-    }
+    const recipient = pf.recipient || { email: recipientEmail };
+    const productName = pf.productIdentity?.displayName || '';
 
-    // Apply personalization
     const personalizedHtml = replacePersonalizationVariables(
-      template.htmlContent,
-      recipient,
-      template,
-      template.productIdentity?.displayName
+      template.emailBodyHtml || '', recipient, { name: template.senderName }, productName
     );
-
     const personalizedPlainText = replacePersonalizationVariables(
-      template.plainTextContent,
-      recipient,
-      template,
-      template.productIdentity?.displayName
+      template.emailBodyText || '', recipient, { name: template.senderName }, productName
     );
 
-    // Schedule email
-    const sender = senderOverride || {
-      name: template.senderName,
-      email: template.senderEmail
-    };
-
+    const sender = senderOverride || { name: template.senderName, email: template.senderEmail };
     const result = await scheduleEmail({
-      to: recipientEmail,
-      subject: template.subject,
-      html: personalizedHtml,
-      text: personalizedPlainText,
-      senderName: sender.name,
-      replyTo: template.replyToEmail,
-      scheduledAt,
-      tags: [template.emailType, 'SCHEDULED'],
-      metadata: { templateId, recipientId: recipient.id }
+      to: recipientEmail, subject: template.subjectLine,
+      html: personalizedHtml, text: personalizedPlainText,
+      senderName: sender.name, replyTo: template.replyToEmail,
+      scheduledAt, tags: [template.category, 'SCHEDULED'],
+      metadata: { templateId }
     });
 
     if (result.success) {
-      // Save delivery record
-      await saveDeliveryRecord(templateId, recipient.id, {
-        brevoMessageId: result.scheduledId,
-        status: 'SCHEDULED',
-        scheduledAt
+      await saveDeliveryRecord(templateId, recipientEmail, {
+        brevoMessageId: result.scheduledId, status: 'SCHEDULED', scheduledAt
       });
-
-      // Log the schedule
       await prisma.automationLog.create({
-        data: {
-          userId,
-          chatId,
-          action: 'email_scheduled',
+        data: { userId, chatId, action: 'email_scheduled',
           message: `Email scheduled for ${scheduledAt}`,
-          metadata: { templateId, scheduledId: result.scheduledId }
-        }
+          metadata: { templateId, scheduledId: result.scheduledId } }
       });
     }
 
-    return res.json(result);
+    return res.json({
+      success: result.success,
+      status: result.success ? 'scheduled' : 'failed',
+      scheduledId: result.scheduledId,
+      message: result.success ? 'Email scheduled successfully' : 'Failed to schedule email'
+    });
   } catch (error) {
     console.error('[EmailWorkflow] Schedule email error:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to schedule email', details: error.message });
   }
 }
 
-/**
- * Cancel scheduled email
- */
 export async function cancelScheduledEmailHandler(req, res) {
   try {
     const { scheduledId } = req.params;
     const userId = req.user.id;
 
-    // Find delivery record
-    const delivery = await prisma.emailDelivery.findFirst({
-      where: { brevoMessageId: scheduledId },
-      include: { template: true }
+    const delivery = await prisma.emailDeliveryLog.findFirst({
+      where: { providerMessageId: scheduledId },
+      include: { campaign: true }
     });
 
-    if (!delivery) {
-      return res.status(404).json({ success: false, error: 'Scheduled email not found' });
-    }
+    if (!delivery) return res.status(404).json({ success: false, error: 'Scheduled email not found' });
 
-    // Verify ownership
-    if (delivery.template.userId !== userId) {
-      return res.status(403).json({ success: false, error: 'Access denied' });
-    }
+    const template = await prisma.emailTemplate.findFirst({ where: { id: delivery.emailCampaignId } });
+    if (!template || template.userId !== userId) return res.status(403).json({ success: false, error: 'Access denied' });
 
-    // Cancel with Brevo
     const result = await cancelScheduledEmail(scheduledId);
-
     if (result.success) {
-      // Update delivery status
-      await prisma.emailDelivery.update({
-        where: { id: delivery.id },
-        data: { status: 'CANCELLED' }
+      await prisma.emailDeliveryLog.update({
+        where: { id: delivery.id }, data: { status: 'CANCELLED' }
       });
     }
 
@@ -581,20 +456,21 @@ export async function cancelScheduledEmailHandler(req, res) {
   }
 }
 
-/**
- * Get delivery status
- */
 export async function getDeliveryStatusHandler(req, res) {
   try {
     const { templateId } = req.params;
     const userId = req.user.id;
 
     const result = await getDeliveryStatus(templateId, userId);
-
     if (result.success) {
-      return res.json(result);
+      return res.json({
+        success: true,
+        status: 'found',
+        deliveries: result.deliveries,
+        count: result.count,
+        approvalStatus: result.deliveries?.[0]?.campaign?.approvalStatus || null
+      });
     }
-
     return res.status(404).json(result);
   } catch (error) {
     console.error('[EmailWorkflow] Get delivery status error:', error.message);
@@ -602,38 +478,22 @@ export async function getDeliveryStatusHandler(req, res) {
   }
 }
 
-/**
- * Generate HTML from email data
- */
 export async function generateHtml(req, res) {
   try {
     const emailData = req.body;
-
     const html = generateEmailHtmlTemplate(emailData);
-
-    return res.json({
-      success: true,
-      html
-    });
+    return res.json({ success: true, html, status: 'generated' });
   } catch (error) {
     console.error('[EmailWorkflow] Generate HTML error:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to generate HTML', details: error.message });
   }
 }
 
-/**
- * Generate plain text from email data
- */
 export async function generatePlainText(req, res) {
   try {
     const emailData = req.body;
-
     const plainText = generatePlainTextFromEmailData(emailData);
-
-    return res.json({
-      success: true,
-      plainText
-    });
+    return res.json({ success: true, plainText, status: 'generated' });
   } catch (error) {
     console.error('[EmailWorkflow] Generate plain text error:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to generate plain text', details: error.message });
