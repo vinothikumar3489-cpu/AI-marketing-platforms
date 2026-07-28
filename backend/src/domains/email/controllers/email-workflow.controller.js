@@ -8,6 +8,7 @@ import {
   deleteEmailTemplate, saveDeliveryRecord, getDeliveryStatus
 } from "../../../services/persistence/email-persistence.service.js";
 import { replacePersonalizationVariables, normalizeEmailData } from "../../../dto/email-copy.dto.js";
+import { deliverEmail } from "../../../services/email/email-delivery.service.js";
 import prisma from "../../../config/prisma.js";
 
 export async function generateEmail(req, res) {
@@ -249,50 +250,30 @@ export async function sendTestEmailHandler(req, res) {
     const templateResult = await getEmailTemplate(templateId, userId);
     if (!templateResult.success) return res.status(404).json({ success: false, error: 'Template not found' });
 
-    const template = templateResult.template;
-    if (template.approvalStatus !== 'APPROVED') {
-      return res.status(400).json({ success: false, error: 'Template must be approved before sending' });
-    }
-
-    const emailData = template.personalizationFields || template;
-    const validation = validateForSending(emailData);
-    if (!validation.canSend) {
-      return res.status(400).json({ success: false, error: 'Email validation failed', blockingIssues: validation.blockingIssues });
-    }
-
-    const pf = template.personalizationFields || {};
-    const recipient = pf.recipient || {};
-    const productName = pf.productIdentity?.displayName || '';
-
-    const personalizedHtml = replacePersonalizationVariables(
-      template.emailBodyHtml || '', recipient, { name: template.senderName }, productName
-    );
-    const personalizedPlainText = replacePersonalizationVariables(
-      template.emailBodyText || '', recipient, { name: template.senderName }, productName
-    );
-
-    const sender = senderOverride || { name: template.senderName, email: template.senderEmail };
-    const result = await sendTestEmail({
-      to: recipientEmail, subject: `[TEST] ${template.subjectLine}`,
-      html: personalizedHtml, text: personalizedPlainText,
-      senderName: sender.name, replyTo: template.replyToEmail,
-      tags: ['TEST_EMAIL', template.category]
+    const deliveryResult = await deliverEmail({
+      templateId, chatId, userId,
+      recipientEmail,
+      emailData: templateResult.template,
+      mode: 'test',
     });
 
-    if (result.success) {
-      await prisma.automationLog.create({
-        data: { userId, chatId, action: 'email_test_sent',
-          message: `Test email sent to ${result.maskedRecipient}`,
-          metadata: { templateId, providerMessageId: result.providerMessageId } }
+    if (deliveryResult.success) {
+      return res.json({
+        success: true,
+        status: 'test_sent',
+        messageId: deliveryResult.messageId,
+        provider: deliveryResult.provider,
+        maskedRecipient: deliveryResult.maskedRecipient || deliveryResult.recipientEmail?.replace(/.(?=.{4})/g, '*'),
+        message: 'Test email sent',
+        delivered: true,
       });
     }
 
-    return res.json({
-      success: result.success,
-      status: result.success ? 'test_sent' : 'failed',
-      messageId: result.providerMessageId,
-      maskedRecipient: result.maskedRecipient,
-      message: result.message || 'Test email sent'
+    return res.status(400).json({
+      success: false,
+      status: 'failed',
+      error: deliveryResult.error || 'Failed to send test email',
+      provider: deliveryResult.provider,
     });
   } catch (error) {
     console.error('[EmailWorkflow] Send test email error:', error.message);
@@ -312,53 +293,31 @@ export async function sendEmailNow(req, res) {
     const templateResult = await getEmailTemplate(templateId, userId);
     if (!templateResult.success) return res.status(404).json({ success: false, error: 'Template not found' });
 
-    const template = templateResult.template;
-    if (template.approvalStatus !== 'APPROVED') {
-      return res.status(400).json({ success: false, error: 'Template must be approved before sending' });
-    }
-
-    const pf = template.personalizationFields || {};
-    const validation = validateForSending(pf);
-    if (!validation.canSend) {
-      return res.status(400).json({ success: false, error: 'Email validation failed', blockingIssues: validation.blockingIssues });
-    }
-
-    const recipient = pf.recipient || { email: recipientEmail };
-    const productName = pf.productIdentity?.displayName || '';
-
-    const personalizedHtml = replacePersonalizationVariables(
-      template.emailBodyHtml || '', recipient, { name: template.senderName }, productName
-    );
-    const personalizedPlainText = replacePersonalizationVariables(
-      template.emailBodyText || '', recipient, { name: template.senderName }, productName
-    );
-
-    const sender = senderOverride || { name: template.senderName, email: template.senderEmail };
-    const result = await sendTransactionalEmail({
-      to: recipientEmail, subject: template.subjectLine,
-      html: personalizedHtml, text: personalizedPlainText,
-      senderName: sender.name, replyTo: template.replyToEmail,
-      tags: [template.category, template.approvalStatus],
-      metadata: { templateId }
+    const deliveryResult = await deliverEmail({
+      templateId, chatId, userId,
+      recipientEmail,
+      emailData: templateResult.template,
+      mode: 'now',
+      senderOverride,
     });
 
-    if (result.success) {
-      await saveDeliveryRecord(templateId, recipientEmail, {
-        brevoMessageId: result.providerMessageId, status: 'SENT'
-      });
-      await prisma.automationLog.create({
-        data: { userId, chatId, action: 'email_sent',
-          message: `Email sent to ${result.maskedRecipient}`,
-          metadata: { templateId, providerMessageId: result.providerMessageId } }
+    if (deliveryResult.success) {
+      return res.json({
+        success: true,
+        status: 'sent',
+        messageId: deliveryResult.messageId,
+        provider: deliveryResult.provider,
+        maskedRecipient: deliveryResult.maskedRecipient || recipientEmail.replace(/.(?=.{4})/g, '*'),
+        message: 'Email sent successfully',
+        delivered: true,
       });
     }
 
-    return res.json({
-      success: result.success,
-      status: result.success ? 'sent' : 'failed',
-      messageId: result.providerMessageId,
-      maskedRecipient: result.maskedRecipient,
-      message: result.success ? 'Email sent successfully' : 'Failed to send email'
+    return res.status(400).json({
+      success: false,
+      status: 'failed',
+      error: deliveryResult.error || 'Failed to send email',
+      provider: deliveryResult.provider,
     });
   } catch (error) {
     console.error('[EmailWorkflow] Send email error:', error.message);
@@ -378,52 +337,33 @@ export async function scheduleEmailHandler(req, res) {
     const templateResult = await getEmailTemplate(templateId, userId);
     if (!templateResult.success) return res.status(404).json({ success: false, error: 'Template not found' });
 
-    const template = templateResult.template;
-    if (template.approvalStatus !== 'APPROVED') {
-      return res.status(400).json({ success: false, error: 'Template must be approved before scheduling' });
-    }
-
-    const pf = template.personalizationFields || {};
-    const validation = validateForSending(pf);
-    if (!validation.canSend) {
-      return res.status(400).json({ success: false, error: 'Email validation failed', blockingIssues: validation.blockingIssues });
-    }
-
-    const recipient = pf.recipient || { email: recipientEmail };
-    const productName = pf.productIdentity?.displayName || '';
-
-    const personalizedHtml = replacePersonalizationVariables(
-      template.emailBodyHtml || '', recipient, { name: template.senderName }, productName
-    );
-    const personalizedPlainText = replacePersonalizationVariables(
-      template.emailBodyText || '', recipient, { name: template.senderName }, productName
-    );
-
-    const sender = senderOverride || { name: template.senderName, email: template.senderEmail };
-    const result = await scheduleEmail({
-      to: recipientEmail, subject: template.subjectLine,
-      html: personalizedHtml, text: personalizedPlainText,
-      senderName: sender.name, replyTo: template.replyToEmail,
-      scheduledAt, tags: [template.category, 'SCHEDULED'],
-      metadata: { templateId }
+    const deliveryResult = await deliverEmail({
+      templateId, chatId, userId,
+      recipientEmail,
+      emailData: templateResult.template,
+      mode: 'schedule',
+      scheduledAt,
+      senderOverride,
     });
 
-    if (result.success) {
-      await saveDeliveryRecord(templateId, recipientEmail, {
-        brevoMessageId: result.scheduledId, status: 'SCHEDULED', scheduledAt
-      });
-      await prisma.automationLog.create({
-        data: { userId, chatId, action: 'email_scheduled',
-          message: `Email scheduled for ${scheduledAt}`,
-          metadata: { templateId, scheduledId: result.scheduledId } }
+    if (deliveryResult.success) {
+      return res.json({
+        success: true,
+        status: 'scheduled',
+        messageId: deliveryResult.messageId,
+        provider: deliveryResult.provider,
+        maskedRecipient: deliveryResult.maskedRecipient || recipientEmail.replace(/.(?=.{4})/g, '*'),
+        scheduledAt,
+        message: 'Email scheduled successfully',
+        delivered: true,
       });
     }
 
-    return res.json({
-      success: result.success,
-      status: result.success ? 'scheduled' : 'failed',
-      scheduledId: result.scheduledId,
-      message: result.success ? 'Email scheduled successfully' : 'Failed to schedule email'
+    return res.status(400).json({
+      success: false,
+      status: 'failed',
+      error: deliveryResult.error || 'Failed to schedule email',
+      provider: deliveryResult.provider,
     });
   } catch (error) {
     console.error('[EmailWorkflow] Schedule email error:', error.message);

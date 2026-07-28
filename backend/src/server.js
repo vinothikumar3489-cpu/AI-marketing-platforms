@@ -81,6 +81,14 @@ if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
 console.log("[3/8] Environment — validating variables...");
 logProviderConfig();
 
+// Log active email provider
+try {
+  const { logActiveProvider } = await import("./services/providers/email/email-provider-registry.js");
+  logActiveProvider();
+} catch (e) {
+  console.warn('[Mail Provider] Could not determine active provider:', e.message);
+}
+
 const execAsync = promisify(exec);
 const app = express();
 console.log("[4/8] Middleware — configuring...");

@@ -221,20 +221,26 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
     if (!selectedChatId || !templateId || !sendEmail) return;
     setSending(true); setSendResult(null);
     try {
+      let result;
       if (sendMode === 'test') {
-        await sendTestEmailContent(selectedChatId, { templateId, recipientEmail: sendEmail });
-        setSendResult({ success: true, message: 'Test email sent' });
+        result = await sendTestEmailContent(selectedChatId, { templateId, recipientEmail: sendEmail });
       } else if (sendMode === 'now') {
-        await sendEmailNow(selectedChatId, { templateId, recipientEmail: sendEmail });
-        setSendResult({ success: true, message: 'Email sent' });
-        loadDeliveries();
+        result = await sendEmailNow(selectedChatId, { templateId, recipientEmail: sendEmail });
       } else {
         const scheduledAt = `${sendDate}T${sendTime}:00`;
-        await scheduleEmailContent(selectedChatId, { templateId, recipientEmail: sendEmail, scheduledAt });
-        setSendResult({ success: true, message: `Scheduled for ${scheduledAt}` });
-        loadDeliveries();
+        result = await scheduleEmailContent(selectedChatId, { templateId, recipientEmail: sendEmail, scheduledAt });
       }
-    } catch { setSendResult({ success: false, message: 'Send failed' }); }
+      if (result?.success) {
+        const parts = [];
+        if (result.messageId) parts.push(`ID: ${result.messageId}`);
+        if (result.provider) parts.push(`Provider: ${result.provider}`);
+        if (result.delivered) parts.push('Delivered');
+        setSendResult({ success: true, message: parts.length > 0 ? parts.join(' · ') : sendMode === 'test' ? 'Test email sent' : sendMode === 'now' ? 'Email sent' : 'Email scheduled' });
+        if (sendMode !== 'test') loadDeliveries();
+      } else {
+        setSendResult({ success: false, message: result?.error || 'Send failed' });
+      }
+    } catch (err: any) { setSendResult({ success: false, message: err?.message || 'Send failed' }); }
     finally { setSending(false); }
   };
 

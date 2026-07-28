@@ -1,8 +1,3 @@
-/**
- * Email Integration Barrel Export
- * Centralized exports for email provider services
- */
-
 export {
   getBrevoHealth,
   sendTransactionalEmail,
@@ -15,12 +10,36 @@ export {
 } from './brevo.provider.js';
 
 export {
+  getResendHealth,
+  sendViaResend,
+  sendTestEmailResend,
+  getResendDeliveryStatus,
+} from './resend.provider.js';
+
+export {
+  getSmtpHealth,
+  sendViaSmtp,
+  sendTestEmailSmtp,
+  verifySmtpConnection,
+} from './smtp.provider.js';
+
+export {
+  getSendgridHealth,
+  sendViaSendgrid,
+  sendTestEmailSendgrid,
+  verifySendgridConnection,
+} from './sendgrid.provider.js';
+
+export {
   getEmailProviderHealth,
   sendEmail,
+  getActiveProvider,
+  logActiveProvider,
+  PROVIDER_STATUS,
 } from "./email-provider-registry.js";
 
 export {
-  PROVIDER_STATUS,
+  PROVIDER_STATUS as PROVIDER_STATUS_CONSTANTS,
   maskEmail,
   validateRecipient,
 } from "./email-provider.interface.js";
