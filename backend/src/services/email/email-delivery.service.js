@@ -143,7 +143,7 @@ export async function deliverEmail({ templateId, chatId, userId, recipientEmail,
           providerMessageId: result.messageId,
           status: deliveryStatus,
           errorMessage: result.error || null,
-          scheduledAt: mode === 'schedule' ? new Date(scheduledAt) : null,
+
           sentAt: result.sentAt ? new Date(result.sentAt) : new Date(),
         }
       });
