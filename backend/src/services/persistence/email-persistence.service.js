@@ -133,19 +133,27 @@ export async function updateEmailTemplate(templateId, userId, emailData) {
 
 export async function approveEmailTemplate(templateId, userId) {
   try {
+    console.log(`[Approve] Loading template ${templateId} for user ${userId}`);
     const template = await prisma.emailTemplate.findFirst({
       where: { id: templateId, userId }
     });
-    if (!template) return { success: false, error: 'Email template not found or access denied' };
+    if (!template) {
+      console.error(`[Approve] Template ${templateId} not found for user ${userId}`);
+      return { success: false, error: 'Email template not found or access denied' };
+    }
+    console.log(`[Approve] Asset loaded: id=${template.id}, currentStatus=${template.approvalStatus}`);
 
     if (template.approvalStatus === 'APPROVED') {
+      console.log(`[Approve] Already approved, skipping`);
       return { success: true, template, approvalStatus: 'APPROVED', message: 'Email template already approved' };
     }
 
+    console.log(`[Approve] Changing status to APPROVED`);
     const updated = await prisma.emailTemplate.update({
       where: { id: templateId },
       data: { approvalStatus: 'APPROVED', approvedAt: new Date(), approvedBy: userId }
     });
+    console.log(`[Approve] Status changed to Approved at ${updated.approvedAt}`);
 
     return {
       success: true,
@@ -157,7 +165,7 @@ export async function approveEmailTemplate(templateId, userId) {
       message: 'Email template approved successfully'
     };
   } catch (error) {
-    console.error('[EmailPersistence] Approve template error:', error.message);
+    console.error(`[Approve] Failed:`, error.message, error.stack);
     return { success: false, error: 'Failed to approve email template', details: error.message };
   }
 }

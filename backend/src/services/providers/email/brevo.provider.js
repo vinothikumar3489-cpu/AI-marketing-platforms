@@ -32,32 +32,44 @@ export function getBrevoHealth() {
   };
 }
 
-/**
- * Send transactional email through Brevo
- * Canonical export: sendViaBrevo
- */
 export async function sendTransactionalEmail({ to, subject, html, text, senderName, replyTo, tags, metadata, idempotencyKey }) {
   const config = getConfig();
-  if (!config.apiKey) return { success: false, status: PROVIDER_STATUS.NOT_CONFIGURED, error: { code: 'BREVO_NOT_CONFIGURED', message: 'BREVO_API_KEY is not configured.' } };
-  if (!config.fromEmail) return { success: false, status: PROVIDER_STATUS.SENDER_NOT_CONFIGURED, error: { code: 'SENDER_NOT_CONFIGURED', message: 'BREVO_SENDER_EMAIL is not configured.' } };
+  console.log(`[Brevo] Connecting...`);
+
+  if (!config.apiKey) {
+    console.error(`[Brevo] BREVO_API_KEY is not configured`);
+    return { success: false, status: PROVIDER_STATUS.NOT_CONFIGURED, error: { code: 'BREVO_NOT_CONFIGURED', message: 'BREVO_API_KEY is not configured.' } };
+  }
+  if (!config.fromEmail) {
+    console.error(`[Brevo] BREVO_SENDER_EMAIL is not configured`);
+    return { success: false, status: PROVIDER_STATUS.SENDER_NOT_CONFIGURED, error: { code: 'SENDER_NOT_CONFIGURED', message: 'BREVO_SENDER_EMAIL is not configured.' } };
+  }
+
+  console.log(`[Brevo] API Key loaded: ${config.apiKey.substring(0, 8)}... (${config.apiKey.length} chars)`);
+  console.log(`[Brevo] From email: ${config.fromEmail}`);
+  console.log(`[Brevo] From name: ${senderName || config.fromName}`);
+
+  const payload = {
+    sender: { email: config.fromEmail, name: senderName || config.fromName },
+    to: [{ email: to }],
+    subject,
+    htmlContent: html,
+    textContent: text || html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(),
+    tags: tags || [],
+    headers: {
+      'X-Idempotency-Key': idempotencyKey || '',
+      'X-Provider': 'brevo',
+    },
+  };
+
+  if (replyTo) payload.replyTo = { email: replyTo };
+  if (metadata) payload.headers = { ...payload.headers, ...metadata };
+
+  console.log(`[Brevo] Sending... to=${to}, subject="${(subject || '').substring(0, 50)}", htmlLen=${(html || '').length}, textLen=${(text || '').length}`);
+  console.log(`[Brevo] Payload sender=`, JSON.stringify(payload.sender));
+  console.log(`[Brevo] Payload tags=`, JSON.stringify(payload.tags));
 
   try {
-    const payload = {
-      sender: { email: config.fromEmail, name: senderName || config.fromName },
-      to: [{ email: to }],
-      subject,
-      htmlContent: html,
-      textContent: text || html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(),
-      tags: tags || [],
-      headers: {
-        'X-Idempotency-Key': idempotencyKey || '',
-        'X-Provider': 'brevo',
-      },
-    };
-
-    if (replyTo) payload.replyTo = { email: replyTo };
-    if (metadata) payload.headers = { ...payload.headers, ...metadata };
-
     const response = await axios.post(BREVO_API_URL, payload, {
       headers: {
         'api-key': config.apiKey,
@@ -66,7 +78,13 @@ export async function sendTransactionalEmail({ to, subject, html, text, senderNa
       timeout: TIMEOUT_MS,
     });
 
+    console.log(`[Brevo] API Response — status=${response.status}, statusText=${response.statusText}`);
+    console.log(`[Brevo] API Response body:`, JSON.stringify(response.data));
+
     const messageId = response.data?.messageId || 'bv-' + Date.now();
+    console.log(`[Brevo] Message ID: ${messageId}`);
+    console.log(`[Brevo] Accepted`);
+
     return {
       success: true,
       provider: 'brevo',
@@ -77,17 +95,15 @@ export async function sendTransactionalEmail({ to, subject, html, text, senderNa
       retryable: false,
     };
   } catch (err) {
+    console.log(`[Brevo] API Error`);
     return handleBrevoError(err, to);
   }
 }
 
-// Canonical export alias for sendTransactionalEmail
 export { sendTransactionalEmail as sendViaBrevo };
 
-/**
- * Send test email through Brevo
- */
 export async function sendTestEmail({ to, subject, html, text, senderName, replyTo, tags = ['TEST_EMAIL'] }) {
+  console.log(`[Brevo] sendTestEmail to=${to}`);
   const result = await sendTransactionalEmail({
     to,
     subject: `[TEST] ${subject}`,
@@ -111,121 +127,81 @@ export async function sendTestEmail({ to, subject, html, text, senderName, reply
   return result;
 }
 
-/**
- * Schedule email through Brevo
- */
 export async function scheduleEmail({ to, subject, html, text, senderName, replyTo, scheduledAt, tags, metadata }) {
   const config = getConfig();
+  console.log(`[Brevo] Schedule email — to=${to}, at=${scheduledAt}`);
   if (!config.apiKey) return { success: false, status: PROVIDER_STATUS.NOT_CONFIGURED, error: { code: 'BREVO_NOT_CONFIGURED', message: 'BREVO_API_KEY is not configured.' } };
   if (!config.fromEmail) return { success: false, status: PROVIDER_STATUS.SENDER_NOT_CONFIGURED, error: { code: 'SENDER_NOT_CONFIGURED', message: 'BREVO_SENDER_EMAIL is not configured.' } };
 
+  const payload = {
+    sender: { email: config.fromEmail, name: senderName || config.fromName },
+    to: [{ email: to }],
+    subject,
+    htmlContent: html,
+    textContent: text || html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(),
+    tags: tags || [],
+    scheduledAt: scheduledAt || new Date(Date.now() + 3600000).toISOString(),
+    headers: { 'X-Provider': 'brevo' },
+  };
+
+  if (replyTo) payload.replyTo = { email: replyTo };
+  if (metadata) payload.headers = { ...payload.headers, ...metadata };
+
+  console.log(`[Brevo] Sending schedule request...`);
   try {
-    const payload = {
-      sender: { email: config.fromEmail, name: senderName || config.fromName },
-      to: [{ email: to }],
-      subject,
-      htmlContent: html,
-      textContent: text || html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(),
-      tags: tags || [],
-      scheduledAt: scheduledAt || new Date(Date.now() + 3600000).toISOString(), // Default to 1 hour from now
-      headers: {
-        'X-Provider': 'brevo',
-      },
-    };
-
-    if (replyTo) payload.replyTo = { email: replyTo };
-    if (metadata) payload.headers = { ...payload.headers, ...metadata };
-
     const response = await axios.post(BREVO_SCHEDULED_URL, payload, {
-      headers: {
-        'api-key': config.apiKey,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'api-key': config.apiKey, 'Content-Type': 'application/json' },
       timeout: TIMEOUT_MS,
     });
+    console.log(`[Brevo] Schedule API response:`, JSON.stringify(response.data));
 
     const scheduledId = response.data?.scheduledId || response.data?.messageId || 'bv-sched-' + Date.now();
     return {
-      success: true,
-      provider: 'brevo',
-      status: 'SCHEDULED',
-      scheduledId,
-      scheduledAt,
-      maskedRecipient: maskEmail(to),
-      createdAt: new Date().toISOString(),
-      retryable: false,
+      success: true, provider: 'brevo', status: 'SCHEDULED', scheduledId, scheduledAt,
+      maskedRecipient: maskEmail(to), createdAt: new Date().toISOString(), retryable: false,
     };
   } catch (err) {
+    console.log(`[Brevo] Schedule API Error`);
     return handleBrevoError(err, to);
   }
 }
 
-/**
- * Cancel scheduled email
- */
 export async function cancelScheduledEmail(scheduledId) {
   const config = getConfig();
   if (!config.apiKey) return { success: false, error: { code: 'BREVO_NOT_CONFIGURED', message: 'BREVO_API_KEY is not configured.' } };
 
+  console.log(`[Brevo] Cancelling scheduled email: ${scheduledId}`);
   try {
     await axios.delete(`${BREVO_SCHEDULED_URL}/${scheduledId}`, {
-      headers: {
-        'api-key': config.apiKey,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'api-key': config.apiKey, 'Content-Type': 'application/json' },
       timeout: TIMEOUT_MS,
     });
-
-    return {
-      success: true,
-      scheduledId,
-      cancelledAt: new Date().toISOString(),
-      message: 'Scheduled email cancelled successfully'
-    };
+    return { success: true, scheduledId, cancelledAt: new Date().toISOString(), message: 'Scheduled email cancelled successfully' };
   } catch (err) {
     const status = err.response?.status;
-    const errorMessage = err.response?.data?.message || err.message || 'Unknown error';
+    const responseBody = err.response?.data;
+    const errorMessage = responseBody?.message || err.message || 'Unknown error';
+    console.error(`[Brevo] Cancel failed: status=${status}, body=${JSON.stringify(responseBody)}`);
 
     if (status === 404) {
       return { success: false, error: { code: 'NOT_FOUND', message: 'Scheduled email not found or already sent.' } };
     }
 
-    return {
-      success: false,
-      error: { code: 'CANCEL_FAILED', message: `Failed to cancel scheduled email: ${errorMessage}` }
-    };
+    return { success: false, error: { code: 'CANCEL_FAILED', message: `Failed to cancel scheduled email: ${errorMessage}` } };
   }
 }
 
-/**
- * Get delivery status for an email
- */
 export async function getDeliveryStatus(messageId) {
   const config = getConfig();
   if (!config.apiKey) return { success: false, error: { code: 'BREVO_NOT_CONFIGURED', message: 'BREVO_API_KEY is not configured.' } };
 
   try {
-    // Brevo doesn't have a direct delivery status endpoint by messageId
-    // This would typically be handled via webhooks
-    // For now, return a placeholder response
-    return {
-      success: true,
-      messageId,
-      status: 'UNKNOWN',
-      message: 'Delivery status tracking requires webhook configuration',
-      webhookRequired: true
-    };
+    return { success: true, messageId, status: 'UNKNOWN', message: 'Delivery status tracking requires webhook configuration', webhookRequired: true };
   } catch (err) {
-    return {
-      success: false,
-      error: { code: 'STATUS_CHECK_FAILED', message: err.message }
-    };
+    return { success: false, error: { code: 'STATUS_CHECK_FAILED', message: err.message } };
   }
 }
 
-/**
- * Create webhook for delivery tracking
- */
 export async function createWebhook({ url, events, description }) {
   const config = getConfig();
   if (!config.apiKey) return { success: false, error: { code: 'BREVO_NOT_CONFIGURED', message: 'BREVO_API_KEY is not configured.' } };
@@ -235,55 +211,49 @@ export async function createWebhook({ url, events, description }) {
       url,
       description: description || 'Email delivery tracking webhook',
       events: events || ['delivered', 'opened', 'click', 'bounce', 'spam', 'blocked', 'invalid_email', 'deferred'],
-      headers: {
-        'X-Webhook-Secret': config.webhookSecret
-      }
+      headers: { 'X-Webhook-Secret': config.webhookSecret }
     };
 
     const response = await axios.post(BREVO_WEBHOOK_URL, payload, {
-      headers: {
-        'api-key': config.apiKey,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'api-key': config.apiKey, 'Content-Type': 'application/json' },
       timeout: TIMEOUT_MS,
     });
 
     const webhookId = response.data?.id || response.data?.webhookId;
-    return {
-      success: true,
-      webhookId,
-      url,
-      events: payload.events,
-      createdAt: new Date().toISOString()
-    };
+    return { success: true, webhookId, url, events: payload.events, createdAt: new Date().toISOString() };
   } catch (err) {
-    return {
-      success: false,
-      error: { code: 'WEBHOOK_CREATION_FAILED', message: err.response?.data?.message || err.message }
-    };
+    console.error(`[Brevo] Webhook creation failed:`, err.response?.data || err.message);
+    return { success: false, error: { code: 'WEBHOOK_CREATION_FAILED', message: err.response?.data?.message || err.message } };
   }
 }
 
-/**
- * Handle Brevo API errors
- */
 function handleBrevoError(err, to) {
   const status = err.response?.status;
   const errorData = err.response?.data;
+  const responseHeaders = err.response?.headers;
   const errorMessage = errorData?.message || err.message || 'Unknown Brevo error';
 
+  console.error(`[Brevo] Caught exception — status=${status}, message="${errorMessage}"`);
+  console.error(`[Brevo] Full error response body:`, JSON.stringify(errorData));
+  console.error(`[Brevo] Error stack:`, err.stack);
+
   if (status === 401 || status === 403) {
-    return { success: false, status: PROVIDER_STATUS.AUTH_FAILED, error: { code: 'BREVO_AUTH_FAILED', message: 'Brevo authentication failed. Check BREVO_API_KEY.' }, providerMessageId: null, maskedRecipient: maskEmail(to), sentAt: new Date().toISOString(), retryable: false };
+    console.error(`[Brevo] Authentication failed — check BREVO_API_KEY and IP whitelist`);
+    return { success: false, status: PROVIDER_STATUS.AUTH_FAILED, error: { code: 'BREVO_AUTH_FAILED', message: `Brevo authentication failed: ${errorMessage}` }, providerMessageId: null, maskedRecipient: maskEmail(to), sentAt: new Date().toISOString(), retryable: false };
   }
   if (status === 429) {
-    return { success: false, status: PROVIDER_STATUS.RATE_LIMITED, error: { code: 'BREVO_RATE_LIMITED', message: 'Brevo rate limit exceeded. Try again later.' }, providerMessageId: null, maskedRecipient: maskEmail(to), sentAt: new Date().toISOString(), retryable: true };
+    console.error(`[Brevo] Rate limit exceeded`);
+    return { success: false, status: PROVIDER_STATUS.RATE_LIMITED, error: { code: 'BREVO_RATE_LIMITED', message: `Brevo rate limit exceeded: ${errorMessage}` }, providerMessageId: null, maskedRecipient: maskEmail(to), sentAt: new Date().toISOString(), retryable: true };
   }
   if (status === 400) {
+    console.error(`[Brevo] Request rejected:`, errorData);
     return { success: false, status: PROVIDER_STATUS.TEMPORARILY_UNAVAILABLE, error: { code: 'BREVO_REJECTED', message: `Brevo rejected request: ${errorMessage}` }, providerMessageId: null, maskedRecipient: maskEmail(to), sentAt: new Date().toISOString(), retryable: false };
   }
   if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+    console.error(`[Brevo] Request timed out`);
     return { success: false, status: PROVIDER_STATUS.TEMPORARILY_UNAVAILABLE, error: { code: 'BREVO_TIMEOUT', message: 'Brevo request timed out.' }, providerMessageId: null, maskedRecipient: maskEmail(to), sentAt: new Date().toISOString(), retryable: true };
   }
 
+  console.error(`[Brevo] Unhandled error:`, err.message, err.stack);
   return { success: false, status: PROVIDER_STATUS.TEMPORARILY_UNAVAILABLE, error: { code: 'BREVO_SEND_FAILED', message: `Brevo send failed: ${errorMessage}` }, providerMessageId: null, maskedRecipient: maskEmail(to), sentAt: new Date().toISOString(), retryable: status >= 500 };
 }

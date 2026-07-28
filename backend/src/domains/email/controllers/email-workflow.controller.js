@@ -138,8 +138,10 @@ export async function approveTemplate(req, res) {
     const { templateId } = req.params;
     const userId = req.user.id;
 
+    console.log(`[Approve] Button clicked for template ${templateId}, user ${userId}`);
     const result = await approveEmailTemplate(templateId, userId);
     if (result.success) {
+      console.log(`[Approve] Complete — status: APPROVED, template: ${templateId}`);
       return res.json({
         success: true,
         status: 'approved',
@@ -152,9 +154,10 @@ export async function approveTemplate(req, res) {
         message: result.message
       });
     }
+    console.error(`[Approve] Failed for template ${templateId}:`, result.error);
     return res.status(400).json(result);
   } catch (error) {
-    console.error('[EmailWorkflow] Approve template error:', error.message);
+    console.error(`[Approve] Exception:`, error.message, error.stack);
     return res.status(500).json({ success: false, error: 'Failed to approve template', details: error.message });
   }
 }
@@ -244,20 +247,29 @@ export async function sendTestEmailHandler(req, res) {
     const userId = req.user.id;
     const { templateId, recipientEmail, senderOverride } = req.body;
 
+    console.log(`[Email] Send Test requested: template=${templateId}, to=${recipientEmail}, user=${userId}`);
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
     if (!chat) return res.status(404).json({ success: false, error: 'Chat not found' });
 
+    console.log(`[Email] Loading template ${templateId}`);
     const templateResult = await getEmailTemplate(templateId, userId);
-    if (!templateResult.success) return res.status(404).json({ success: false, error: 'Template not found' });
+    if (!templateResult.success) {
+      console.error(`[Email] Template ${templateId} not found`);
+      return res.status(404).json({ success: false, error: 'Template not found' });
+    }
+    console.log(`[Email] Template loaded: status=${templateResult.approvalStatus}`);
 
+    console.log(`[Email] Preparing to send (mode=test)`);
     const deliveryResult = await deliverEmail({
       templateId, chatId, userId,
       recipientEmail,
       emailData: templateResult.template,
       mode: 'test',
     });
+    console.log(`[Email] Delivery result:`, JSON.stringify(deliveryResult));
 
     if (deliveryResult.success) {
+      console.log(`[Email] Test sent successfully: id=${deliveryResult.messageId}, provider=${deliveryResult.provider}`);
       return res.json({
         success: true,
         status: 'test_sent',
@@ -269,6 +281,7 @@ export async function sendTestEmailHandler(req, res) {
       });
     }
 
+    console.error(`[Email] Test send failed:`, deliveryResult.error);
     return res.status(400).json({
       success: false,
       status: 'failed',
@@ -276,7 +289,7 @@ export async function sendTestEmailHandler(req, res) {
       provider: deliveryResult.provider,
     });
   } catch (error) {
-    console.error('[EmailWorkflow] Send test email error:', error.message);
+    console.error(`[Email] Send test email exception:`, error.message, error.stack);
     return res.status(500).json({ success: false, error: 'Failed to send test email', details: error.message });
   }
 }
@@ -287,12 +300,19 @@ export async function sendEmailNow(req, res) {
     const userId = req.user.id;
     const { templateId, recipientEmail, senderOverride } = req.body;
 
+    console.log(`[Email] Send Now requested: template=${templateId}, to=${recipientEmail}, user=${userId}`);
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
     if (!chat) return res.status(404).json({ success: false, error: 'Chat not found' });
 
+    console.log(`[Email] Loading template ${templateId}`);
     const templateResult = await getEmailTemplate(templateId, userId);
-    if (!templateResult.success) return res.status(404).json({ success: false, error: 'Template not found' });
+    if (!templateResult.success) {
+      console.error(`[Email] Template ${templateId} not found`);
+      return res.status(404).json({ success: false, error: 'Template not found' });
+    }
+    console.log(`[Email] Template loaded: status=${templateResult.approvalStatus}`);
 
+    console.log(`[Email] Preparing to send (mode=now)`);
     const deliveryResult = await deliverEmail({
       templateId, chatId, userId,
       recipientEmail,
@@ -300,8 +320,10 @@ export async function sendEmailNow(req, res) {
       mode: 'now',
       senderOverride,
     });
+    console.log(`[Email] Delivery result:`, JSON.stringify(deliveryResult));
 
     if (deliveryResult.success) {
+      console.log(`[Email] Sent successfully: id=${deliveryResult.messageId}, provider=${deliveryResult.provider}`);
       return res.json({
         success: true,
         status: 'sent',
@@ -313,6 +335,7 @@ export async function sendEmailNow(req, res) {
       });
     }
 
+    console.error(`[Email] Send failed:`, deliveryResult.error);
     return res.status(400).json({
       success: false,
       status: 'failed',
@@ -320,7 +343,7 @@ export async function sendEmailNow(req, res) {
       provider: deliveryResult.provider,
     });
   } catch (error) {
-    console.error('[EmailWorkflow] Send email error:', error.message);
+    console.error(`[Email] Send exception:`, error.message, error.stack);
     return res.status(500).json({ success: false, error: 'Failed to send email', details: error.message });
   }
 }
@@ -331,12 +354,19 @@ export async function scheduleEmailHandler(req, res) {
     const userId = req.user.id;
     const { templateId, recipientEmail, scheduledAt, senderOverride } = req.body;
 
+    console.log(`[Email] Schedule requested: template=${templateId}, to=${recipientEmail}, at=${scheduledAt}`);
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
     if (!chat) return res.status(404).json({ success: false, error: 'Chat not found' });
 
+    console.log(`[Email] Loading template ${templateId}`);
     const templateResult = await getEmailTemplate(templateId, userId);
-    if (!templateResult.success) return res.status(404).json({ success: false, error: 'Template not found' });
+    if (!templateResult.success) {
+      console.error(`[Email] Template ${templateId} not found`);
+      return res.status(404).json({ success: false, error: 'Template not found' });
+    }
+    console.log(`[Email] Template loaded: status=${templateResult.approvalStatus}`);
 
+    console.log(`[Email] Preparing to schedule (mode=schedule)`);
     const deliveryResult = await deliverEmail({
       templateId, chatId, userId,
       recipientEmail,
@@ -345,8 +375,10 @@ export async function scheduleEmailHandler(req, res) {
       scheduledAt,
       senderOverride,
     });
+    console.log(`[Email] Schedule result:`, JSON.stringify(deliveryResult));
 
     if (deliveryResult.success) {
+      console.log(`[Email] Scheduled successfully: id=${deliveryResult.messageId}, provider=${deliveryResult.provider}`);
       return res.json({
         success: true,
         status: 'scheduled',
@@ -359,6 +391,7 @@ export async function scheduleEmailHandler(req, res) {
       });
     }
 
+    console.error(`[Email] Schedule failed:`, deliveryResult.error);
     return res.status(400).json({
       success: false,
       status: 'failed',
@@ -366,7 +399,7 @@ export async function scheduleEmailHandler(req, res) {
       provider: deliveryResult.provider,
     });
   } catch (error) {
-    console.error('[EmailWorkflow] Schedule email error:', error.message);
+    console.error(`[Email] Schedule exception:`, error.message, error.stack);
     return res.status(500).json({ success: false, error: 'Failed to schedule email', details: error.message });
   }
 }
