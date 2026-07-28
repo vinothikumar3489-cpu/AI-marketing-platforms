@@ -81,10 +81,32 @@ if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
 console.log("[3/8] Environment — validating variables...");
 logProviderConfig();
 
-// Log active email provider
+// Log active email provider with detailed health check
 try {
-  const { logActiveProvider } = await import("./services/providers/email/email-provider-registry.js");
+  const { logActiveProvider, getEmailProviderHealth } = await import("./services/providers/email/email-provider-registry.js");
   logActiveProvider();
+  const health = getEmailProviderHealth();
+  const brevoHealth = health.providers?.brevo;
+  if (brevoHealth) {
+    console.log(`[Email Provider] Provider: Brevo`);
+    console.log(`[Email Provider] Configured: ${brevoHealth.configured}`);
+    console.log(`[Email Provider] Sender Set: ${brevoHealth.senderConfigured}`);
+    console.log(`[Email Provider] API Key: ${brevoHealth.configured ? 'loaded' : 'MISSING'}`);
+    console.log(`[Email Provider] Status: ${brevoHealth.status}`);
+    if (!brevoHealth.configured) {
+      console.warn(`[Email Provider] Brevo not configured — set BREVO_API_KEY in .env`);
+    } else if (!brevoHealth.senderConfigured) {
+      console.warn(`[Email Provider] Brevo sender not configured — set BREVO_SENDER_EMAIL or BREVO_FROM_EMAIL`);
+    }
+  }
+  // SMTP health
+  const smtpHealth = health.providers?.smtp;
+  if (smtpHealth?.configured) {
+    console.log(`[Email Provider] SMTP: connected (${process.env.SMTP_HOST || 'unknown'})`);
+  }
+  if (!health.canSend) {
+    console.warn(`[Email Provider] No usable email provider — email sending will fail`);
+  }
 } catch (e) {
   console.warn('[Mail Provider] Could not determine active provider:', e.message);
 }

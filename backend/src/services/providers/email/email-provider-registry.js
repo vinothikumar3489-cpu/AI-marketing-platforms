@@ -125,6 +125,10 @@ export function logActiveProvider() {
     const providerLabel = { brevo: 'Brevo', sendgrid: 'SendGrid', smtp: 'SMTP' }[active] || active;
     console.log(`[Mail Provider] Active: ${providerLabel}`);
     if (health?.mode) console.log(`[Mail Provider] Mode: ${health.mode}`);
+    if (health?.configured) {
+      console.log(`[Mail Provider] API Key: loaded`);
+      if (health?.senderConfigured) console.log(`[Mail Provider] Sender Email: configured`);
+    }
   } else {
     console.warn(`[Mail Provider] None configured. Set BREVO_API_KEY and BREVO_FROM_EMAIL, or configure SMTP/SendGrid.`);
   }
