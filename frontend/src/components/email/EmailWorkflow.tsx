@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Loader2, Sparkles, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Send, Save, Eye, Smartphone, Code, FileText, ThumbsUp, RefreshCw, Calendar, Activity, Settings, BarChart3 } from 'lucide-react';
+import { Mail, Loader2, Sparkles, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Send, Save, Eye, Smartphone, Code, FileText, ThumbsUp, RefreshCw, Calendar, Activity, Settings } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import {
   generateEmailContent, saveEmailDraft, updateEmailTemplate,
@@ -8,6 +8,7 @@ import {
   generateEmailHtml, generateEmailPlainText, getEmailTemplate,
 } from '../../lib/api';
 import { EmailEditor } from './EmailEditor';
+import { QualityCheck } from './QualityCheck';
 
 const FIELD_LABELS: Record<string, string> = {
   greeting: 'Greeting', headline: 'Headline', opening: 'Opening',
@@ -85,10 +86,11 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [deliveryLoading, setDeliveryLoading] = useState(false);
 
-  // Validation state for approval
+  // Validation state for approval — driven ONLY by backend responses
   const [schemaValid, setSchemaValid] = useState(false);
   const [assetPersisted, setAssetPersisted] = useState(false);
   const [validation, setValidation] = useState<any>(null);
+  const [claimValidation, setClaimValidation] = useState<any>(null);
 
   // Derive personalization vars from asset data + recipient + product identity
   const personalizationVars: Record<string, string> = {
@@ -100,8 +102,9 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
     domain: asset?.productIdentity?.domain || '',
   };
 
-  // Approval is enabled when schema validation passed AND asset is persisted
-  const canApprove = schemaValid && assetPersisted && approvalStatus !== 'APPROVED';
+  // Approve button depends ONLY on: assetSaved, schema.valid, claimValidation not failed
+  const claimStatusOk = claimValidation?.status !== 'failed';
+  const canApprove = assetPersisted && schemaValid && claimStatusOk && approvalStatus !== 'APPROVED';
   const isApproved = approvalStatus === 'APPROVED';
   const canSend = isApproved && !!templateId;
 
@@ -117,6 +120,8 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
     if (data._qualityScore !== undefined) setValidation(v => ({ ...v, score: data._qualityScore }));
     if (data.validation) setValidation(data.validation);
     if (data.quality) setValidation(v => ({ ...v, ...data.quality }));
+    if (data.claimValidation) setClaimValidation(data.claimValidation);
+    if (data.claimsRequiringReview) setClaimValidation({ status: data.claimsRequiringReview.length > 0 ? 'failed' : 'passed', findings: data.claimsRequiringReview });
     // Update config from data if available
     if (data.emailType) setEmailConfig(p => ({ ...p, emailType: data.emailType }));
     if (data.goal) setEmailConfig(p => ({ ...p, goal: data.goal }));
@@ -124,7 +129,6 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
     if (data.audience) setEmailConfig(p => ({ ...p, audience: data.audience }));
     if (data.sender) setEmailConfig(p => ({ ...p, sender: { ...p.sender, ...data.sender } }));
     if (data.recipient) setRecipient(p => ({ ...p, ...data.recipient }));
-    // Mark persisted if we have an ID
     if (data.id || data.templateId) setAssetPersisted(true);
   };
 
@@ -160,8 +164,9 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
       if (result.success) {
         setValidation(result.validation || null);
         setSchemaValid(result.validation?.valid !== false);
+        if (result.email?.claimValidation) setClaimValidation(result.email.claimValidation);
+        if (result.email?.claimsRequiringReview) setClaimValidation({ status: result.email.claimsRequiringReview.length > 0 ? 'failed' : 'passed', findings: result.email.claimsRequiringReview });
         mergeAsset(result.email);
-        // Generate HTML and plain text from the email data
         const h = await generateEmailHtml(result.email);
         if (h.success) { setHtml(h.html); setAsset(a => ({ ...a, _htmlTemplate: h.html })); }
         const p = await generateEmailPlainText(result.email);
@@ -241,11 +246,6 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
     </div>
   );
 
-  const qualityScore = validation?.score ?? asset?._qualityScore ?? 0;
-  const qualityLabel = validation?.label ?? asset?._qualityLabel ?? 'Pending';
-  const blockingIssues = validation?.blockingIssues ?? [];
-  const warnings = validation?.warnings ?? [];
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {error && (
@@ -290,7 +290,15 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
             <button onClick={() => setEditMode('preview')} style={{ padding: '6px 14px', background: editMode === 'preview' ? '#53a7ff' : '#293245', border: 'none', borderRadius: '6px', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>Personalized Preview</button>
           </div>
           {editMode === 'edit' ? (
-            <EmailEditor emailData={asset} onChange={(f, v) => setAsset((p: any) => ({ ...p, [f]: v }))} onSave={handleSaveDraft} />
+            <EmailEditor emailData={asset} onChange={(f, v) => {
+              setAsset((p: any) => {
+                if (f.includes('.')) {
+                  const [parent, child] = f.split('.');
+                  return { ...p, [parent]: { ...(p[parent] || {}), [child]: v } };
+                }
+                return { ...p, [f]: v };
+              });
+            }} onSave={handleSaveDraft} />
           ) : (
             <div style={{ fontSize: '13px', lineHeight: 1.7, color: '#e5e7eb' }}>
               <div style={{ marginBottom: '8px' }}><strong>Subject:</strong> {replacePersonalization(asset?.subject || '', personalizationVars)}</div>
@@ -302,7 +310,7 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
               {asset?.signature && <div style={{ marginBottom: '4px' }}>{replacePersonalization(asset.signature, personalizationVars)}</div>}
               <div style={{ marginTop: '12px', padding: '10px', background: '#0f1729', borderRadius: '6px', fontSize: '11px', color: '#9aa7bd', fontFamily: 'monospace' }}>
                 {Object.entries(personalizationVars).map(([k, v]) => (
-                  <div key={k}>{{`{{${k}}}`}} → {v || <span style={{ color: '#ffb347' }}>Not set</span>}</div>
+                  <div key={k}>{`{{${k}}}`} → {v || <span style={{ color: '#ffb347' }}>Not set</span>}</div>
                 ))}
               </div>
             </div>
@@ -320,7 +328,7 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
           </div>
           {previewTab === 'visual' || previewTab === 'mobile' ? (
             <div style={{ maxWidth: previewTab === 'mobile' ? '375px' : '600px', margin: '0 auto', background: '#fff', borderRadius: '8px', overflow: 'hidden', border: '1px solid #293245' }}>
-              <iframe srcDoc={html} title="Email Preview" style={{ width: '100%', height: '500px', border: 'none' }} sandbox="allow-same-origin" />
+              <iframe srcDoc={html} title="Email Preview" style={{ width: '100%', height: '500px', border: 'none' }} sandbox="" />
             </div>
           ) : previewTab === 'html' ? (
             <pre style={{ background: '#0f1729', color: '#e5e7eb', padding: '16px', borderRadius: '6px', fontSize: '12px', overflow: 'auto', maxHeight: '500px', whiteSpace: 'pre-wrap' }}>{html}</pre>
@@ -329,56 +337,12 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
           )}
         </SectionCard>
 
-        {/* SECTION 4: Quality Score & Validation (Advisory - single merged card) */}
-        <SectionCard title="Quality & Validation" icon={<BarChart3 size={14} />}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '12px' }}>
-            <div style={{ padding: '10px', background: '#0f1729', borderRadius: '6px', textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: qualityScore >= 87 ? '#10e18b' : qualityScore >= 70 ? '#ffb347' : '#ff4757' }}>{qualityScore}</div>
-              <div style={{ fontSize: '10px', color: '#9aa7bd' }}>{qualityLabel}</div>
-            </div>
-            <div style={{ padding: '10px', background: '#0f1729', borderRadius: '6px', textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: asset?.spamScore?.flag === 'high' ? '#ff4757' : '#53a7ff' }}>{asset?.spamScore?.score || 0}</div>
-              <div style={{ fontSize: '10px', color: '#9aa7bd' }}>Spam Risk</div>
-            </div>
-            <div style={{ padding: '10px', background: '#0f1729', borderRadius: '6px', textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#818cf8' }}>{asset?.readabilityScore?.score || asset?.readabilityScore || 0}</div>
-              <div style={{ fontSize: '10px', color: '#9aa7bd' }}>Readability</div>
-            </div>
-            <div style={{ padding: '10px', background: '#0f1729', borderRadius: '6px', textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: blockingIssues.length === 0 ? '#10e18b' : '#ff4757' }}>{blockingIssues.length === 0 ? 'OK' : blockingIssues.length}</div>
-              <div style={{ fontSize: '10px', color: '#9aa7bd' }}>Blockers</div>
-            </div>
-          </div>
-
-          {/* Validation details */}
-          {warnings.length > 0 && (
-            <div style={{ marginTop: '8px' }}>
-              <div style={{ fontSize: '12px', color: '#ffb347', marginBottom: '6px', fontWeight: 600 }}>Advisory Suggestions:</div>
-              {warnings.slice(0, 5).map((w: string, i: number) => (
-                <div key={i} style={{ padding: '4px 8px', background: 'rgba(255,179,71,0.1)', borderRadius: '4px', marginBottom: '4px', fontSize: '11px', color: '#ffb347', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <AlertTriangle size={12} /> {w}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {blockingIssues.length > 0 && (
-            <div style={{ marginTop: '8px' }}>
-              <div style={{ fontSize: '12px', color: '#ff4757', marginBottom: '6px', fontWeight: 600 }}>Blocking Issues:</div>
-              {blockingIssues.map((b: string, i: number) => (
-                <div key={i} style={{ padding: '4px 8px', background: 'rgba(255,71,87,0.1)', borderRadius: '4px', marginBottom: '4px', fontSize: '11px', color: '#ff4757', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <XCircle size={12} /> {b}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {qualityScore > 0 && qualityScore < 87 && (
-            <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(255,179,71,0.1)', borderRadius: '4px', border: '1px solid #ffb347', fontSize: '12px', color: '#ffb347', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <AlertTriangle size={14} /> Quality can be improved — score is advisory only
-            </div>
-          )}
-        </SectionCard>
+        {/* SECTION 4: Quality Check — single canonical component driven only by backend data */}
+        {validation && (
+          <SectionCard title="Quality & Validation" icon={<Activity size={14} />}>
+            <QualityCheck validation={validation} />
+          </SectionCard>
+        )}
 
         {/* SECTION 5: Approval */}
         <SectionCard title="Approval" icon={<ThumbsUp size={14} />}>
@@ -387,6 +351,9 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
             <span style={{ fontSize: '12px', fontWeight: 600, color: isApproved ? '#10e18b' : approvalStatus === 'REJECTED' ? '#ff4757' : '#ffb347', padding: '3px 8px', background: isApproved ? 'rgba(16,225,139,0.1)' : approvalStatus === 'REJECTED' ? 'rgba(255,71,87,0.1)' : 'rgba(255,179,71,0.1)', borderRadius: '4px', border: `1px solid ${isApproved ? '#10e18b' : approvalStatus === 'REJECTED' ? '#ff4757' : '#ffb347'}` }}>
               {approvalStatus}
             </span>
+            {asset?.approvedAt && (
+              <span style={{ fontSize: '11px', color: '#9aa7bd' }}>Approved {new Date(asset.approvedAt).toLocaleString()}</span>
+            )}
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
             <button onClick={handleSaveDraft} style={{ padding: '8px 16px', background: '#293245', border: '1px solid #3b4d61', borderRadius: '6px', color: '#e5e7eb', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}><Save size={14} /> Save Draft</button>
@@ -403,7 +370,7 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
             <button onClick={handleGenerate} style={{ padding: '8px 16px', background: '#818cf8', border: '1px solid #818cf8', borderRadius: '6px', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}><RefreshCw size={14} /> Regenerate</button>
           </div>
           <div style={{ marginTop: '8px', fontSize: '11px', color: '#9aa7bd' }}>
-            {!assetPersisted ? 'Save a draft first to enable approval' : !schemaValid ? 'Fix blocking issues to enable approval' : isApproved ? 'Email is approved and ready to send' : 'Approval is ready — review and approve'}
+            {!assetPersisted ? 'Save a draft first to enable approval' : !schemaValid ? 'Fix blocking issues to enable approval' : !claimStatusOk ? 'Review claims requiring verification' : isApproved ? 'Email is approved and ready to send' : 'Approval is ready — review and approve'}
           </div>
         </SectionCard>
 

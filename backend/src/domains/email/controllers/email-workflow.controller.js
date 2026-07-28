@@ -143,6 +143,8 @@ export async function approveTemplate(req, res) {
         success: true,
         status: 'approved',
         approvalStatus: 'APPROVED',
+        approvedAt: result.approvedAt,
+        approvedBy: result.approvedBy,
         assetId: result.assetId,
         template: result.template,
         quality: result.template?.quality || null,
@@ -193,6 +195,8 @@ export async function getTemplate(req, res) {
         status: 'found',
         template: result.template,
         approvalStatus: result.approvalStatus,
+        approvedAt: result.approvedAt,
+        approvedBy: result.approvedBy,
         assetId: result.assetId,
         quality: result.quality,
         validation: result.validation

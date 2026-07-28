@@ -464,10 +464,10 @@ export function EmailEditor({ emailData, onChange, onSave, onReset, readOnly = f
         {renderEditableField('Social Proof', 'socialProof', emailData?.socialProof || '', true)}
 
         {/* CTA Label */}
-        {renderEditableField('CTA Label', 'ctaLabel', emailData?.callToAction?.label || emailData?.primaryCta?.label || '', false)}
+        {renderEditableField('CTA Label', 'callToAction.label', emailData?.callToAction?.label || emailData?.primaryCta?.label || '', false)}
 
         {/* CTA URL */}
-        {renderEditableField('CTA URL', 'ctaUrl', emailData?.callToAction?.url || emailData?.primaryCta?.url || '', false)}
+        {renderEditableField('CTA URL', 'callToAction.url', emailData?.callToAction?.url || emailData?.primaryCta?.url || '', false)}
 
         {/* Closing */}
         {renderEditableField('Closing', 'closing', emailData?.closing || '', true)}

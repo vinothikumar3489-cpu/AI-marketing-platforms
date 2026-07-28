@@ -1245,6 +1245,7 @@ model EmailTemplate {
   personalizationFields Json?
   approvalStatus        String  @default("DRAFT")
   approvedAt            DateTime?
+  approvedBy            String?
   quality               Json?
   contentAssetId        String?
   generationStatus      String  @default("pending")

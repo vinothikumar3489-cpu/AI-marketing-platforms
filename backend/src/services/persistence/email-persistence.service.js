@@ -6,10 +6,12 @@ export async function saveEmailDraft(userId, chatId, emailData) {
       emailType, goal, tone, audience, language, sender, recipient,
       subject, subjectAlternatives, previewText, greeting, headline,
       opening, painPoint, solution, benefits, bodyParagraphs, socialProof,
-      primaryCta, secondaryCta, closing, signature, postscript,
+      callToAction, primaryCta, secondaryCta, closing, signature, postscript,
       complianceFooter, unsubscribeText, html, plainText, evidenceUsed,
       quality, contentAssetId, spamScore, readabilityScore
     } = emailData;
+
+    const cta = callToAction || primaryCta || emailData.cta;
 
     let template;
     if (contentAssetId) {
@@ -21,7 +23,8 @@ export async function saveEmailDraft(userId, chatId, emailData) {
     const personalizationFields = {
       evidenceUsed, quality, goal, tone, audience, language,
       subjectAlternatives, greeting, headline, opening, painPoint,
-      solution, benefits, bodyParagraphs, socialProof, primaryCta,
+      solution, benefits, bodyParagraphs, socialProof,
+      primaryCta: cta, callToAction: cta,
       secondaryCta, closing, signature, postscript, complianceFooter,
       unsubscribeText, recipient, spamScore, readabilityScore,
       version: template?.personalizationFields?.version ? template.personalizationFields.version + 1 : 1
@@ -80,16 +83,19 @@ export async function updateEmailTemplate(templateId, userId, emailData) {
       emailType, goal, tone, audience, language, sender, recipient,
       subject, subjectAlternatives, previewText, greeting, headline,
       opening, painPoint, solution, benefits, bodyParagraphs, socialProof,
-      primaryCta, secondaryCta, closing, signature, postscript,
+      callToAction, primaryCta, secondaryCta, closing, signature, postscript,
       complianceFooter, unsubscribeText, html, plainText, evidenceUsed,
       quality, spamScore, readabilityScore
     } = emailData;
+
+    const cta = callToAction || primaryCta || emailData.cta;
 
     const existingPf = existing.personalizationFields || {};
     const personalizationFields = {
       evidenceUsed, quality, goal, tone, audience, language,
       subjectAlternatives, greeting, headline, opening, painPoint,
-      solution, benefits, bodyParagraphs, socialProof, primaryCta,
+      solution, benefits, bodyParagraphs, socialProof,
+      primaryCta: cta, callToAction: cta,
       secondaryCta, closing, signature, postscript, complianceFooter,
       unsubscribeText, recipient, spamScore, readabilityScore,
       version: (existingPf.version || 1) + 1
@@ -138,13 +144,15 @@ export async function approveEmailTemplate(templateId, userId) {
 
     const updated = await prisma.emailTemplate.update({
       where: { id: templateId },
-      data: { approvalStatus: 'APPROVED', approvedAt: new Date() }
+      data: { approvalStatus: 'APPROVED', approvedAt: new Date(), approvedBy: userId }
     });
 
     return {
       success: true,
       template: updated,
       approvalStatus: 'APPROVED',
+      approvedAt: updated.approvedAt,
+      approvedBy: updated.approvedBy,
       assetId: updated.id,
       message: 'Email template approved successfully'
     };
@@ -195,6 +203,8 @@ export async function getEmailTemplate(templateId, userId) {
       approvalStatus: template.approvalStatus,
       assetId: template.id,
       quality: template.quality,
+      approvedAt: template.approvedAt,
+      approvedBy: template.approvedBy,
       validation: template.personalizationFields?.quality || null
     };
   } catch (error) {

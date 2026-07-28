@@ -227,7 +227,7 @@ export function EmailRenderer({
                 border: 'none',
                 borderRadius: '8px',
               }}
-              sandbox="allow-same-origin"
+              sandbox=""
             />
           </div>
         )}
@@ -243,7 +243,7 @@ export function EmailRenderer({
                 border: 'none',
                 borderRadius: '8px',
               }}
-              sandbox="allow-same-origin"
+              sandbox=""
             />
           </div>
         )}
