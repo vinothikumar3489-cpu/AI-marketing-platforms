@@ -5,16 +5,9 @@ export {
   sendTestEmail,
   scheduleEmail,
   cancelScheduledEmail,
-  getDeliveryStatus,
+  getDeliveryStatus as getBrevoDeliveryStatus,
   createWebhook,
 } from './brevo.provider.js';
-
-export {
-  getResendHealth,
-  sendViaResend,
-  sendTestEmailResend,
-  getResendDeliveryStatus,
-} from './resend.provider.js';
 
 export {
   getSmtpHealth,

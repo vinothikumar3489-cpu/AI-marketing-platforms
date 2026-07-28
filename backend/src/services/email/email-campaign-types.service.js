@@ -298,7 +298,7 @@ export async function generateEmailCampaignPlan(context) {
   return {
     campaigns: results,
     totalGenerated: Object.keys(results).length,
-    providerConfigured: !!(process.env.GMAIL_USER || process.env.SENDGRID_API_KEY || process.env.BREVO_API_KEY || process.env.RESEND_API_KEY),
+    providerConfigured: !!(process.env.BREVO_API_KEY || process.env.SENDGRID_API_KEY || process.env.SMTP_USER),
     _metadata: {
       evidenceVersion: '2.0.0',
       generatedAt: new Date().toISOString(),

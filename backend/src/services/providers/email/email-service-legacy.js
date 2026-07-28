@@ -61,7 +61,6 @@ export async function checkEmailProvider() {
     smtpPassConfigured: !!process.env.SMTP_PASS,
     sendgridConfigured: !!process.env.SENDGRID_API_KEY,
     brevoConfigured: !!providers.brevo?.configured,
-    resendConfigured: !!process.env.RESEND_API_KEY,
     from: providers.brevo?.senderConfigured ? maskEmail(process.env.BREVO_FROM_EMAIL) : null,
     port587: 'unknown',
     port465: 'unknown',

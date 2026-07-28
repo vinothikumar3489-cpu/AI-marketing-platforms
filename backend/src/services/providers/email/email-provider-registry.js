@@ -1,16 +1,18 @@
 import { getBrevoHealth, sendViaBrevo } from './brevo.provider.js';
-import { getResendHealth, sendViaResend } from './resend.provider.js';
 import { getSmtpHealth, sendViaSmtp } from './smtp.provider.js';
 import { getSendgridHealth, sendViaSendgrid } from './sendgrid.provider.js';
 
-const PROVIDERS = {
-  resend: { send: sendViaResend, health: getResendHealth },
-  brevo: { send: sendViaBrevo, health: getBrevoHealth },
-  smtp: { send: sendViaSmtp, health: getSmtpHealth },
-  sendgrid: { send: sendViaSendgrid, health: getSendgridHealth },
-};
+const PROVIDERS = {};
+const SEND_PROVIDER_PREFERENCE = [];
 
-const SEND_PROVIDER_PREFERENCE = ['sendgrid', 'resend', 'brevo', 'smtp'];
+function registerProvider(name, provider) {
+  PROVIDERS[name] = provider;
+  SEND_PROVIDER_PREFERENCE.push(name);
+}
+
+registerProvider('brevo', { send: sendViaBrevo, health: getBrevoHealth });
+registerProvider('sendgrid', { send: sendViaSendgrid, health: getSendgridHealth });
+registerProvider('smtp', { send: sendViaSmtp, health: getSmtpHealth });
 
 const CIRCUIT_BREAKER_STATE = {};
 for (const name of Object.keys(PROVIDERS)) {
@@ -120,11 +122,11 @@ export function logActiveProvider() {
   const active = getActiveProvider();
   if (active) {
     const health = PROVIDERS[active]?.health();
-    const providerLabel = { resend: 'Resend', brevo: 'Brevo', smtp: 'SMTP', sendgrid: 'SendGrid' }[active] || active;
+    const providerLabel = { brevo: 'Brevo', sendgrid: 'SendGrid', smtp: 'SMTP' }[active] || active;
     console.log(`[Mail Provider] Active: ${providerLabel}`);
     if (health?.mode) console.log(`[Mail Provider] Mode: ${health.mode}`);
   } else {
-    console.warn(`[Mail Provider] None configured. Set SENDGRID_API_KEY, RESEND_API_KEY, BREVO_API_KEY, or SMTP_USER/SMTP_PASS.`);
+    console.warn(`[Mail Provider] None configured. Set BREVO_API_KEY and BREVO_FROM_EMAIL, or configure SMTP/SendGrid.`);
   }
 }
 

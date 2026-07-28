@@ -230,7 +230,7 @@ function generateEvidenceBasedPlan(context) {
   const competitorData = competitorIntelligence?.competitorAnalysis || {};
 
   // Provider availability (from env)
-  const providerEmail = !!(process.env.GMAIL_USER || process.env.SENDGRID_API_KEY || process.env.BREVO_API_KEY || process.env.RESEND_API_KEY);
+  const providerEmail = !!(process.env.BREVO_API_KEY || process.env.SENDGRID_API_KEY || process.env.SMTP_USER);
   const providerCreative = !!(process.env.POLLINATIONS_API_KEY || process.env.FAL_API_KEY);
   const providerVideo = !!(process.env.SHOTSTACK_API_KEY || process.env.CREATOMATE_API_KEY);
   const analyticsConnected = !!(process.env.GA_API_KEY || process.env.MIXPANEL_API_KEY);

@@ -15,7 +15,7 @@
     "seed": "node prisma/seed.js",
     "postinstall": "prisma generate",
     "build": "prisma generate",
-    "test": "node --test \"tests/*.test.js\"",
+    "test": "node --experimental-test-module-mocks --test \"tests/*.test.js\"",
     "test:jest": "npx jest --passWithNoTests",
     "test:all": "node --test \"tests/*.test.js\" && npx jest --passWithNoTests",
     "check:imports": "node scripts/check-module-imports.mjs",
