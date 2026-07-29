@@ -107,6 +107,8 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
   const canApprove = assetPersisted && schemaValid && claimStatusOk && approvalStatus !== 'APPROVED';
   const isApproved = approvalStatus === 'APPROVED';
   const canSend = isApproved && !!templateId;
+  const canSendTest = !!templateId; // test mode does NOT require approval
+  const canSendNow = isApproved && !!templateId;
 
   // Merge backend response into local state
   const mergeAsset = (data: any) => {
@@ -138,8 +140,30 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
   }, []);
 
   useEffect(() => {
-    if (templateId) loadDeliveries();
+    if (templateId) {
+      console.log(`[EMAIL-FE] ENTER: loadTemplateStatus — templateId=${templateId}`);
+      loadTemplateStatus();
+      loadDeliveries();
+    }
   }, [templateId]);
+
+  const loadTemplateStatus = async () => {
+    if (!templateId) return;
+    try {
+      console.log(`[EMAIL-FE] loadTemplateStatus: fetching template ${templateId}`);
+      const refreshed = await getEmailTemplate(templateId);
+      if (refreshed.success && refreshed.template) {
+        console.log(`[EMAIL-FE] loadTemplateStatus: status=${refreshed.approvalStatus}`);
+        if (refreshed.approvalStatus) setApprovalStatus(refreshed.approvalStatus);
+        mergeAsset(refreshed.template);
+      } else {
+        console.error(`[EMAIL-FE] loadTemplateStatus: FAILED — ${refreshed.error}`);
+      }
+      console.log(`[EMAIL-FE] loadTemplateStatus: EXIT`);
+    } catch (err: any) {
+      console.error(`[EMAIL-FE] loadTemplateStatus: EXCEPTION — ${err.message}`);
+    }
+  };
 
   const loadDeliveries = async () => {
     if (!templateId) return;
@@ -177,12 +201,18 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
   };
 
   const handleSaveDraft = async () => {
-    if (!selectedChatId || !asset) return;
+    const rid = 'FE-' + Date.now().toString(36).toUpperCase();
+    console.log(`[${rid}] [EMAIL-FE] ENTER: handleSaveDraft — selectedChatId=${selectedChatId}, templateId=${templateId}`);
+    if (!selectedChatId || !asset) {
+      console.error(`[${rid}] [EMAIL-FE] RETURN: FAIL — selectedChatId=${selectedChatId}, asset=${!!asset}`);
+      return;
+    }
     try {
       const dataToSave = { ...asset, html, plainText, config: emailConfig, recipient };
       const result = templateId
         ? await updateEmailTemplate(templateId, dataToSave)
         : await saveEmailDraft(selectedChatId, dataToSave);
+      console.log(`[${rid}] [EMAIL-FE] RESULT: success=${result?.success}, assetId=${result?.assetId}, approvalStatus=${result?.approvalStatus}`);
       if (result.success) {
         const id = result.template?.id || result.assetId;
         if (id) setTemplateId(id);
@@ -190,23 +220,47 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
         if (result.template) mergeAsset(result.template);
         if (result.approvalStatus) setApprovalStatus(result.approvalStatus);
         setSchemaValid(true);
+        console.log(`[${rid}] [EMAIL-FE] RETURN: SUCCESS — templateId=${id}`);
+      } else {
+        console.error(`[${rid}] [EMAIL-FE] RETURN: FAIL — ${result?.error}`);
       }
-    } catch (err: any) { setError(err.message || 'Failed to save draft'); }
+    } catch (err: any) {
+      console.error(`[${rid}] [EMAIL-FE] RETURN: EXCEPTION — ${err.message}`);
+      setError(err.message || 'Failed to save draft');
+    }
+    console.log(`[${rid}] [EMAIL-FE] EXIT: handleSaveDraft`);
   };
 
   const handleApprove = async () => {
-    if (!templateId) return;
+    const rid = 'FE-' + Date.now().toString(36).toUpperCase();
+    console.log(`[${rid}] [EMAIL-FE] ENTER: handleApprove — templateId=${templateId}`);
+    if (!templateId) {
+      console.error(`[${rid}] [EMAIL-FE] RETURN: FAIL — templateId missing`);
+      return;
+    }
+    console.log(`[${rid}] [EMAIL-FE] ACTION: calling approveEmailTemplate(${templateId})`);
     try {
       const r = await approveEmailTemplate(templateId);
+      console.log(`[${rid}] [EMAIL-FE] RESULT: approveEmailTemplate returned success=${r?.success}`);
       if (r.success) {
         setApprovalStatus('APPROVED');
+        console.log(`[${rid}] [EMAIL-FE] STATUS: setApprovalStatus(APPROVED)`);
         if (r.template) mergeAsset(r.template);
         const refreshed = await getEmailTemplate(templateId);
-        if (refreshed.success && refreshed.template) mergeAsset(refreshed.template);
+        if (refreshed.success && refreshed.template) {
+          console.log(`[${rid}] [EMAIL-FE] REFRESHED: approvalStatus=${refreshed.approvalStatus}`);
+          mergeAsset(refreshed.template);
+        }
+        console.log(`[${rid}] [EMAIL-FE] RETURN: SUCCESS — approved`);
       } else {
+        console.error(`[${rid}] [EMAIL-FE] RETURN: FAIL — ${r.error}`);
         setError(r.error || 'Approve failed');
       }
-    } catch (err: any) { setError(err.message || 'Approve failed'); }
+    } catch (err: any) {
+      console.error(`[${rid}] [EMAIL-FE] RETURN: EXCEPTION — ${err.message}`);
+      setError(err.message || 'Approve failed');
+    }
+    console.log(`[${rid}] [EMAIL-FE] EXIT: handleApprove`);
   };
 
   const handleReject = async () => {
@@ -219,74 +273,79 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
 
   const handleSendAction = async () => {
     const rid = 'FE-' + Date.now().toString(36).toUpperCase();
-    console.log(`[${rid}] [EMAIL-FE] STEP 1: handleSendAction called`);
-    console.log(`[${rid}] [EMAIL-FE] STEP 1 DETAILS: selectedChatId=${selectedChatId}, templateId=${templateId}, sendEmail=${sendEmail}, sendMode=${sendMode}`);
+    console.log(`[${rid}] [EMAIL-FE] ENTER: handleSendAction`);
+    console.log(`[${rid}] [EMAIL-FE] INPUT: selectedChatId=${selectedChatId}, templateId=${templateId}, sendEmail=${sendEmail}, sendMode=${sendMode}, approvalStatus=${approvalStatus}, isApproved=${isApproved}`);
 
     if (!selectedChatId) {
-      console.error(`[${rid}] [EMAIL-FE] STEP 1 FAIL: No selectedChatId`);
+      console.error(`[${rid}] [EMAIL-FE] RETURN: FAIL — selectedChatId is missing`);
       setSendResult({ success: false, message: 'No chat selected' });
       return;
     }
     if (!templateId) {
-      console.error(`[${rid}] [EMAIL-FE] STEP 1 FAIL: No templateId`);
+      console.error(`[${rid}] [EMAIL-FE] RETURN: FAIL — templateId is missing`);
       setSendResult({ success: false, message: 'No template — save a draft first' });
       return;
     }
     if (!sendEmail) {
-      console.error(`[${rid}] [EMAIL-FE] STEP 1 FAIL: No recipient email`);
+      console.error(`[${rid}] [EMAIL-FE] RETURN: FAIL — recipient email is empty`);
       setSendResult({ success: false, message: 'Enter a recipient email' });
       return;
     }
 
-    const isApproved = approvalStatus === 'APPROVED';
     if (!isApproved && sendMode !== 'test') {
-      console.error(`[${rid}] [EMAIL-FE] STEP 1 FAIL: Not approved (status=${approvalStatus})`);
+      console.error(`[${rid}] [EMAIL-FE] RETURN: FAIL — not approved (status=${approvalStatus})`);
       setSendResult({ success: false, message: 'Approve the email before sending' });
       return;
     }
 
+    console.log(`[${rid}] [EMAIL-FE] EXIT-CHECKS: all guards passed, proceeding to API call`);
     setSending(true);
     setSendResult(null);
     try {
       let result;
-      let url: string;
+      let apiPath;
       if (sendMode === 'test') {
-        url = `/content/email/${selectedChatId}/send-test`;
-        console.log(`[${rid}] [EMAIL-FE] STEP 2: Calling POST ${url}`);
-        console.log(`[${rid}] [EMAIL-FE] STEP 2 PAYLOAD:`, JSON.stringify({ templateId, recipientEmail: sendEmail }));
+        apiPath = `/content/email/${selectedChatId}/send-test`;
+        console.log(`[${rid}] [EMAIL-FE] ACTION: calling sendTestEmailContent — url=${apiPath}`);
+        console.log(`[${rid}] [EMAIL-FE] REQUEST: ${JSON.stringify({ templateId, recipientEmail: sendEmail })}`);
         result = await sendTestEmailContent(selectedChatId, { templateId, recipientEmail: sendEmail });
+        console.log(`[${rid}] [EMAIL-FE] RESULT: sendTestEmailContent returned —`, JSON.stringify(result));
       } else if (sendMode === 'now') {
-        url = `/content/email/${selectedChatId}/send-now`;
-        console.log(`[${rid}] [EMAIL-FE] STEP 2: Calling POST ${url}`);
-        console.log(`[${rid}] [EMAIL-FE] STEP 2 PAYLOAD:`, JSON.stringify({ templateId, recipientEmail: sendEmail }));
+        apiPath = `/content/email/${selectedChatId}/send-now`;
+        console.log(`[${rid}] [EMAIL-FE] ACTION: calling sendEmailNow — url=${apiPath}`);
+        console.log(`[${rid}] [EMAIL-FE] REQUEST: ${JSON.stringify({ templateId, recipientEmail: sendEmail })}`);
         result = await sendEmailNow(selectedChatId, { templateId, recipientEmail: sendEmail });
+        console.log(`[${rid}] [EMAIL-FE] RESULT: sendEmailNow returned —`, JSON.stringify(result));
       } else {
         const scheduledAt = `${sendDate}T${sendTime}:00`;
-        url = `/content/email/${selectedChatId}/schedule`;
-        console.log(`[${rid}] [EMAIL-FE] STEP 2: Calling POST ${url}`);
-        console.log(`[${rid}] [EMAIL-FE] STEP 2 PAYLOAD:`, JSON.stringify({ templateId, recipientEmail: sendEmail, scheduledAt }));
+        apiPath = `/content/email/${selectedChatId}/schedule`;
+        console.log(`[${rid}] [EMAIL-FE] ACTION: calling scheduleEmailContent — url=${apiPath}`);
+        console.log(`[${rid}] [EMAIL-FE] REQUEST: ${JSON.stringify({ templateId, recipientEmail: sendEmail, scheduledAt })}`);
         result = await scheduleEmailContent(selectedChatId, { templateId, recipientEmail: sendEmail, scheduledAt });
+        console.log(`[${rid}] [EMAIL-FE] RESULT: scheduleEmailContent returned —`, JSON.stringify(result));
       }
-      console.log(`[${rid}] [EMAIL-FE] STEP 3: API response:`, JSON.stringify(result));
 
       if (result?.success) {
         const parts = [];
         if (result.messageId) parts.push(`ID: ${result.messageId}`);
         if (result.provider) parts.push(`Provider: ${result.provider}`);
         if (result.delivered) parts.push('Delivered');
-        console.log(`[${rid}] [EMAIL-FE] STEP 3 PASS: ${parts.join(' · ')}`);
+        console.log(`[${rid}] [EMAIL-FE] RETURN: SUCCESS — ${parts.join(' · ')}`);
         setSendResult({ success: true, message: parts.length > 0 ? parts.join(' · ') : sendMode === 'test' ? 'Test email sent' : sendMode === 'now' ? 'Email sent' : 'Email scheduled' });
         if (sendMode !== 'test') loadDeliveries();
       } else {
-        console.error(`[${rid}] [EMAIL-FE] STEP 3 FAIL: ${result?.error || 'Unknown error'}`);
+        console.error(`[${rid}] [EMAIL-FE] RETURN: FAIL — ${result?.error || 'Unknown error'}`);
         setSendResult({ success: false, message: result?.error || 'Send failed' });
       }
     } catch (err: any) {
-      console.error(`[${rid}] [EMAIL-FE] STEP 3 EXCEPTION: ${err?.message || err}`);
+      console.error(`[${rid}] [EMAIL-FE] RETURN: EXCEPTION — ${err?.message || err}`);
       console.error(`[${rid}] [EMAIL-FE] Stack:`, err?.stack || 'N/A');
       setSendResult({ success: false, message: err?.message || 'Send failed' });
     }
-    finally { setSending(false); }
+    finally {
+      console.log(`[${rid}] [EMAIL-FE] EXIT: handleSendAction complete`);
+      setSending(false);
+    }
   };
 
   if (!selectedChatId) return (
@@ -444,8 +503,8 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
               <input type="time" value={sendTime} onChange={e => setSendTime(e.target.value)} style={{ padding: '8px', background: '#0f1729', border: '1px solid #293245', borderRadius: '4px', color: '#e5e7eb', fontSize: '12px' }} />
             </div>
           )}
-          {!isApproved && <div style={{ marginTop: '8px', marginBottom: '8px', fontSize: '11px', color: '#ffb347', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={12} /> Approve the email before sending</div>}
-          <button onClick={handleSendAction} disabled={!canSend || sending || !sendEmail} style={{ width: '100%', padding: '10px', background: canSend ? '#10e18b' : '#293245', border: canSend ? '1px solid #10e18b' : '1px solid #3b4d61', borderRadius: '6px', color: canSend ? '#0f1729' : '#9aa7bd', cursor: canSend ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: 600, opacity: canSend ? 1 : 0.5 }}>
+          {!isApproved && sendMode !== 'test' && <div style={{ marginTop: '8px', marginBottom: '8px', fontSize: '11px', color: '#ffb347', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={12} /> Approve the email before sending</div>}
+          <button onClick={handleSendAction} disabled={(sendMode === 'test' ? !canSendTest : !canSendNow) || sending || !sendEmail} style={{ width: '100%', padding: '10px', background: (sendMode === 'test' ? canSendTest : canSendNow) ? '#10e18b' : '#293245', border: (sendMode === 'test' ? canSendTest : canSendNow) ? '1px solid #10e18b' : '1px solid #3b4d61', borderRadius: '6px', color: (sendMode === 'test' ? canSendTest : canSendNow) ? '#0f1729' : '#9aa7bd', cursor: (sendMode === 'test' ? canSendTest : canSendNow) ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: 600, opacity: (sendMode === 'test' ? canSendTest : canSendNow) ? 1 : 0.5 }}>
             {sending ? 'Sending...' : sendMode === 'test' ? 'Send Test Email' : sendMode === 'now' ? 'Send Now' : 'Schedule Email'}
           </button>
           {sendResult && <div style={{ marginTop: '8px', padding: '8px 12px', background: sendResult.success ? 'rgba(16,225,139,0.1)' : 'rgba(255,71,87,0.1)', borderRadius: '4px', border: `1px solid ${sendResult.success ? '#10e18b' : '#ff4757'}`, fontSize: '12px', color: sendResult.success ? '#10e18b' : '#ff4757', display: 'flex', alignItems: 'center', gap: '6px' }}>

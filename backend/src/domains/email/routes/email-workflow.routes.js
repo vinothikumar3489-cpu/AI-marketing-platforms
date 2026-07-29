@@ -24,7 +24,8 @@ export const emailWorkflowRouter = express.Router();
 // Log all incoming requests to this router
 emailWorkflowRouter.use((req, res, next) => {
   const rid = req.requestId || 'NO_RID';
-  console.log(`[${rid}] [EMAIL-ROUTE] ${req.method} ${req.originalUrl} — matched emailWorkflowRouter`);
+  const bodyPreview = req.method === 'POST' && req.body ? JSON.stringify(req.body).substring(0, 200) : '';
+  console.log(`[${rid}] [EMAIL-ROUTE] ${req.method} ${req.originalUrl} — matched emailWorkflowRouter${bodyPreview ? ' — body: ' + bodyPreview : ''}`);
   next();
 });
 

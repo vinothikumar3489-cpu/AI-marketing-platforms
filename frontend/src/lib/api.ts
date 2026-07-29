@@ -733,28 +733,38 @@ export async function rejectEmailTemplate(templateId: string, reason: string) {
 
 export async function sendTestEmailContent(chatId: string, data: any) {
   const rid = 'API-' + Date.now().toString(36).toUpperCase();
-  console.log(`[${rid}] [API] POST /content/email/${chatId}/send-test`);
-  console.log(`[${rid}] [API] Payload:`, JSON.stringify(data));
+  console.log(`[${rid}] [API] ENTER: sendTestEmailContent`);
+  console.log(`[${rid}] [API] INPUT: chatId=${chatId}, data=${JSON.stringify(data)}`);
+  const url = `/content/email/${chatId}/send-test`;
+  const fullUrl = `${API_BASE}${url}`;
+  console.log(`[${rid}] [API] URL: POST ${fullUrl}`);
   try {
-    const result = await api.post<any>(`/content/email/${chatId}/send-test`, data);
-    console.log(`[${rid}] [API] Response:`, JSON.stringify(result));
+    const result = await api.post<any>(url, data);
+    console.log(`[${rid}] [API] EXIT: SUCCESS — response=${JSON.stringify(result)}`);
     return result;
   } catch (err: any) {
-    console.error(`[${rid}] [API] Error:`, err?.message || err, err?.data ? JSON.stringify(err.data) : '');
+    console.error(`[${rid}] [API] EXIT: FAILED — ${err?.message || err}`);
+    if (err?.data) console.error(`[${rid}] [API] Error data:`, JSON.stringify(err.data));
+    if (err?.stack) console.error(`[${rid}] [API] Stack: ${err.stack}`);
     throw err;
   }
 }
 
 export async function sendEmailNow(chatId: string, data: any) {
   const rid = 'API-' + Date.now().toString(36).toUpperCase();
-  console.log(`[${rid}] [API] POST /content/email/${chatId}/send-now`);
-  console.log(`[${rid}] [API] Payload:`, JSON.stringify(data));
+  console.log(`[${rid}] [API] ENTER: sendEmailNow`);
+  console.log(`[${rid}] [API] INPUT: chatId=${chatId}, data=${JSON.stringify(data)}`);
+  const url = `/content/email/${chatId}/send-now`;
+  const fullUrl = `${API_BASE}${url}`;
+  console.log(`[${rid}] [API] URL: POST ${fullUrl}`);
   try {
-    const result = await api.post<any>(`/content/email/${chatId}/send-now`, data);
-    console.log(`[${rid}] [API] Response:`, JSON.stringify(result));
+    const result = await api.post<any>(url, data);
+    console.log(`[${rid}] [API] EXIT: SUCCESS — response=${JSON.stringify(result)}`);
     return result;
   } catch (err: any) {
-    console.error(`[${rid}] [API] Error:`, err?.message || err, err?.data ? JSON.stringify(err.data) : '');
+    console.error(`[${rid}] [API] EXIT: FAILED — ${err?.message || err}`);
+    if (err?.data) console.error(`[${rid}] [API] Error data:`, JSON.stringify(err.data));
+    if (err?.stack) console.error(`[${rid}] [API] Stack: ${err.stack}`);
     throw err;
   }
 }
