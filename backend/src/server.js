@@ -35,6 +35,7 @@ import { emailCampaignRouter, brevoWebhookRouter } from "./domains/email/routes/
 import { emailWorkflowRouter } from "./domains/email/routes/email-workflow.routes.js";
 import { crmRouter } from "./domains/crm/routes/crm.routes.js";
 import { salesCopilotRouter } from "./routes/sales-copilot.routes.js";
+import { brainRouter } from "./routes/brain.routes.js";
 
 console.log("[2/8] Environment — loading config...");
 dotenv.config();
@@ -363,6 +364,17 @@ app.get("/api/version", (req, res) => {
 });
 
 // ============================================
+// BRAIN UNIVERSAL MIDDLEWARE
+// ============================================
+import { brainMiddleware } from './middleware/brainMiddleware.js';
+app.use('/api', brainMiddleware);
+
+// ============================================
+// BRAIN API ROUTES
+// ============================================
+app.use("/api/brain", brainRouter);
+
+// ============================================
 // ROUTES
 // ============================================
 console.log("[5/8] Routes — registering...");
@@ -418,11 +430,38 @@ app.use((err, req, res, _next) => {
   });
 });
 
+// ============================================
+// BRAIN (Marketing Intelligence Core)
+// ============================================
+let brainService = null;
+if (dbConnected) {
+  const { initializeBrain, getBrain } = await import('./brain/index.js');
+  try {
+    brainService = await initializeBrain(prisma);
+    console.log("[BRAIN] Marketing Intelligence Core initialized");
+  } catch (err) {
+    console.error("[BRAIN] Failed to initialize Brain Core:", err.message);
+    console.error("[BRAIN] Server will continue without Brain features");
+  }
+} else {
+  console.log("[BRAIN] Skipped — no database connection");
+}
+
 console.log("[6/8] Startup — preparing to listen...");
 
 let runningServer;
-function shutdownGracefully(signal) {
+async function shutdownGracefully(signal) {
   console.log(`\n${signal} received, shutting down gracefully...`);
+  if (brainService) {
+    try {
+      const scheduler = brainService.scheduler;
+      if (scheduler && typeof scheduler.shutdown === 'function') {
+        await scheduler.shutdown();
+      }
+    } catch (err) {
+      console.error("[BRAIN] Error during scheduler shutdown:", err.message);
+    }
+  }
   if (runningServer) {
     runningServer.close(() => {
       prisma.$disconnect();

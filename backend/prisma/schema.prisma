@@ -1883,6 +1883,269 @@ model SalesCopilotMemory {
   @@index([createdAt])
 }
 
+// ============================================
+// BRAIN LEARNING SYSTEM (Phase 4)
+// ============================================
+
+model BrainExecution {
+  id        String   @id @default(cuid())
+  requestId String   @unique
+
+  requestType String?
+  module      String?
+  company     String?
+  product     String?
+  chatId      String?
+  userId      String?
+
+  processingTime    Int
+  enginesExecuted   Json?   // ["memory","knowledge",...]
+  confidenceBefore  Float?
+  confidenceAfter   Float?
+  memoryHits        Int     @default(0)
+  memoryMisses      Int     @default(0)
+  evidenceCount     Int     @default(0)
+  reasoningRulesTriggered Json? // [{ rule, severity }]
+  recommendationsGenerated Int @default(0)
+  graphNewEntities         Int @default(0)
+  graphRelationships       Int @default(0)
+  graphDuplicatesMerged    Int @default(0)
+  qualityScore             Float?
+  errors                   Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([module])
+  @@index([company])
+  @@index([product])
+  @@index([chatId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([processingTime])
+}
+
+model BrainFeedback {
+  id        String   @id @default(cuid())
+  executionId String?
+  requestId   String?
+
+  feedbackType String   // explicit, implicit
+  action       String   // approved, edited, rejected, regenerated, published, reused, launched, rerun, refreshed
+  module       String?
+  targetType   String?  // recommendation, entity, relationship, evidence
+  targetId     String?
+  targetValue  String?
+
+  // Source context
+  chatId    String?
+  userId    String?
+  metadata  Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([executionId])
+  @@index([feedbackType])
+  @@index([action])
+  @@index([module])
+  @@index([targetType])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model BrainPattern {
+  id        String   @id @default(cuid())
+  type      String   // competitor_cluster, keyword_cluster, audience_segment, feature_benefit, industry_strategy, campaign_sequence, evidence_source
+
+  name      String
+  description String? @db.Text
+
+  entities  Json?    // ["entity1", "entity2"]
+  frequency Int      @default(1)
+  confidence Float   @default(0.5)
+
+  // Source execution IDs
+  sourceExecutions Json?
+
+  firstSeen DateTime @default(now())
+  lastSeen  DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([type, name])
+  @@index([type])
+  @@index([frequency])
+  @@index([confidence])
+  @@index([lastSeen])
+}
+
+model BrainRulePerformance {
+  id        String   @id @default(cuid())
+  ruleName  String   @unique
+
+  timesTriggered  Int     @default(0)
+  timesUseful     Int     @default(0)
+  falsePositives  Int     @default(0)
+  falseNegatives  Int     @default(0)
+  averageConfidence Float @default(0.5)
+  priority        String  @default("medium") // high, medium, low
+  effectiveness   Float   @default(0.5) // timesUseful / timesTriggered
+
+  lastTriggeredAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([effectiveness])
+  @@index([priority])
+}
+
+model BrainLearningScore {
+  id        String   @id @default(cuid())
+  period    String   // daily, weekly, monthly
+
+  overallScore        Float @default(0)
+  knowledgeCompleteness Float @default(0)
+  recommendationUsefulness Float @default(0)
+  confidenceCalibration   Float @default(0)
+  evidenceReliability    Float @default(0)
+  memoryReuse           Float @default(0)
+  graphQuality          Float @default(0)
+  ruleEffectiveness     Float @default(0)
+
+  totalExecutions       Int @default(0)
+  totalFeedbacks        Int @default(0)
+  totalPatterns         Int @default(0)
+  totalEntities         Int @default(0)
+  totalRelationships    Int @default(0)
+
+  brainIQ               Float @default(0)
+
+  periodStart DateTime
+  periodEnd   DateTime
+
+  createdAt DateTime @default(now())
+
+  @@unique([period, periodStart])
+  @@index([period])
+  @@index([periodStart])
+  @@index([overallScore])
+}
+
+// ============================================
+// MARKETING KNOWLEDGE GRAPH (Phase 3)
+// ============================================
+
+enum GraphEntityType {
+  Company
+  Product
+  Competitor
+  Industry
+  Audience
+  Persona
+  Keyword
+  Feature
+  Benefit
+  PainPoint
+  UseCase
+  Campaign
+  MarketingChannel
+  Website
+  SocialPlatform
+  Country
+  Region
+  Language
+  Technology
+  Integration
+  Pricing
+  Review
+  ContentAsset
+}
+
+enum GraphRelationshipType {
+  OWNS
+  COMPETES_WITH
+  TARGETS
+  BELONGS_TO
+  HAS_FEATURE
+  CREATES
+  SOLVED_BY
+  PROMOTES
+  OPERATES_IN
+  CONNECTS_TO
+}
+
+model GraphEntity {
+  id        String          @id @default(cuid())
+  type      GraphEntityType
+  name      String
+  canonicalName String?     // normalized dedup key
+  aliases   Json?           // [ "alternative names" ]
+
+  // Context
+  chatId    String?
+  userId    String?
+  source    String?         // evidence, brain, import, manual
+  sourceId  String?         // ID of source record (productIntelligence, etc.)
+
+  // Confidence
+  confidence Float    @default(0.5)
+  sourceCount Int     @default(1)
+  lastSeen   DateTime @default(now())
+  freshness  String?  // fresh, stale, unknown
+
+  // Metadata
+  metadata  Json?
+  embedding Json? // reserved for future vector search [Float[]]
+
+  // Relationships
+  outgoingRelationships GraphRelationship[] @relation("Outgoing")
+  incomingRelationships GraphRelationship[] @relation("Incoming")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([type, canonicalName])
+  @@index([type])
+  @@index([name])
+  @@index([canonicalName])
+  @@index([chatId])
+  @@index([userId])
+  @@index([confidence])
+  @@index([lastSeen])
+}
+
+model GraphRelationship {
+  id        String                  @id @default(cuid())
+  type      GraphRelationshipType
+
+  // Source entity
+  fromId    String
+  from      GraphEntity             @relation("Outgoing", fields: [fromId], references: [id], onDelete: Cascade)
+
+  // Target entity
+  toId      String
+  to        GraphEntity             @relation("Incoming", fields: [toId], references: [id], onDelete: Cascade)
+
+  // Confidence
+  confidence   Float    @default(0.7)
+  evidenceCount Int     @default(1)
+  reason        String?
+  sources       Json?   // ["source1", "source2"]
+
+  // Context
+  chatId    String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fromId, toId, type])
+  @@index([fromId])
+  @@index([toId])
+  @@index([type])
+  @@index([confidence])
+  @@index([chatId])
+}
+
 model DealInsight {
   id     String   @id @default(cuid())
   user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
