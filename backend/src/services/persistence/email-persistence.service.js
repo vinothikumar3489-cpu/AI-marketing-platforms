@@ -1,7 +1,9 @@
 import prisma from "../../config/prisma.js";
 
 export async function saveEmailDraft(userId, chatId, emailData) {
+  const fn = 'saveEmailDraft';
   try {
+    console.log(`[EmailPersistence] [${fn}] START: userId=${userId}, chatId=${chatId}`);
     const {
       emailType, goal, tone, audience, language, sender, recipient,
       subject, subjectAlternatives, previewText, greeting, headline,
@@ -59,6 +61,7 @@ export async function saveEmailDraft(userId, chatId, emailData) {
       });
     }
 
+    console.log(`[EmailPersistence] [${fn}] SUCCESS: id=${template.id}`);
     return {
       success: true,
       template,
@@ -67,17 +70,23 @@ export async function saveEmailDraft(userId, chatId, emailData) {
       message: 'Email draft saved successfully'
     };
   } catch (error) {
-    console.error('[EmailPersistence] Save draft error:', error.message);
+    console.error(`[EmailPersistence] [${fn}] FAILED: ${error.message}`);
+    console.error(`[EmailPersistence] [${fn}] Stack: ${error.stack}`);
     return { success: false, error: 'Failed to save email draft', details: error.message };
   }
 }
 
 export async function updateEmailTemplate(templateId, userId, emailData) {
+  const fn = 'updateEmailTemplate';
   try {
+    console.log(`[EmailPersistence] [${fn}] START: templateId=${templateId}, userId=${userId}`);
     const existing = await prisma.emailTemplate.findFirst({
       where: { id: templateId, userId }
     });
-    if (!existing) return { success: false, error: 'Email template not found or access denied' };
+    if (!existing) {
+      console.error(`[EmailPersistence] [${fn}] FAILED: Template ${templateId} not found for user ${userId}`);
+      return { success: false, error: 'Email template not found or access denied' };
+    }
 
     const {
       emailType, goal, tone, audience, language, sender, recipient,
@@ -118,6 +127,7 @@ export async function updateEmailTemplate(templateId, userId, emailData) {
       }
     });
 
+    console.log(`[EmailPersistence] [${fn}] SUCCESS: id=${template.id}`);
     return {
       success: true,
       template,
@@ -126,7 +136,8 @@ export async function updateEmailTemplate(templateId, userId, emailData) {
       message: 'Email template updated successfully'
     };
   } catch (error) {
-    console.error('[EmailPersistence] Update template error:', error.message);
+    console.error(`[EmailPersistence] [${fn}] FAILED: ${error.message}`);
+    console.error(`[EmailPersistence] [${fn}] Stack: ${error.stack}`);
     return { success: false, error: 'Failed to update email template', details: error.message };
   }
 }
@@ -171,11 +182,16 @@ export async function approveEmailTemplate(templateId, userId) {
 }
 
 export async function rejectEmailTemplate(templateId, userId, reason) {
+  const fn = 'rejectEmailTemplate';
   try {
+    console.log(`[EmailPersistence] [${fn}] START: templateId=${templateId}, userId=${userId}`);
     const template = await prisma.emailTemplate.findFirst({
       where: { id: templateId, userId }
     });
-    if (!template) return { success: false, error: 'Email template not found or access denied' };
+    if (!template) {
+      console.error(`[EmailPersistence] [${fn}] FAILED: Template ${templateId} not found for user ${userId}`);
+      return { success: false, error: 'Email template not found or access denied' };
+    }
 
     const updated = await prisma.emailTemplate.update({
       where: { id: templateId },
@@ -185,6 +201,7 @@ export async function rejectEmailTemplate(templateId, userId, reason) {
       }
     });
 
+    console.log(`[EmailPersistence] [${fn}] SUCCESS: id=${updated.id}`);
     return {
       success: true,
       template: updated,
@@ -193,18 +210,25 @@ export async function rejectEmailTemplate(templateId, userId, reason) {
       message: 'Email template rejected'
     };
   } catch (error) {
-    console.error('[EmailPersistence] Reject template error:', error.message);
+    console.error(`[EmailPersistence] [${fn}] FAILED: ${error.message}`);
+    console.error(`[EmailPersistence] [${fn}] Stack: ${error.stack}`);
     return { success: false, error: 'Failed to reject email template', details: error.message };
   }
 }
 
 export async function getEmailTemplate(templateId, userId) {
+  const fn = 'getEmailTemplate';
   try {
+    console.log(`[EmailPersistence] [${fn}] START: templateId=${templateId}`);
     const template = await prisma.emailTemplate.findFirst({
       where: { id: templateId, userId }
     });
-    if (!template) return { success: false, error: 'Email template not found' };
+    if (!template) {
+      console.error(`[EmailPersistence] [${fn}] FAILED: Template ${templateId} not found`);
+      return { success: false, error: 'Email template not found' };
+    }
 
+    console.log(`[EmailPersistence] [${fn}] SUCCESS: id=${template.id}, status=${template.approvalStatus}`);
     return {
       success: true,
       template,
@@ -216,13 +240,16 @@ export async function getEmailTemplate(templateId, userId) {
       validation: template.personalizationFields?.quality || null
     };
   } catch (error) {
-    console.error('[EmailPersistence] Get template error:', error.message);
+    console.error(`[EmailPersistence] [${fn}] FAILED: ${error.message}`);
+    console.error(`[EmailPersistence] [${fn}] Stack: ${error.stack}`);
     return { success: false, error: 'Failed to get email template', details: error.message };
   }
 }
 
 export async function listEmailTemplates(userId, chatId, filters = {}) {
+  const fn = 'listEmailTemplates';
   try {
+    console.log(`[EmailPersistence] [${fn}] START: userId=${userId}, chatId=${chatId}`);
     const { approvalStatus, emailType } = filters;
     const where = { userId, ...(chatId && { chatId }), ...(approvalStatus && { approvalStatus }), ...(emailType && { category: emailType }) };
 
@@ -231,36 +258,49 @@ export async function listEmailTemplates(userId, chatId, filters = {}) {
       orderBy: { createdAt: 'desc' }
     });
 
+    console.log(`[EmailPersistence] [${fn}] SUCCESS: count=${templates.length}`);
     return { success: true, templates, count: templates.length };
   } catch (error) {
-    console.error('[EmailPersistence] List templates error:', error.message);
+    console.error(`[EmailPersistence] [${fn}] FAILED: ${error.message}`);
+    console.error(`[EmailPersistence] [${fn}] Stack: ${error.stack}`);
     return { success: false, error: 'Failed to list email templates', details: error.message };
   }
 }
 
 export async function deleteEmailTemplate(templateId, userId) {
+  const fn = 'deleteEmailTemplate';
   try {
+    console.log(`[EmailPersistence] [${fn}] START: templateId=${templateId}`);
     const template = await prisma.emailTemplate.findFirst({
       where: { id: templateId, userId }
     });
-    if (!template) return { success: false, error: 'Email template not found or access denied' };
-    if (template.approvalStatus === 'APPROVED') return { success: false, error: 'Cannot delete approved email template' };
+    if (!template) {
+      console.error(`[EmailPersistence] [${fn}] FAILED: Template ${templateId} not found`);
+      return { success: false, error: 'Email template not found or access denied' };
+    }
+    if (template.approvalStatus === 'APPROVED') {
+      console.error(`[EmailPersistence] [${fn}] FAILED: Cannot delete approved template ${templateId}`);
+      return { success: false, error: 'Cannot delete approved email template' };
+    }
 
     await prisma.emailTemplate.delete({ where: { id: templateId } });
+    console.log(`[EmailPersistence] [${fn}] SUCCESS: Deleted template ${templateId}`);
     return { success: true, message: 'Email template deleted successfully' };
   } catch (error) {
-    console.error('[EmailPersistence] Delete template error:', error.message);
+    console.error(`[EmailPersistence] [${fn}] FAILED: ${error.message}`);
+    console.error(`[EmailPersistence] [${fn}] Stack: ${error.stack}`);
     return { success: false, error: 'Failed to delete email template', details: error.message };
   }
 }
 
 export async function saveDeliveryRecord(templateId, recipientId, deliveryData) {
+  const fn = 'saveDeliveryRecord';
   try {
+    console.log(`[EmailPersistence] [${fn}] START: templateId=${templateId}, recipientId=${recipientId}`);
     const { brevoMessageId, brevoCampaignId, status, scheduledAt, errorMessage, errorCategory } = deliveryData;
 
     const delivery = await prisma.emailDeliveryLog.create({
       data: {
-        emailCampaignId: templateId,
         recipientEmail: recipientId,
         provider: 'brevo',
         providerMessageId: brevoMessageId,
@@ -270,15 +310,19 @@ export async function saveDeliveryRecord(templateId, recipientId, deliveryData) 
       }
     });
 
+    console.log(`[EmailPersistence] [${fn}] SUCCESS: id=${delivery.id}`);
     return { success: true, delivery, message: 'Delivery record saved successfully' };
   } catch (error) {
-    console.error('[EmailPersistence] Save delivery error:', error.message);
+    console.error(`[EmailPersistence] [${fn}] FAILED: ${error.message}`);
+    console.error(`[EmailPersistence] [${fn}] Stack: ${error.stack}`);
     return { success: false, error: 'Failed to save delivery record', details: error.message };
   }
 }
 
 export async function updateDeliveryStatus(deliveryId, statusData) {
+  const fn = 'updateDeliveryStatus';
   try {
+    console.log(`[EmailPersistence] [${fn}] START: deliveryId=${deliveryId}`);
     const { status, sentAt, deliveredAt, openedAt, clickedAt, bouncedAt, failedAt, errorMessage, errorCategory } = statusData;
 
     const delivery = await prisma.emailDeliveryLog.update({
@@ -286,28 +330,41 @@ export async function updateDeliveryStatus(deliveryId, statusData) {
       data: { status, sentAt, deliveredAt, openedAt, clickedAt, bouncedAt, failedAt, errorMessage, errorCategory }
     });
 
+    console.log(`[EmailPersistence] [${fn}] SUCCESS: id=${delivery.id}, status=${status}`);
     return { success: true, delivery, message: 'Delivery status updated successfully' };
   } catch (error) {
-    console.error('[EmailPersistence] Update delivery status error:', error.message);
+    console.error(`[EmailPersistence] [${fn}] FAILED: ${error.message}`);
+    console.error(`[EmailPersistence] [${fn}] Stack: ${error.stack}`);
     return { success: false, error: 'Failed to update delivery status', details: error.message };
   }
 }
 
 export async function getDeliveryStatus(templateId, userId) {
+  const fn = 'getDeliveryStatus';
   try {
+    console.log(`[EmailPersistence] [${fn}] START: templateId=${templateId}`);
     const template = await prisma.emailTemplate.findFirst({
       where: { id: templateId, userId }
     });
-    if (!template) return { success: false, error: 'Email template not found' };
+    if (!template) {
+      console.error(`[EmailPersistence] [${fn}] FAILED: Template ${templateId} not found`);
+      return { success: false, error: 'Email template not found' };
+    }
 
-    const deliveries = await prisma.emailDeliveryLog.findMany({
-      where: { emailCampaignId: templateId },
-      orderBy: { createdAt: 'desc' }
+    const allLogs = await prisma.emailDeliveryLog.findMany({
+      where: { emailCampaignId: null },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
     });
+    const deliveries = allLogs.filter(d =>
+      d.metadata && typeof d.metadata === 'object' && d.metadata.templateId === templateId
+    );
 
+    console.log(`[EmailPersistence] [${fn}] SUCCESS: count=${deliveries.length}`);
     return { success: true, deliveries, count: deliveries.length };
   } catch (error) {
-    console.error('[EmailPersistence] Get delivery status error:', error.message);
+    console.error(`[EmailPersistence] [${fn}] FAILED: ${error.message}`);
+    console.error(`[EmailPersistence] [${fn}] Stack: ${error.stack}`);
     return { success: false, error: 'Failed to get delivery status', details: error.message };
   }
 }

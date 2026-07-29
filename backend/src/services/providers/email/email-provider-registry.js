@@ -144,37 +144,42 @@ export function logActiveProvider() {
 }
 
 export async function sendEmail({ to, subject, html, text, senderName, replyTo, tags, metadata, idempotencyKey }) {
-  console.log(`[ProviderRegistry] sendEmail() called — to=${to ? maskEmailFromRegistry(to) : '?'}, subject="${(subject || '').substring(0, 40)}"`);
+  const rid = (metadata && metadata.requestId) || (metadata && metadata.request_id) || (tags && tags.find(t => t && t.startsWith && t.startsWith('REQ-'))) || 'NO_RID';
+  console.log(`[${rid}] [ProviderRegistry] STEP 1: sendEmail() called — to=${maskEmailFromRegistry(to)}, subject="${(subject || '').substring(0, 40)}"`);
 
   const providerName = detectProvider();
   if (!providerName) {
-    console.error(`[ProviderRegistry] No provider detected — cannot send`);
+    console.error(`[${rid}] [ProviderRegistry] STEP 1 FAIL: No provider detected — cannot send`);
+    console.error(`[${rid}] [ProviderRegistry] FIX: Set EMAIL_PROVIDER=brevo and configure BREVO_API_KEY/BREVO_FROM_EMAIL`);
     return { success: false, provider: null, status: 'NOT_CONFIGURED', error: { code: 'PROVIDER_NOT_CONFIGURED', message: 'No email provider configured.' } };
   }
 
-  console.log(`[ProviderRegistry] Using provider: ${providerName}`);
+  console.log(`[${rid}] [ProviderRegistry] STEP 1 PASS: Using provider: ${providerName}`);
 
   if (checkCircuitBreaker(providerName)) {
-    console.error(`[ProviderRegistry] Circuit breaker open for ${providerName} — blocking send`);
+    console.error(`[${rid}] [ProviderRegistry] STEP 1 FAIL: Circuit breaker open for ${providerName}`);
     return { success: false, provider: providerName, status: 'CIRCUIT_OPEN', error: { code: 'CIRCUIT_BREAKER_OPEN', message: `Provider "${providerName}" circuit is open.` } };
   }
+  console.log(`[${rid}] [ProviderRegistry] STEP 1 PASS: Circuit breaker closed for ${providerName}`);
 
   const provider = PROVIDERS[providerName];
   if (!provider) {
-    console.error(`[ProviderRegistry] Provider "${providerName}" not registered`);
+    console.error(`[${rid}] [ProviderRegistry] STEP 1 FAIL: Provider "${providerName}" not registered`);
     return { success: false, provider: providerName, status: 'NOT_CONFIGURED', error: { code: 'PROVIDER_NOT_CONFIGURED', message: `Provider "${providerName}" not found.` } };
   }
 
-  console.log(`[ProviderRegistry] Delegating to ${providerName}.send()...`);
+  console.log(`[${rid}] [ProviderRegistry] STEP 2: Delegating to ${providerName}.send()...`);
+  console.log(`[${rid}] [ProviderRegistry] STEP 2 PAYLOAD (masked): to=${maskEmailFromRegistry(to)}, subject="${(subject || '').substring(0, 50)}", htmlLen=${(html || '').length}, textLen=${(text || '').length}, senderName="${senderName || ''}"`);
+
   const result = await provider.send({ to, subject, html, text, senderName, replyTo, tags, metadata, idempotencyKey });
-  console.log(`[ProviderRegistry] ${providerName}.send() result:`, JSON.stringify(result));
+  console.log(`[${rid}] [ProviderRegistry] STEP 3: ${providerName}.send() returned success=${result.success}`);
 
   if (result.success) {
     recordSuccess(providerName);
-    console.log(`[ProviderRegistry] Send succeeded via ${providerName}: messageId=${result.providerMessageId}`);
+    console.log(`[${rid}] [ProviderRegistry] STEP 3 PASS: Send succeeded via ${providerName}: messageId=${result.providerMessageId}`);
   } else {
     recordFailure(providerName);
-    console.error(`[ProviderRegistry] Send failed via ${providerName}: ${result.error?.code || 'UNKNOWN'} — ${result.error?.message || ''}`);
+    console.error(`[${rid}] [ProviderRegistry] STEP 3 FAIL: Send failed via ${providerName}: ${result.error?.code || 'UNKNOWN'} — ${result.error?.message || ''}`);
   }
 
   return result;

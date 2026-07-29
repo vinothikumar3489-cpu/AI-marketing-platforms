@@ -218,29 +218,74 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
   };
 
   const handleSendAction = async () => {
-    if (!selectedChatId || !templateId || !sendEmail) return;
-    setSending(true); setSendResult(null);
+    const rid = 'FE-' + Date.now().toString(36).toUpperCase();
+    console.log(`[${rid}] [EMAIL-FE] STEP 1: handleSendAction called`);
+    console.log(`[${rid}] [EMAIL-FE] STEP 1 DETAILS: selectedChatId=${selectedChatId}, templateId=${templateId}, sendEmail=${sendEmail}, sendMode=${sendMode}`);
+
+    if (!selectedChatId) {
+      console.error(`[${rid}] [EMAIL-FE] STEP 1 FAIL: No selectedChatId`);
+      setSendResult({ success: false, message: 'No chat selected' });
+      return;
+    }
+    if (!templateId) {
+      console.error(`[${rid}] [EMAIL-FE] STEP 1 FAIL: No templateId`);
+      setSendResult({ success: false, message: 'No template — save a draft first' });
+      return;
+    }
+    if (!sendEmail) {
+      console.error(`[${rid}] [EMAIL-FE] STEP 1 FAIL: No recipient email`);
+      setSendResult({ success: false, message: 'Enter a recipient email' });
+      return;
+    }
+
+    const isApproved = approvalStatus === 'APPROVED';
+    if (!isApproved && sendMode !== 'test') {
+      console.error(`[${rid}] [EMAIL-FE] STEP 1 FAIL: Not approved (status=${approvalStatus})`);
+      setSendResult({ success: false, message: 'Approve the email before sending' });
+      return;
+    }
+
+    setSending(true);
+    setSendResult(null);
     try {
       let result;
+      let url: string;
       if (sendMode === 'test') {
+        url = `/content/email/${selectedChatId}/send-test`;
+        console.log(`[${rid}] [EMAIL-FE] STEP 2: Calling POST ${url}`);
+        console.log(`[${rid}] [EMAIL-FE] STEP 2 PAYLOAD:`, JSON.stringify({ templateId, recipientEmail: sendEmail }));
         result = await sendTestEmailContent(selectedChatId, { templateId, recipientEmail: sendEmail });
       } else if (sendMode === 'now') {
+        url = `/content/email/${selectedChatId}/send-now`;
+        console.log(`[${rid}] [EMAIL-FE] STEP 2: Calling POST ${url}`);
+        console.log(`[${rid}] [EMAIL-FE] STEP 2 PAYLOAD:`, JSON.stringify({ templateId, recipientEmail: sendEmail }));
         result = await sendEmailNow(selectedChatId, { templateId, recipientEmail: sendEmail });
       } else {
         const scheduledAt = `${sendDate}T${sendTime}:00`;
+        url = `/content/email/${selectedChatId}/schedule`;
+        console.log(`[${rid}] [EMAIL-FE] STEP 2: Calling POST ${url}`);
+        console.log(`[${rid}] [EMAIL-FE] STEP 2 PAYLOAD:`, JSON.stringify({ templateId, recipientEmail: sendEmail, scheduledAt }));
         result = await scheduleEmailContent(selectedChatId, { templateId, recipientEmail: sendEmail, scheduledAt });
       }
+      console.log(`[${rid}] [EMAIL-FE] STEP 3: API response:`, JSON.stringify(result));
+
       if (result?.success) {
         const parts = [];
         if (result.messageId) parts.push(`ID: ${result.messageId}`);
         if (result.provider) parts.push(`Provider: ${result.provider}`);
         if (result.delivered) parts.push('Delivered');
+        console.log(`[${rid}] [EMAIL-FE] STEP 3 PASS: ${parts.join(' · ')}`);
         setSendResult({ success: true, message: parts.length > 0 ? parts.join(' · ') : sendMode === 'test' ? 'Test email sent' : sendMode === 'now' ? 'Email sent' : 'Email scheduled' });
         if (sendMode !== 'test') loadDeliveries();
       } else {
+        console.error(`[${rid}] [EMAIL-FE] STEP 3 FAIL: ${result?.error || 'Unknown error'}`);
         setSendResult({ success: false, message: result?.error || 'Send failed' });
       }
-    } catch (err: any) { setSendResult({ success: false, message: err?.message || 'Send failed' }); }
+    } catch (err: any) {
+      console.error(`[${rid}] [EMAIL-FE] STEP 3 EXCEPTION: ${err?.message || err}`);
+      console.error(`[${rid}] [EMAIL-FE] Stack:`, err?.stack || 'N/A');
+      setSendResult({ success: false, message: err?.message || 'Send failed' });
+    }
     finally { setSending(false); }
   };
 

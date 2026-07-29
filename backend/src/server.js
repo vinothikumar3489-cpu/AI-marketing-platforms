@@ -9,8 +9,6 @@ import compression from "compression";
 import path from "path";
 import { exec, execSync } from "child_process";
 import { promisify } from "util";
-import { prisma } from "./config/prisma.js";
-import { logProviderConfig } from "./services/provider-health.service.js";
 import { fileURLToPath } from "url";
 import { readFileSync } from "fs";
 
@@ -55,7 +53,7 @@ function getBuildMetadata() {
       nodeEnv: process.env.NODE_ENV || 'development'
     };
   } catch (error) {
-    console.warn('⚠️ Could not retrieve git metadata:', error.message);
+    console.warn('Could not retrieve git metadata:', error.message);
     return {
       branch: 'unknown',
       commitSha: 'unknown',
@@ -65,20 +63,25 @@ function getBuildMetadata() {
 }
 
 const buildMetadata = getBuildMetadata();
-console.log('📦 Build Metadata:', JSON.stringify(buildMetadata, null, 2));
+console.log('Build Metadata:', JSON.stringify(buildMetadata, null, 2));
 
 // Startup env validation
 const REQUIRED_ENV_VARS = ['JWT_SECRET', 'DATABASE_URL'];
 const MISSING_VARS = REQUIRED_ENV_VARS.filter(v => !process.env[v]);
 if (MISSING_VARS.length > 0) {
-  console.error(`❌ Missing required environment variables: ${MISSING_VARS.join(', ')}`);
+  console.error(`Missing required environment variables: ${MISSING_VARS.join(', ')}`);
   process.exit(1);
 }
 if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
-  console.warn('⚠️ JWT_SECRET is too short (< 32 chars). Use a random 64-character string.');
+  console.warn('JWT_SECRET is too short (< 32 chars). Use a random 64-character string.');
 }
 
+// Print masked DATABASE_URL at startup
+const maskedDbUrl = (process.env.DATABASE_URL || 'NOT SET').replace(/:([^@]+)@/, ':***@');
+console.log('[DB] DATABASE_URL:', maskedDbUrl);
+
 console.log("[3/8] Environment — validating variables...");
+const { logProviderConfig } = await import("./services/provider-health.service.js");
 logProviderConfig();
 
 // Log active email provider with detailed health check
@@ -99,7 +102,6 @@ try {
       console.warn(`[Email Provider] Brevo sender not configured — set BREVO_SENDER_EMAIL or BREVO_FROM_EMAIL`);
     }
   }
-  // SMTP health
   const smtpHealth = health.providers?.smtp;
   if (smtpHealth?.configured) {
     console.log(`[Email Provider] SMTP: connected (${process.env.SMTP_HOST || 'unknown'})`);
@@ -116,91 +118,58 @@ const app = express();
 console.log("[4/8] Middleware — configuring...");
 const REQUIRED_PORT = parseInt(process.env.PORT || '5000', 10);
 
-/**
- * Kill any existing process using the specified port
- * This ensures we always start fresh on port 5000
- */
 async function killProcessOnPort(port) {
   try {
     const isWindows = process.platform === 'win32';
-    
     if (isWindows) {
-      // Find process using port on Windows
       try {
         const { stdout } = await execAsync(`netstat -ano | findstr :${port}`);
         const lines = stdout.trim().split('\n');
         const pids = new Set();
-        
         for (const line of lines) {
           const match = line.trim().match(/LISTENING\s+(\d+)/);
-          if (match) {
-            pids.add(match[1]);
-          }
+          if (match) pids.add(match[1]);
         }
-        
-        // Kill each process
         for (const pid of pids) {
           if (pid !== process.pid.toString()) {
             try {
               await execAsync(`taskkill /F /PID ${pid}`);
-              console.log(`✅ Killed existing process on port ${port} (PID: ${pid})`);
-            } catch (err) {
-              // Process might have already exited
-            }
+              console.log(`Killed existing process on port ${port} (PID: ${pid})`);
+            } catch {}
           }
         }
-      } catch (err) {
-        // Port likely not in use - this is fine
-      }
+      } catch {}
     } else {
-      // Unix-like systems (Linux, macOS)
       try {
         const { stdout } = await execAsync(`lsof -ti:${port}`);
         const pids = stdout.trim().split('\n').filter(Boolean);
-        
         for (const pid of pids) {
           if (pid !== process.pid.toString()) {
             try {
               await execAsync(`kill -9 ${pid}`);
-              console.log(`✅ Killed existing process on port ${port} (PID: ${pid})`);
-            } catch (err) {
-              // Process might have already exited
-            }
+              console.log(`Killed existing process on port ${port} (PID: ${pid})`);
+            } catch {}
           }
         }
-      } catch (err) {
-        // Port likely not in use - this is fine
-      }
+      } catch {}
     }
   } catch (error) {
-    console.error(`⚠️ Error checking port ${port}:`, error.message);
+    console.error(`Error checking port ${port}:`, error.message);
   }
 }
 
-/**
- * Start server on REQUIRED_PORT only - never switch ports
- */
 async function startServer(app) {
-  // First, kill any existing process on our port
   await killProcessOnPort(REQUIRED_PORT);
-  
-  // Wait a moment for port to be released
   await new Promise(resolve => setTimeout(resolve, 500));
-  
   return new Promise((resolve, reject) => {
     const server = app.listen(REQUIRED_PORT, () => {
-      console.log(`✅ Backend server running on http://localhost:${REQUIRED_PORT}`);
-      console.log(`📡 API ready at http://localhost:${REQUIRED_PORT}/api`);
+      console.log(`Backend server running on http://localhost:${REQUIRED_PORT}`);
+      console.log(`API ready at http://localhost:${REQUIRED_PORT}/api`);
       resolve(server);
     });
-    
     server.on('error', (err) => {
       if (err.code === 'EADDRINUSE') {
-        reject(new Error(
-          `❌ Port ${REQUIRED_PORT} is still in use. Please manually kill the process:\n` +
-          `   Windows: netstat -ano | findstr :${REQUIRED_PORT}\n` +
-          `   Mac/Linux: lsof -ti:${REQUIRED_PORT} | xargs kill -9`
-        ));
+        reject(new Error(`Port ${REQUIRED_PORT} is still in use. Please manually kill the process.`));
       } else {
         reject(err);
       }
@@ -208,13 +177,9 @@ async function startServer(app) {
   });
 }
 
-// Trust proxy — required for rate limiting behind reverse proxies (e.g. Nginx, Render, Heroku)
 app.set('trust proxy', 1);
-
-// Compression
 app.use(compression());
 
-// Helmet with production-safe Content Security Policy
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -232,106 +197,49 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-// Differentiated Rate Limiting
 const isProduction = process.env.NODE_ENV === "production";
-
 const minute = 60 * 1000;
 
-// General API limiter — applied to all routes
 const generalLimiter = rateLimit({
-  windowMs: 15 * minute,
-  max: isProduction ? 200 : 1000,
-  standardHeaders: true,
-  legacyHeaders: false,
+  windowMs: 15 * minute, max: isProduction ? 200 : 1000,
+  standardHeaders: true, legacyHeaders: false,
   skip: () => !isProduction,
 });
 app.use(generalLimiter);
 
-// Auth limiter — stricter to prevent brute force
 const authLimiter = rateLimit({
-  windowMs: 15 * minute,
-  max: isProduction ? 20 : 100,
-  standardHeaders: true,
-  legacyHeaders: false,
+  windowMs: 15 * minute, max: isProduction ? 20 : 100,
+  standardHeaders: true, legacyHeaders: false,
   skip: () => !isProduction,
 });
 
-// AI route limiter — prevent runaway AI costs
 const aiLimiter = rateLimit({
-  windowMs: 1 * minute,
-  max: isProduction ? 10 : 60,
-  standardHeaders: true,
-  legacyHeaders: false,
+  windowMs: 1 * minute, max: isProduction ? 10 : 60,
+  standardHeaders: true, legacyHeaders: false,
   skip: () => !isProduction,
 });
 
-// Automation & workflow limiter
 const automationLimiter = rateLimit({
-  windowMs: 15 * minute,
-  max: isProduction ? 50 : 200,
-  standardHeaders: true,
-  legacyHeaders: false,
+  windowMs: 15 * minute, max: isProduction ? 50 : 200,
+  standardHeaders: true, legacyHeaders: false,
   skip: () => !isProduction,
 });
 
-// Email send limiter — 5 per hour per IP
-const emailLimiter = rateLimit({
-  windowMs: 60 * minute,
-  max: isProduction ? 5 : 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => !isProduction,
-});
-
-// Image generation limiter — 10 per hour per IP
-const imageLimiter = rateLimit({
-  windowMs: 60 * minute,
-  max: isProduction ? 10 : 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => !isProduction,
-});
-
-// Video render limiter — 3 per hour per IP
-const videoLimiter = rateLimit({
-  windowMs: 60 * minute,
-  max: isProduction ? 3 : 15,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => !isProduction,
-});
-
-// CORS Configuration
 const allowedOrigins = [
   ...(process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',').map(s => s.trim()) : ["http://localhost:5173"]),
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "http://127.0.0.1:5173",
-  "http://localhost:5174",
-  "http://127.0.0.1:5174",
-  "http://localhost:8080",
-  "http://127.0.0.1:8080",
-  "http://192.168.56.1:8080",
+  "http://localhost:3000", "http://127.0.0.1:3000",
+  "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174",
+  "http://localhost:8080", "http://127.0.0.1:8080", "http://192.168.56.1:8080",
   "https://ai-marketing-platforms.vercel.app"
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || !isProduction) {
-      callback(null, true);
-      return;
-    }
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-      return;
-    }
-    // Allow Vercel preview deployments
+    if (!origin || !isProduction) { callback(null, true); return; }
+    if (allowedOrigins.indexOf(origin) !== -1) { callback(null, true); return; }
     try {
       const url = new URL(origin);
-      if (url.hostname.endsWith('.vercel.app')) {
-        callback(null, true);
-        return;
-      }
+      if (url.hostname.endsWith('.vercel.app')) { callback(null, true); return; }
     } catch {}
     callback(new Error("Not allowed by CORS"));
   },
@@ -341,24 +249,108 @@ app.use(cors({
 }));
 
 app.options("*", cors());
-
 app.use(express.json({ limit: isProduction ? "1mb" : "10mb" }));
+
+// Request ID middleware
+import { requestIdMiddleware } from "./utils/request-id.js";
+app.use(requestIdMiddleware);
+
+// ============================================
+// DATABASE CONNECTION
+// ============================================
+import { connectWithRetry, printDatabaseConfig, prisma } from "./config/prisma.js";
+
+let dbConnected = false;
+let dbInfo = null;
+let dbError = null;
+
+console.log("[3a/8] Database — connecting...");
+printDatabaseConfig();
+
+const dbResult = await connectWithRetry(5, 3000);
+if (dbResult.success) {
+  dbConnected = true;
+  dbInfo = dbResult;
+  console.log('');
+  console.log('==============================');
+  console.log('  DATABASE CONNECTED');
+  console.log('==============================');
+  console.log(`  Host: ${dbResult.host}`);
+  console.log(`  Port: ${dbResult.port}`);
+  console.log(`  Database: ${dbResult.database}`);
+  console.log(`  Version: ${dbResult.version}`);
+  console.log('==============================');
+} else {
+  dbError = dbResult;
+  console.error('');
+  console.error('==============================');
+  console.error('  DATABASE FAILED');
+  console.error('==============================');
+  console.error(`  Host: ${dbResult.host}`);
+  console.error(`  Port: ${dbResult.port}`);
+  console.error(`  Database: ${dbResult.database}`);
+  console.error(`  SSL Mode: ${dbResult.sslMode}`);
+  console.error(`  Error: ${dbResult.error}`);
+  console.error(`  Code: ${dbResult.code}`);
+  console.error('==============================');
+  console.error('');
+  console.error('The server will start WITHOUT database connectivity.');
+  console.error('All database-dependent features (auth, email templates, users) will fail.');
+  console.error('Fix DATABASE_URL or PostgreSQL access before using those features.');
+}
+
+// ============================================
+// HEALTH ENDPOINTS
+// ============================================
 console.log("[7/8] Health endpoint — registering...");
 
 app.get("/api/health", async (req, res) => {
-  let dbStatus = "ok";
+  let dbStatus = "error";
+  let dbDetail = null;
   try {
     await prisma.$queryRaw`SELECT 1`;
-  } catch {
+    dbStatus = "ok";
+  } catch (err) {
     dbStatus = "error";
+    dbDetail = err.message;
   }
   res.json({
     status: "ok",
     message: "Backend running successfully",
     environment: process.env.NODE_ENV || "development",
     database: dbStatus,
+    databaseDetail: dbDetail,
     timestamp: new Date().toISOString(),
     commitSha: process.env.APP_COMMIT_SHA || 'unknown',
+  });
+});
+
+app.get("/api/health/database", async (req, res) => {
+  let connected = false;
+  let detail = null;
+  let version = null;
+  let dbName = null;
+
+  try {
+    const result = await prisma.$queryRaw`SELECT 1 as ok, current_database() as db, version() as ver`;
+    connected = true;
+    version = result[0]?.ver || null;
+    dbName = result[0]?.db || null;
+  } catch (err) {
+    detail = { code: err.code || 'N/A', message: err.message };
+  }
+
+  res.json({
+    success: connected,
+    connected,
+    host: dbInfo?.host || 'unknown',
+    port: dbInfo?.port || '5432',
+    database: dbName || dbInfo?.database || 'unknown',
+    version,
+    sslMode: 'require',
+    error: detail,
+    startupConnected: dbConnected,
+    startupError: dbError,
   });
 });
 
@@ -370,6 +362,9 @@ app.get("/api/version", (req, res) => {
   });
 });
 
+// ============================================
+// ROUTES
+// ============================================
 console.log("[5/8] Routes — registering...");
 app.use("/api/auth", authLimiter, authRouter);
 app.use("/api/chats", chatRouter);
@@ -395,14 +390,11 @@ app.use("/api/content/email", emailWorkflowRouter);
 app.use("/api/chats", automationLimiter, crmRouter);
 app.use("/api/chats", automationLimiter, salesCopilotRouter);
 
-// Brevo webhook (no auth required)
 app.use("/api/webhooks/email", brevoWebhookRouter);
 
-// Serve local fallback assets for Cloudinary-free operation
 const localAssetsDir = path.join(process.cwd(), 'local-assets');
 app.use('/api/local-assets', express.static(localAssetsDir));
 
-// 404 handler
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -411,18 +403,14 @@ app.use((req, res) => {
   });
 });
 
-// Global error handler - never crash server
 app.use((err, req, res, _next) => {
-  console.error("❌ Server error:", {
+  console.error("Server error:", {
     message: err.message,
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
     path: req.originalUrl,
     method: req.method,
   });
-
-  // Never expose internal errors in production
   const isDev = process.env.NODE_ENV === 'development';
-  
   res.status(err.status || 500).json({
     success: false,
     error: isDev ? err.message : "Internal server error",
@@ -432,10 +420,9 @@ app.use((err, req, res, _next) => {
 
 console.log("[6/8] Startup — preparing to listen...");
 
-// Graceful shutdown handlers (module-level ref filled after server starts)
 let runningServer;
 function shutdownGracefully(signal) {
-  console.log(`\n⚠️ ${signal} received, shutting down gracefully...`);
+  console.log(`\n${signal} received, shutting down gracefully...`);
   if (runningServer) {
     runningServer.close(() => {
       prisma.$disconnect();
@@ -450,13 +437,12 @@ function shutdownGracefully(signal) {
 process.on('SIGTERM', () => shutdownGracefully('SIGTERM'));
 process.on('SIGINT', () => shutdownGracefully('SIGINT'));
 
-// Start server - always on port 5000
 (async () => {
   try {
     runningServer = await startServer(app);
     console.log("[8/8] Startup Complete — ready for requests");
   } catch (error) {
-    console.error('❌ Failed to start backend server:', error.message);
+    console.error('Failed to start backend server:', error.message);
     process.exit(1);
   }
 })();

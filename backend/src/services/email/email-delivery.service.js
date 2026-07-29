@@ -8,7 +8,8 @@ function generatePlainTextFromHtml(html) {
   return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
 }
 
-export async function deliverEmail({ templateId, chatId, userId, recipientEmail, emailData, mode = 'now', scheduledAt, senderOverride }) {
+export async function deliverEmail({ templateId, chatId, userId, recipientEmail, emailData, mode = 'now', scheduledAt, senderOverride, requestId: rid }) {
+  rid = rid || 'NO_RID';
   const result = {
     success: false, messageId: null, provider: null, status: null,
     delivered: false, sentAt: null, error: null,
@@ -16,7 +17,7 @@ export async function deliverEmail({ templateId, chatId, userId, recipientEmail,
 
   try {
     const shortId = templateId ? templateId.slice(-8) : 'unknown';
-    console.log(`[Email] Preparing email — templateId=${shortId}, mode=${mode}, to=${maskEmail(recipientEmail)}`);
+    console.log(`[${rid}] [deliverEmail] STEP 1: Starting — templateId=${shortId}, mode=${mode}, to=${maskEmail(recipientEmail)}`);
 
     // Step 1: Validate pre-send requirements
     const pf = emailData.personalizationFields || emailData;
@@ -26,68 +27,72 @@ export async function deliverEmail({ templateId, chatId, userId, recipientEmail,
     let htmlContent = template.emailBodyHtml || template.html || pf.html || '';
     let textContent = template.emailBodyText || template.plainText || pf.plainText || '';
 
-    console.log(`[Email] Extracted fields — subject="${(subject || '').substring(0, 50)}", hasHtml=${!!htmlContent}, hasText=${!!textContent}, approvalStatus=${template.approvalStatus}`);
+    console.log(`[${rid}] [deliverEmail] STEP 1 EXTRACTED: subject="${(subject || '').substring(0, 50)}", hasHtml=${!!htmlContent}, hasText=${!!textContent}, approvalStatus=${template.approvalStatus}`);
 
     if (!recipientEmail) {
       result.error = 'recipientEmail is required';
-      console.error(`[Email] Validation failed: recipientEmail is required`);
+      console.error(`[${rid}] [deliverEmail] STEP 1 FAIL: recipientEmail is required — file=email-delivery.service.js, fn=deliverEmail, line=35`);
       return result;
     }
 
     const recipientValidation = validateRecipient(recipientEmail);
     if (!recipientValidation.valid) {
       result.error = recipientValidation.reason;
-      console.error(`[Email] Validation failed: ${recipientValidation.reason}`);
+      console.error(`[${rid}] [deliverEmail] STEP 1 FAIL: recipient validation — ${recipientValidation.reason}`);
       return result;
     }
-    console.log(`[Email] Recipient validated: ${maskEmail(recipientEmail)}`);
+    console.log(`[${rid}] [deliverEmail] STEP 1 PASS: Recipient validated: ${maskEmail(recipientEmail)}`);
 
     if (!subject) {
       result.error = 'Subject is required';
-      console.error(`[Email] Validation failed: Subject is required`);
+      console.error(`[${rid}] [deliverEmail] STEP 1 FAIL: Subject is required`);
       return result;
     }
-    console.log(`[Email] Subject validated: "${subject.substring(0, 50)}"`);
+    console.log(`[${rid}] [deliverEmail] STEP 1 PASS: Subject validated: "${subject.substring(0, 50)}"`);
 
     // Step 2: Generate HTML if missing
     if (!htmlContent) {
-      console.log(`[Email] HTML missing — generating from email data`);
+      console.log(`[${rid}] [deliverEmail] STEP 2: HTML missing — generating from email data`);
       htmlContent = generateEmailHtmlTemplate(pf);
       if (!htmlContent) {
         result.error = 'Failed to generate HTML content';
-        console.error(`[Email] HTML generation failed`);
+        console.error(`[${rid}] [deliverEmail] STEP 2 FAIL: HTML generation returned empty`);
         return result;
       }
-      console.log(`[Email] HTML generated: ${htmlContent.length} chars`);
+      console.log(`[${rid}] [deliverEmail] STEP 2 PASS: HTML generated: ${htmlContent.length} chars`);
+    } else {
+      console.log(`[${rid}] [deliverEmail] STEP 2 PASS: HTML already present: ${htmlContent.length} chars`);
     }
 
     if (!textContent) {
       textContent = generatePlainTextFromHtml(htmlContent);
-      console.log(`[Email] Plain text generated from HTML: ${textContent.length} chars`);
+      console.log(`[${rid}] [deliverEmail] STEP 2: Plain text generated from HTML: ${textContent.length} chars`);
     }
 
-    console.log(`[Email] Validation passed — subjectLen=${subject.length}, htmlLen=${htmlContent.length}, textLen=${textContent.length}`);
+    console.log(`[${rid}] [deliverEmail] VALIDATION SUMMARY: subjectLen=${subject.length}, htmlLen=${htmlContent.length}, textLen=${textContent.length}`);
 
     // Step 3: Verify approval
     if (template.approvalStatus !== 'APPROVED') {
-      result.error = 'Template must be approved before sending';
-      console.error(`[Email] Approval check failed: current=${template.approvalStatus}, required=APPROVED`);
+      result.error = `Template must be approved before sending (current: ${template.approvalStatus})`;
+      console.error(`[${rid}] [deliverEmail] STEP 3 FAIL: Approval check — current=${template.approvalStatus}, required=APPROVED`);
+      console.error(`[${rid}] [deliverEmail] STEP 3 FIX: Call /templates/:id/approve endpoint first`);
       return result;
     }
-    console.log(`[Email] Approval verified: ${template.approvalStatus}`);
+    console.log(`[${rid}] [deliverEmail] STEP 3 PASS: Approval verified: ${template.approvalStatus}`);
 
     // Step 4: Select provider
-    console.log(`[Email] Loading provider from registry...`);
+    console.log(`[${rid}] [deliverEmail] STEP 4: Loading provider from registry...`);
     const providerName = getActiveProvider();
     if (!providerName) {
       result.error = 'No email provider configured';
-      console.error(`[Email] No provider returned from getActiveProvider()`);
+      console.error(`[${rid}] [deliverEmail] STEP 4 FAIL: getActiveProvider() returned null`);
+      console.error(`[${rid}] [deliverEmail] STEP 4 FIX: Set BREVO_API_KEY and BREVO_FROM_EMAIL in .env`);
       return result;
     }
-    console.log(`[Email] Provider = ${providerName}`);
+    console.log(`[${rid}] [deliverEmail] STEP 4 PASS: Provider = ${providerName}`);
 
     const sender = senderOverride || { name: template.senderName, email: template.senderEmail };
-    console.log(`[Email] Sender: name="${sender.name}", email="${sender.email}"`);
+    console.log(`[${rid}] [deliverEmail] STEP 4 SENDER: name="${sender.name}", email="${sender.email}"`);
 
     const sendPayload = {
       to: recipientEmail.trim(),
@@ -97,23 +102,26 @@ export async function deliverEmail({ templateId, chatId, userId, recipientEmail,
       senderName: sender.name,
       replyTo: template.replyToEmail,
       tags: [mode === 'test' ? 'TEST_EMAIL' : mode === 'schedule' ? 'SCHEDULED' : 'PRODUCTION', template.category || 'email'],
-      metadata: { templateId, chatId, userId, mode },
+      metadata: { templateId, chatId, userId, mode, requestId: rid },
     };
 
     if (mode === 'schedule' && scheduledAt) {
       sendPayload.scheduledAt = scheduledAt;
-      console.log(`[Email] Scheduling: scheduledAt=${scheduledAt}`);
+      console.log(`[${rid}] [deliverEmail] STEP 4 SCHEDULE: scheduledAt=${scheduledAt}`);
     }
 
-    console.log(`[Email] Calling sendEmail() on registry (provider=${providerName})...`);
+    console.log(`[${rid}] [deliverEmail] STEP 5: Calling sendEmail() on registry (provider=${providerName})...`);
+    console.log(`[${rid}] [deliverEmail] STEP 5 PAYLOAD: to=${maskEmail(sendPayload.to)}, subject="${sendPayload.subject.substring(0, 50)}", htmlLen=${sendPayload.html.length}, textLen=${sendPayload.text.length}`);
+
     let sendResult;
     try {
       sendResult = await sendEmail(sendPayload);
     } catch (err) {
-      console.error(`[Email] sendEmail() threw exception:`, err.message, err.stack);
+      console.error(`[${rid}] [deliverEmail] STEP 5 EXCEPTION: sendEmail() threw — ${err.message}`);
+      console.error(`[${rid}] [deliverEmail] Stack: ${err.stack}`);
       sendResult = { success: false, error: { code: 'SEND_EXCEPTION', message: err.message } };
     }
-    console.log(`[Email] sendEmail() returned:`, JSON.stringify(sendResult));
+    console.log(`[${rid}] [deliverEmail] STEP 5 RESULT: ${JSON.stringify(sendResult)}`);
 
     if (sendResult.success) {
       result.success = true;
@@ -122,51 +130,52 @@ export async function deliverEmail({ templateId, chatId, userId, recipientEmail,
       result.status = mode === 'schedule' ? 'SCHEDULED' : 'SENT';
       result.delivered = true;
       result.sentAt = sendResult.sentAt || new Date().toISOString();
-      console.log(`[Email] Delivery success — messageId=${result.messageId}, provider=${result.provider}, status=${result.status}`);
+      console.log(`[${rid}] [deliverEmail] STEP 5 PASS: messageId=${result.messageId}, provider=${result.provider}, status=${result.status}`);
     } else {
       result.error = sendResult.error?.message || sendResult.error?.code || 'Send failed';
       result.provider = sendResult.provider || providerName;
       result.status = 'FAILED';
       const errorDetail = sendResult.error?.code ? `${sendResult.error.code}: ${sendResult.error.message}` : JSON.stringify(sendResult.error);
-      console.error(`[Email] Delivery failed — provider=${result.provider}, error=${errorDetail}`);
+      console.error(`[${rid}] [deliverEmail] STEP 5 FAIL: provider=${result.provider}, error=${errorDetail}`);
     }
 
-    // Step 5: Save to database
+    // Step 6: Save to database
     try {
       const deliveryStatus = result.success ? (mode === 'schedule' ? 'SCHEDULED' : 'SENT') : 'FAILED';
-      console.log(`[Email] Storing delivery record — status=${deliveryStatus}`);
+      console.log(`[${rid}] [deliverEmail] STEP 6: Storing delivery record — status=${deliveryStatus}`);
       const delivery = await prisma.emailDeliveryLog.create({
         data: {
-          emailCampaignId: templateId,
           recipientEmail: recipientEmail.trim(),
           provider: result.provider || providerName,
           providerMessageId: result.messageId,
           status: deliveryStatus,
           errorMessage: result.error || null,
-
           sentAt: result.sentAt ? new Date(result.sentAt) : new Date(),
+          metadata: { templateId, chatId, userId, mode },
         }
       });
-      console.log(`[Email] Stored delivery record: id=${delivery.id}, status=${deliveryStatus}`);
+      console.log(`[${rid}] [deliverEmail] STEP 6 PASS: Stored delivery record: id=${delivery.id}`);
 
       await prisma.automationLog.create({
         data: {
           userId, chatId,
           action: mode === 'test' ? 'email_test_sent' : mode === 'schedule' ? 'email_scheduled' : 'email_sent',
           message: `${mode === 'test' ? 'Test' : mode === 'schedule' ? 'Scheduled' : ''} email ${result.success ? 'sent' : 'failed'} to ${maskEmail(recipientEmail)}`,
-          metadata: { templateId, providerMessageId: result.messageId, provider: result.provider, status: deliveryStatus, error: result.error },
+          metadata: { templateId, providerMessageId: result.messageId, provider: result.provider, status: deliveryStatus, error: result.error, requestId: rid },
         }
       });
-      console.log(`[Email] Automation log saved`);
+      console.log(`[${rid}] [deliverEmail] STEP 6 PASS: Automation log saved`);
     } catch (dbErr) {
-      console.error(`[Email] Database save failed:`, dbErr.message, dbErr.stack);
+      console.error(`[${rid}] [deliverEmail] STEP 6 FAIL: Database save — ${dbErr.message}`);
+      console.error(`[${rid}] [deliverEmail] Stack: ${dbErr.stack}`);
     }
 
-    console.log(`[Email] Completed — success=${result.success}, status=${result.status}`);
+    console.log(`[${rid}] [deliverEmail] FINAL: success=${result.success}, status=${result.status}`);
     return result;
 
   } catch (err) {
-    console.error(`[Email] Unexpected exception:`, err.message, err.stack);
+    console.error(`[${rid}] [deliverEmail] UNEXPECTED EXCEPTION: ${err.message}`);
+    console.error(`[${rid}] [deliverEmail] Stack: ${err.stack}`);
     result.error = `Unexpected error: ${err.message}`;
     result.status = 'FAILED';
     return result;

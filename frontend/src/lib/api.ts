@@ -732,11 +732,31 @@ export async function rejectEmailTemplate(templateId: string, reason: string) {
 }
 
 export async function sendTestEmailContent(chatId: string, data: any) {
-  return api.post<any>(`/content/email/${chatId}/send-test`, data);
+  const rid = 'API-' + Date.now().toString(36).toUpperCase();
+  console.log(`[${rid}] [API] POST /content/email/${chatId}/send-test`);
+  console.log(`[${rid}] [API] Payload:`, JSON.stringify(data));
+  try {
+    const result = await api.post<any>(`/content/email/${chatId}/send-test`, data);
+    console.log(`[${rid}] [API] Response:`, JSON.stringify(result));
+    return result;
+  } catch (err: any) {
+    console.error(`[${rid}] [API] Error:`, err?.message || err, err?.data ? JSON.stringify(err.data) : '');
+    throw err;
+  }
 }
 
 export async function sendEmailNow(chatId: string, data: any) {
-  return api.post<any>(`/content/email/${chatId}/send-now`, data);
+  const rid = 'API-' + Date.now().toString(36).toUpperCase();
+  console.log(`[${rid}] [API] POST /content/email/${chatId}/send-now`);
+  console.log(`[${rid}] [API] Payload:`, JSON.stringify(data));
+  try {
+    const result = await api.post<any>(`/content/email/${chatId}/send-now`, data);
+    console.log(`[${rid}] [API] Response:`, JSON.stringify(result));
+    return result;
+  } catch (err: any) {
+    console.error(`[${rid}] [API] Error:`, err?.message || err, err?.data ? JSON.stringify(err.data) : '');
+    throw err;
+  }
 }
 
 export async function scheduleEmailContent(chatId: string, data: any) {
