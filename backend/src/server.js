@@ -463,9 +463,48 @@ if (dbConnected) {
 
 console.log("[6/8] Startup — preparing to listen...");
 
+// ============================================
+// QUEUE WORKERS
+// ============================================
+console.log("[6a/8] Workers — starting queue workers...");
+try {
+  const { startWorkers } = await import("./jobs/worker.js");
+  await startWorkers();
+  console.log("[Workers] Queue workers initialized");
+} catch (err) {
+  console.warn("[Workers] Failed to start queue workers:", err.message);
+  console.warn("[Workers] Email automation and async jobs will not work without Redis.");
+}
+
+console.log("[6b/8] Scheduler — starting scheduled email processor...");
+try {
+  const { startScheduledEmailProcessor } = await import("./jobs/scheduled-email-processor.js");
+  startScheduledEmailProcessor();
+} catch (err) {
+  console.warn("[Scheduler] Failed to start scheduled email processor:", err.message);
+}
+
 let runningServer;
 async function shutdownGracefully(signal) {
   console.log(`\n${signal} received, shutting down gracefully...`);
+  
+  // Stop scheduled email processor
+  try {
+    const { stopScheduledEmailProcessor } = await import("./jobs/scheduled-email-processor.js");
+    stopScheduledEmailProcessor();
+  } catch (err) {
+    console.warn("[Scheduler] Failed to stop scheduled email processor:", err.message);
+  }
+  
+  // Stop workers
+  try {
+    const { stopWorkers } = await import("./jobs/worker.js");
+    await stopWorkers();
+    console.log("[Workers] Queue workers stopped");
+  } catch (err) {
+    console.warn("[Workers] Failed to stop workers:", err.message);
+  }
+  
   if (brainService) {
     try {
       const scheduler = brainService.scheduler;
