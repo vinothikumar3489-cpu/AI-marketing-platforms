@@ -24,6 +24,11 @@ import { ResearchAdapter } from './adapters/ResearchAdapter.js';
 import { WorkflowAdapter } from './adapters/WorkflowAdapter.js';
 import { AdapterEngine } from './adapters/AdapterEngine.js';
 
+// Decision Intelligence Engine
+import { DecisionEngine } from './decision/DecisionEngine.js';
+import { DecisionMemory } from './decision/DecisionMemory.js';
+import { DecisionHealth } from './decision/DecisionHealth.js';
+
 // Agent system
 import { AgentManager } from './agents/AgentManager.js';
 import { AgentRegistry } from './agents/AgentRegistry.js';
@@ -38,6 +43,7 @@ import { AnalyticsAgent } from './agents/agents/AnalyticsAgent.js';
 import { ResearchAgent } from './agents/agents/ResearchAgent.js';
 import { EmailAgent } from './agents/agents/EmailAgent.js';
 import { ExecutiveStrategyAgent } from './agents/agents/ExecutiveStrategyAgent.js';
+import { DecisionAgent } from './agents/agents/DecisionAgent.js';
 
 // Graph module
 import { EntityStore } from './graph/EntityStore.js';
@@ -77,6 +83,9 @@ export function createBrain(prisma) {
   di.register('confidence', ConfidenceEngine);
   di.register('learning', LearningEngine);
   di.register('quality', QualityEngine);
+  di.register('decision', DecisionEngine);
+  di.register('decisionMemory', DecisionMemory);
+  di.register('decisionHealth', DecisionHealth);
   di.register('scheduler', BrainScheduler);
   di.register('health', BrainHealth);
   di.register('orchestrator', BrainOrchestrator);
@@ -177,8 +186,28 @@ function _resolveLearningDependencies(di) {
   }
 }
 
+function _resolveDecisionDependencies(di) {
+  const decisionEngine = di.resolve('decision');
+  const decisionMemory = di.resolve('decisionMemory');
+  const decisionHealth = di.resolve('decisionHealth');
+
+  if (decisionEngine) {
+    const prisma = di.resolve('prisma');
+    if (prisma && decisionMemory && typeof decisionMemory.setPrisma === 'function') {
+      decisionMemory.setPrisma(prisma);
+    }
+    decisionEngine.setDependencies({ decisionMemory, decisionHealth });
+  }
+}
+
 function _initializeAgentSystem(di, service) {
   const registry = new AgentRegistry();
+
+  const decisionAgent = new DecisionAgent();
+  const decisionEngine = di.resolve('decision');
+  if (decisionEngine) {
+    decisionAgent.setEngine(decisionEngine);
+  }
 
   const agents = [
     new SeoAgent(),
@@ -192,6 +221,7 @@ function _initializeAgentSystem(di, service) {
     new ResearchAgent(),
     new EmailAgent(),
     new ExecutiveStrategyAgent(),
+    decisionAgent,
   ];
 
   for (const agent of agents) {
@@ -211,10 +241,12 @@ export async function initializeBrain(prisma) {
 
   _resolveGraphDependencies(di);
   _resolveLearningDependencies(di);
+  _resolveDecisionDependencies(di);
 
   const engineNames = [
     'memory', 'knowledge', 'evidence', 'adapter', 'graph', 'reasoning',
     'recommendations', 'confidence', 'learning', 'quality',
+    'decision', 'decisionMemory', 'decisionHealth',
     'scheduler', 'health',
   ];
 
@@ -283,6 +315,20 @@ export { DIContainer, BrainOrchestrator, BrainHealth, BrainScheduler, BrainServi
 export { BrainRequest, BrainContext, BrainResponse } from './interfaces.js';
 export { BaseEngine } from './engine.js';
 export { generateBrainId, elapsedMs, EngineStatus, HealthStatus, logEngine } from './core.js';
+
+// Decision Intelligence exports
+export { DecisionEngine } from './decision/DecisionEngine.js';
+export { DecisionContext } from './decision/DecisionContext.js';
+export { DecisionScenario } from './decision/DecisionScenario.js';
+export { DecisionComparator } from './decision/DecisionComparator.js';
+export { DecisionSimulator } from './decision/DecisionSimulator.js';
+export { TradeoffAnalyzer } from './decision/TradeoffAnalyzer.js';
+export { RiskAnalyzer } from './decision/RiskAnalyzer.js';
+export { ImpactAnalyzer } from './decision/ImpactAnalyzer.js';
+export { ConstraintEngine } from './decision/ConstraintEngine.js';
+export { DecisionExplainer } from './decision/DecisionExplainer.js';
+export { DecisionMemory } from './decision/DecisionMemory.js';
+export { DecisionHealth } from './decision/DecisionHealth.js';
 
 // Graph exports
 export { EntityStore } from './graph/EntityStore.js';

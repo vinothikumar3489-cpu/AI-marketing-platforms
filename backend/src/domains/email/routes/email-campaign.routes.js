@@ -2,10 +2,11 @@ import crypto from 'crypto';
 import express from 'express';
 import { requireAuth } from "../../../middleware/auth.middleware.js";
 import { getEmailQueue } from '../../../jobs/queues.js';
-import { generateEmailCampaign, sendCampaignEmail, scheduleCampaign, approveCampaign, createRecurringCampaign, listAudienceSegments, createAudienceSegment } from '../../../services/email/email-campaign-generator.service.js';
+import { generateEmailCampaign, sendCampaignEmail, scheduleCampaign, approveCampaign, submitCampaignForReview, requestCampaignChanges, createCampaignVersion, restoreCampaignVersion, fromAssetToEmailCampaign, createRecurringCampaign, listAudienceSegments, createAudienceSegment } from '../../../services/email/email-campaign-generator.service.js';
 import prisma from "../../../config/prisma.js";
 
 export const emailCampaignRouter = express.Router();
+
 emailCampaignRouter.use(requireAuth);
 
 emailCampaignRouter.post('/:chatId/email-campaign/generate', async (req, res) => {
@@ -162,6 +163,36 @@ emailCampaignRouter.post('/:chatId/email-campaign/save-draft', async (req, res) 
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/test-send', async (req, res) => {
+  const { campaignId } = req.params;
+  const userId = req.user?.id;
+  const { recipientEmail, recipientName, companyName } = req.body || {};
+
+  if (!recipientEmail) return res.status(400).json({ success: false, error: 'recipientEmail required' });
+  if (!EMAIL_REGEX.test(recipientEmail)) return res.status(400).json({ success: false, error: 'Invalid recipient email format' });
+
+  try {
+    const campaign = await prisma.emailCampaign.findFirst({
+      where: { id: campaignId, userId },
+      include: { sequenceItems: { take: 1, orderBy: { sequenceOrder: 'asc' } } }
+    });
+    if (!campaign || !campaign.sequenceItems[0]) return res.status(404).json({ success: false, error: 'Campaign or email item not found' });
+
+    const result = await sendCampaignEmail({
+      campaignId,
+      itemId: campaign.sequenceItems[0].id,
+      recipientEmail,
+      recipientName: recipientName || 'Test User',
+      companyName: companyName || campaign.name,
+      requireApproval: false
+    });
+
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/send-test', async (req, res) => {
   const { campaignId } = req.params;
   const userId = req.user?.id;
@@ -182,7 +213,8 @@ emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/send-test', async 
       itemId: campaign.sequenceItems[0].id,
       recipientEmail,
       recipientName: recipientName || 'Test User',
-      companyName: companyName || campaign.name
+      companyName: companyName || campaign.name,
+      requireApproval: false
     });
 
     return res.json(result);
@@ -190,6 +222,22 @@ emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/send-test', async 
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
+function resolveRecipients(body, campaign) {
+  if (body.recipients && Array.isArray(body.recipients) && body.recipients.length > 0) {
+    return body.recipients.map(r => typeof r === 'string' ? { email: r, name: '' } : r);
+  }
+  if (body.recipientEmails && Array.isArray(body.recipientEmails) && body.recipientEmails.length > 0) {
+    return body.recipientEmails.map(email => ({ email, name: '' }));
+  }
+  if (body.recipientEmail && EMAIL_REGEX.test(body.recipientEmail)) {
+    return [{ email: body.recipientEmail, name: body.recipientName || '' }];
+  }
+  if (campaign.audienceSummary && EMAIL_REGEX.test(campaign.audienceSummary)) {
+    return [{ email: campaign.audienceSummary, name: campaign.name || '' }];
+  }
+  return [];
+}
 
 emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/send', async (req, res) => {
   const { campaignId } = req.params;
@@ -203,16 +251,23 @@ emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/send', async (req,
     if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
     if (!campaign.sequenceItems || campaign.sequenceItems.length === 0) return res.status(400).json({ success: false, error: 'No sequence items to send' });
 
+    const recipients = resolveRecipients(req.body, campaign);
+    if (recipients.length === 0) {
+      return res.status(400).json({ success: false, error: 'No valid recipients. Provide recipients array, recipientEmails array, or recipientEmail in the request body.' });
+    }
+
     const results = [];
     for (const item of campaign.sequenceItems) {
-      const result = await sendCampaignEmail({
-        campaignId,
-        itemId: item.id,
-        recipientEmail: campaign.audienceSummary || '',
-        recipientName: campaign.name || 'Valued Customer',
-        companyName: campaign.name || ''
-      });
-      results.push(result);
+      for (const recipient of recipients) {
+        const result = await sendCampaignEmail({
+          campaignId,
+          itemId: item.id,
+          recipientEmail: recipient.email,
+          recipientName: recipient.name || 'Valued Customer',
+          companyName: campaign.name || ''
+        });
+        results.push(result);
+      }
     }
 
     const allSuccess = results.every(r => r.success);
@@ -259,6 +314,33 @@ emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/items/:itemId/rege
     const result = await generateEmailCampaign({ chatId, userId, planId: campaign.campaignPlanId, emailType: 'regenerate' });
     if (!result.success) return res.status(500).json({ success: false, error: result.error });
     return res.json({ success: true, data: result.data });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.patch('/:chatId/email-campaign/:campaignId/items/:itemId', async (req, res) => {
+  const { campaignId, itemId } = req.params;
+  const userId = req.user?.id;
+  const updates = req.body || {};
+
+  try {
+    const campaign = await prisma.emailCampaign.findFirst({ where: { id: campaignId, userId } });
+    if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+
+    const item = await prisma.emailSequenceItem.update({
+      where: { id: itemId },
+      data: {
+        subjectLine: updates.subjectLine,
+        previewText: updates.previewText,
+        emailBodyText: updates.emailBodyText,
+        emailBodyHtml: updates.emailBodyHtml,
+        primaryCta: updates.primaryCta,
+        status: updates.status || 'draft',
+        updatedAt: new Date()
+      }
+    });
+    return res.json({ success: true, data: item });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
@@ -324,6 +406,88 @@ emailCampaignRouter.post('/:chatId/email-campaign/segments', async (req, res) =>
 
   try {
     const result = await createAudienceSegment({ segmentName, conditions, userId });
+    if (!result.success) return res.status(500).json({ success: false, error: result.error });
+    return res.json({ success: true, data: result.data });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/submit-review', async (req, res) => {
+  const { campaignId } = req.params;
+  const userId = req.user?.id;
+
+  try {
+    const campaign = await prisma.emailCampaign.findFirst({ where: { id: campaignId, userId } });
+    if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+
+    const result = await submitCampaignForReview(campaignId);
+    if (!result.success) return res.status(500).json({ success: false, error: result.error });
+    return res.json({ success: true, data: result.data });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/request-changes', async (req, res) => {
+  const { campaignId } = req.params;
+  const userId = req.user?.id;
+  const { feedback } = req.body || {};
+
+  try {
+    const campaign = await prisma.emailCampaign.findFirst({ where: { id: campaignId, userId } });
+    if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+
+    const result = await requestCampaignChanges(campaignId, feedback);
+    if (!result.success) return res.status(500).json({ success: false, error: result.error });
+    return res.json({ success: true, data: result.data });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/versions', async (req, res) => {
+  const { campaignId } = req.params;
+  const userId = req.user?.id;
+  const { reason } = req.body || {};
+
+  try {
+    const campaign = await prisma.emailCampaign.findFirst({ where: { id: campaignId, userId } });
+    if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+
+    const result = await createCampaignVersion(campaignId, reason);
+    if (!result.success) return res.status(500).json({ success: false, error: result.error });
+    return res.json({ success: true, data: result.data });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/versions/:versionId/restore', async (req, res) => {
+  const { campaignId, versionId } = req.params;
+  const userId = req.user?.id;
+
+  try {
+    const campaign = await prisma.emailCampaign.findFirst({ where: { id: campaignId, userId } });
+    if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+
+    const result = await restoreCampaignVersion(campaignId, versionId);
+    if (!result.success) return res.status(500).json({ success: false, error: result.error });
+    return res.json({ success: true, data: result.data });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+emailCampaignRouter.post('/:chatId/email-campaign/from-asset', async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user?.id;
+  const { automationAssetId, ...options } = req.body || {};
+
+  if (!automationAssetId) return res.status(400).json({ success: false, error: 'automationAssetId required' });
+
+  try {
+    const result = await fromAssetToEmailCampaign({ chatId, userId, automationAssetId, options });
     if (!result.success) return res.status(500).json({ success: false, error: result.error });
     return res.json({ success: true, data: result.data });
   } catch (error) {

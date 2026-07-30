@@ -278,6 +278,109 @@ export const getDiagnostics = async (req, res) => {
   }
 };
 
+export const getDecisionDashboard = async (req, res) => {
+  const brain = getBrain();
+  if (!brain) return res.status(503).json({ success: false, error: 'Brain not available' });
+
+  try {
+    const engine = brain.decisionEngine;
+    const memory = brain.decisionMemory;
+    const health = engine?.healthService;
+
+    const engineHealth = engine ? await engine.health() : null;
+    const memoryHealth = memory ? await memory.health() : null;
+    const healthReport = health ? await health.generateReport({ decisionEngine: engine, decisionMemory: memory }) : null;
+    const learningSummary = memory ? await memory.getLearningSummary() : null;
+    const recentDecisions = memory ? await memory.getDecisions({ limit: 20 }) : [];
+
+    return res.json({
+      success: true,
+      dashboard: {
+        engine: engineHealth,
+        memory: memoryHealth,
+        health: healthReport,
+        learning: learningSummary,
+        recentDecisions: recentDecisions.map(d => ({
+          id: d.id,
+          goal: d.goal,
+          selectedStrategy: d.selectedScenario?.label || 'N/A',
+          confidence: d.selectedScenario?.confidence || 0,
+          expectedRoi: d.selectedScenario?.expectedRoi || 0,
+          riskLevel: d.selectedScenario?.risks?.riskLevel || 'unknown',
+          status: d.status,
+          outcomeRecorded: !!d.outcomeRecordedAt,
+          success: d.success,
+          createdAt: d.createdAt,
+        })),
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+export const getDecisionQueue = async (req, res) => {
+  const brain = getBrain();
+  if (!brain) return res.status(503).json({ success: false, error: 'Brain not available' });
+
+  try {
+    const memory = brain.decisionMemory;
+    const pending = memory
+      ? (await memory.getDecisions({ status: 'active' })).filter(d => !d.outcomeRecordedAt)
+      : [];
+
+    return res.json({
+      success: true,
+      decisions: pending.map(d => ({
+        id: d.id,
+        goal: d.goal,
+        selectedStrategy: d.selectedScenario?.label || 'N/A',
+        confidence: d.selectedScenario?.confidence || 0,
+        createdAt: d.createdAt,
+      })),
+      count: pending.length,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+export const getDecisionHealth = async (req, res) => {
+  const brain = getBrain();
+  if (!brain) return res.status(503).json({ success: false, error: 'Brain not available' });
+
+  try {
+    const health = brain.getEngine('decisionHealth');
+    const report = health ? await health.generateReport({
+      decisionEngine: brain.decisionEngine,
+      decisionMemory: brain.decisionMemory,
+    }) : null;
+
+    return res.json({ success: true, health: report });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+export const getDecisionLearning = async (req, res) => {
+  const brain = getBrain();
+  if (!brain) return res.status(503).json({ success: false, error: 'Brain not available' });
+
+  try {
+    const memory = brain.decisionMemory;
+    const learningSummary = memory ? await memory.getLearningSummary() : null;
+    const similarDecisions = memory ? await memory.getSimilarDecisions(req.query.goal || '') : [];
+
+    return res.json({
+      success: true,
+      learning: learningSummary,
+      similarDecisions,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
 export const getExecutions = async (req, res) => {
   const brain = getBrain();
   if (!brain) return res.status(503).json({ success: false, error: 'Brain not available' });

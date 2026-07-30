@@ -79,16 +79,29 @@ function createEmailHandler() {
       });
       if (!campaign || campaign.status !== 'scheduled') return { status: 'skipped', reason: 'Campaign not found or not scheduled' };
 
+      const recipients = job.data.recipients || [];
+      if (recipients.length === 0) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (campaign.audienceSummary && emailRegex.test(campaign.audienceSummary)) {
+          recipients.push({ email: campaign.audienceSummary, name: campaign.name || '' });
+        } else {
+          console.warn(`[EmailWorker] No recipients for scheduled campaign ${campaign.id}`);
+          return { status: 'skipped', reason: 'No recipients configured' };
+        }
+      }
+
       const results = [];
       for (const item of campaign.sequenceItems) {
-        const r = await sendCampaignEmail({
-          campaignId: job.data.campaignId,
-          itemId: item.id,
-          recipientEmail: campaign.audienceSummary || '',
-          recipientName: campaign.name || 'Valued Customer',
-          companyName: campaign.name || ''
-        });
-        results.push(r);
+        for (const recipient of recipients) {
+          const r = await sendCampaignEmail({
+            campaignId: job.data.campaignId,
+            itemId: item.id,
+            recipientEmail: recipient.email,
+            recipientName: recipient.name || campaign.name || 'Valued Customer',
+            companyName: campaign.name || ''
+          });
+          results.push(r);
+        }
       }
 
       const allSuccess = results.every(r => r.success);

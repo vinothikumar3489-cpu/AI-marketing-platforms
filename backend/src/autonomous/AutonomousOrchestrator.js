@@ -10,6 +10,7 @@ import { AlertManager } from './AlertManager.js';
 import { InsightGenerator } from './InsightGenerator.js';
 import { OpportunityScorer } from './OpportunityScorer.js';
 import { AutonomousScheduler } from './AutonomousScheduler.js';
+import { AutonomousDecisionModule } from './AutonomousDecisionModule.js';
 
 export class AutonomousOrchestrator extends BaseAutonomousModule {
   constructor(brainService) {
@@ -31,6 +32,7 @@ export class AutonomousOrchestrator extends BaseAutonomousModule {
     this._registerModule('alertManager', new AlertManager(this._brain));
     this._registerModule('insightGenerator', new InsightGenerator(this._brain));
     this._registerModule('opportunityScorer', new OpportunityScorer(this._brain));
+    this._registerModule('decisionModule', new AutonomousDecisionModule(this._brain));
     this._registerModule('scheduler', new AutonomousScheduler(this._brain));
 
     for (const [name, module] of this._modules) {
@@ -246,6 +248,12 @@ export class AutonomousOrchestrator extends BaseAutonomousModule {
       interval: twentyFourHours,
       handler: async () => { await this.runFullCycle(); },
       immediate: false,
+    });
+
+    scheduler.registerJob('strategicDecisionAnalysis', {
+      interval: twelveHours,
+      handler: async () => { await this.runModule('decisionModule'); },
+      immediate: true,
     });
 
     return scheduler.startAll();

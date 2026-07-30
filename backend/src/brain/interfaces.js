@@ -53,6 +53,7 @@ export class BrainResponse {
     this.data = data.data || null;
     this.context = data.context || null;
     this.decisions = data.decisions || [];
+    this.decisionId = data.decisionId || null;
     this.recommendations = data.recommendations || [];
     this.confidence = data.confidence || null;
     this.insights = data.insights || [];

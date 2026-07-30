@@ -225,12 +225,17 @@ function calculateNextRunTime(schedule) {
 
 function parseRecipients(audienceSummary) {
   if (!audienceSummary) return [];
-  
+
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (emailRegex.test(audienceSummary)) {
     return [{ email: audienceSummary, name: '' }];
   }
-  
+
   const emails = audienceSummary.split(',').map(e => e.trim()).filter(e => emailRegex.test(e));
-  return emails.map(email => ({ email, name: '' }));
+  if (emails.length > 0) {
+    return emails.map(email => ({ email, name: '' }));
+  }
+
+  console.warn(`[ScheduledEmailProcessor] audienceSummary "${audienceSummary}" contains no valid email addresses. Campaign may have a text description instead of recipient list.`);
+  return [];
 }

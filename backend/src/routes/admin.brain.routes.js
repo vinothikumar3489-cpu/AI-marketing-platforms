@@ -12,6 +12,10 @@ import {
   getPerformance,
   getExecutions,
   getDiagnostics,
+  getDecisionDashboard,
+  getDecisionQueue,
+  getDecisionHealth,
+  getDecisionLearning,
 } from '../controllers/admin.brain.controller.js';
 
 export const adminBrainRouter = express.Router();
@@ -28,3 +32,9 @@ adminBrainRouter.get('/recommendations', getRecommendations);
 adminBrainRouter.get('/performance', getPerformance);
 adminBrainRouter.get('/executions', getExecutions);
 adminBrainRouter.get('/diagnostics', getDiagnostics);
+
+// Decision Intelligence admin endpoints
+adminBrainRouter.get('/decisions', getDecisionDashboard);
+adminBrainRouter.get('/decisions/queue', getDecisionQueue);
+adminBrainRouter.get('/decisions/health', getDecisionHealth);
+adminBrainRouter.get('/decisions/learning', getDecisionLearning);

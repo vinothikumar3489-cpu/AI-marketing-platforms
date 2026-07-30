@@ -18,6 +18,28 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: EMAIL_PROVIDER
+        value: brevo
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_FROM_EMAIL
+        sync: false
+      - key: BREVO_FROM_NAME
+        value: AI Marketing Platform
+      - key: BREVO_REPLY_TO
+        sync: false
+      - key: BREVO_SENDER_EMAIL
+        sync: false
+      - key: BREVO_SENDER_NAME
+        sync: false
+      - key: BREVO_WEBHOOK_SECRET
+        sync: false
+      - key: BREVO_SANDBOX
+        sync: false
+      - key: APP_PUBLIC_URL
+        sync: false
       - key: GROQ_API_KEY
         sync: false
       - key: GEMINI_API_KEY
@@ -36,8 +58,6 @@ services:
         sync: false
       - key: DATAFORSEO_PASSWORD
         sync: false
-      - key: EMAIL_PROVIDER
-        sync: false
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
@@ -46,27 +66,31 @@ services:
         sync: false
       - key: SMTP_PASS
         sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: SENDGRID_FROM_EMAIL
+        sync: false
       - key: FAL_KEY
         sync: false
       - key: SHOTSTACK_API_KEY
         sync: false
       - key: CREATOMATE_API_KEY
         sync: false
-      - key: BREVO_API_KEY
-        sync: false
-      - key: BREVO_FROM_EMAIL
-        sync: false
-      - key: BREVO_FROM_NAME
-        sync: false
       - key: JINA_API_KEY
         sync: false
       - key: SERPAPI_API_KEY
-        sync: false
-      - key: REDIS_URL
         sync: false
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
         sync: false
       - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: CEREBRAS_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
         sync: false

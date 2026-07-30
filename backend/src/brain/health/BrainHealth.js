@@ -41,6 +41,7 @@ export class BrainHealth extends BaseEngine {
     const engineNames = [
       'memory', 'knowledge', 'evidence', 'adapter', 'graph', 'reasoning',
       'recommendations', 'confidence', 'learning', 'quality',
+      'decision', 'decisionMemory', 'decisionHealth',
       'scheduler',
     ];
 

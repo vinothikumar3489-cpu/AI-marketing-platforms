@@ -18,6 +18,7 @@ export class BrainOrchestrator extends BaseEngine {
       'confidence',
       'learning',
       'quality',
+      'decision',
     ];
   }
 
@@ -87,12 +88,14 @@ export class BrainOrchestrator extends BaseEngine {
 
     logEngine(this._name, rid, totalElapsed, errors.length ? EngineStatus.FAILED : EngineStatus.COMPLETED);
 
+    const decisionResult = results.decision;
     return new BrainResponse({
       requestId: rid,
       success: errors.length === 0,
       status: errors.length ? 'PARTIAL_FAILURE' : 'COMPLETED',
       context,
-      decisions: [],
+      decisions: decisionResult?.data?.decisions || [],
+      decisionId: decisionResult?.data?.decisionId || null,
       recommendations: context?.recommendations?.items || [],
       confidence: context?.confidence || null,
       insights: [],

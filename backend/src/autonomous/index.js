@@ -11,6 +11,7 @@ import { AlertManager } from './AlertManager.js';
 import { InsightGenerator } from './InsightGenerator.js';
 import { OpportunityScorer } from './OpportunityScorer.js';
 import { AutonomousScheduler } from './AutonomousScheduler.js';
+import { AutonomousDecisionModule } from './AutonomousDecisionModule.js';
 
 let _instance = null;
 

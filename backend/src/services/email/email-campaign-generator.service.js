@@ -632,38 +632,47 @@ export async function generateEmailCampaign({ chatId, userId, planId, campaignPl
     const finalEmail = validation.sanitized || emailData;
     const preview = buildPreviewData(finalEmail);
 
-    const campaignRecord = await prisma.emailCampaign.upsert({
-      where: { id: `${chatId}_${planId || campaignPlanId}` },
-      create: {
-        chatId, userId,
-        campaignPlanId: planId || campaignPlanId,
-        name: `${context.productName || 'Product'} - ${new Date().toLocaleDateString()}`,
-        status: 'draft',
-        approvalStatus: 'DRAFT',
-        sequenceItems: {
-          create: [{
-            sequenceOrder: 1,
-            emailName: `Email 1: ${finalEmail.subjectLine || 'Campaign Email'}`,
-            purpose: 'campaign',
-            subjectLine: finalEmail.subjectLine || '',
-            alternativeSubjectLines: [],
-            previewText: finalEmail.previewText || '',
-            emailBodyText: finalEmail.plainTextBody || '',
-            emailBodyHtml: finalEmail.htmlBody || '',
-            responsiveHtml: buildResponsiveHTML(finalEmail),
-            primaryCta: finalEmail.cta || '',
-            personalizationFields: ['{{firstName}}', '{{companyName}}'],
-            inferenceStatus: 'EVIDENCE_BACKED',
-            preview: preview
-          }]
-        }
-      },
-      update: {
-        status: 'draft',
-        approvalStatus: 'DRAFT',
-        updatedAt: new Date()
-      }
-    });
+    const existingCampaign = planId || campaignPlanId ? await prisma.emailCampaign.findFirst({
+      where: { chatId, campaignPlanId: planId || campaignPlanId },
+      orderBy: { createdAt: 'desc' }
+    }) : null;
+
+    const campaignRecord = existingCampaign
+      ? await prisma.emailCampaign.update({
+          where: { id: existingCampaign.id },
+          data: {
+            status: 'draft',
+            approvalStatus: 'DRAFT',
+            name: `${context.productName || 'Product'} - ${new Date().toLocaleDateString()}`,
+            updatedAt: new Date()
+          }
+        })
+      : await prisma.emailCampaign.create({
+          data: {
+            chatId, userId,
+            campaignPlanId: planId || campaignPlanId,
+            name: `${context.productName || 'Product'} - ${new Date().toLocaleDateString()}`,
+            status: 'draft',
+            approvalStatus: 'DRAFT',
+            sequenceItems: {
+              create: [{
+                sequenceOrder: 1,
+                emailName: `Email 1: ${finalEmail.subjectLine || 'Campaign Email'}`,
+                purpose: 'campaign',
+                subjectLine: finalEmail.subjectLine || '',
+                alternativeSubjectLines: [],
+                previewText: finalEmail.previewText || '',
+                emailBodyText: finalEmail.plainTextBody || '',
+                emailBodyHtml: finalEmail.htmlBody || '',
+                responsiveHtml: buildResponsiveHTML(finalEmail),
+                primaryCta: finalEmail.cta || '',
+                personalizationFields: ['{{firstName}}', '{{companyName}}'],
+                inferenceStatus: 'EVIDENCE_BACKED',
+                preview: preview
+              }]
+            }
+          }
+        });
 
     return {
       success: true,
@@ -720,14 +729,14 @@ function generateFallbackEmail(context) {
   };
 }
 
-export async function sendCampaignEmail({ campaignId, itemId, recipientEmail, recipientName, companyName }) {
+export async function sendCampaignEmail({ campaignId, itemId, recipientEmail, recipientName, companyName, requireApproval = true }) {
   try {
     const item = await prisma.emailSequenceItem.findUnique({ 
       where: { id: itemId },
       include: { campaign: true }
     });
     if (!item) throw new Error('Email item not found');
-    if (item.campaign && item.campaign.approvalStatus !== 'APPROVED') {
+    if (requireApproval && item.campaign && item.campaign.approvalStatus !== 'APPROVED') {
       throw new Error('Campaign must be approved before sending');
     }
 
@@ -844,6 +853,195 @@ export async function createRecurringCampaign({ chatId, userId, name, recurrence
     });
 
     return { success: true, data: result.data };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function submitCampaignForReview(campaignId) {
+  try {
+    const campaign = await prisma.emailCampaign.update({
+      where: { id: campaignId },
+      data: { status: 'pending_review', approvalStatus: 'PENDING_REVIEW', submittedAt: new Date() }
+    });
+    return { success: true, data: campaign };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function requestCampaignChanges(campaignId, feedback) {
+  try {
+    const campaign = await prisma.emailCampaign.update({
+      where: { id: campaignId },
+      data: { status: 'draft', approvalStatus: 'CHANGES_REQUESTED' }
+    });
+    await prisma.emailCampaignLog.create({
+      data: {
+        emailCampaignId: campaignId,
+        action: 'changes_requested',
+        status: 'changes_requested',
+        message: feedback || 'Changes requested',
+        metadata: { feedback, timestamp: new Date().toISOString() }
+      }
+    }).catch(() => {});
+    return { success: true, data: campaign };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function createCampaignVersion(campaignId, reason) {
+  try {
+    const campaign = await prisma.emailCampaign.findUnique({
+      where: { id: campaignId },
+      include: { sequenceItems: true }
+    });
+    if (!campaign) return { success: false, error: 'Campaign not found' };
+
+    const latestVersion = await prisma.emailCampaignVersion.findFirst({
+      where: { emailCampaignId: campaignId },
+      orderBy: { versionNumber: 'desc' }
+    });
+    const nextVersion = (latestVersion?.versionNumber || 0) + 1;
+
+    const version = await prisma.emailCampaignVersion.create({
+      data: {
+        emailCampaignId: campaignId,
+        versionNumber: nextVersion,
+        snapshot: {
+          name: campaign.name,
+          objective: campaign.objective,
+          audienceSummary: campaign.audienceSummary,
+          funnelStage: campaign.funnelStage,
+          status: campaign.status,
+          approvalStatus: campaign.approvalStatus,
+          sequenceItems: campaign.sequenceItems.map(item => ({
+            id: item.id,
+            sequenceOrder: item.sequenceOrder,
+            emailName: item.emailName,
+            subjectLine: item.subjectLine,
+            previewText: item.previewText,
+            emailBodyText: item.emailBodyText,
+            emailBodyHtml: item.emailBodyHtml,
+            primaryCta: item.primaryCta,
+            status: item.status
+          }))
+        },
+        reason: reason || 'Manual version',
+        createdBy: 'system'
+      }
+    });
+    return { success: true, data: version };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function restoreCampaignVersion(campaignId, versionId) {
+  try {
+    const version = await prisma.emailCampaignVersion.findUnique({
+      where: { id: versionId }
+    });
+    if (!version) return { success: false, error: 'Version not found' };
+
+    const snapshot = version.snapshot;
+    if (!snapshot) return { success: false, error: 'Version snapshot is empty' };
+
+    const campaign = await prisma.emailCampaign.update({
+      where: { id: campaignId },
+      data: {
+        name: snapshot.name,
+        objective: snapshot.objective,
+        audienceSummary: snapshot.audienceSummary,
+        funnelStage: snapshot.funnelStage,
+        status: 'draft',
+        approvalStatus: 'DRAFT'
+      }
+    });
+
+    if (snapshot.sequenceItems && snapshot.sequenceItems.length > 0) {
+      await prisma.emailSequenceItem.deleteMany({ where: { emailCampaignId: campaignId } });
+      for (const item of snapshot.sequenceItems) {
+        await prisma.emailSequenceItem.create({
+          data: {
+            emailCampaignId: campaignId,
+            sequenceOrder: item.sequenceOrder,
+            emailName: item.emailName,
+            subjectLine: item.subjectLine,
+            previewText: item.previewText,
+            emailBodyText: item.emailBodyText,
+            emailBodyHtml: item.emailBodyHtml,
+            primaryCta: item.primaryCta,
+            status: item.status || 'draft'
+          }
+        });
+      }
+    }
+
+    await prisma.emailCampaignLog.create({
+      data: {
+        emailCampaignId: campaignId,
+        action: 'version_restored',
+        status: 'restored',
+        message: `Restored to version ${version.versionNumber}`,
+        metadata: { versionId, versionNumber: version.versionNumber, timestamp: new Date().toISOString() }
+      }
+    }).catch(() => {});
+
+    return { success: true, data: campaign };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function fromAssetToEmailCampaign({ chatId, userId, automationAssetId, options = {} }) {
+  try {
+    const asset = await prisma.automationAsset.findUnique({
+      where: { id: automationAssetId }
+    });
+    if (!asset) return { success: false, error: 'Automation asset not found' };
+
+    const content = typeof asset.content === 'string' ? JSON.parse(asset.content) : (asset.content || {});
+    const emailContent = content.emailData || content.email || content;
+
+    const campaign = await prisma.emailCampaign.create({
+      data: {
+        chatId,
+        userId,
+        name: emailContent.subjectLine ? `From Asset: ${emailContent.subjectLine.substring(0, 50)}` : 'From Asset',
+        status: 'draft',
+        approvalStatus: 'NOT_SUBMITTED',
+        campaignPlanId: options.campaignPlanId || null,
+        sequenceItems: {
+          create: [{
+            sequenceOrder: options.sequenceOrder || 1,
+            emailName: emailContent.subjectLine || 'Asset Email',
+            subjectLine: emailContent.subjectLine || '',
+            previewText: emailContent.previewText || '',
+            emailBodyText: emailContent.emailBodyText || emailContent.plainTextBody || emailContent.body || '',
+            emailBodyHtml: emailContent.emailBodyHtml || emailContent.htmlBody || emailContent.html || '',
+            primaryCta: emailContent.primaryCta || emailContent.cta || '',
+            purpose: options.purpose || 'campaign',
+            delayAfterPreviousDays: options.delayAfterPreviousDays || 0,
+            inferenceStatus: 'EVIDENCE_BACKED'
+          }]
+        }
+      },
+      include: { sequenceItems: true }
+    });
+
+    await prisma.emailCampaignLog.create({
+      data: {
+        emailCampaignId: campaign.id,
+        action: 'created_from_asset',
+        status: 'draft',
+        message: `Campaign created from asset ${automationAssetId}`,
+        metadata: { assetId: automationAssetId, timestamp: new Date().toISOString() }
+      }
+    }).catch(() => {});
+
+    return { success: true, data: campaign };
   } catch (error) {
     return { success: false, error: error.message };
   }
