@@ -36,6 +36,8 @@ import { emailWorkflowRouter } from "./domains/email/routes/email-workflow.route
 import { crmRouter } from "./domains/crm/routes/crm.routes.js";
 import { salesCopilotRouter } from "./routes/sales-copilot.routes.js";
 import { brainRouter } from "./routes/brain.routes.js";
+import { adminBrainRouter } from "./routes/admin.brain.routes.js";
+import { intelligenceRouter } from "./routes/intelligence.routes.js";
 
 console.log("[2/8] Environment — loading config...");
 dotenv.config();
@@ -373,6 +375,8 @@ app.use('/api', brainMiddleware);
 // BRAIN API ROUTES
 // ============================================
 app.use("/api/brain", brainRouter);
+app.use("/api/admin/brain", adminBrainRouter);
+app.use("/api/admin/intelligence", intelligenceRouter);
 
 // ============================================
 // ROUTES
@@ -439,6 +443,16 @@ if (dbConnected) {
   try {
     brainService = await initializeBrain(prisma);
     console.log("[BRAIN] Marketing Intelligence Core initialized");
+
+    const { createAutonomousLayer } = await import('./autonomous/index.js');
+    try {
+      const autonomousLayer = createAutonomousLayer(brainService);
+      await autonomousLayer.initialize({ requestId: 'BOOT' });
+      await autonomousLayer.scheduleDefaultJobs();
+      console.log("[AUTONOMOUS] Autonomous Marketing Intelligence Layer initialized");
+    } catch (err) {
+      console.warn("[AUTONOMOUS] Failed to initialize autonomous layer:", err.message);
+    }
   } catch (err) {
     console.error("[BRAIN] Failed to initialize Brain Core:", err.message);
     console.error("[BRAIN] Server will continue without Brain features");
@@ -460,6 +474,15 @@ async function shutdownGracefully(signal) {
       }
     } catch (err) {
       console.error("[BRAIN] Error during scheduler shutdown:", err.message);
+    }
+    try {
+      const { getAutonomousLayer } = await import('./autonomous/index.js');
+      const auto = getAutonomousLayer();
+      if (auto && typeof auto.shutdown === 'function') {
+        await auto.shutdown();
+      }
+    } catch (err) {
+      console.error("[AUTONOMOUS] Error during autonomous shutdown:", err.message);
     }
   }
   if (runningServer) {

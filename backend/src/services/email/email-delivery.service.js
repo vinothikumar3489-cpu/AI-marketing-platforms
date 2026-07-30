@@ -1,15 +1,38 @@
 import { sendEmail, getActiveProvider } from '../providers/email/email-provider-registry.js';
 import { validateRecipient, maskEmail } from '../providers/email/email-provider.interface.js';
 import { generateEmailHtmlTemplate } from './email-html-generator.service.js';
+import { getEmailQueue } from '../../jobs/queues.js';
 import prisma from '../../config/prisma.js';
+
+function sanitizeHtml(html) {
+  if (!html) return '';
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<object[\s\S]*?<\/object>/gi, '')
+    .replace(/<embed[\s\S]*?<\/embed>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')
+    .replace(/\son\w+='[^']*'/gi, '')
+    .replace(/javascript:\s*/gi, '');
+}
 
 function generatePlainTextFromHtml(html) {
   if (!html) return '';
   return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
 }
 
-export async function deliverEmail({ templateId, chatId, userId, recipientEmail, emailData, mode = 'now', scheduledAt, senderOverride, requestId: rid }) {
+export async function deliverEmail({ templateId, chatId, userId, recipientEmail, emailData, mode = 'now', scheduledAt, senderOverride, requestId: rid, useQueue = false }) {
   rid = rid || 'NO_RID';
+
+  // Queue-based delivery when available and requested
+  if (useQueue && mode !== 'test') {
+    const emailQueue = getEmailQueue();
+    if (emailQueue) {
+      await emailQueue.add('send-email', { templateId, chatId, userId, recipientEmail, emailData, mode, scheduledAt, senderOverride });
+      return { success: true, status: 'QUEUED', message: 'Email queued for delivery', provider: null, messageId: null, delivered: false, sentAt: null, error: null };
+    }
+  }
+
   const result = {
     success: false, messageId: null, provider: null, status: null,
     delivered: false, sentAt: null, error: null,
@@ -68,6 +91,9 @@ export async function deliverEmail({ templateId, chatId, userId, recipientEmail,
       textContent = generatePlainTextFromHtml(htmlContent);
       console.log(`[${rid}] [deliverEmail] STEP 2: Plain text generated from HTML: ${textContent.length} chars`);
     }
+
+    htmlContent = sanitizeHtml(htmlContent);
+    console.log(`[${rid}] [deliverEmail] STEP 2: HTML sanitized: ${htmlContent.length} chars`);
 
     console.log(`[${rid}] [deliverEmail] VALIDATION SUMMARY: subjectLen=${subject.length}, htmlLen=${htmlContent.length}, textLen=${textContent.length}`);
 

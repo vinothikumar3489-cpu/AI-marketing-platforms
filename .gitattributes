@@ -1,0 +1,4 @@
+
+# Environment files
+backend/.env linguist-generated
+backend/.env.* linguist-generated

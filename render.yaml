@@ -46,13 +46,23 @@ services:
         sync: false
       - key: SMTP_PASS
         sync: false
-      - key: RESEND_API_KEY
-        sync: false
       - key: FAL_KEY
         sync: false
       - key: SHOTSTACK_API_KEY
         sync: false
       - key: CREATOMATE_API_KEY
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_FROM_EMAIL
+        sync: false
+      - key: BREVO_FROM_NAME
+        sync: false
+      - key: JINA_API_KEY
+        sync: false
+      - key: SERPAPI_API_KEY
+        sync: false
+      - key: REDIS_URL
         sync: false
       - key: CLOUDINARY_CLOUD_NAME
         sync: false

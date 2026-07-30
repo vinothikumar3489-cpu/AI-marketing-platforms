@@ -1,6 +1,7 @@
 import prisma from "../../config/prisma.js";
 import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
 import { sendEmail, getEmailProviderHealth } from "../providers/email/index.js";
+import brevoProvider from "../providers/brevo/brevo.provider.js";
 import { getLatestEvidenceSnapshot } from "../../modules/evidence/evidence.service.js";
 
 function buildRichContext(plan, evidence, productIntelligence, seoData, campaignData, audienceData, competitorData) {

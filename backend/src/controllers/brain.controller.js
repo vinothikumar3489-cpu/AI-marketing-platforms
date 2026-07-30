@@ -3,7 +3,7 @@ import { getBrain } from '../brain/index.js';
 export const dispatchAgentTask = async (req, res) => {
   const brain = getBrain();
   if (!brain) {
-    return res.status(503).json({ success: false, error: 'Brain not available' });
+    return res.status(503).json({ success: false, error: 'Processing service unavailable' });
   }
 
   try {
@@ -14,7 +14,7 @@ export const dispatchAgentTask = async (req, res) => {
 
     const manager = brain.agentManager;
     if (!manager) {
-      return res.status(503).json({ success: false, error: 'AgentManager not available' });
+      return res.status(503).json({ success: false, error: 'Processing service unavailable' });
     }
 
     const result = await manager.processTask({
@@ -27,7 +27,11 @@ export const dispatchAgentTask = async (req, res) => {
     });
 
     const statusCode = result.success ? 200 : 500;
-    return res.status(statusCode).json(result);
+    return res.status(statusCode).json({
+      success: result.success,
+      output: result.output || result.result || null,
+      error: result.error || null,
+    });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -36,18 +40,22 @@ export const dispatchAgentTask = async (req, res) => {
 export const getAgentStatus = async (req, res) => {
   const brain = getBrain();
   if (!brain) {
-    return res.status(503).json({ success: false, error: 'Brain not available' });
+    return res.status(503).json({ success: false, error: 'Processing service unavailable' });
   }
 
   try {
     const manager = brain.agentManager;
     if (!manager) {
-      return res.status(503).json({ success: false, error: 'AgentManager not available' });
+      return res.status(503).json({ success: false, error: 'Processing service unavailable' });
     }
 
     const status = await manager.getStatus();
-    const health = await manager.health();
-    return res.json({ success: true, status, health });
+    return res.json({
+      success: true,
+      agents: status.registeredAgents || 0,
+      active: status.activeTasks || 0,
+      completed: status.completedTasks || 0,
+    });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -56,24 +64,19 @@ export const getAgentStatus = async (req, res) => {
 export const getLearningDashboard = async (req, res) => {
   const brain = getBrain();
   if (!brain) {
-    return res.status(503).json({ success: false, error: 'Brain not available' });
+    return res.status(503).json({ success: false, error: 'Processing service unavailable' });
   }
 
   try {
-    const learningEngine = brain.getEngine('learning');
     const healthService = brain.getEngine('learningHealth');
-    const trendAnalyzer = brain.getEngine('trendAnalyzer');
-    const ruleOptimizer = brain.getEngine('ruleOptimizer');
+    const score = healthService ? await healthService.generateLearningScore() : null;
 
-    const dashboard = {
-      health: healthService ? await healthService.getHealthSummary() : null,
-      score: healthService ? await healthService.generateLearningScore() : null,
-      trends: trendAnalyzer ? await trendAnalyzer.allTrends() : null,
-      rulePerformance: ruleOptimizer ? await ruleOptimizer.getPerformanceReport() : null,
-      learningEngine: learningEngine ? await learningEngine.health() : null,
-    };
-
-    return res.json({ success: true, dashboard });
+    return res.json({
+      success: true,
+      score: score?.brainIQ || 0,
+      coverage: score?.knowledgeCompleteness || 0,
+      accuracy: score?.recommendationUsefulness || 0,
+    });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }

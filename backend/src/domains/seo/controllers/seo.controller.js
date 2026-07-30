@@ -4,20 +4,6 @@ import { getScrapingQueue } from '../../../jobs/queues.js';
 import { buildSEOReport } from "../../../services/seo/seo-report-builder.service.js";
 import { getSEOProviderStatus, getCachedSEOProviderStatus, clearSEOCache, getCacheStats } from "../../../services/seo/seo-provider-router.service.js";
 import { getSearchConsoleStatus } from "../../../providers/googleSearchConsole.service.js";
-import { getBrain } from "../../../brain/index.js";
-
-async function runBrain(request) {
-  try {
-    const brain = getBrain();
-    if (!brain) return null;
-    const brainResponse = await brain.process(request);
-    return brainResponse.toControllerSummary();
-  } catch (e) {
-    console.error("[BRAIN] seo controller:", e.message);
-    return null;
-  }
-}
-
 export const runSeoHandler = async (req, res) => {
   const { chatId } = req.params;
   const userId = req.user?.id;
@@ -40,23 +26,10 @@ export const runSeoHandler = async (req, res) => {
     }
   }
 
-  const brainSummary = await runBrain({
-    module: 'seo',
-    action: 'run_analysis',
-    userId,
-    chatId,
-    companyName: input.companyName || '',
-    website: websiteUrl || '',
-    industry: input.industry || '',
-    productName: input.productName || '',
-    payload: input,
-  });
-
   if (!websiteUrl) {
     return res.status(400).json({
       success: false,
       error: 'Website URL required. Please provide websiteUrl or create a product profile first.',
-      brain: brainSummary,
     });
   }
 
@@ -75,7 +48,6 @@ export const runSeoHandler = async (req, res) => {
         message: 'SEO Analysis started in the background.',
         jobId: job.id,
         statusUrl: `/api/jobs/scraping/${job.id}/status`,
-        brain: brainSummary,
       });
     } catch (queueErr) {
       console.warn('[SEO QUEUE FAILED] falling back to sync:', queueErr.message);
@@ -86,10 +58,10 @@ export const runSeoHandler = async (req, res) => {
 
   try {
     const result = await generateCompleteSeoIntelligence({ chatId, userId, websiteUrl, chat: chatRecord });
-    return res.json({ success: true, message: 'SEO Analysis completed.', ...result, brain: brainSummary });
+    return res.json({ success: true, message: 'SEO Analysis completed.', ...result });
   } catch (syncErr) {
     console.error('[SEO SYNC FAILED]', syncErr);
-    return res.status(500).json({ success: false, error: syncErr.message || 'SEO Analysis failed', brain: brainSummary });
+    return res.status(500).json({ success: false, error: syncErr.message || 'SEO Analysis failed' });
   }
 };
 
@@ -100,13 +72,6 @@ export const getSeoHandler = async (req, res) => {
   if (!chatId || !userId) {
     return res.status(400).json({ success: false, error: 'Missing chatId or user' });
   }
-
-  const brainSummary = await runBrain({
-    module: 'seo',
-    action: 'get_intelligence',
-    userId,
-    chatId,
-  });
 
   try {
     const seo = await prisma.seoIntelligence.findUnique({
@@ -124,7 +89,7 @@ export const getSeoHandler = async (req, res) => {
     });
 
     if (!seo || seo.userId !== userId) {
-      return res.json({ success: true, seoIntelligence: null, brain: brainSummary });
+      return res.json({ success: true, seoIntelligence: null });
     }
 
     const keywordData = seo.keywordIntelligence || seo.keywordOpportunities || {};
@@ -182,10 +147,9 @@ export const getSeoHandler = async (req, res) => {
           coverage: (inputMeta.measuredModules?.length || 0) / ((inputMeta.measuredModules?.length || 0) + (inputMeta.unavailableModules?.length || 1))
         }
       },
-      brain: brainSummary
     });
   } catch (error) {
-    return res.status(500).json({ success: false, error: error.message, brain: brainSummary });
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
 

@@ -226,10 +226,16 @@ export const getFullResults = async (req, res) => {
   console.log('technicalHasAuditData:', !!seoIntelligence?.technicalAuditDetail?.auditData);
   console.log('');
 
-  const agentRuns = await prisma.agentRun.findMany({
+  const agentRunsRaw = await prisma.agentRun.findMany({
     where: { chatId },
     orderBy: { createdAt: 'desc' },
   });
+  const agentRuns = agentRunsRaw.map(r => ({
+    id: r.id,
+    agentType: r.agentType,
+    status: r.status,
+    createdAt: r.createdAt,
+  }));
   let automationPlan = null;
   try {
     automationPlan = await prisma.automationPlan.findUnique({

@@ -69,6 +69,37 @@ function createAIHandler() {
 function createEmailHandler() {
   return async (job) => {
     console.log(`[EmailQueue] Processing job ${job.id} of type ${job.name}`);
+
+    if (job.name === 'scheduled-campaign') {
+      const { sendCampaignEmail } = await import('../services/email/email-campaign-generator.service.js');
+      const prisma = (await import('../config/prisma.js')).default;
+      const campaign = await prisma.emailCampaign.findUnique({
+        where: { id: job.data.campaignId },
+        include: { sequenceItems: { orderBy: { sequenceOrder: 'asc' } } }
+      });
+      if (!campaign || campaign.status !== 'scheduled') return { status: 'skipped', reason: 'Campaign not found or not scheduled' };
+
+      const results = [];
+      for (const item of campaign.sequenceItems) {
+        const r = await sendCampaignEmail({
+          campaignId: job.data.campaignId,
+          itemId: item.id,
+          recipientEmail: campaign.audienceSummary || '',
+          recipientName: campaign.name || 'Valued Customer',
+          companyName: campaign.name || ''
+        });
+        results.push(r);
+      }
+
+      const allSuccess = results.every(r => r.success);
+      await prisma.emailCampaign.update({
+        where: { id: job.data.campaignId },
+        data: { status: allSuccess ? 'sent' : 'failed', sentAt: new Date() }
+      });
+
+      return { success: allSuccess, results };
+    }
+
     const { sendEmail } = await import('../services/providers/email/email-provider-registry.js');
     const result = await sendEmail(job.data);
     if (!result.success) throw new Error(result.error || 'Email send failed');

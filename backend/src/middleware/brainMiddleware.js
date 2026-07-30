@@ -60,32 +60,5 @@ function extractRequestContext(req) {
 }
 
 export async function brainMiddleware(req, res, next) {
-  if (shouldSkip(req.path)) return next();
-
-  const brain = getBrain();
-  if (!brain) return next();
-
-  const module = mapPathToModule(req.path);
-  const context = extractRequestContext(req);
-
-  try {
-    const response = await brain.process({
-      module,
-      action: req.method.toLowerCase(),
-      ...context,
-    });
-    req.brainSummary = response?.toControllerSummary ? response.toControllerSummary() : null;
-  } catch {
-    req.brainSummary = null;
-  }
-
-  const originalJson = res.json.bind(res);
-  res.json = (data) => {
-    if (data && typeof data === 'object' && !data.brainSummary && req.brainSummary) {
-      data.brainSummary = req.brainSummary;
-    }
-    return originalJson(data);
-  };
-
   next();
 }
