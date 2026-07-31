@@ -3,6 +3,7 @@ import { LayoutDashboard, Users, Building, Trello, CheckSquare, Workflow, Upload
 import { CRMDashboard } from './CRMDashboard';
 import { CRMContactsPage } from './CRMContactsPage';
 import { CRMCompaniesPage } from './CRMCompaniesPage';
+import { CRMCompanyDetail } from './CRMCompanyDetail';
 import { CRMPipelineBoard } from './CRMPipelineBoard';
 import { CRMTasksPage } from './CRMTasksPage';
 import { CRMWorkflowList } from './CRMWorkflowList';
@@ -35,6 +36,7 @@ export function CRMWorkspace() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [showCompanyDetail, setShowCompanyDetail] = useState(false);
+  const [showActivityTimeline, setShowActivityTimeline] = useState(false);
 
   function handleCopilotNavigate(view: string) {
     setCopilotView(view);

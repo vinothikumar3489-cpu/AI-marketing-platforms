@@ -42,15 +42,16 @@ Ensure all arrays have at least 3 items. Return ONLY valid JSON.`;
 function getRuleBasedFallback(inputData) {
   const { productName, industry } = inputData;
   return {
-    competitorList: ["Competitor A", "Competitor B", "Competitor C"],
-    competitorStrengths: ["Strong brand", "Large user base", "Feature-rich"],
-    competitorWeaknesses: ["Expensive pricing", "Slow support", "Outdated UI"],
-    pricingInsights: ["Competitors use tiered pricing", "Most expensive at $29/month", "Freemium options available"],
-    positioningComparison: `${productName} should be positioned as a more affordable, user-friendly alternative in the ${industry} industry.`,
-    featureGapAnalysis: ["Gap 1", "Gap 2", "Gap 3"],
-    opportunitiesToBeatCompetitors: ["Better pricing", "Faster onboarding", "More integrations"],
-    recommendedStrategy: "Focus on content marketing and user referrals to drive initial growth.",
-    finalRecommendation: "Start with a freemium model targeting early adopters, then expand to paid tiers."
+    competitorList: [],
+    competitorStrengths: [],
+    competitorWeaknesses: [],
+    pricingInsights: [],
+    positioningComparison: "",
+    featureGapAnalysis: [],
+    opportunitiesToBeatCompetitors: [],
+    recommendedStrategy: "",
+    finalRecommendation: "",
+    fallbackNote: `Competitor analysis could not be generated for ${productName || "this product"} (${industry || "industry unknown"}). No AI provider was available and no verified competitor data could be retrieved. Provide competitor URLs or connect an AI provider to generate a full analysis.`
   };
 }
 

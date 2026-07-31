@@ -22,11 +22,11 @@ export default function DashboardPage() {
 
   const handleNewAnalysis = async (type: 'growth' | 'seo' | 'full') => {
     setShowModal(false);
-    const newChatId = await createChat('New Analysis', 'USER_CLICK_NEW_ANALYSIS');
+    const newChatId = await createChat('New Analysis');
     if (type === 'growth') {
       navigate('/app/growth-workspace');
     } else if (type === 'seo') {
-      navigate('/app/seo-intelligence');
+      navigate('/app/seo');
     } else {
       navigate('/app/growth-workspace');
     }
@@ -181,7 +181,7 @@ export default function DashboardPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '12px', color: '#9aa7bd' }}>Updated: {new Date(p.updatedAt || p.createdAt).toLocaleDateString()}</span>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className="secondary-btn" onClick={() => { selectChat(p.id); navigate('/app/seo-intelligence'); }} style={{ padding: '6px 12px', fontSize: '13px' }}>SEO</button>
+                    <button className="secondary-btn" onClick={() => { selectChat(p.id); navigate('/app/seo'); }} style={{ padding: '6px 12px', fontSize: '13px' }}>SEO</button>
                     <button className="secondary-btn" onClick={() => handleOpen(p.id)} style={{ padding: '6px 12px', fontSize: '13px' }}>Growth</button>
                   </div>
                 </div>

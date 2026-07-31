@@ -409,36 +409,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
       console.log('');
     }
 
-    // Delete old child records BEFORE saving new ones (avoids stale/mixed data)
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('🧹 [SEO SAVE] Cleaning old child records for chat:', chatId);
-    }
-    try {
-      const existingSeo = await prisma.seoIntelligence.findUnique({ where: { chatId }, select: { id: true } });
-      if (existingSeo) {
-        const oldId = existingSeo.id;
-        await prisma.rawCrawlData.deleteMany({ where: { seoIntelligenceId: oldId } });
-        await prisma.technicalSeoAudit.deleteMany({ where: { seoIntelligenceId: oldId } });
-        await prisma.seoScoreBreakdown.deleteMany({ where: { seoIntelligenceId: oldId } });
-        await prisma.keywordIntelligenceRecord.deleteMany({ where: { seoIntelligenceId: oldId } });
-        await prisma.geoIntelligenceRecord.deleteMany({ where: { seoIntelligenceId: oldId } });
-        await prisma.competitorSeoRecord.deleteMany({ where: { seoIntelligenceId: oldId } });
-        await prisma.contentGapRecord.deleteMany({ where: { seoIntelligenceId: oldId } });
-        await prisma.blogIntelligenceRecord.deleteMany({ where: { seoIntelligenceId: oldId } });
-        await prisma.executiveSeoDashboard.deleteMany({ where: { seoIntelligenceId: oldId } });
-        // Delete the main seoIntelligence record (cascade should handle children but we're being explicit)
-        await prisma.seoIntelligence.deleteMany({ where: { id: oldId } });
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('✅ [SEO SAVE] Deleted old SEO record and all children for chat:', chatId);
-        }
-      } else {
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('ℹ️ [SEO SAVE] No existing SEO record found for chat:', chatId);
-        }
-      }
-    } catch (cleanupError) {
-      console.error('❌ [SEO SAVE] Cleanup error (non-fatal):', cleanupError.message);
-    }
+    // Child-record cleanup now happens INSIDE the transaction (atomic with save)
 
     if (process.env.NODE_ENV !== 'production') {
       console.log('💾 [SEO Intelligence] Step 12: Saving to database...');
@@ -475,16 +446,46 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     
     console.log('[SEO] Starting transaction save for chat:', chatId, 'userId:', userId);
     const saved = await prisma.$transaction(async (tx) => {
+      // Clean old child records INSIDE the transaction — atomic with the new save,
+      // so a failed save can never destroy previously persisted data.
+      try {
+        const existingSeo = await tx.seoIntelligence.findUnique({ where: { chatId }, select: { id: true } });
+        if (existingSeo) {
+          const oldId = existingSeo.id;
+          await tx.rawCrawlData.deleteMany({ where: { seoIntelligenceId: oldId } });
+          await tx.technicalSeoAudit.deleteMany({ where: { seoIntelligenceId: oldId } });
+          await tx.seoScoreBreakdown.deleteMany({ where: { seoIntelligenceId: oldId } });
+          await tx.keywordIntelligenceRecord.deleteMany({ where: { seoIntelligenceId: oldId } });
+          await tx.geoIntelligenceRecord.deleteMany({ where: { seoIntelligenceId: oldId } });
+          await tx.competitorSeoRecord.deleteMany({ where: { seoIntelligenceId: oldId } });
+          await tx.contentGapRecord.deleteMany({ where: { seoIntelligenceId: oldId } });
+          await tx.blogIntelligenceRecord.deleteMany({ where: { seoIntelligenceId: oldId } });
+          await tx.executiveSeoDashboard.deleteMany({ where: { seoIntelligenceId: oldId } });
+        }
+      } catch (cleanupError) {
+        console.error('❌ [SEO SAVE] Cleanup error inside transaction:', cleanupError.message);
+      }
+
+      // Preserve previously persisted identity — never overwrite with empty/placeholder values
+      const priorIdentity = await tx.seoIntelligence.findUnique({
+        where: { chatId },
+        select: { companyName: true, productName: true, domain: true, websiteUrl: true },
+      });
+      const safeCompanyName = identity.companyName || priorIdentity?.companyName || '';
+      const safeProductName = identity.productName || priorIdentity?.productName || '';
+      const safeDomain = identity.domain || priorIdentity?.domain || '';
+      const safeWebsiteUrl = identity.websiteUrl || priorIdentity?.websiteUrl || '';
+
       // First, upsert the main SEO intelligence record
       const seoRecord = await tx.seoIntelligence.upsert({
         where: { chatId },
         create: {
           chatId,
           userId,
-          websiteUrl: identity.websiteUrl,
-          domain: identity.domain,
-          companyName: identity.companyName,
-          productName: identity.productName,
+          websiteUrl: safeWebsiteUrl,
+          domain: safeDomain,
+          companyName: safeCompanyName,
+          productName: safeProductName,
           seoScore: safeSeoScores.overall,
           technicalAudit: technicalAudit,
           keywordOpportunities: keywordIntelligence,
@@ -497,23 +498,23 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
           status: 'completed'
         },
         update: {
-          websiteUrl: identity.websiteUrl,
-          domain: identity.domain,
-          companyName: identity.companyName,
-          productName: identity.productName,
+          websiteUrl: safeWebsiteUrl,
+          domain: safeDomain,
+          companyName: safeCompanyName,
+          productName: safeProductName,
           seoScore: safeSeoScores.overall,
           technicalAudit: technicalAudit,
           keywordOpportunities: keywordIntelligence,
           competitorKeywords: competitorIntelligence,
-        contentGaps: contentGapIntelligence,
-        aiVisibility: geoIntelligence,
-        blogIdeas: blogIntelligence,
-        providers: researchData.sources,
-        warnings: researchData.warnings,
-        status: 'completed',
-        updatedAt: new Date()
-      }
-    });
+          contentGaps: contentGapIntelligence,
+          aiVisibility: geoIntelligence,
+          blogIdeas: blogIntelligence,
+          providers: researchData.sources,
+          warnings: researchData.warnings,
+          status: 'completed',
+          updatedAt: new Date()
+        }
+      });
 
     const savedId = seoRecord.id;
 

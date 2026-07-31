@@ -24,13 +24,41 @@ export class AutonomousDecisionModule extends BaseAutonomousModule {
     const recommendations = brain?.getEngine?.('recommendations');
     const confidence = brain?.getEngine?.('confidence');
 
-    const knowledgeData = knowledge ? await knowledge.execute({}).catch(() => null) : null;
-    const evidenceData = evidence ? await evidence.execute({}).catch(() => null) : null;
-    const recData = recommendations ? await recommendations.execute({}).catch(() => null) : null;
-    const confidenceData = confidence ? await confidence.execute({}).catch(() => null) : null;
+    const baseContext = {
+      ...(context || {}),
+      requestId: context?.requestId || `AUTO-${Date.now()}`,
+      request: context?.request || {
+        companyName: context?.companyName || '',
+        productName: context?.productName || '',
+        website: context?.website || '',
+        industry: context?.industry || '',
+        chatId: context?.chatId || '',
+        userId: context?.userId || '',
+      },
+      company: context?.company || (context?.companyName ? { name: context.companyName } : {}),
+      product: context?.product || (context?.productName ? { name: context.productName } : {}),
+    };
 
-    const companyName = knowledgeData?.company?.name || 'Unknown';
-    const productName = knowledgeData?.product?.name || 'Unknown';
+    const runEngine = async (engine) => {
+      if (!engine) return null;
+      try {
+        const result = await engine.execute(baseContext);
+        return result?.data || result || null;
+      } catch (err) {
+        console.error(`[AutonomousDecisionModule] engine ${engine._name} failed: ${err?.message}`);
+        return null;
+      }
+    };
+
+    const [knowledgeData, evidenceData, recData, confidenceData] = await Promise.all([
+      runEngine(knowledge),
+      runEngine(evidence),
+      runEngine(recommendations),
+      runEngine(confidence),
+    ]);
+
+    const companyName = knowledgeData?.company?.name || baseContext.request.companyName || 'Unknown';
+    const productName = knowledgeData?.product?.name || baseContext.request.productName || 'Unknown';
 
     const goals = this._generateAutonomousGoals(knowledgeData, evidenceData, confidenceData);
 

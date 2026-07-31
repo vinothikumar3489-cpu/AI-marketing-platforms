@@ -288,7 +288,7 @@ export default function SEOIntelligencePage() {
       setMode('creating');
       setCreatingChat(true);
       try {
-        chatId = await createChat('New SEO Analysis', 'ANALYSIS_RUN_NO_CHAT');
+        chatId = await createChat('New SEO Analysis');
         navigate('/app/seo', { replace: true });
       } catch (e: any) {
         setError('Failed to create project: ' + (e.message || 'Unknown error'));
@@ -322,7 +322,7 @@ export default function SEOIntelligencePage() {
       }
 
       console.log('[SEO UI] refreshing full results');
-      await loadFullResults(chatId, true);
+      await loadFullResults(chatId);
 
       // Crash detector: find risky objects in full results after refresh
       if (import.meta.env.DEV) {
@@ -495,6 +495,16 @@ export default function SEOIntelligencePage() {
 
       {mode === 'form' && !hasData && !loading && (
         <EnterpriseEmptyState title="No SEO data yet" message="Enter a URL and run the analysis to generate SEO & GEO intelligence." icon={Search} />
+      )}
+
+      {mode === 'results' && !hasData && !loading && (
+        <EnterpriseEmptyState
+          title="Analysis completed but no data was returned"
+          message="The SEO pipeline finished without producing usable results. This can happen when website scraping or provider APIs are unavailable. Check the backend logs, then retry."
+          icon={AlertTriangle}
+          action={() => run()}
+          actionLabel="Retry Analysis"
+        />
       )}
 
       

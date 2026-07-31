@@ -27,11 +27,12 @@ export function SeoIntelligencePage() {
     (async () => {
       try {
         const resp = await api.get(`/api/chats/${chatId}/seo-intelligence`);
-        if (resp?.data?.success && resp.data.seoAnalysis) {
-          setData(resp.data.seoAnalysis);
+        // api.get unwraps { success, data } — the SEO payload lives on the response itself
+        if (resp?.success && (resp.seoIntelligence || resp.data?.seoAnalysis)) {
+          setData(resp.seoIntelligence || resp.data.seoAnalysis);
         }
-      } catch (e) {
-        // silent
+      } catch (e: any) {
+        console.warn('[SEO] Failed to load existing analysis:', e?.message || e);
       }
     })();
   }, [chatId]);
@@ -42,8 +43,11 @@ export function SeoIntelligencePage() {
     setError(null);
     try {
       const resp = await api.post(`/api/chats/${chatId}/seo-intelligence/run`, form);
-      if (resp?.data?.success) {
-        setData(resp.data.seoAnalysis);
+      // api.post unwraps { success, data } — the run response includes the analysis inline
+      if (resp?.success) {
+        setData(resp.seoIntelligence || resp.data?.seoAnalysis || null);
+      } else {
+        setError(resp?.error || "Failed to run SEO analysis");
       }
     } catch (e: any) {
       const msg = e?.response?.data?.error || "Failed to run SEO analysis";
@@ -141,13 +145,13 @@ export function SeoIntelligencePage() {
               <div className="flex items-center gap-3 mb-2">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Overall SEO Score</div>
               </div>
-              <div className="text-3xl font-bold text-brand-blue">{data.seoScore || 0}/100</div>
+              <div className="text-3xl font-bold text-brand-blue">{data.seoScore != null ? `${data.seoScore}/100` : '—'}</div>
             </div>
             <div className="glass rounded-3xl p-5 border border-white/10">
               <div className="flex items-center gap-3 mb-2">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">PageSpeed Score</div>
               </div>
-              <div className="text-3xl font-bold text-brand-purple">{data.pageSpeedScore || 0}/100</div>
+              <div className="text-3xl font-bold text-brand-purple">{data.pageSpeedScore != null ? `${data.pageSpeedScore}/100` : '—'}</div>
             </div>
           </div>
 

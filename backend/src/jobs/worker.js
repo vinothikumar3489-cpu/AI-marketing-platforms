@@ -61,8 +61,17 @@ function createScrapingHandler() {
 
 function createAIHandler() {
   return async (job) => {
-    console.log(`[AIQueue] Processing job ${job.id}`);
-    return { status: 'success' };
+    console.log(`[AIQueue] Processing job ${job.id} of type ${job.name}`);
+
+    if (job.name === 'content-generation') {
+      const { generateSingleModule } = await import('../services/execution/marketing-execution.service.js');
+      const moduleType = job.data?.moduleType || job.data?.type;
+      const context = job.data?.context || job.data;
+      if (!moduleType) throw new Error('AI content-generation job missing moduleType');
+      return await generateSingleModule(moduleType, context);
+    }
+
+    throw new Error(`Unknown AI job name: ${job.name}`);
   };
 }
 

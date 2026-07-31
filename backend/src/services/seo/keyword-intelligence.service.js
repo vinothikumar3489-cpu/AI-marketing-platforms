@@ -4,6 +4,22 @@ import { asArray } from "../../utils/text.util.js";
 import { logEvidenceError } from "../../utils/evidence-logger.js";
 import { callAI } from "../../ai/services/aiRouter.service.js";
 
+const GROQ_TIMEOUT_MS = 30000;
+
+async function fetchGroqCompletion(payload) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GROQ_TIMEOUT_MS);
+  try {
+    return await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      signal: controller.signal,
+      ...payload,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ============================================
 // KEYWORD INTELLIGENCE ENGINE
 // ============================================
@@ -200,8 +216,7 @@ Rules:
 - All keywords must be directly relevant to ${productName || 'the product'} in ${industry || 'the industry'}
 - No generic terms like "software", "solution", "platform" alone without context
 - Prioritize specific, actionable, searchable phrases`;
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
+    const response = await fetchGroqCompletion({
       headers: {
         'Authorization': `Bearer ${GROQ_API_KEY}`,
         'Content-Type': 'application/json'
@@ -724,8 +739,7 @@ RULES (strict):
 - Every keyword MUST be a complete phrase (noun phrase or question) — never a fragment
 - Max 8 per category`;
 
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
+      const response = await fetchGroqCompletion({
         headers: {
           'Authorization': `Bearer ${GROQ_API_KEY}`,
           'Content-Type': 'application/json'
@@ -929,8 +943,7 @@ ${allKeywords.join(', ')}
 Return ONLY valid JSON:
 [{"name": "cluster name", "keywords": ["kw1", "kw2"], "priority": 1}]`;
 
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
+      const response = await fetchGroqCompletion({
         headers: {
           'Authorization': `Bearer ${GROQ_API_KEY}`,
           'Content-Type': 'application/json'

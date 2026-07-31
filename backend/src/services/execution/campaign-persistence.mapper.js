@@ -3,18 +3,21 @@ export function mapCampaignPlanToPersistence(generatedPlan, { userId, chatId, ex
   const meta = d._metadata || {};
   const nextVersion = (existingPlan?.version ?? 0) + 1;
 
+  // Never null-out previously persisted values on regeneration — merge with prior record.
+  const mergeField = (value, prior) => (value !== null && value !== undefined ? value : prior);
+
   const base = {
-    executiveSummary: d.executiveSummary ?? null,
-    businessGoal: d.businessGoal ?? null,
-    campaignObjective: d.campaignObjective ?? null,
-    audienceSelection: d.audienceSelection ?? null,
-    channelRecommendations: d.channelRecommendations ?? null,
-    timeline: d.timeline ?? null,
-    marketingFunnel: d.marketingFunnel ?? null,
-    kpiFramework: d.kpiFramework ?? null,
-    riskAssessment: d.riskAssessment ?? null,
-    opportunityAssessment: d.opportunityAssessment ?? null,
-    nextActions: d.nextActions ?? d.executiveSummary?.nextActions ?? null,
+    executiveSummary: mergeField(d.executiveSummary, existingPlan?.executiveSummary),
+    businessGoal: mergeField(d.businessGoal, existingPlan?.businessGoal),
+    campaignObjective: mergeField(d.campaignObjective, existingPlan?.campaignObjective),
+    audienceSelection: mergeField(d.audienceSelection, existingPlan?.audienceSelection),
+    channelRecommendations: mergeField(d.channelRecommendations, existingPlan?.channelRecommendations),
+    timeline: mergeField(d.timeline, existingPlan?.timeline),
+    marketingFunnel: mergeField(d.marketingFunnel, existingPlan?.marketingFunnel),
+    kpiFramework: mergeField(d.kpiFramework, existingPlan?.kpiFramework),
+    riskAssessment: mergeField(d.riskAssessment, existingPlan?.riskAssessment),
+    opportunityAssessment: mergeField(d.opportunityAssessment, existingPlan?.opportunityAssessment),
+    nextActions: mergeField(d.nextActions ?? d.executiveSummary?.nextActions, existingPlan?.nextActions),
     status: "draft",
     provider: meta.provider ?? "ai",
     fallbackUsed: meta.fallbackUsed ?? false,

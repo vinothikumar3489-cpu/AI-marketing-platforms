@@ -79,6 +79,13 @@ function asArray(value) {
 // MAIN UNIFIED ANALYSIS FUNCTION
 // ============================================
 
+const firstStringValue = (list) => {
+  const item = Array.isArray(list) ? list[0] : null;
+  if (item == null) return null;
+  if (typeof item === 'string') return item.trim() || null;
+  return (item.value || item.title || item.name || item.goal || item.opportunity || item.channel || '').trim() || null;
+};
+
 export async function runFullGrowthAnalysis({ chatId, userId, input }) {
   console.log('ðŸš€ [Growth Workspace] Starting full analysis:', { chatId, userId, productName: input.productName });
 
@@ -244,12 +251,14 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     // Validate user-provided names against tagline/UI patterns to prevent leakage
     const validatedBrandName = input.brandName && isValidProductIdentity(input.brandName) ? input.brandName : null;
     const validatedCompanyName = input.companyName && isValidProductIdentity(input.companyName) ? input.companyName : null;
-    input.productName = validatedBrandName || identity.productName;
-    input.companyName = validatedCompanyName || identity.companyName;
-    input.industry = input.industry || identity.industry;
-    input.businessModel = identity.businessModel;
-    input.businessCategory = identity.businessCategory;
-    input.companySize = identity.companySize;
+    // Never overwrite verified identity with placeholders — fall back in priority order:
+    // user-validated > derived identity > raw user input
+    input.productName = validatedBrandName || identity.productName || (input.productName && isValidProductIdentity(input.productName) ? input.productName : '') || 'Unnamed Product';
+    input.companyName = validatedCompanyName || identity.companyName || (input.companyName && isValidProductIdentity(input.companyName) ? input.companyName : '') || input.productName;
+    input.industry = input.industry || identity.industry || '';
+    input.businessModel = identity.businessModel || input.businessModel || '';
+    input.businessCategory = identity.businessCategory || '';
+    input.companySize = identity.companySize || '';
 
     // [Business Intelligence] Collect enterprise-grade intelligence
     console.log('[Business Intelligence] Starting enterprise intelligence collection');
@@ -1130,6 +1139,13 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
             growthSummary,
             metadata: {
               growthSummary,
+              steps: steps.map(({ status, provider, failureType, responseReceived, jsonParsed, confidenceScore }) => ({
+                status, provider, failureType: failureType || null,
+                responseReceived, jsonParsed, confidenceScore: confidenceScore ?? null,
+              })),
+              warnings,
+              overallStatus,
+              usedFallback: steps.some(s => s.provider === 'fallback'),
               generatedAt: new Date().toISOString()
             }
           },
@@ -1143,6 +1159,13 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
             growthSummary,
             metadata: {
               growthSummary,
+              steps: steps.map(({ status, provider, failureType, responseReceived, jsonParsed, confidenceScore }) => ({
+                status, provider, failureType: failureType || null,
+                responseReceived, jsonParsed, confidenceScore: confidenceScore ?? null,
+              })),
+              warnings,
+              overallStatus,
+              usedFallback: steps.some(s => s.provider === 'fallback'),
               generatedAt: new Date().toISOString()
             }
           },
@@ -1278,6 +1301,33 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       warnings.push(...biWarnings.map(w => `[Business Intelligence] ${w}`));
     }
 
+    const actionPlanBuckets = Object.values(campaignData.actionPlan || {}).find(b => Array.isArray(b) && b.length > 0) || [];
+    const summary = {
+      overallGrowthScore,
+      marketOpportunityScore,
+      competitivePositionScore,
+      audienceClarityScore,
+      campaignReadinessScore,
+      brandAuthorityScore,
+      revenuePotentialScore,
+      productMaturityScore,
+      goToMarketReadinessScore,
+      channelReadinessScore,
+      pricingCompetitivenessScore,
+      viralityScore,
+      confidenceScore,
+      growthScoreStatus,
+      topRecommendation: growthSummary.topRecommendation || null,
+      primaryRisk: growthSummary.primaryRisk || null,
+      immediateAction: growthSummary.immediateAction || null,
+      bestChannel: normalizedResults.channel?.primaryChannel || normalizedResults.channel?.recommendedChannels?.[0]?.channel || normalizedResults.channel?.recommendedChannels?.[0]?.name || null,
+      topOpportunity: firstStringValue(marketData.opportunities) || firstStringValue(marketData.growthOpportunities) || null,
+      topRisk: firstStringValue(marketData.risks) || firstStringValue(marketData.marketRisks) || null,
+      nextAction: firstStringValue(campaignData.nextActions) || firstStringValue(actionPlanBuckets) || firstStringValue(campaignData.creativeAngles) || firstStringValue(campaignData.campaignIdeas) || null,
+      completedSteps: steps.filter(s => s.status === 'completed').length,
+      progress: Math.round((steps.filter(s => s.status === 'completed').length / steps.length) * 100)
+    };
+
     return {
       success: true,
       chatId: validChatId,
@@ -1293,20 +1343,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
         evidenceSources: synthesizedIntel.evidence?.sources?.length || 0,
         dataGaps: synthesizedIntel.evidence?.warnings?.length || 0
       } : null,
-      summary: {
-        overallGrowthScore,
-        growthPotential: null,
-        marketReadiness: null,
-        competitiveStrength: null,
-        customerDemand: null,
-        brandPosition: null,
-        bestChannel: normalizedResults.channel?.primaryChannel || normalizedResults.channel?.recommendedChannels?.[0]?.channel || null,
-        topOpportunity: null,
-        topRisk: null,
-        nextAction: null,
-        completedSteps: steps.filter(s => s.status === 'completed').length,
-        progress: Math.round((steps.filter(s => s.status === 'completed').length / steps.length) * 100)
-      }
+      summary
     };
 
   } catch (error) {
@@ -1791,10 +1828,10 @@ export async function getGrowthWorkspaceResults({ chatId, userId }) {
         audienceClarityScore,
         competitiveDefensibilityScore,
         campaignReadinessScore,
-        bestChannel: results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel || results.channel?.recommendedChannels?.[0]?.name || 'Unknown',
-        topOpportunity: results.market?.growthOpportunities?.[0] || null,
-        topRisk: results.market?.marketRisks?.[0] || null,
-        nextAction: results.campaign?.nextActions?.[0] || results.campaign?.campaignIdeas?.[0] || null,
+        bestChannel: results.channel?.primaryChannel || results.channel?.recommendedChannels?.[0]?.channel || results.channel?.recommendedChannels?.[0]?.name || null,
+        topOpportunity: firstStringValue(results.market?.opportunities) || firstStringValue(results.market?.growthOpportunities) || null,
+        topRisk: firstStringValue(results.market?.risks) || firstStringValue(results.market?.marketRisks) || null,
+        nextAction: firstStringValue(results.campaign?.nextActions) || firstStringValue(Object.values(results.campaign?.actionPlan || {}).find(b => Array.isArray(b) && b.length > 0)) || firstStringValue(results.campaign?.creativeAngles) || firstStringValue(results.campaign?.campaignIdeas) || null,
         completedSteps,
         progress: Math.round((completedSteps / 8) * 100)
       }

@@ -86,6 +86,13 @@ export const addMessage = async (req, res) => {
       },
     });
 
+    const existingProductIntelligence = await prisma.productIntelligence.findUnique({
+      where: { chatId },
+      select: { marketDiscovery: true },
+    });
+    const priorIndustry = existingProductIntelligence?.marketDiscovery?.industry || "";
+    const industryValue = structured.category || priorIndustry || "Technology";
+
     await prisma.productIntelligence.upsert({
       where: { chatId },
       create: {
@@ -109,7 +116,7 @@ export const addMessage = async (req, res) => {
           productName: chat.productName || "Product Analysis",
           productDescription: latestAnalysis?.productDescription || content,
           targetAudience: latestAnalysis?.targetAudience || "Not specified",
-          industry: structured.category || "",
+          industry: industryValue,
           pricingPosition: structured.pricingPosition || null,
           marketMaturity: structured.marketMaturity || null,
           tam: structured.tam || null,
@@ -148,7 +155,7 @@ export const addMessage = async (req, res) => {
           productName: chat.productName || "Product Analysis",
           productDescription: latestAnalysis?.productDescription || content,
           targetAudience: latestAnalysis?.targetAudience || "Not specified",
-          industry: structured.category || "",
+          industry: industryValue,
           pricingPosition: structured.pricingPosition || null,
           marketMaturity: structured.marketMaturity || null,
           tam: structured.tam || null,

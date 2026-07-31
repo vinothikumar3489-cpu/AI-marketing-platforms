@@ -125,17 +125,36 @@ export class AgentManager {
           action: 'agent_context',
           ...task.input,
         });
-      } catch {
-        // Brain unavailable, use what we have
+      } catch (err) {
+        console.error(`[AgentManager] Brain context build failed for task ${task.taskId}: ${err?.message}`);
       }
     }
 
     const bc = brainResponse?.context || brainContext;
+    const knowledge = bc?.knowledge || task.input.knowledge || null;
+
+    const requestCompanyName = task.input?.companyName || bc?.request?.companyName || '';
+    const knowledgeCompany = knowledge?.company?.name
+      ? {
+          name: knowledge.company.name,
+          domain: knowledge.company.domain || '',
+          industry: knowledge.company.industry || '',
+          website: task.input?.website || bc?.request?.website || '',
+        }
+      : null;
+
+    const taskCompany = task.input?.company && Object.keys(task.input.company).length > 0
+      ? task.input.company
+      : null;
+
+    const taskProduct = task.input?.product && Object.keys(task.input.product).length > 0
+      ? task.input.product
+      : null;
 
     return new AgentContext({
       requestId: task.taskId,
       brainContext: bc,
-      knowledge: bc.knowledge || task.input.knowledge || null,
+      knowledge,
       memory: bc.memory || task.input.memory || null,
       learning: bc.learning || task.input.learning || null,
       confidence: bc.confidence || task.input.confidence || null,
@@ -143,8 +162,8 @@ export class AgentManager {
       recommendations: bc.recommendations || task.input.recommendations || null,
       graph: bc.graph || task.input.graph || null,
       module: task.type,
-      company: task.input.company || bc.company || null,
-      product: task.input.product || bc.product || null,
+      company: taskCompany || knowledgeCompany || bc.company || (requestCompanyName ? { name: requestCompanyName } : null),
+      product: taskProduct || bc.product || null,
       campaign: task.input.campaign || bc.campaign || null,
       workspace: task.input.workspace || bc.workspace || '',
       taskId: task.taskId,
@@ -193,7 +212,17 @@ export class AgentManager {
   _determineStrategy(task, agents) {
     if (task.metadata?.strategy === 'sequential') return 'sequential';
     if (task.metadata?.strategy === 'parallel') return 'parallel';
-    if (agents.some(a => a.dependencies && a.dependencies.length > 0)) return 'dependency';
+
+    const agentMap = new Map(agents.map(a => [a.name, a]));
+    const depsSatisfiable = agents.every(a => {
+      const deps = a.dependencies || [];
+      if (deps.length === 0) return true;
+      return deps.every(d => agentMap.has(d));
+    });
+
+    if (agents.some(a => a.dependencies && a.dependencies.length > 0) && depsSatisfiable) {
+      return 'dependency';
+    }
     if (agents.length <= 3) return 'parallel';
     return 'sequential';
   }
@@ -259,13 +288,37 @@ export class AgentManager {
       }
       if (!progressed) {
         for (const name of remaining) {
-          results.push({
+          const failure = {
             agentName: name,
             success: false,
+            status: 'failed',
+            confidence: 0,
+            findings: [],
+            recommendations: [],
             errors: [`Dependencies not met for ${name}`],
-          });
+            summary: `${name} skipped — dependencies not met`,
+          };
+          results.push(failure);
+          context.setAgentResult(name, failure);
         }
         break;
+      }
+    }
+
+    if (remaining.size > 0) {
+      for (const name of remaining) {
+        const failure = {
+          agentName: name,
+          success: false,
+          status: 'failed',
+          confidence: 0,
+          findings: [],
+          recommendations: [],
+          errors: [`Agent timed out or was not reached within the task deadline (${timeout}ms)`],
+          summary: `${name} did not complete within the task deadline`,
+        };
+        results.push(failure);
+        context.setAgentResult(name, failure);
       }
     }
 
@@ -287,6 +340,14 @@ export class AgentManager {
 
         const duration = Date.now() - startTime;
         agent._track(duration, result.success);
+
+        if (result.success === false && result.errors && result.errors.length > 0) {
+          lastError = Array.isArray(result.errors) ? result.errors.join('; ') : String(result.errors);
+          if (attempt < maxRetries) {
+            await this._sleep(retryDelay * attempt);
+            continue;
+          }
+        }
 
         return result;
       } catch (err) {
@@ -373,8 +434,10 @@ export class AgentManager {
       if (r.errors) merged.errors.push(...r.errors);
     }
 
+    const successful = results.filter(r => r.success !== false && r.confidence > 0);
+    const confidencePool = successful.length > 0 ? successful : results;
     merged.confidence = Math.round(
-      results.reduce((s, r) => s + (r.confidence || 0), 0) / results.length * 1000
+      confidencePool.reduce((s, r) => s + (r.confidence || 0), 0) / confidencePool.length * 1000
     ) / 1000;
 
     return merged;
@@ -413,18 +476,19 @@ export class AgentManager {
       };
 
       await this._brain.process(brainRequest);
-    } catch {
-      // Brain update is best-effort
+    } catch (err) {
+      console.error(`[AgentManager] Brain update failed for task ${context?.taskId}: ${err?.message}`);
     }
   }
 
   _withTimeout(promise, ms) {
-    return Promise.race([
-      promise,
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`Agent timed out after ${ms}ms`)), ms)
-      ),
-    ]);
+    let timer = null;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`Agent timed out after ${ms}ms`)), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => {
+      if (timer) clearTimeout(timer);
+    });
   }
 
   _sleep(ms) {

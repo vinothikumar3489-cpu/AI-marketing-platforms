@@ -35,7 +35,8 @@ export const runSeoHandler = async (req, res) => {
 
   let chatRecord = chat;
   if (!chatRecord && chatId) {
-    try { chatRecord = await prisma.chat.findUnique({ where: { id: chatId } }); } catch (e) {}
+    try { chatRecord = await prisma.chat.findUnique({ where: { id: chatId } }); }
+    catch (e) { console.error('Error fetching chat record for SEO:', e); }
   }
 
   const queue = getScrapingQueue();

@@ -169,23 +169,25 @@ export function deriveWebsiteIdentity(params = {}) {
     chat = {}
   } = params || {};
 
-  // Return safe defaults if no websiteUrl
+  // Return safe defaults if no websiteUrl — use verified chat identity when available, never placeholders
   if (!websiteUrl || typeof websiteUrl !== 'string') {
+    const chatProduct = chat?.productName && isValidProductIdentity(chat.productName) ? chat.productName : '';
+    const chatCompany = chat?.companyName && isValidProductIdentity(chat.companyName) ? chat.companyName : chatProduct;
     return {
       websiteUrl: '',
       domain: '',
-      brandName: 'Unknown',
-      companyName: 'Unknown Company',
-      productName: 'Unknown Product',
-      industry: 'Technology',
+      brandName: chatProduct || '',
+      companyName: chatCompany || '',
+      productName: chatProduct || '',
+      industry: chat?.industry || '',
       category: 'General',
-      targetAudience: 'General',
+      targetAudience: '',
       websiteTitle: '',
       websiteDescription: '',
-      businessModel: 'B2B SaaS',
-      businessCategory: 'Technology',
-      companySize: 'Unknown',
-      source: 'fallback'
+      businessModel: '',
+      businessCategory: '',
+      companySize: '',
+      source: chatProduct ? 'chat_input' : 'unresolved'
     };
   }
 
@@ -289,7 +291,7 @@ export function deriveWebsiteIdentity(params = {}) {
   // Pick the best company/product/brand name - prioritize scraped title/meta over domain
   // Filter through isValidProductIdentity to reject UI/navigation text
   const nameCandidates = [jsonLdName, ogSiteName, titlePart, domainDerivedName, domain].filter(Boolean);
-  const brandName = nameCandidates.find(c => isValidProductIdentity(c)) || 'Unknown';
+  const brandName = nameCandidates.find(c => isValidProductIdentity(c)) || domain || '';
   let companyName = brandName;
   let productName = brandName;
 

@@ -53,7 +53,7 @@ export class LearningEngine extends BaseEngine {
       return { success: true, data: { learningScore: context.learning.learningScore } };
     } catch (err) {
       logEngine(this._name, rid, elapsedMs(start), EngineStatus.FAILED, err.message);
-      context.learning = { error: err.message };
+      context.learning = { ...(context.learning || {}), error: err.message };
       return { success: false, error: err.message };
     }
   }
@@ -88,11 +88,13 @@ export class LearningEngine extends BaseEngine {
     context.learning.delta = learningScore.delta;
     context.learning.health = await this._health.getHealthSummary();
 
+    if (!context.contextSummary || typeof context.contextSummary !== 'object') {
+      context.contextSummary = {};
+    }
     context.contextSummary.learningScore = learningScore.brainIQ;
     context.contextSummary.brainIQ = learningScore.brainIQ;
     context.contextSummary.executionsTracked = context.learning.executionsTracked;
     context.contextSummary.patternsFound = context.learning.patternsFound;
-
     context.learning.processingTime = Date.now() - startTime;
 
     return context;

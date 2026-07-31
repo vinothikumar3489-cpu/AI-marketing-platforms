@@ -28,13 +28,42 @@ export class EvidenceEngine extends BaseEngine {
 
       const needsRefresh = Object.values(memory).some(s => s?.needsRefresh);
 
-      const [companyEvidence, productEvidence, competitorEvidence, seoEvidence, profileEvidence] = await Promise.all([
-        this._gatherCompanyEvidence(request, memory, sources),
-        this._gatherProductEvidence(request, memory, sources),
-        this._gatherCompetitorEvidence(request, memory, sources),
-        this._gatherSeoEvidence(request, memory, sources, gaps),
-        this._gatherProfileEvidence(request, memory, sources),
-      ]);
+      const gatherers = [
+        { name: 'company', fn: () => this._gatherCompanyEvidence(request, memory, sources) },
+        { name: 'product', fn: () => this._gatherProductEvidence(request, memory, sources) },
+        { name: 'competitor', fn: () => this._gatherCompetitorEvidence(request, memory, sources) },
+        { name: 'seo', fn: () => this._gatherSeoEvidence(request, memory, sources, gaps) },
+        { name: 'profile', fn: () => this._gatherProfileEvidence(request, memory, sources) },
+      ];
+
+      const settled = await Promise.allSettled(gatherers.map(g => g.fn()));
+      const collected = {};
+      let gatherFailures = 0;
+
+      settled.forEach((outcome, i) => {
+        if (outcome.status === 'fulfilled') {
+          collected[gatherers[i].name] = outcome.value;
+        } else {
+          gatherFailures++;
+          const err = outcome.reason;
+          console.error(`[EvidenceEngine] ${gatherers[i].name} gatherer failed: ${err?.message}`);
+          sources.push({
+            type: gatherers[i].name,
+            subType: 'gatherer_error',
+            value: err?.message || 'Gatherer failed',
+            sourceTable: 'evidenceEngine',
+          });
+          collected[gatherers[i].name] = { error: err?.message || 'Gatherer failed', source: 'error' };
+        }
+      });
+
+      const { companyEvidence, productEvidence, competitorEvidence, seoEvidence, profileEvidence } = {
+        companyEvidence: collected.company,
+        productEvidence: collected.product,
+        competitorEvidence: collected.competitor,
+        seoEvidence: collected.seo,
+        profileEvidence: collected.profile,
+      };
 
       sources.forEach(s => {
         s.requestId = rid;
@@ -52,47 +81,52 @@ export class EvidenceEngine extends BaseEngine {
         totalSources: sources.length,
         totalGaps: gaps.length,
         needsRefresh,
+        gatherFailures,
         summary: `Collected ${sources.length} evidence sources, ${gaps.length} gaps identified`,
       };
 
-      context.evidence = evidenceResult;
+      context.evidence = { ...(context.evidence || {}), ...evidenceResult };
 
       logEngine(this._name, rid, elapsedMs(start), EngineStatus.COMPLETED, `sources=${sources.length} gaps=${gaps.length}`);
       return { success: true, data: evidenceResult };
     } catch (err) {
       logEngine(this._name, rid, elapsedMs(start), EngineStatus.FAILED, err.message);
-      context.evidence = { sources: [], gaps: [], error: err.message };
+      context.evidence = { ...(context.evidence || { sources: [], gaps: [] }), error: err.message };
       return { success: false, error: err.message };
     }
   }
 
   async _gatherCompanyEvidence(request, memory, sources) {
-    const mem = memory?.competitor?.data || memory?.profile?.data;
+    const profileMem = memory?.profile?.data;
+    const competitorMem = memory?.competitor?.data;
+    const mem = profileMem || competitorMem;
     if (mem) {
+      const companyValue = mem.companyName || mem.name || request?.companyName || '';
       sources.push({
         type: 'company',
         subType: 'memory',
-        value: mem.companyName || mem.name || request?.companyName || 'Unknown',
+        value: companyValue || 'Unknown',
         freshness: mem.updatedAt || null,
         sourceTable: memory?.profile?.source || 'memory',
       });
 
-      const ws = request?.website || memory?.profile?.data?.websiteUrl || '';
+      const ws = request?.website || profileMem?.websiteUrl || competitorMem?.websiteUrl || '';
       if (ws && typeof _collectCompanyIntelligence === 'function') {
         try {
           const ci = await _collectCompanyIntelligence({
             websiteUrl: ws,
             productName: request?.productName || '',
-            companyName: request?.companyName || '',
-            industry: request?.industry || '',
+            companyName: companyValue,
+            industry: request?.industry || profileMem?.industry || '',
             scrapedData: {},
           });
-          sources.push({ type: 'company', subType: 'live_service', value: ci.name || 'Unknown', sourceTable: 'companyIntelligence' });
+          sources.push({ type: 'company', subType: 'live_service', value: ci.name || companyValue || 'Unknown', sourceTable: 'companyIntelligence' });
           return ci;
         } catch (e) {
           sources.push({ type: 'company', subType: 'service_error', value: e.message, sourceTable: 'companyIntelligence' });
         }
       }
+      return { name: companyValue || 'Unknown', source: profileMem ? 'productProfile' : 'memory' };
     }
     return { name: request?.companyName || 'Unknown', source: 'request' };
   }

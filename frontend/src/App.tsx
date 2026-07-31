@@ -110,6 +110,8 @@ export default function App() {
         <Route path="insights" element={<ErrorBoundary resetKey={resetKey}><IntelligenceInsightsPage /></ErrorBoundary>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/app/*" element={<Navigate to="/app/dashboard" replace />} />
+      <Route path="/admin/*" element={<Navigate to="/admin/brain/dashboard" replace />} />
     </Routes>
   );
 }

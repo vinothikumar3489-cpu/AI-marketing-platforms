@@ -53,7 +53,7 @@ export class ReasoningEngine extends BaseEngine {
       return { success: true, data: reasoningResult };
     } catch (err) {
       logEngine(this._name, rid, elapsedMs(start), EngineStatus.FAILED, err.message);
-      context.reasoning = { steps: [], conclusions: [], error: err.message };
+      context.reasoning = { ...(context.reasoning || {}), error: err.message };
       return { success: false, error: err.message };
     }
   }

@@ -44,13 +44,27 @@ export const runCompetitorsHandler = async (req, res) => {
 export const runIntentHandler = async (req, res) => {
   const { chatId } = req.params; const userId = req.user?.id; const input = req.body || {};
 
-  try { const out = await runIntentPrediction({ chatId, userId, input }); return res.json({ ...out.result }); } catch(e){ console.error(e); return res.status(500).json({ success: false, error: e.message }); }
+  try {
+    const out = await runIntentPrediction({ chatId, userId, input });
+    if (!out.success) return res.status(400).json({ success: false, error: out.error || "Intent prediction failed" });
+    return res.json({ success: true, intentPrediction: out.result });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ success: false, error: e.message });
+  }
 };
 
 export const runPositioningHandler = async (req, res) => {
   const { chatId } = req.params; const userId = req.user?.id; const input = req.body || {};
 
-  try { const out = await runPositioning({ chatId, userId, input }); return res.json({ ...out.result }); } catch(e){ console.error(e); return res.status(500).json({ success: false, error: e.message }); }
+  try {
+    const out = await runPositioning({ chatId, userId, input });
+    if (!out.success) return res.status(400).json({ success: false, error: out.error || "Positioning generation failed" });
+    return res.json({ success: true, positioningEngine: out.result });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ success: false, error: e.message });
+  }
 };
 
 export const getCompetitorIntelligence = async (req, res) => {
@@ -72,7 +86,12 @@ export const getCompetitorIntelligence = async (req, res) => {
       fallbackUsed: ci.fallbackUsed
     } : null;
 
-    return res.json({ success: true, competitorAnalysis: response });
+    return res.json({
+      success: true,
+      competitorAnalysis: response,
+      intentPrediction: ci.intentPrediction || null,
+      positioningEngine: ci.positioningEngine || null
+    });
   } catch (e) {
     console.error("getCompetitorIntelligence", e);
     return res.status(500).json({ success: false, error: e?.message || "Internal error" });

@@ -538,6 +538,23 @@ async function shutdownGracefully(signal) {
 process.on('SIGTERM', () => shutdownGracefully('SIGTERM'));
 process.on('SIGINT', () => shutdownGracefully('SIGINT'));
 
+// Process-level error handlers — without these, unhandled promise rejections
+// can crash the process or fail silently in background jobs.
+process.on('unhandledRejection', (reason) => {
+  console.error('[PROCESS] Unhandled promise rejection:', reason instanceof Error ? reason.stack : reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[PROCESS] Uncaught exception:', err.stack);
+  try {
+    shutdownGracefully('UNCAUGHT_EXCEPTION');
+  } catch (shutdownErr) {
+    console.error('[PROCESS] Failed during emergency shutdown:', shutdownErr.message);
+    process.exit(1);
+  }
+  setTimeout(() => process.exit(1), 12000).unref();
+});
+
 (async () => {
   try {
     runningServer = await startServer(app);

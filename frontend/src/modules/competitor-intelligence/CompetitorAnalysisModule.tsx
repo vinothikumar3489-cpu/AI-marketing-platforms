@@ -29,11 +29,12 @@ export function CompetitorAnalysisModule() {
     (async () => {
       try {
         const resp = await api.get(`/api/chats/${chatId}/competitor-intelligence`);
-        if (resp?.data?.success && resp.data.competitorAnalysis) {
-          setData(resp.data.competitorAnalysis);
+        // api.get unwraps { success, data } — competitorAnalysis lives on the response itself
+        if (resp?.success && resp.competitorAnalysis) {
+          setData(resp.competitorAnalysis);
         }
-      } catch (e) {
-        // silent
+      } catch (e: any) {
+        console.warn('[Competitor] Failed to load existing analysis:', e?.message || e);
       }
     })();
   }, [chatId]);
@@ -44,8 +45,10 @@ export function CompetitorAnalysisModule() {
     setError(null);
     try {
       const resp = await api.post(`/api/chats/${chatId}/competitor-intelligence/competitors/run`, form);
-      if (resp?.data?.success) {
-        setData(resp.data.competitorAnalysis);
+      if (resp?.success && resp.competitorAnalysis) {
+        setData(resp.competitorAnalysis);
+      } else {
+        setError(resp?.error || "Failed to run competitor analysis");
       }
     } catch (e: any) {
       const msg = e?.response?.data?.error || "Failed to run competitor analysis";

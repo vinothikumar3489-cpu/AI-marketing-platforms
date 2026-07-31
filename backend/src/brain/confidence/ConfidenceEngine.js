@@ -47,7 +47,7 @@ export class ConfidenceEngine extends BaseEngine {
       return { success: true, data: confidenceResult };
     } catch (err) {
       logEngine(this._name, rid, elapsedMs(start), EngineStatus.FAILED, err.message);
-      context.confidence = { overall: 0, sections: {}, error: err.message };
+      context.confidence = { ...(context.confidence || { overall: 0, sections: {} }), error: err.message };
       return { success: false, error: err.message };
     }
   }

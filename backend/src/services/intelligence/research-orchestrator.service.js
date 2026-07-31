@@ -10,7 +10,7 @@ import { scrapeWebsite } from '../../domains/research/services/scraper.service.j
 import { getDesktopAndMobilePageSpeed } from '../../providers/pagespeed.service.js';
 import { discoverCompetitors, extractDomainFromUrl } from '../../providers/competitor-discovery.service.js';
 import { getKeywordMetrics, isDataForSEOConfigured } from '../../providers/dataforseo.service.js';
-import { researchCompetitors } from '../../providers/tavily.service.js';
+import { researchCompetitors, researchCompany } from '../../providers/tavily.service.js';
 import { callAI } from '../../ai/services/aiRouter.service.js';
 import { cleanValue, scrubPlaceholders } from '../../utils/clean-value.util.js';
 
@@ -555,6 +555,24 @@ async function collectMarketSignals(url, query) {
     }
   } catch (error) {
     console.warn('[Research Orchestrator] News search failed:', error.message);
+  }
+
+  // Company intelligence (mission, funding, founders, employees) with confidence scoring
+  try {
+    const companyResult = await researchCompany(query);
+    if (companyResult && companyResult.success && Array.isArray(companyResult.facts)) {
+      companies.push({
+        name: query,
+        mission: companyResult.mission,
+        funding: companyResult.funding,
+        founders: companyResult.founders,
+        employees: companyResult.employees,
+        facts: companyResult.facts,
+        source: 'tavily_company',
+      });
+    }
+  } catch (error) {
+    console.warn('[Research Orchestrator] Company research failed:', error.message);
   }
 
   return { news, companies, market };

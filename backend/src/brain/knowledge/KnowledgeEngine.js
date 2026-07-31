@@ -48,7 +48,7 @@ export class KnowledgeEngine extends BaseEngine {
       return { success: true, data: knowledgeResult };
     } catch (err) {
       logEngine(this._name, rid, elapsedMs(start), EngineStatus.FAILED, err.message);
-      context.knowledge = { error: err.message };
+      context.knowledge = { ...(context.knowledge || {}), error: err.message };
       return { success: false, error: err.message };
     }
   }

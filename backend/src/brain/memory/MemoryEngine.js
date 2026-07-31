@@ -41,7 +41,7 @@ export class MemoryEngine extends BaseEngine {
       return { success: true, data: memoryResult };
     } catch (err) {
       logEngine(this._name, rid, elapsedMs(start), EngineStatus.FAILED, err.message);
-      context.memory = { hits: 0, misses: 0, sections: {}, error: err.message };
+      context.memory = { ...(context.memory || { hits: 0, misses: 0, sections: {} }), error: err.message };
       return { success: false, error: err.message };
     }
   }

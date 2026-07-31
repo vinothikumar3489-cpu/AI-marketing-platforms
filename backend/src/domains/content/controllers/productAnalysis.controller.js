@@ -27,6 +27,10 @@ export const runProductAnalysisController = async (req, res) => {
     const result = await runProductAnalysis(userId, validatedData.chatId, validatedData);
 
     // Also save product profile using the final chatId
+    const existingProfile = await prisma.productProfile.findUnique({
+      where: { chatId: result.chatId },
+      select: { websiteUrl: true, description: true, targetAudience: true }
+    });
     await prisma.productProfile.upsert({
       where: { chatId: result.chatId },
       create: {
@@ -39,9 +43,10 @@ export const runProductAnalysisController = async (req, res) => {
       },
       update: {
         productName: validatedData.productName,
-        websiteUrl: validatedData.websiteUrl || null,
-        description: validatedData.description || null,
-        targetAudience: validatedData.targetMarket || null
+        // Never overwrite previously persisted values with null/empty on partial requests
+        websiteUrl: validatedData.websiteUrl || existingProfile?.websiteUrl || null,
+        description: validatedData.description || existingProfile?.description || null,
+        targetAudience: validatedData.targetMarket || existingProfile?.targetAudience || null
       }
     });
 
@@ -57,8 +62,8 @@ export const runProductAnalysisController = async (req, res) => {
       productProfile,
       productAnalysis: {
         ...result.data,
-        confidenceScore: 80, // Default for now
-        category: "Technology"
+        confidenceScore: productAnalysis?.confidenceScore ?? null,
+        category: productAnalysis?.category || result.data?.category || null
       },
       chatId: result.chatId
     });
@@ -102,8 +107,8 @@ export const getProductAnalysisController = async (req, res) => {
     };
     res.json({
       ...data,
-      confidenceScore: 80,
-      category: "Technology",
+      confidenceScore: analysis.confidenceScore ?? null,
+      category: analysis.category || null,
       fallbackUsed: analysis.fallbackUsed,
       provider: analysis.provider,
       dataSourcesUsed: analysis.dataSourcesUsed

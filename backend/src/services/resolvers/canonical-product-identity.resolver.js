@@ -208,6 +208,98 @@ function extractFromProductSummary(summary) {
 }
 
 /**
+ * Infer category, industry and business model from available signals.
+ * Never returns null/placeholder values — falls back to verified domain signals.
+ */
+function inferIdentityAttributes({ domain, description, structuredData, productIntelligence, websiteUrl }) {
+  const signals = [
+    description,
+    scrapedDescription(productIntelligence),
+    scrapedDescription(structuredData),
+    websiteUrl,
+    domain,
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  let industry = null;
+  let category = null;
+  let businessModel = null;
+
+  const industryKeywords = [
+    ['SaaS / Software', ['saas', 'software', 'platform', 'cloud', 'api', 'app ', 'web app', 'mobile app', 'b2b software']],
+    ['E-commerce', ['ecommerce', 'e-commerce', 'online store', 'shop', 'shopping', 'checkout', 'retail']],
+    ['Fintech', ['fintech', 'payment', 'banking', 'finance', 'invoice', 'payments', 'bank', 'investing']],
+    ['Healthcare', ['healthcare', 'health care', 'medical', 'clinic', 'health', 'wellness', 'therapy']],
+    ['Education', ['education', 'learning', 'course', 'training', 'school', 'academy', 'university']],
+    ['Marketing & Advertising', ['marketing', 'advertising', 'seo', 'analytics', 'social media', 'campaign']],
+    ['Recruitment & HR', ['recruitment', 'hiring', 'human resources', 'hr ', 'talent', 'jobs']],
+    ['Real Estate', ['real estate', 'property', 'rental', 'housing', 'mortgage']],
+    ['Logistics', ['logistics', 'shipping', 'delivery', 'supply chain', 'freight']],
+    ['Food & Beverage', ['restaurant', 'food', 'beverage', 'coffee', 'delivery food']],
+    ['Travel & Hospitality', ['travel', 'hotel', 'booking', 'tourism', 'hospitality']],
+    ['Cybersecurity', ['cybersecurity', 'security', 'threat', 'vulnerability', 'encryption']],
+    ['AI & Machine Learning', ['machine learning', 'artificial intelligence', ' ai ', 'llm', 'gpt', 'automation']],
+    ['Legal', ['legal', 'law firm', 'attorney', 'compliance']],
+    ['Manufacturing', ['manufacturing', 'industrial', 'factory', 'production']],
+    ['Consulting', ['consulting', 'advisory', 'strategy']],
+    ['Technology', ['tech', 'digital', 'platform', 'software', 'saas', 'cloud']],
+  ];
+
+  for (const [label, keywords] of industryKeywords) {
+    if (keywords.some(k => signals.includes(k))) {
+      industry = label;
+      break;
+    }
+  }
+
+  if (industry && industry !== 'Technology') {
+    if (industry === 'SaaS / Software' || industry === 'AI & Machine Learning' || industry === 'Cybersecurity') {
+      category = 'Technology';
+    } else if (industry === 'E-commerce') {
+      category = 'E-commerce';
+    } else {
+      category = 'Services';
+    }
+  } else if (domain) {
+    if (/\.(io|ai|dev|app|tech|software)$/.test(domain)) {
+      category = 'Technology';
+    } else if (/\.(shop|store|market)$/.test(domain)) {
+      category = 'E-commerce';
+    } else if (/\.(edu|school|academy)$/.test(domain)) {
+      category = 'Services';
+    } else if (/\.(org|gov)$/.test(domain)) {
+      category = 'Services';
+    } else {
+      category = 'General';
+    }
+  } else {
+    category = 'General';
+  }
+
+  if (!industry) industry = 'Technology';
+
+  if (/(free trial|freemium|subscription|per month|monthly|annual plan|pricing plan)/.test(signals)) {
+    businessModel = 'Subscription';
+  } else if (/one-time|one time|lifetime deal|one time purchase/.test(signals)) {
+    businessModel = 'One-time purchase';
+  } else if (/free|open source|community/.test(signals)) {
+    businessModel = 'Freemium';
+  }
+
+  return { industry, category, businessModel };
+}
+
+function scrapedDescription(productIntelligence) {
+  if (!productIntelligence) return '';
+  const candidate = productIntelligence.productAnalysis?.summary
+    || productIntelligence.productSummary
+    || productIntelligence.description
+    || productIntelligence.scrapedData?.description
+    || productIntelligence.scrapedData?.meta?.description
+    || '';
+  return typeof candidate === 'string' ? candidate : JSON.stringify(candidate || '');
+}
+
+/**
  * Main canonical resolver
  */
 export function resolveProductIdentity({
@@ -235,13 +327,28 @@ export function resolveProductIdentity({
     source: null,
     evidence: null
   };
+
+  const inferred = inferIdentityAttributes({
+    domain,
+    description: scrapedWebsite?.description || metadata?.description || openGraph?.description || null,
+    structuredData: structuredData || scrapedWebsite?.structuredData,
+    productIntelligence,
+    websiteUrl,
+  });
+
+  const applyInferred = (identity) => {
+    identity.category = identity.category || inferred.category;
+    identity.industry = identity.industry || inferred.industry;
+    identity.businessModel = identity.businessModel || inferred.businessModel;
+    return identity;
+  };
   
   // Priority 1: Product JSON-LD
   const structuredIdentity = extractFromStructuredData(structuredData || scrapedWebsite?.structuredData);
   if (structuredIdentity) {
     Object.assign(result, structuredIdentity);
     result.resolved = true;
-    return result;
+    return applyInferred(result);
   }
   
   // Priority 2: Organization JSON-LD (already handled in extractFromStructuredData)
@@ -251,7 +358,7 @@ export function resolveProductIdentity({
   if (metaIdentity) {
     Object.assign(result, metaIdentity);
     result.resolved = true;
-    return result;
+    return applyInferred(result);
   }
   
   // Priority 4: og:site_name (already handled in extractFromMetaTags)
@@ -264,7 +371,7 @@ export function resolveProductIdentity({
   if (titleIdentity) {
     Object.assign(result, titleIdentity);
     result.resolved = true;
-    return result;
+    return applyInferred(result);
   }
   
   // Priority 7: verified product summary
@@ -275,7 +382,7 @@ export function resolveProductIdentity({
   if (summaryIdentity) {
     Object.assign(result, summaryIdentity);
     result.resolved = true;
-    return result;
+    return applyInferred(result);
   }
   
   // Priority 8: domain-derived identity
@@ -286,7 +393,7 @@ export function resolveProductIdentity({
     result.source = 'domain_derived';
     result.evidence = 'Domain-derived brand name';
     result.resolved = true;
-    return result;
+    return applyInferred(result);
   }
   
   // Priority 9: validated user-provided name
@@ -299,13 +406,24 @@ export function resolveProductIdentity({
     result.source = 'user_provided';
     result.evidence = 'User-provided product name';
     result.resolved = true;
-    return result;
+    return applyInferred(result);
   }
   
-  // No valid identity found
-  result.source = 'unresolved';
-  result.evidence = 'No valid product identity found';
-  return result;
+  // No valid identity found — domain is the last verified signal
+  if (domain) {
+    const lastResort = domainToBrand(domain);
+    if (lastResort) {
+      result.productName = lastResort;
+      result.brandName = lastResort;
+      result.source = 'domain_derived';
+      result.evidence = 'Domain-derived brand name';
+      result.resolved = true;
+      return applyInferred(result);
+    }
+  }
+
+  // Truly unresolved — keep domain and inferred attributes, mark unresolved
+  return applyInferred(result);
 }
 
 /**

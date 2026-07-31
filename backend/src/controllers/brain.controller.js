@@ -191,11 +191,23 @@ export const dispatchAgentTask = async (req, res) => {
       agentPreferences: agentPreferences || [],
     });
 
-    const statusCode = result.success ? 200 : 500;
+    const hasData = !!(result.findings?.length || result.recommendations?.length || result.summary || result.confidence);
+    const statusCode = result.success ? 200 : hasData ? 200 : 500;
     return res.status(statusCode).json({
       success: result.success,
-      output: result.output || result.result || null,
+      status: result.status || (result.success ? 'completed' : 'failed'),
+      output: result.output || result.result || result.summary || null,
+      findings: result.findings || [],
+      recommendations: result.recommendations || [],
+      confidence: result.confidence ?? null,
+      evidenceUsed: result.evidenceUsed || [],
+      knowledgeUpdated: result.knowledgeUpdated || [],
+      learningUpdated: result.learningUpdated || [],
+      errors: result.errors || [],
       error: result.error || null,
+      agentsUsed: result.agentsUsed || [],
+      taskId: result.taskId || null,
+      processingTime: result.processingTime || null,
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });

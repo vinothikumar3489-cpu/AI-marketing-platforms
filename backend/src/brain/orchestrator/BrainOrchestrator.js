@@ -94,11 +94,16 @@ export class BrainOrchestrator extends BaseEngine {
       success: errors.length === 0,
       status: errors.length ? 'PARTIAL_FAILURE' : 'COMPLETED',
       context,
-      decisions: decisionResult?.data?.decisions || [],
-      decisionId: decisionResult?.data?.decisionId || null,
+      decisions: decisionResult?.decisions || decisionResult?.data?.decisions || [],
+      decisionId: decisionResult?.decisionId || decisionResult?.data?.decisionId || null,
       recommendations: context?.recommendations?.items || [],
       confidence: context?.confidence || null,
-      insights: [],
+      insights: (context?.reasoning?.conclusions || []).map(c => ({
+        type: 'reasoning',
+        rule: c.rule,
+        message: c.conclusion,
+        severity: c.severity,
+      })),
       warnings,
       errors,
       timings: context.timings,
@@ -117,11 +122,24 @@ export class BrainOrchestrator extends BaseEngine {
       metadata: request?.metadata || {},
     });
 
-    const response = await this.execute(context);
-    response.requestId = rid;
-
-    console.log(`[${rid}] [BrainOrchestrator] EXIT: success=${response.success}, elapsed=${elapsedMs(start)}ms, errors=${response.errors.length}`);
-    return response;
+    try {
+      const response = await this.execute(context);
+      response.requestId = rid;
+      console.log(`[${rid}] [BrainOrchestrator] EXIT: success=${response.success}, elapsed=${elapsedMs(start)}ms, errors=${response.errors.length}`);
+      return response;
+    } catch (err) {
+      console.error(`[${rid}] [BrainOrchestrator] FATAL: process threw — ${err.message}`, err);
+      return new BrainResponse({
+        requestId: rid,
+        success: false,
+        status: 'FAILED',
+        context,
+        warnings: [],
+        errors: [{ engine: 'BrainOrchestrator', error: err.message }],
+        timings: {},
+        engineResults: {},
+      });
+    }
   }
 
   async health() {

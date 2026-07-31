@@ -292,7 +292,7 @@ export function generateMarketFallback(input, productData) {
     som: `Realistic near-term: ${Math.round(stageMultiplier * 5)}% – ${Math.round(stageMultiplier * 15)}% of SAM`,
     somConfidence: 'Estimated (stage-adjusted projection)',
     cagr: `Industry average for ${industry}: 12% – 18% CAGR`,
-    growthRate: `Estimated ${Math.round(12 + Math.random() * 6)}% – ${Math.round(18 + Math.random() * 7)}% (${industry} sector)`,
+    growthRate: `Estimated 12% – 18% (${industry} sector)`,
     growthRateConfidence: 'Estimated (industry benchmark)',
     marketTrends: [
       { value: `Growing adoption of ${industry?.toLowerCase() || 'technology'} solutions by ${audience.toLowerCase()}`, confidence: 50, impact: 'High' },
@@ -302,7 +302,7 @@ export function generateMarketFallback(input, productData) {
       { value: `Consolidation of ${industry?.toLowerCase() || 'technology'} vendors creating market opportunities`, confidence: 35, impact: 'Medium' }
     ],
     growthSignals: [
-      { signal: `${industry} sector seeing ${Math.round(12 + Math.random() * 8)}% year-over-year growth in digital adoption`, source: 'Industry analysis', confidence: 50 },
+      { signal: `${industry} sector showing year-over-year growth in digital adoption`, source: 'Industry analysis', confidence: 50 },
       { signal: `${audience} increasingly investing in ${industry?.toLowerCase() || 'technology'} solutions`, source: 'Market research', confidence: 45 },
       { signal: `Competitors in ${industry} raising funding and expanding`, source: 'Market intelligence', confidence: 40 }
     ],
@@ -375,7 +375,8 @@ export function generateCompetitorFallback(input, productData, orchestratorCompe
         seoOverlap: 40, aiSimilarityScore: 50,
         strengths: [], weaknesses: [],
         evidence: `Identified via ${c.source || 'SERP analysis'}`,
-        source: c.source || 'orchestrator'
+        source: c.source || 'orchestrator',
+        isInferred: false
       }))
     : [];
 
@@ -383,11 +384,7 @@ export function generateCompetitorFallback(input, productData, orchestratorCompe
   const category = productData?.productCategory || 'software';
   const audience = productData?.targetAudience || 'business professionals';
 
-  const inferredCompetitors = verifiedCompetitors.length === 0 ? [
-    { name: 'Industry Leader (Direct)', domain: null, opportunityScore: 60, trafficEstimate: 'Estimated', seoAuthority: 70, featureOverlap: 65, pricingOverlap: 55, audienceOverlap: 70, seoOverlap: 60, aiSimilarityScore: 65, strengths: ['Market presence', 'Brand recognition'], weaknesses: ['Higher pricing', 'Slower innovation'], evidence: `Inferred from ${category} market analysis`, source: 'inference_engine' },
-    { name: 'Mid-Market Competitor', domain: null, opportunityScore: 70, trafficEstimate: 'Estimated', seoAuthority: 50, featureOverlap: 55, pricingOverlap: 70, audienceOverlap: 65, seoOverlap: 50, aiSimilarityScore: 60, strengths: ['Competitive pricing', 'Good feature set'], weaknesses: ['Limited scale', 'Smaller team'], evidence: `Inferred from ${industry} competitive landscape`, source: 'inference_engine' },
-    { name: 'Emerging Challenger', domain: null, opportunityScore: 75, trafficEstimate: 'Estimated', seoAuthority: 35, featureOverlap: 45, pricingOverlap: 65, audienceOverlap: 55, seoOverlap: 40, aiSimilarityScore: 55, strengths: ['Innovation focus', 'Modern tech stack'], weaknesses: ['Small market share', 'Limited integrations'], evidence: `Inferred from ${category} market trends`, source: 'inference_engine' }
-  ] : [];
+  const inferredCompetitors = [];
 
   const allCompetitors = [...verifiedCompetitors, ...inferredCompetitors];
 
@@ -404,13 +401,15 @@ export function generateCompetitorFallback(input, productData, orchestratorCompe
       audienceOverlap: c.audienceOverlap, seoOverlap: c.seoOverlap,
       aiSimilarityScore: c.aiSimilarityScore,
       strengths: c.strengths || [], weaknesses: c.weaknesses || [],
-      evidence: c.evidence, source: c.source
+      evidence: c.evidence, source: c.source, isInferred: c.isInferred
     })),
     indirectCompetitors: [
-      { name: 'DIY / Build In-House', domain: null, opportunityScore: 80, featureOverlap: 20, pricingOverlap: 90, audienceOverlap: 60, seoOverlap: 10, aiSimilarityScore: 25, strengths: ['Full control'], weaknesses: ['High maintenance'], evidence: `Inferred build-vs-buy analysis`, source: 'inference_engine' },
-      { name: 'Traditional Agency Services', domain: null, opportunityScore: 65, featureOverlap: 30, pricingOverlap: 40, audienceOverlap: 50, seoOverlap: 15, aiSimilarityScore: 30, strengths: ['Personalized service'], weaknesses: ['Expensive', 'Slow'], evidence: `Inferred from market alternatives`, source: 'inference_engine' }
+      { name: 'DIY / Build In-House', domain: null, opportunityScore: 80, featureOverlap: 20, pricingOverlap: 90, audienceOverlap: 60, seoOverlap: 10, aiSimilarityScore: 25, strengths: ['Full control'], weaknesses: ['High maintenance'], evidence: `Inferred build-vs-buy analysis`, source: 'inference_engine', isInferred: true },
+      { name: 'Traditional Agency Services', domain: null, opportunityScore: 65, featureOverlap: 30, pricingOverlap: 40, audienceOverlap: 50, seoOverlap: 15, aiSimilarityScore: 30, strengths: ['Personalized service'], weaknesses: ['Expensive', 'Slow'], evidence: `Inferred from market alternatives`, source: 'inference_engine', isInferred: true }
     ],
-    competitorMatrix: `${allCompetitors.length} competitors identified (${verifiedCompetitors.length} verified, ${inferredCompetitors.length} inferred)`,
+    competitorMatrix: allCompetitors.length > 0
+      ? `${allCompetitors.length} competitors identified (${verifiedCompetitors.length} verified, ${inferredCompetitors.length} inferred)`
+      : `No verified competitors found — run competitor discovery to populate the competitive landscape`,
     differentiationOpportunities: [
       { value: `Superior ${audience.toLowerCase()} experience and usability`, confidence: 40, impact: 'High' },
       { value: `Better integration ecosystem for ${industry}`, confidence: 35, impact: 'Medium' },
@@ -418,7 +417,10 @@ export function generateCompetitorFallback(input, productData, orchestratorCompe
     ],
     strengths: [{ value: 'Specialized focus on target market', confidence: 30, impact: 'Medium' }],
     weaknesses: [{ value: 'Limited brand recognition vs incumbents', confidence: 45, impact: 'High' }],
-    confidenceScore: 35,
+    dataGaps: verifiedCompetitors.length === 0
+      ? ['No verified competitor list — run Competitor Discovery to enable matrix, feature comparison and opportunity scoring']
+      : [],
+    confidenceScore: verifiedCompetitors.length > 0 ? 45 : 20,
     provider: 'inference_engine'
   };
 }
@@ -491,9 +493,9 @@ export function generateCampaignFallback(input, websiteData, allResults) {
     status: 'GENERATED',
     campaignObjective: `Drive awareness and adoption of ${name} among ${audience.toLowerCase()}`,
     campaignPhases: [
-      { phase: 'Awareness', duration: '1-2 weeks', objective: `Build awareness of ${name} among ${audience.toLowerCase()}`, channels: ['LinkedIn', 'Content Marketing'], kpis: [{ metric: 'Impressions', target: '10,000+', status: 'on_track' }] },
-      { phase: 'Consideration', duration: '3-4 weeks', objective: `Educate ${audience.toLowerCase()} on ${name} benefits and differentiators`, channels: ['Email', 'Webinars', 'Case Studies'], kpis: [{ metric: 'Lead Quality', target: '50+ MQLs', status: 'on_track' }] },
-      { phase: 'Conversion', duration: '5-8 weeks', objective: 'Convert qualified leads to trials and demos', channels: ['Sales Outreach', 'Retargeting', 'Demo Requests'], kpis: [{ metric: 'Trial Signups', target: '100+', status: 'on_track' }] }
+      { phase: 'Awareness', duration: '1-2 weeks', objective: `Build awareness of ${name} among ${audience.toLowerCase()}`, channels: ['LinkedIn', 'Content Marketing'], kpis: [{ metric: 'Impressions', target: 'Tracked from launch', status: 'planned' }] },
+      { phase: 'Consideration', duration: '3-4 weeks', objective: `Educate ${audience.toLowerCase()} on ${name} benefits and differentiators`, channels: ['Email', 'Webinars', 'Case Studies'], kpis: [{ metric: 'Qualified Leads', target: 'Set after first reporting period', status: 'planned' }] },
+      { phase: 'Conversion', duration: '5-8 weeks', objective: 'Convert qualified leads to trials and demos', channels: ['Sales Outreach', 'Retargeting', 'Demo Requests'], kpis: [{ metric: 'Trial Signups', target: 'Tracked from launch', status: 'planned' }] }
     ],
     creativeAngles: [
       { value: `Modernize your ${category.toLowerCase()} stack with ${name}`, confidence: 40, impact: 'High' },
@@ -502,7 +504,7 @@ export function generateCampaignFallback(input, websiteData, allResults) {
     ],
     copyHooks: [
       { value: `Stop settling for outdated ${category.toLowerCase()} tools`, confidence: 40, impact: 'High' },
-      { value: `95% of ${audience.toLowerCase()} are missing this`, confidence: 30, impact: 'High' },
+      { value: `The gap most ${audience.toLowerCase()} teams overlook in their ${category.toLowerCase()} stack`, confidence: 30, impact: 'High' },
       { value: `The ${category.toLowerCase()} platform ${audience} actually love using`, confidence: 35, impact: 'Medium' }
     ],
     ctaSuggestions: [

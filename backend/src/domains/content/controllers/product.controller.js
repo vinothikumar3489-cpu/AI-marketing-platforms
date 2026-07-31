@@ -202,10 +202,15 @@ export const runProductAnalysis = async (req, res) => {
       update: completeAnalysis,
     });
 
+    const existingProfile = await prisma.productProfile.findUnique({
+      where: { chatId },
+      select: { scrapedData: true },
+    });
     const updatedProfile = await prisma.productProfile.update({
       where: { chatId },
       data: {
-        scrapedData: scraped.scrapedData || null,
+        // Never null-out previously scraped data when the scrape fails
+        scrapedData: scraped.success ? scraped.scrapedData : (existingProfile?.scrapedData ?? null),
         mergedData,
         scrapeStatus: scraped.success ? "completed" : "failed",
       },

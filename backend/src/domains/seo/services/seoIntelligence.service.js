@@ -121,12 +121,22 @@ async function generateCompleteSeoIntelligence({ chatId, userId, websiteUrl, cha
 }
 
 async function saveSEOData({ chatId, userId, identity, websiteUrl, technicalAudit, chromeUXData, pageSpeedMobile, pageSpeedDesktop, keywordIntelligence, competitorIntelligence, geoIntelligence, contentGapIntelligence, blogIntelligence, seoReport, runId, overallScore, confidence, coverage, measuredModules, unavailableModules, providers, provider, warnings }) {
+  // Preserve previously persisted identity — never overwrite verified values with empty/placeholder data
+  const priorRecord = await prisma.seoIntelligence.findUnique({
+    where: { chatId },
+    select: { companyName: true, productName: true, domain: true, websiteUrl: true },
+  });
+  const safeCompanyName = identity?.companyName || priorRecord?.companyName || '';
+  const safeProductName = identity?.productName || priorRecord?.productName || '';
+  const safeDomain = identity?.domain || priorRecord?.domain || '';
+  const safeWebsiteUrl = identity?.websiteUrl || priorRecord?.websiteUrl || websiteUrl;
+
   const seoIntelligencePayload = {
     chatId, userId,
-    websiteUrl: identity?.websiteUrl || websiteUrl,
-    domain: identity?.domain || '',
-    companyName: identity?.companyName || '',
-    productName: identity?.productName || '',
+    websiteUrl: safeWebsiteUrl,
+    domain: safeDomain,
+    companyName: safeCompanyName,
+    productName: safeProductName,
     seoScore: overallScore ?? null,
     analyzedAt: new Date(),
     fallbackUsed: provider !== 'SERPAPI',

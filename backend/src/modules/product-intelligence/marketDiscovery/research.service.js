@@ -11,10 +11,14 @@ async function searchWithSerper(query) {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERPER_API_KEY}` },
       body: JSON.stringify({ q: query, num: 5 }),
     });
-    if (!resp.ok) return null;
+    if (!resp.ok) {
+      console.warn('[Research] Serper responded with HTTP', resp.status);
+      return null;
+    }
     const data = await resp.json();
     return data;
   } catch (e) {
+    console.warn('[Research] Serper request failed:', e.message);
     return null;
   }
 }
@@ -26,7 +30,7 @@ export async function runResearch({ productName, industry, region, websiteUrl } 
       const r = await researchCompetitors(productName || "Product", industry || "General", region || industry || "General");
       if (r && r.success) return { success: true, source: "tavily", data: r };
     } catch (e) {
-      // continue
+      console.warn('[Research] Tavily search failed:', e.message);
     }
   }
 
@@ -39,7 +43,9 @@ export async function runResearch({ productName, industry, region, websiteUrl } 
         const competitors = (s.organic || []).slice(0, 8).map((it) => it.title || it.link || it.snippet).filter(Boolean);
         return { success: true, source: "serper", data: { competitors, raw: s } };
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[Research] Serper search failed:', e.message);
+    }
   }
 
   // 3. Use website scraping if provided (Firecrawl/Jina/Cheerio)
@@ -50,7 +56,9 @@ export async function runResearch({ productName, industry, region, websiteUrl } 
         const competitors = scraped.scrapedData?.features || [];
         return { success: true, source: scraped.source || "scrape", data: { competitors, scrapedData: scraped.scrapedData } };
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[Research] Website scraping failed:', e.message);
+    }
   }
 
   // 4. Fallback - returns empty when API unavailable

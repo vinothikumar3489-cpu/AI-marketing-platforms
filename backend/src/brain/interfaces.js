@@ -41,7 +41,7 @@ export class BrainContext {
     this.graph = data.graph || null;
     this.errors = data.errors || [];
     this.timings = data.timings || {};
-    this.contextSummary = data.contextSummary || null;
+    this.contextSummary = data.contextSummary || {};
   }
 }
 
@@ -69,6 +69,14 @@ export class BrainResponse {
     const adapterMetrics = c.adapterMetrics || {};
     const learning = c.learning || {};
     return {
+      success: this.success,
+      status: this.status,
+      requestId: this.requestId,
+      decisions: this.decisions,
+      decisionId: this.decisionId,
+      insights: this.insights,
+      errors: this.errors,
+      warnings: this.warnings,
       contextSummary: c.contextSummary || null,
       confidence: this.confidence,
       recommendations: this.recommendations,

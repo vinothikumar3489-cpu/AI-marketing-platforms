@@ -286,7 +286,7 @@ function analyzeKnowledgeGraphReadiness(websiteData, technicalAudit) {
   const hasArticle = schemas.some(s => s.type === 'Article');
   const hasBreadcrumb = schemas.some(s => s.type === 'BreadcrumbList');
   
-  const score = calculateKnowledgeGraphScore({
+  const { score } = calculateKnowledgeGraphScore({
     hasOrganization,
     hasFAQ,
     hasArticle,
@@ -354,7 +354,7 @@ function analyzeCitationReadiness(websiteData) {
   const hasGuides = headings.some(h => /guide|tutorial|how to|step by step/i.test(h.text));
   const hasResources = /resource|whitepaper|case study|research/gi.test(text);
   
-  const score = calculateCitationScore({
+  const { score } = calculateCitationScore({
     hasDefinitions,
     hasFAQs,
     hasGuides,
@@ -532,7 +532,7 @@ function analyzeTopicalAuthority(websiteData, productName, industry) {
   const depth = assessContentDepth(text, wordCount, headings);
   
   // Calculate score
-  const score = calculateTopicalAuthorityScore({
+  const { score } = calculateTopicalAuthorityScore({
     topicCount: topics.length,
     wordCount,
     headingCount: headings.length,
@@ -986,21 +986,29 @@ function generateRecommendations(data) {
 // ============================================
 
 async function callGroqAI(prompt) {
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${GROQ_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      max_tokens: 2000
-    })
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  let response;
+  try {
+    response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 2000
+      })
+    });
 
-  if (!response.ok) throw new Error('Groq API error');
+    if (!response.ok) throw new Error('Groq API error');
+  } finally {
+    clearTimeout(timer);
+  }
 
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content;

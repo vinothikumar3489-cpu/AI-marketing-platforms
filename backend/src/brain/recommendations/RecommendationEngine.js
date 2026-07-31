@@ -40,7 +40,7 @@ export class RecommendationEngine extends BaseEngine {
       return { success: true, data: recommendationsResult };
     } catch (err) {
       logEngine(this._name, rid, elapsedMs(start), EngineStatus.FAILED, err.message);
-      context.recommendations = { items: [], priority: [], error: err.message };
+      context.recommendations = { ...(context.recommendations || { items: [], priority: [] }), error: err.message };
       return { success: false, error: err.message };
     }
   }
