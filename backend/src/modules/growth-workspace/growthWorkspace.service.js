@@ -667,49 +667,50 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     function calculateProductFitScore(product) {
       if (!product) return null;
-      // Only score based on real features from evidence
-      if (evidenceGrowthData?.productIntelligence?.features?.length) {
-        return Math.min(100, Math.round(evidenceGrowthData.productIntelligence.features.length * 20));
-      }
-      return null;
+      // Score from REAL product data (AI/validated output), not just evidence scan
+      const features = (product.features || []).filter(f => f && f.value && !/core functionality/i.test(f.value));
+      const benefits = (product.benefits || []).filter(b => b && b.value);
+      const count = Math.max(features.length, benefits.length);
+      return count > 0 ? Math.min(100, Math.round(count * 20)) : null;
     }
 
     function calculateMarketOpportunityScore(market) {
       if (!market) return null;
-      // Only if we have real growth signals
-      if (market.growthSignals?.length) {
-        return Math.min(100, Math.round(market.growthSignals.length * 15));
-      }
-      return null;
+      // Real growth signals + opportunities (never empty after validation fix)
+      const signals = (market.growthSignals || []).filter(s => s && (s.signal || s.value) && !/unavailable/i.test(s.signal || s.value || ''));
+      const opportunities = (market.opportunities || []).filter(o => o && o.value && !/unavailable/i.test(o.value));
+      const count = signals.length + opportunities.length;
+      return count > 0 ? Math.min(100, Math.round(count * 12)) : null;
     }
 
     function calculateAudienceClarityScore(audience) {
       if (!audience) return null;
-      // Only if personas have substance
-      const realPersonas = (audience.buyerPersonas || []).filter(p => p.name && p.name !== 'Target Persona' && p.name !== 'Persona Name');
+      // Only personas with real substance
+      const realPersonas = (audience.buyerPersonas || []).filter(p => p.name && p.name !== 'Target Persona' && p.name !== 'Persona Name' && !p.name.includes(','));
       if (realPersonas.length) {
-        return Math.min(100, Math.round(realPersonas.length * 20 + (audience.buyingTriggers?.length || 0) * 10));
+        return Math.min(100, Math.round(realPersonas.length * 15 + (audience.buyingTriggers?.length || 0) * 10));
       }
       return null;
     }
 
     function calculateCompetitiveDefensibilityScore(competitor) {
       if (!competitor) return null;
-      // Only if we have real competitor data
+      // Only real competitor names
       const realCompetitors = (competitor.directCompetitors || []).filter(c => c.name && !c.name.includes('Competitor') && !c.name.includes('competitor'));
+      const gaps = (competitor.marketGaps || []).filter(g => g && g.value && !/unavailable/i.test(g.value));
       if (realCompetitors.length) {
-        return Math.min(100, Math.round(realCompetitors.length * 15 + (competitor.marketGaps?.length || 0) * 10));
+        return Math.min(100, Math.round(realCompetitors.length * 15 + gaps.length * 10));
       }
       return null;
     }
 
     function calculateCampaignReadinessScore(campaign, channel) {
       if (!campaign && !channel) return null;
-      // Only if we have evidence-backed campaign data
+      // Only evidence-backed campaign data
       const angles = (campaign?.creativeAngles || []).filter(a => a.value && !a.value.includes('Angle'));
       const channels = (channel?.recommendedChannels || []).filter(c => c.channel && !c.channel.includes('Channel'));
       if (angles.length || channels.length) {
-        return Math.min(100, Math.round(angles.length * 15 + channels.length * 15));
+        return Math.min(100, Math.round(angles.length * 10 + channels.length * 15));
       }
       return null;
     }
@@ -766,8 +767,8 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     const campaignReadinessScore = campaignViabilityScore;
     const componentScores = [productFitScore, marketOpportunityScore, audienceClarityScore, competitiveDefensibilityScore, campaignReadinessScore].filter(s => s !== null && s !== undefined);
     const measurableComponents = componentScores.length;
-    const overallGrowthScore = measurableComponents >= 3 ? Math.round(componentScores.reduce((a, b) => a + b, 0) / measurableComponents) : null;
-    const growthScoreStatus = measurableComponents >= 3 ? null : NOT_ENOUGH_EVIDENCE;
+    const overallGrowthScore = measurableComponents >= 2 ? Math.round(componentScores.reduce((a, b) => a + b, 0) / measurableComponents) : null;
+    const growthScoreStatus = measurableComponents >= 2 ? null : NOT_ENOUGH_EVIDENCE;
 
     console.log('[Growth Scores]', {
       overallGrowthScore,
@@ -1139,7 +1140,9 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       data: {
         chatId: validChatId,
         role: 'assistant',
-        content: `Full growth analysis completed for ${input.productName}. Growth Score: ${overallGrowthScore}/100`,
+        content: overallGrowthScore != null
+          ? `Full growth analysis completed for ${input.productName}. Growth Score: ${overallGrowthScore}/100`
+          : `Full growth analysis completed for ${input.productName}.`,
         analysisData: { summary: { overallGrowthScore, stepsCompleted: 8 } }
       }
     });
@@ -1312,15 +1315,17 @@ async function runAudienceIntelligence(input, productData) {
   const prompt = `Analyze the target audience for this product:
 
 Product: ${input.productName}
-Target Audience: ${input.targetAudience}
 Industry: ${input.industry}
 USP: ${normalizeTextList(productData.usp)}
+
+Audience hints (from the user's form — treat ONLY as starting hints, NEVER echo them as persona names):
+${normalizeTextList(input.targetAudience)}
 
 Provide JSON response:
 {
   "buyerPersonas": [
     {
-      "name": "Persona Name",
+      "name": "Role-based persona name INVENTED by you (e.g. 'Growth Marketer', 'Ops Lead') — never a comma-separated list",
       "demographics": "Detailed description",
       "intentScore": null,
       "goals": ["Goal 1"],
@@ -1334,7 +1339,7 @@ Provide JSON response:
   "confidenceScore": null
 }
 
-CRITICAL INSTRUCTION: NEVER use generic text. Personas must deeply reflect the real problems ${input.productName} solves. Return only valid JSON.`;
+CRITICAL INSTRUCTION: NEVER use generic text. NEVER use the audience hints list verbatim as a persona name. Personas must deeply reflect the real problems ${input.productName} solves. Return only valid JSON.`;
 
   const fallbackData = generateAudienceFallback(input, productData);
   const aiResult = await callBestAI(prompt, 1200, 'Audience Intelligence', fallbackData);
@@ -1378,7 +1383,7 @@ Provide JSON response:
   "confidenceScore": null
 }
 
-CRITICAL INSTRUCTION: NEVER use generic placeholders like "Competitor 1". Use real competitor names if known, or infer real players in the ${input.industry} space. Return only valid JSON.`;
+CRITICAL INSTRUCTION: NEVER use generic placeholders like "Competitor 1". Use the Known Competitors list when provided. ONLY infer competitor names when you are highly confident they are real players in the ${input.industry || 'unknown'} space; if unsure, return an empty "directCompetitors" array rather than inventing names. Never list companies unrelated to the product's actual use case. Return only valid JSON.`;
 
   const fallbackData = generateCompetitorFallback(input, productData, orchestratorCompetitors);
   const aiResult = await callBestAI(prompt, 1200, 'Competitor Analysis', fallbackData);
@@ -1504,7 +1509,7 @@ Target Audience: ${input.targetAudience}
 Budget info: ${input.budgetRange}
 Campaign Goal: ${input.campaignGoal}
 
-Best Channels from Audience Analysis: ${audienceData.bestChannels?.join(', ')}
+Best Channels from Audience Analysis: ${(audienceData.bestChannels || []).map(c => c?.value || c).join(', ')}
 
 IMPORTANT: Do NOT invent budget allocations or ROI numbers. Use channel fit reasoning instead.
 
@@ -1538,7 +1543,7 @@ CRITICAL INSTRUCTION: Do NOT invent budget allocations or ROI percentages. Retur
 async function callBestAI(prompt, maxTokens = 2000, moduleName = 'unknown', fallbackData = null) {
   const start = Date.now();
   console.log(`🚀 [AI][${moduleName}] Calling AI...`);
-  const result = await callAI(prompt);
+  const result = await callAI(prompt, maxTokens);
   const durationMs = Date.now() - start;
   if (result.success && result.data) {
     console.log(`✅ [AI][${moduleName}] ${result.provider} succeeded in ${durationMs}ms`);
@@ -1639,7 +1644,7 @@ export async function getGrowthWorkspaceResults({ chatId, userId }) {
 
     const componentScores = [productFitScore, marketOpportunityScore, audienceClarityScore, competitiveDefensibilityScore, campaignReadinessScore].filter(s => s !== null && s !== undefined);
     const measurableComponents = componentScores.length;
-    const overallGrowthScore = measurableComponents >= 3 ? Math.round(componentScores.reduce((a, b) => a + b, 0) / measurableComponents) : null;
+    const overallGrowthScore = measurableComponents >= 2 ? Math.round(componentScores.reduce((a, b) => a + b, 0) / measurableComponents) : null;
 
     return {
       success: true,
@@ -1687,11 +1692,13 @@ function enforceGrowthQualityFilters(results) {
 
   const market = results.market;
   if (market) {
-    // Remove TAM/SAM/SOM fields entirely - they are always invented
-    delete market.tam;
-    delete market.sam;
-    delete market.som;
-    delete market.cagr;
+    // Only strip fabricated market sizing (placeholders), never real values
+    const UNAVAILABLE = ['Unknown', 'Insufficient Data', 'insufficient data', 'N/A', 'unknown'];
+    ['tam', 'sam', 'som', 'cagr'].forEach(key => {
+      if (market[key] == null || UNAVAILABLE.includes(String(market[key]))) {
+        delete market[key];
+      }
+    });
     // If demandScore exists and looks made up, null it
     if (market.demandScore != null && (market.demandScore < 0 || market.demandScore > 100)) {
       market.demandScore = null;
@@ -1708,7 +1715,11 @@ function enforceGrowthQualityFilters(results) {
       if (!p || !p.name) return false;
       const name = p.name.toLowerCase();
       if (name === 'target persona' || name === 'target user' || name === 'persona name') return false;
-      return (p.goals && p.goals.length > 0) || (p.painPoints && p.painPoints.length > 0) || (p.demographics && p.demographics.length > 10);
+      // Reject personas that echo the raw comma-joined form inputs with no substance
+      const hasSubstance = (p.goals && p.goals.length > 0) || (p.painPoints && p.painPoints.length > 0) || (p.demographics && p.demographics.length > 10);
+      if (!hasSubstance) return false;
+      if (name.includes(',') && !hasSubstance) return false;
+      return true;
     });
     // Sanitize persona goals: remove fabricated numeric targets, add inferenceStatus
     audience.buyerPersonas.forEach(p => {
@@ -1793,17 +1804,12 @@ function enforceGrowthQualityFilters(results) {
     });
   }
 
-  // Phase 7: Remove generic/unsupported roadmap and strategy actions
+  // Phase 7 (RELAXED): Only remove clearly hallucinated roadmap actions; keep
+  // legitimate marketing actions (pricing optimization, partnerships, etc.)
   const GENERIC_ACTIONS = [
     'commission market sizing report',
     'build predictive market intelligence models',
-    'launch partner ecosystem',
-    'launch demand generation campaign',
-    'optimize pricing',
-    'influencer partnerships',
-    'conduct market research',
     'build predictive intelligence',
-    'launch partner program',
     'develop predictive models',
     'create market sizing',
   ];
@@ -1854,7 +1860,7 @@ function normalizeGrowthResults(results, input) {
     };
   }
   
-  // Normalize Market Discovery (no TAM/SAM/SOM - always invented)
+  // Normalize Market Discovery (TAM/SAM/SOM kept only when real data exists)
   if (results.market || results.marketDiscovery) {
     const data = results.market || results.marketDiscovery;
     normalized.market = {
@@ -1864,6 +1870,10 @@ function normalizeGrowthResults(results, input) {
       growthSignals: ensureArray(data.growthSignals),
       entryStrategy: ensureString(data.entryStrategy, null),
       demandScore: data.demandScore ?? data.demand ?? null,
+      tam: data.tam || null,
+      sam: data.sam || null,
+      som: data.som || null,
+      cagr: data.cagr || null,
       confidenceScore: data.confidenceScore ?? null,
       provider: ensureString(data.provider, 'unknown')
     };

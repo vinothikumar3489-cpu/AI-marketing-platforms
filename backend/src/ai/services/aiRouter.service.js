@@ -192,7 +192,7 @@ function logDiagnostics(stage, provider, result, durationMs) {
   }));
 }
 
-async function callGemini(prompt) {
+async function callGemini(prompt, maxTokens = 4000) {
   const key = getGeminiKey();
   if (!isConfigured(key)) return { success: false, status: 'NOT_CONFIGURED' };
   if (Date.now() < geminiQuotaExhaustedUntil) return { success: false, status: 'QUOTA_EXHAUSTED' };
@@ -206,7 +206,7 @@ async function callGemini(prompt) {
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          maxOutputTokens: 4000,
+          maxOutputTokens: maxTokens,
           temperature: 0.4
         }
       }),
@@ -270,7 +270,7 @@ async function callGemini(prompt) {
   }
 }
 
-async function callGroq(prompt) {
+async function callGroq(prompt, maxTokens = 4000) {
   const key = getGroqKey();
   if (!isConfigured(key)) return { success: false, status: 'NOT_CONFIGURED' };
   const start = Date.now();
@@ -286,7 +286,7 @@ async function callGroq(prompt) {
       body: JSON.stringify({
         model: model,
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 4000,
+        max_tokens: maxTokens,
         temperature: 0.4
       }),
       signal: AbortSignal.timeout(45000)
@@ -347,7 +347,7 @@ async function callGroq(prompt) {
   }
 }
 
-async function callOpenRouter(prompt) {
+async function callOpenRouter(prompt, maxTokens = 4000) {
   const key = getOpenRouterKey();
   if (!isConfigured(key)) return { success: false, status: 'NOT_CONFIGURED' };
   const start = Date.now();
@@ -365,7 +365,7 @@ async function callOpenRouter(prompt) {
       body: JSON.stringify({
         model: model,
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 4000,
+        max_tokens: maxTokens,
         temperature: 0.4
       }),
       signal: AbortSignal.timeout(45000)
@@ -426,7 +426,7 @@ async function callOpenRouter(prompt) {
   }
 }
 
-async function callOpenAI(prompt) {
+async function callOpenAI(prompt, maxTokens = 4000) {
   const key = getOpenAIKey();
   if (!isConfigured(key)) return { success: false, status: 'NOT_CONFIGURED' };
   const start = Date.now();
@@ -442,7 +442,7 @@ async function callOpenAI(prompt) {
       body: JSON.stringify({
         model: model,
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 4000,
+        max_tokens: maxTokens,
         temperature: 0.4
       }),
       signal: AbortSignal.timeout(45000)
@@ -503,18 +503,18 @@ async function callOpenAI(prompt) {
   }
 }
 
-async function tryWithRetry(providerFn, prompt) {
-  const result = await providerFn(prompt);
+async function tryWithRetry(providerFn, prompt, maxTokens = 4000) {
+  const result = await providerFn(prompt, maxTokens);
   if (result.success) return result;
   if (result.status === 'JSON_PARSE_FAILED' || result.status === 'INVALID_RESPONSE') {
     const retryPrompt = prompt + "\n\nReturn only a valid compact JSON object matching the requested schema. No markdown, no explanation.";
-    const retryResult = await providerFn(retryPrompt);
+    const retryResult = await providerFn(retryPrompt, maxTokens);
     if (retryResult.success) return retryResult;
   }
   return result;
 }
 
-export async function callAI(prompt) {
+export async function callAI(prompt, maxTokens = 4000) {
   const diagnostics = [];
 
   // Provider fallback order: Groq → Gemini → OpenRouter → OpenAI → deterministic fallback
@@ -524,7 +524,7 @@ export async function callAI(prompt) {
   if (!isProviderInCooldown('groq')) {
     const groqStatus = getStatus('groq');
     if (groqStatus === 'AVAILABLE') {
-      const result = await tryWithRetry(callGroq, prompt);
+      const result = await tryWithRetry(callGroq, prompt, maxTokens);
       diagnostics.push({ provider: 'groq', status: result.status || (result.success ? 'AVAILABLE' : 'FAILED') });
       if (result.success) return result;
       if (result.status === 'RATE_LIMITED' || result.status === 'QUOTA_EXHAUSTED') {
@@ -542,7 +542,7 @@ export async function callAI(prompt) {
   if (!isProviderInCooldown('gemini')) {
     const geminiStatus = getStatus('gemini');
     if (geminiStatus === 'AVAILABLE') {
-      const result = await tryWithRetry(callGemini, prompt);
+      const result = await tryWithRetry(callGemini, prompt, maxTokens);
       diagnostics.push({ provider: 'gemini', status: result.status || (result.success ? 'AVAILABLE' : 'FAILED') });
       if (result.success) return result;
       if (result.status === 'QUOTA_EXHAUSTED' || result.status === 'RATE_LIMITED') {
@@ -560,7 +560,7 @@ export async function callAI(prompt) {
   if (!isProviderInCooldown('openrouter')) {
     const openrouterStatus = getStatus('openrouter');
     if (openrouterStatus === 'AVAILABLE') {
-      const result = await tryWithRetry(callOpenRouter, prompt);
+      const result = await tryWithRetry(callOpenRouter, prompt, maxTokens);
       diagnostics.push({ provider: 'openrouter', status: result.status || (result.success ? 'AVAILABLE' : 'FAILED') });
       if (result.success) return result;
       if (result.status === 'AUTH_FAILED' || result.status === 'NOT_CONFIGURED') PROVIDER_STATUS.openrouter = 'NOT_CONFIGURED';
@@ -578,7 +578,7 @@ export async function callAI(prompt) {
   if (!isProviderInCooldown('openai')) {
     const openaiStatus = getStatus('openai');
     if (openaiStatus === 'AVAILABLE') {
-      const result = await tryWithRetry(callOpenAI, prompt);
+      const result = await tryWithRetry(callOpenAI, prompt, maxTokens);
       diagnostics.push({ provider: 'openai', status: result.status || (result.success ? 'AVAILABLE' : 'FAILED') });
       if (result.success) return result;
       if (result.status === 'AUTH_FAILED' || result.status === 'NOT_CONFIGURED') PROVIDER_STATUS.openai = 'NOT_CONFIGURED';

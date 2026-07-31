@@ -32,7 +32,7 @@ const defaults: any = {
 const tabs = ['Executive Snapshot', 'Executive Story', 'Product DNA', 'Market Intelligence', 'Audience Intelligence', 'Competitor Intelligence', 'Intent Prediction', 'Positioning Strategy', 'Campaign Strategy', 'Channel Strategy', 'Action Plan', 'Report Preview'];
 
 export default function GrowthWorkspacePage() {
-  const { selectedChatId, createChat, loadFullResults, fullResults, restoreStatus } = useProject();
+  const { selectedChatId, createChat, loadFullResults, fullResults, restoreStatus, selectChat } = useProject();
   const [form, setForm] = useState(defaults);
   const [activeTab, setActiveTab] = useWorkspaceMemory('gw-activeTab', 'Executive Snapshot');
   const [loading, setLoading] = useState(false);
@@ -96,8 +96,8 @@ export default function GrowthWorkspacePage() {
         setResults(r);
         setStatus('completed');
         restoreAttemptedRef.current = true;
-      } else if (selectedChatId && restoreStatus === 'restored') {
-        // Chat exists but no growth data yet
+      } else if (selectedChatId && (restoreStatus === 'restored' || restoreStatus === 'not_found')) {
+        // Chat exists but no growth data yet - show the form instead of a stuck spinner
         analysisRunningRef.current = false;
         setResults({});
         setStatus('input_required');
@@ -138,7 +138,20 @@ export default function GrowthWorkspacePage() {
       
       const res: any = await api.post(`/chats/${chatId}/growth-workspace/run-full-analysis`, form);
       
-      await loadFullResults(chatId);
+      // The backend may have created a NEW chat when the requested one was stale/invalid.
+      // Always load results from the chatId the backend actually persisted to.
+      const resultChatId = res?.chatId || chatId;
+      const loaded: any = await loadFullResults(resultChatId);
+      
+      // Populate results immediately so a completed run can never flash the empty state
+      if (loaded && (loaded.hasGrowthWorkspace === true || (loaded.growth && Object.keys(loaded.growth).length > 0))) {
+        setResults(loaded.growth || {});
+      }
+      
+      if (resultChatId && selectedChatId !== resultChatId) {
+        await selectChat(resultChatId);
+        return;
+      }
       
       setStatus('completed');
     } catch (e: any) {

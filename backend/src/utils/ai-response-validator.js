@@ -23,7 +23,7 @@ export function validateProductAnalysis(data, input) {
     targetUsers: ensureInsightArray(data.targetUsers || []),
     differentiators: ensureInsightArray(data.differentiators || []),
     jobsToBeDone: ensureInsightArray(data.jobsToBeDone || data.jtbd || []),
-    confidenceScore: ensureNumber(data.confidenceScore, 0),
+    confidenceScore: ensureScorePreserveNull(data.confidenceScore),
     provider: ensureString(data.provider, 'fallback')
   };
 }
@@ -37,9 +37,9 @@ export function validateMarketDiscovery(data, input) {
   }
 
   return {
-    demandScore: ensureNumber(data.demandScore, 0),
-    confidence: ensureNumber(data.confidence || data.confidenceScore, 0),
-    confidenceScore: ensureNumber(data.confidence || data.confidenceScore, 0),
+    demandScore: ensureScorePreserveNull(data.demandScore),
+    confidence: ensureScorePreserveNull(data.confidence || data.confidenceScore),
+    confidenceScore: ensureScorePreserveNull(data.confidence || data.confidenceScore),
     tam: ensureString(data.tam, 'Unknown'),
     sam: ensureString(data.sam, 'Unknown'),
     som: ensureString(data.som, 'Unknown'),
@@ -49,6 +49,7 @@ export function validateMarketDiscovery(data, input) {
     growthOpportunities: ensureInsightArray(data.opportunities || data.growthOpportunities || []),
     risks: ensureInsightArray(data.risks || data.marketRisks || []),
     marketRisks: ensureInsightArray(data.risks || data.marketRisks || []),
+    growthSignals: ensureInsightArray(data.growthSignals || data.marketSignals || []),
     entryStrategy: ensureString(data.entryStrategy),
     provider: ensureString(data.provider, 'fallback')
   };
@@ -69,7 +70,7 @@ export function validateAudienceIntelligence(data, input) {
     commonObjections: ensureInsightArray(data.commonObjections || data.objections || []),
     bestChannels: ensureInsightArray(data.bestChannels || data.recommendedChannels || []),
     decisionMakers: ensureInsightArray(data.decisionMakers || []),
-    confidenceScore: ensureNumber(data.confidenceScore, 0),
+    confidenceScore: ensureScorePreserveNull(data.confidenceScore),
     provider: ensureString(data.provider, 'fallback')
   };
 }
@@ -88,7 +89,7 @@ export function validateCompetitorAnalysis(data, input) {
     differentiationOpportunities: ensureInsightArray(data.differentiationOpportunities || []),
     marketGaps: ensureInsightArray(data.marketGaps || []),
     competitorWeaknesses: ensureInsightArray(data.competitorWeaknesses || []),
-    confidenceScore: ensureNumber(data.confidenceScore, 0),
+    confidenceScore: ensureScorePreserveNull(data.confidenceScore),
     provider: ensureString(data.provider, 'fallback')
   };
 }
@@ -109,7 +110,7 @@ export function validateIntentPrediction(data, input) {
     buyingSignals: ensureInsightArray(data.buyingSignals || []),
     triggerEvents: ensureInsightArray(data.triggerEvents || []),
     leadScoringRules: ensureInsightArray(data.leadScoringRules || []),
-    confidenceScore: ensureNumber(data.confidenceScore, 0),
+    confidenceScore: ensureScorePreserveNull(data.confidenceScore),
     provider: ensureString(data.provider, 'fallback')
   };
 }
@@ -130,7 +131,7 @@ export function validatePositioningEngine(data, input) {
     messagingPillars: ensureInsightArray(data.messagingPillars || data.pillars || []),
     pillars: ensureInsightArray(data.messagingPillars || data.pillars || []),
     competitorWeaknessesToAttack: ensureInsightArray(data.competitorWeaknessesToAttack || []),
-    confidenceScore: ensureNumber(data.confidenceScore, 0),
+    confidenceScore: ensureScorePreserveNull(data.confidenceScore),
     provider: ensureString(data.provider, 'fallback')
   };
 }
@@ -153,7 +154,7 @@ export function validateCampaignGenerator(data, input) {
     actionPlan: validateActionPlan(data.actionPlan || {}),
     nextActions: ensureStringArray(data.nextActions || []),
     campaignIdeas: ensureInsightArray(data.campaignIdeas || []),
-    confidenceScore: ensureNumber(data.confidenceScore, 0),
+    confidenceScore: ensureScorePreserveNull(data.confidenceScore),
     provider: ensureString(data.provider, 'fallback')
   };
 }
@@ -195,7 +196,7 @@ export function validateChannelRecommendation(data, input) {
     channelFitScores: ensureInsightArray(data.channelFitScores || []),
     postingFrequency: ensureInsightArray(data.postingFrequency || []),
     contentTypes: ensureInsightArray(data.contentTypes || []),
-    confidenceScore: ensureNumber(data.confidenceScore, 0),
+    confidenceScore: ensureScorePreserveNull(data.confidenceScore),
     provider: ensureString(data.provider, 'fallback')
   };
 }
@@ -312,6 +313,16 @@ function ensureNumber(value, fallback = null) {
 }
 
 /**
+ * Ensure value is a valid number, preserving null/undefined (never coerced to 0)
+ */
+function ensureScorePreserveNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  if (isNaN(num) || num < 0) return null;
+  return Math.min(100, Math.max(0, Math.round(num)));
+}
+
+/**
  * Ensure value is an array of strings
  */
 function ensureStringArray(value) {
@@ -338,7 +349,7 @@ function ensureInsightArray(value) {
     // If it's an object, normalize it
     if (typeof item === 'object' && item !== null) {
       return {
-        value: ensureString(item.value || item.insight || item.recommendation || item.opportunity || item.risk || item.trend || item),
+        value: ensureString(item.value || item.insight || item.signal || item.recommendation || item.opportunity || item.risk || item.trend || item),
         confidence: ensureNumber(item.confidence, null),
         impact: ensureString(item.impact || item.priority, null)
       };
@@ -513,6 +524,7 @@ function generateMarketFallback(input) {
     marketRisks: [
       { value: 'Market risk data unavailable. No verified source found.', confidence: null, impact: null }
     ],
+    growthSignals: [],
     entryStrategy: 'Market entry strategy unavailable. No verified source found.',
     provider: 'fallback'
   };

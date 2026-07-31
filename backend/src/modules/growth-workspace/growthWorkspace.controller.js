@@ -31,6 +31,26 @@ export const runFullAnalysisHandler = async (req, res) => {
     description: (input.description || '') + (input.additionalNotes ? `\nAdditional Notes: ${input.additionalNotes}` : '')
   };
 
+  // Normalize audience hints: plain "Students, Job Seekers" comma-joined lists
+  // cause the AI to echo them back as persona names. Convert to descriptive hints.
+  if (Array.isArray(input.audienceTypes) && input.audienceTypes.length > 0) {
+    mappedInput.targetAudience = input.audienceTypes
+      .map(a => {
+        const lower = String(a).toLowerCase();
+        if (lower === 'students') return 'students / early-career learners';
+        if (lower === 'job seekers') return 'job seekers / career movers';
+        if (lower === 'founders') return 'startup founders / business owners';
+        if (lower === 'marketers') return 'marketing professionals';
+        if (lower === 'smbs') return 'small & medium business owners';
+        if (lower === 'enterprises') return 'enterprise organizations';
+        if (lower === 'parents') return 'parents / families';
+        if (lower === 'creators') return 'content creators / influencers';
+        if (lower === 'developers') return 'developers / technical teams';
+        return a;
+      })
+      .join(', ');
+  }
+
   try {
     console.info('[Growth Stage]', { stage: 'START_PIPELINE', status: 'running', chatId });
     const result = await runFullGrowthAnalysis({ chatId, userId, input: mappedInput });
