@@ -18,6 +18,8 @@ const getOpenAIModel = () => process.env.OPENAI_MODEL || "gpt-4o-mini";
 const getOpenAIUrl = () => "https://api.openai.com/v1/chat/completions";
 
 const PROVIDER_COOLDOWN_MS = 300000; // 5 minutes cooldown for rate limits
+const GEMINI_QUOTA_COOLDOWN_MS = 60000; // 1 minute cooldown for Gemini quota exhaustion
+let geminiQuotaExhaustedUntil = 0;
 const providerCooldowns = {
   groq: 0,
   gemini: 0,

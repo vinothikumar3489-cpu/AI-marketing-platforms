@@ -23,7 +23,9 @@ const GENERIC_KEYWORDS = new Set([
 const VALID_ENDPOINTS = new Set([
   '/keywords_data/google_ads/search_volume/live',
   '/keywords_data/google_ads/keywords_for_keywords/live',
+  '/dataforseo_labs/google/keyword_ideas/live',
   '/serp/google/organic/live/regular',
+  '/serp/google/organic/live/html',
   '/backlinks/summary/live',
   '/backlinks/referring_domains/live',
   '/domain_analytics/domain_intersection/live',
@@ -343,8 +345,73 @@ export async function getKeywordMetrics(keywords, location = 'United States', la
   return { success: true, data: normalized };
 }
 
-export async function getKeywordSuggestions(seedKeywords, location = 'United States', language = 'English') {
-  if (!Array.isArray(seedKeywords) || seedKeywords.length === 0) {
+/**
+ * DataForSEO Labs Keyword Ideas — returns volume + difficulty + competition + cpc + intent
+ * in a single call (better than the search_volume endpoint which omits difficulty).
+ */
+export async function getKeywordIdeaMetrics(keywords, location = 'United States', language = 'English') {
+  if (!Array.isArray(keywords) || keywords.length === 0) {
+    return { success: false, error: 'No keywords provided' };
+  }
+
+  const filteredKeywords = sanitizeKeywords(keywords);
+  if (filteredKeywords.length === 0) {
+    return { success: false, error: 'No valid keywords after sanitization' };
+  }
+
+  const loc = resolveLocation(location);
+
+  const body = [{
+    keywords: filteredKeywords,
+    location_code: loc.location_code,
+    language_code: loc.language_code,
+    include_serp_info: false,
+    limit: 10,
+  }];
+
+  const response = await dataforseoRequest('/dataforseo_labs/google/keyword_ideas/live', 'POST', body);
+
+  if (!response.success) {
+    return response;
+  }
+
+  const normalized = (response.data.tasks || [])
+    .filter(task => task.status_code === 20000)
+    .flatMap(task => {
+      if (!task.result) return [];
+      const taskResults = Array.isArray(task.result) ? task.result : [task.result];
+      return taskResults.flatMap(result => {
+        const ideas = result.items || [];
+        return ideas.map(item => ({
+          keyword: item.keyword || '',
+          volume: item.keyword_info?.search_volume ?? null,
+          keywordDifficulty: item.keyword_properties?.keyword_difficulty ?? null,
+          cpc: item.keyword_info?.cpc ?? null,
+          competition: item.keyword_info?.competition_level || item.keyword_info?.competition || null,
+          competitionIndex: item.keyword_info?.competition_index ?? null,
+          intent: item.keyword_info?.intent || item.keyword_properties?.search_intent || null,
+          monthlySearches: item.keyword_info?.monthly_searches ?? null,
+          source: 'DataForSEO',
+          confidence: 100,
+          evidence: 'Retrieved from DataForSEO Labs Keyword Ideas API',
+        }));
+      });
+    })
+    .filter(item => item !== null && item.keyword && item.keyword.length > 0);
+
+  if (normalized.length === 0) {
+    return {
+      success: false,
+      error: 'No valid metrics returned',
+      message: 'Metrics unavailable from DataForSEO Labs',
+      data: [],
+    };
+  }
+
+  return { success: true, data: normalized };
+}
+
+export async function getKeywordSuggestions(seedKeywords, location = 'United States', language = 'English') {  if (!Array.isArray(seedKeywords) || seedKeywords.length === 0) {
     return { success: false, error: 'No seed keywords provided' };
   }
 

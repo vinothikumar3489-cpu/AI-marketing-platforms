@@ -1,7 +1,8 @@
-import { getKeywordMetrics, isDataForSEOConfigured } from "../../providers/dataforseo.service.js";
+import { getKeywordMetrics, getKeywordIdeaMetrics, isDataForSEOConfigured } from "../../providers/dataforseo.service.js";
 import { isValidKeyword } from "../../utils/text.util.js";
 import { asArray } from "../../utils/text.util.js";
 import { logEvidenceError } from "../../utils/evidence-logger.js";
+import { callAI } from "../../ai/services/aiRouter.service.js";
 
 // ============================================
 // KEYWORD INTELLIGENCE ENGINE
@@ -300,7 +301,14 @@ async function enrichWithDataForSEO(result, extractedKeywords) {
 
     if (allKeywords.length === 0) return;
 
-    const metricsResult = await getKeywordMetrics(allKeywords, 'United States', 'English');
+    // Preferred: Labs Keyword Ideas (volume + difficulty + competition + intent in one call)
+    let metricsResult = await getKeywordIdeaMetrics(allKeywords, 'United States', 'English');
+    let usedLabs = metricsResult.success;
+
+    // Fallback: classic search volume endpoint (no difficulty)
+    if (!metricsResult.success) {
+      metricsResult = await getKeywordMetrics(allKeywords, 'United States', 'English');
+    }
 
     if (metricsResult.success && metricsResult.data) {
       const metricsMap = new Map(metricsResult.data.map(m => [m.keyword.toLowerCase(), m]));
@@ -313,7 +321,8 @@ async function enrichWithDataForSEO(result, extractedKeywords) {
           keywordDifficulty: metrics?.keywordDifficulty ?? null,
           cpc: metrics?.cpc ?? null,
           competition: metrics?.competition ?? null,
-          source: metrics?.source || 'verified',
+          intent: metrics?.intent ?? kw.intent ?? null,
+          source: metrics?.source || (usedLabs ? 'DataForSEO' : 'verified'),
           confidence: metrics?.confidence || null,
           metricType: metrics ? 'verified_keyword_metric' : 'topic_idea_only',
           label: metrics ? 'verified keyword metric' : 'topic idea only',
@@ -324,17 +333,88 @@ async function enrichWithDataForSEO(result, extractedKeywords) {
       result.secondaryKeywords = result.secondaryKeywords.map(enrichKeyword);
       result.longTailKeywords = result.longTailKeywords.map(enrichKeyword);
       result.questionKeywords = result.questionKeywords.map(enrichKeyword);
+      result.metadata.dataForSeoEnriched = true;
+      result.metadata.dataForSeoMethod = usedLabs ? 'labs_keyword_ideas' : 'search_volume';
     } else {
       console.warn('⚠️ [Keyword Intelligence] DataForSEO enrichment failed:', metricsResult.error || 'No data returned');
-      // DataForSEO failure is not fatal - continue with topic candidates
       result.metadata.dataForSeoEnriched = false;
       result.metadata.dataForSeoError = metricsResult.error || 'Unknown error';
     }
+
+    // AI-estimate fallback: never leave metrics null when API data is missing
+    await estimateMissingMetricsWithAI(result, allKeywords);
   } catch (error) {
     console.error('❌ [Keyword Intelligence] DataForSEO enrichment error:', error.message);
-    // DataForSEO failure is not fatal - continue with topic candidates
     result.metadata.dataForSeoEnriched = false;
     result.metadata.dataForSeoError = error.message;
+    await estimateMissingMetricsWithAI(result, null);
+  }
+}
+
+/**
+ * Estimates search metrics with AI for keywords that still have no volume/difficulty.
+ * Marked clearly as ai_estimated (LOW confidence) — the UI shows real numbers, never N/A.
+ */
+async function estimateMissingMetricsWithAI(result, allKeywords) {
+  const missing = [];
+  const collectMissing = (buckets) => {
+    buckets.forEach((kw) => {
+      if (kw && (kw.searchVolume === null || kw.searchVolume === undefined || kw.keywordDifficulty === null || kw.keywordDifficulty === undefined)) {
+        missing.push(kw.keyword);
+      }
+    });
+  };
+  collectMissing(result.primaryKeywords || []);
+  collectMissing(result.secondaryKeywords || []);
+  collectMissing(result.longTailKeywords || []);
+  collectMissing(result.questionKeywords || []);
+
+  if (missing.length === 0) return;
+
+  const uniqueMissing = [...new Set(missing)].slice(0, 30);
+  try {
+    const prompt = `You are a senior SEO data analyst. Estimate realistic US Google search metrics for these keywords.
+
+Keywords: ${uniqueMissing.map(k => `"${k}"`).join(', ')}
+
+Return ONLY compact JSON:
+{"keywords":[{"keyword":"exact keyword as given","volume":1234,"difficulty":45,"cpc":2.10,"intent":"informational|commercial|transactional|navigational"}]}
+
+Rules:
+- volume: 0 to 1,000,000 (honest estimate; niche long-tails should be small, e.g. 10-300)
+- difficulty: 0-100
+- cpc: 0-50 (US$)
+- intent: one of informational, commercial, transactional, navigational
+- Must return an entry for EVERY keyword. Never null, never -1.`;
+
+    const result_ai = await callAI(prompt, 4000);
+    if (result_ai.success && Array.isArray(result_ai.data?.keywords)) {
+      const estMap = new Map(result_ai.data.keywords.map(k => [k.keyword.toLowerCase().trim(), k]));
+      const apply = (kw) => {
+        if (!kw) return kw;
+        const est = estMap.get(String(kw.keyword).toLowerCase().trim());
+        if (!est) return kw;
+        const estimated = {
+          searchVolume: kw.searchVolume ?? (est.volume != null ? Math.round(est.volume) : null),
+          keywordDifficulty: kw.keywordDifficulty ?? (est.difficulty != null ? Math.round(est.difficulty) : null),
+          cpc: kw.cpc ?? (est.cpc != null ? Math.round(est.cpc * 100) / 100 : null),
+          intent: kw.intent || est.intent || null,
+          source: 'ai_estimated',
+          confidence: 30,
+          metricType: 'ai_estimated_metric',
+          label: 'ai estimated metric',
+        };
+        return { ...kw, ...estimated };
+      };
+      result.primaryKeywords = (result.primaryKeywords || []).map(apply);
+      result.secondaryKeywords = (result.secondaryKeywords || []).map(apply);
+      result.longTailKeywords = (result.longTailKeywords || []).map(apply);
+      result.questionKeywords = (result.questionKeywords || []).map(apply);
+      result.metadata.aiEstimated = true;
+      result.metadata.aiEstimatedCount = uniqueMissing.length;
+    }
+  } catch (error) {
+    console.warn('[Keyword Intelligence] AI metric estimation failed:', error.message);
   }
 }
 

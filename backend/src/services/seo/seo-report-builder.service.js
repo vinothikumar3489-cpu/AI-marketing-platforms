@@ -12,15 +12,19 @@ export function buildSEOReport({
   peopleAlsoAsk,
   trendAnalysis,
   providers,
+  backlinkData,
   pageSpeed,
   crux
 }) {
   const scData = searchConsoleData || searchConsole;
+  const authorityScore = calculateAuthorityScore(backlinkData, geoIntelligence, competitorIntelligence);
   const overallScore = calculateOverallScore({
     technicalAudit,
     keywordIntelligence,
     geoIntelligence,
-    competitorIntelligence
+    competitorIntelligence,
+    contentGapIntelligence,
+    authorityScore
   });
 
   const technicalScore = extractScore(technicalAudit, 'overallScore');
@@ -83,6 +87,24 @@ export function buildSEOReport({
     internalLinkingRating: scoreToRating(internalLinkingScore),
     schemaScore,
     schemaRating: scoreToRating(schemaScore),
+    authorityScore,
+    authorityRating: scoreToRating(authorityScore),
+    backlinks: backlinkData?.backlinks ? {
+      totalBacklinks: backlinkData.backlinks.totalBacklinks,
+      referringDomains: backlinkData.backlinks.referringDomains,
+      referringPages: backlinkData.backlinks.referringPages,
+      dofollowBacklinks: backlinkData.backlinks.dofollowBacklinks,
+      domainRank: backlinkData.backlinks.domainRank,
+      spamScore: backlinkData.backlinks.spamScore,
+      source: 'DataForSEO Backlinks API',
+      status: 'measured'
+    } : {
+      totalBacklinks: null,
+      referringDomains: null,
+      source: 'estimated',
+      status: 'estimated',
+      note: 'Backlink API unavailable — authority score is a conservative estimate'
+    },
     coreWebVitals,
     keywordOpportunities,
     serpFeatures: serpFeaturesData,
@@ -178,9 +200,52 @@ function calculateOverallScore(data) {
   if (data.keywordIntelligence?.metadata?.totalKeywords != null) scores.push(Math.min(data.keywordIntelligence.metadata.totalKeywords * 5, 100));
   if (data.geoIntelligence?.aiVisibilityScore != null) scores.push(data.geoIntelligence.aiVisibilityScore);
   if (data.competitorIntelligence?.metadata?.totalCompetitors != null) scores.push(Math.min(data.competitorIntelligence.metadata.totalCompetitors * 10, 100));
+  if (data.authorityScore != null) scores.push(data.authorityScore);
 
-  if (scores.length === 0) return null;
+  // On-page component scores always computable from the audit object
+  const ta = data.technicalAudit;
+  if (ta) {
+    const crawlability = calculateCrawlabilityScore(ta);
+    if (crawlability != null) scores.push(crawlability);
+    const metadata = calculateMetadataScore(ta);
+    if (metadata != null) scores.push(metadata);
+    const linking = calculateInternalLinkingScore(ta);
+    if (linking != null) scores.push(linking);
+    const schema = calculateSchemaScore(ta);
+    if (schema != null) scores.push(schema);
+  }
+  const content = calculateContentScore(data.keywordIntelligence, data.contentGapIntelligence);
+  if (content != null) scores.push(content);
+
+  if (scores.length === 0) return 0;
   return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+}
+
+/**
+ * Authority/backlink health score — DataForSEO backlinks when available,
+ * else GEO entity signals, else conservative domain-age-free estimate (LOW confidence).
+ */
+function calculateAuthorityScore(backlinkData, geoIntelligence, competitorIntelligence) {
+  if (backlinkData?.backlinks) {
+    const b = backlinkData.backlinks;
+    let score = 0;
+    const referringDomains = b.referringDomains;
+    if (referringDomains != null) score += Math.min(referringDomains * 2, 50);
+    const totalBacklinks = b.totalBacklinks;
+    if (totalBacklinks != null) score += Math.min(totalBacklinks * 0.1, 20);
+    const domainRank = b.domainRank;
+    if (domainRank != null) score += Math.min(domainRank / 2, 25);
+    const dofollowRatio = b.dofollowRatio != null ? Number(b.dofollowRatio) : null;
+    if (dofollowRatio != null) score += dofollowRatio > 50 ? 5 : 2;
+    return Math.max(0, Math.min(100, Math.round(score)));
+  }
+  if (geoIntelligence?.knowledgeGraphEntities?.length) {
+    return Math.min(40 + geoIntelligence.knowledgeGraphEntities.length * 8, 80);
+  }
+  if (geoIntelligence?.entityCoverageScore != null) {
+    return Math.round(geoIntelligence.entityCoverageScore * 0.8);
+  }
+  return 25; // conservative baseline — never null
 }
 
 function extractScore(obj, field) {

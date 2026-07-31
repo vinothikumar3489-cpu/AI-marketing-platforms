@@ -998,10 +998,23 @@ function ExecutiveStory({ data }: { data: any }) {
 }
 
 function SectionBlock({ icon: Icon, title, color, data }: { icon: any, title: string, color: string, data: any }) {
-  if (!data) return null;
+  if (!data || (typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length === 0)) {
+    return (
+      <Card>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}><Icon size={18} style={{ color }} /> {title}</h3>
+          <Badge className="yellow">Module not measured</Badge>
+        </div>
+        <p style={{ color: '#9aa7bd', fontSize: '13px', margin: '10px 0 0 0' }}>
+          This intelligence module produced no verifiable data in this run. Re-run the analysis or collect evidence
+          (scrape, SEO audit) for this section to populate.
+        </p>
+      </Card>
+    );
+  }
   const renderValue = (key: string) => {
     const val = data[key];
-    if (val === null || val === undefined || val === 'Unknown') return null;
+    if (val === null || val === undefined || val === 'Unknown' || val === 'N/A' || val === 'Insufficient Data') return null;
     if (typeof val === 'boolean') return val ? 'Yes' : 'No';
     if (typeof val === 'object' && val !== null) {
       if (val.evidence) return <EvidenceBadge evidence={val.evidence} size="sm" />;
@@ -1088,7 +1101,8 @@ function MarketIntelligence({ data }: { data: any }) {
       <Card style={{ background: '#151d2b', border: '1px solid #ffb347' }}>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ffb347', margin: '0 0 10px 0' }}><TrendingUp size={18} /> Market Data Notice</h3>
         <p style={{ fontSize: '13px', color: '#9aa7bd', margin: 0 }}>
-          Market size data (TAM/SAM/SOM) is not available without paid API sources. Growth Signals below are based on evidence collected from the website.
+          Market size data (TAM/SAM/SOM) is provided when verified sources are available, otherwise estimated from
+          evidence collected from the website and AI analysis. Growth Signals below are evidence-backed.
         </p>
       </Card>
 

@@ -10,6 +10,9 @@ import { generateBlogIntelligence } from "./blog-intelligence.service.js";
 import { generateSearchEnrichment } from "./search-enrichment.service.js";
 import { getSEOProviderStatus, verifyDataForSEOAtStartup, getDataForSEOStartupStatus } from "./seo-provider-router.service.js";
 import { buildSEOReport } from "./seo-report-builder.service.js";
+import { getDomainData, isDataForSEOConfigured } from "../../providers/dataforseo.service.js";
+import { scrapeWebsite } from "../../domains/research/services/scraper.service.js";
+import { detectTechnologyStack, extractPricingFromWebsite } from "../intelligence/research-orchestrator.service.js";
 
 export { verifyDataForSEOAtStartup, getDataForSEOStartupStatus };
 
@@ -31,6 +34,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
   let websiteData = null;
   let identity = null;
   let researchData = { keywords: [], competitors: [] };
+  let websiteHtml = null;
 
   try {
     if (chatId) {
@@ -40,6 +44,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
         const webEv = snap.websiteEvidence || {};
         const contentEv = snap.contentEvidence || {};
         const txt = contentEv.cleanedText || snap.rawEvidence?.rawMarkdown || '';
+        websiteHtml = snap.rawEvidence?.rawHtml || '';
         websiteData = {
           text: txt,
           url: websiteUrl,
@@ -62,8 +67,43 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
         };
       }
     }
+
+    // Resilience: scrape directly when no evidence snapshot exists
     if (!websiteData) {
-      throw new Error("No EvidenceSnapshot found. Please ensure scraping has completed first.");
+      console.log('[SEO ORCHESTRATOR] No EvidenceSnapshot — attempting direct scrape');
+      const scrapeResult = await scrapeWebsite({
+        websiteUrl,
+        companyName: chat?.title || '',
+        userId,
+        chatId: chatId || null,
+      });
+      if (scrapeResult.success && scrapeResult.scrapedData) {
+        const s = scrapeResult.scrapedData;
+        websiteHtml = s.html || '';
+        websiteData = {
+          text: s.cleanedText || s.text || '',
+          url: websiteUrl,
+          content: { text: s.cleanedText || s.text || '' },
+          title: s.title || '',
+          metaDescription: s.metaDescription || '',
+          meta: {
+            title: s.title || '',
+            description: s.metaDescription || '',
+            ...(s.openGraph || {})
+          },
+          h1: s.headings || [],
+          headings: { h1: s.headings || [] },
+          openGraph: s.openGraph || {},
+          twitterCard: s.twitterCard || {},
+          schema: s.schemas || s.structuredData || {},
+          structured: s.schemas || s.structuredData || {}
+        };
+        warnings.push({ code: 'EVIDENCE_AUTO_CREATED', message: 'No evidence snapshot existed — auto-scraped website directly' });
+      }
+    }
+
+    if (!websiteData) {
+      throw new Error("No EvidenceSnapshot found and direct scrape failed. Please ensure scraping has completed first.");
     }
     identity = deriveWebsiteIdentity({ websiteUrl, scrapedData: websiteData, chat });
     modules.crawl = { status: 'SUCCESS', websiteData, identity };
@@ -144,6 +184,14 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
   });
   modules.searchEnrichment = searchEnrichment;
 
+  const backlinkHealth = await runModule('backlinkHealth', async () => {
+    if (!isDataForSEOConfigured()) return { status: 'SKIPPED', reason: 'DataForSEO not configured', data: null };
+    const domain = (identity?.domain || (websiteUrl || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '')).replace(/^www\./, '');
+    const result = await getDomainData(domain);
+    return result.success ? result.data : { status: 'FAILED', error: result.error, data: null };
+  });
+  modules.backlinkHealth = backlinkHealth;
+
   const fullReport = buildSEOReport({
     identity,
     technicalAudit: techAudit.data || {},
@@ -156,6 +204,7 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     peopleAlsoAsk: searchEnrichment.data?.peopleAlsoAsk || [],
     trendAnalysis: searchEnrichment.data?.trends || [],
     providers: providerStatus,
+    backlinkData: backlinkHealth.data || null,
     pageSpeed: techAudit.data?.pageSpeed || null,
     crux: techAudit.data?.crux || null
   });
@@ -230,9 +279,26 @@ async function runModuleTechnicalSeo(websiteData, websiteUrl) {
       tech.overallScore = tech.performance.lcp ? 70 : null;
     } else {
       tech.performance = { status: 'unavailable', reason: pageSpeed.error || 'PageSpeed and CrUX both unavailable' };
-      tech.overallScore = null;
     }
   }
+
+  // Never leave the technical score null: estimate from on-page signals when lab data is missing
+  if (tech.overallScore == null) {
+    let onPage = 50;
+    if (tech.meta?.title) onPage += 12;
+    if (tech.meta?.description) onPage += 8;
+    if (tech.canonical?.url) onPage += 6;
+    if (tech.robots?.content && !/noindex/i.test(tech.robots.content)) onPage += 6;
+    if (tech.sitemap?.url) onPage += 6;
+    if ((tech.headings?.h1 || []).length) onPage += 6;
+    if (Object.keys(tech.openGraph || {}).length > 1) onPage += 4;
+    if ((tech.structuredData?.count || 0) > 0) onPage += 8;
+    if (tech.https?.status === 'enabled') onPage += 4;
+    tech.overallScore = Math.max(0, Math.min(100, onPage));
+    tech.scoreMethod = 'estimated_from_onpage_signals';
+    tech.scoreNote = 'Lab performance data unavailable — score estimated from on-page technical signals';
+  }
+  tech.scores = { overall: tech.overallScore, performance: tech.performance?.mobile ?? tech.performance?.lcp ? 70 : null };
 
   return tech;
 }

@@ -80,7 +80,7 @@ function asArray(value) {
 // ============================================
 
 export async function runFullGrowthAnalysis({ chatId, userId, input }) {
-  console.log('🚀 [Growth Workspace] Starting full analysis:', { chatId, userId, productName: input.productName });
+  console.log('ðŸš€ [Growth Workspace] Starting full analysis:', { chatId, userId, productName: input.productName });
 
   // STEP 1: Validate or create chat if needed
   let chat = null;
@@ -97,7 +97,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
   // If chat doesn't exist or invalid chatId, create a new one
   if (!chat) {
-    console.log('📝 [Growth Workspace] No valid chat found, creating new chat automatically...');
+    console.log('ðŸ“ [Growth Workspace] No valid chat found, creating new chat automatically...');
     
     const title = input.productName || input.companyName || 'New Project';
     
@@ -109,12 +109,12 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       }
     });
 
-    console.log('✅ [Growth Workspace] New chat created automatically:', { 
+    console.log('âœ… [Growth Workspace] New chat created automatically:', { 
       chatId: chat.id, 
       title: chat.title 
     });
   } else {
-    console.log('✅ [Growth Workspace] Chat validated:', { chatId: chat.id });
+    console.log('âœ… [Growth Workspace] Chat validated:', { chatId: chat.id });
   }
 
   // Use the valid chat ID for all operations
@@ -123,7 +123,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
   // IMPROVED: Don't delete old data immediately - we'll use upsert operations instead
   // This prevents data loss if analysis fails mid-way
   // Old approach (REMOVED): await prisma.productIntelligence.deleteMany({ where: { chatId: validChatId } });
-  console.log('💾 [Growth Workspace] Using transactional upsert approach (old data preserved until success)');
+  console.log('ðŸ’¾ [Growth Workspace] Using transactional upsert approach (old data preserved until success)');
 
   // Phase 1: Load latest EvidenceSnapshot as primary data source
   let evidenceSnapshot = null;
@@ -173,36 +173,39 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     // Step 0: Collect research data using orchestrator (single source of truth)
     let researchData = null;
     if (input.websiteUrl) {
-      console.log('🔍 [Growth Workspace] Collecting research data via orchestrator:', input.websiteUrl);
+      console.log('ðŸ” [Growth Workspace] Collecting research data via orchestrator:', input.websiteUrl);
       try {
         researchData = await collectResearchData({
           websiteUrl: input.websiteUrl,
           productName: input.productName || '',
-          companyName: input.companyName || ''
+          companyName: input.companyName || '',
+          userId,
+          chatId: validChatId
         });
-        console.log('✅ [Growth Workspace] Research data collected:', {
+        console.log('âœ… [Growth Workspace] Research data collected:', {
           hasWebsite: !!researchData.websiteContent,
           hasTechnical: !!researchData.technical,
           competitorsCount: researchData.competitors.length,
           keywordsCount: researchData.keywords.length
         });
       } catch (researchError) {
-        console.log('⚠️ [Growth Workspace] Research orchestrator failed, falling back to direct scrape:', researchError.message);
+        console.log('âš ï¸ [Growth Workspace] Research orchestrator failed, falling back to direct scrape:', researchError.message);
       }
     }
 
     // Step 1: Scrape website if not already done by orchestrator
     if (input.websiteUrl && !researchData?.websiteContent) {
-      console.log('🔍 [Growth Workspace] Scraping website (fallback):', input.websiteUrl);
+      console.log('ðŸ” [Growth Workspace] Scraping website (fallback):', input.websiteUrl);
       try {
-        const scrapeResult = await scrapeWebsite(input.websiteUrl, {
-          timeout: 20000,
-          extractSchema: true
+        const scrapeResult = await scrapeWebsite({
+          websiteUrl: input.websiteUrl,
+          userId,
+          chatId: validChatId
         });
         
-        if (scrapeResult.success) {
-          websiteData = scrapeResult.data;
-          console.log('✅ [Growth Workspace] Website scraped successfully:', {
+        if (scrapeResult.success && scrapeResult.scrapedData) {
+          websiteData = scrapeResult.scrapedData;
+          console.log('âœ… [Growth Workspace] Website scraped successfully:', {
             titleLength: websiteData.metadata?.title?.length,
             contentLength: websiteData.text?.length,
             hasDescription: !!websiteData.metadata?.description
@@ -213,14 +216,14 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
             input.description = websiteData.metadata.description;
           }
         } else {
-          console.log('⚠️ [Growth Workspace] Website scraping failed, continuing without scraped data');
+          console.log('âš ï¸ [Growth Workspace] Website scraping failed, continuing without scraped data');
         }
       } catch (scrapeError) {
-        console.log('⚠️ [Growth Workspace] Scraping error:', scrapeError.message);
+        console.log('âš ï¸ [Growth Workspace] Scraping error:', scrapeError.message);
       }
     } else if (researchData?.websiteContent) {
       websiteData = researchData.websiteContent;
-      console.log('✅ [Growth Workspace] Using website content from orchestrator');
+      console.log('âœ… [Growth Workspace] Using website content from orchestrator');
     }
 
     // Limit scraped content size to prevent 429 token limits
@@ -235,7 +238,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     // Derive proper identity from scraped data and URL
     const identity = deriveWebsiteIdentity({ websiteUrl: input.websiteUrl, scrapedData: websiteData || {}, chat });
-    console.log('✅ [Growth Workspace] Derived Identity:', identity);
+    console.log('âœ… [Growth Workspace] Derived Identity:', identity);
     
     // Inject identity into input but prefer user inputs from the new multi-step form
     // Validate user-provided names against tagline/UI patterns to prevent leakage
@@ -299,7 +302,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     }
 
     // Step 1: Product Analysis (evidence-backed)
-    console.log('✨ [Growth Workspace] Running Product Analysis...');
+    console.log('âœ¨ [Growth Workspace] Running Product Analysis...');
     steps[0].status = 'running';
     steps[0].startTime = Date.now();
     try {
@@ -315,7 +318,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[0].jsonParsed = !!rawResult.data;
       steps[0].schemaValidated = true;
       steps[0].confidenceScore = results.product.confidenceScore ?? null;
-      console.log('✅ [Growth Workspace] Product Analysis complete & validated:', {
+      console.log('âœ… [Growth Workspace] Product Analysis complete & validated:', {
         hasUSP: !!results.product.usp,
         featuresCount: results.product.features?.length || 0,
         provider: results.product.provider,
@@ -330,7 +333,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[0].responseReceived = false;
       steps[0].jsonParsed = false;
       steps[0].schemaValidated = false;
-      console.log('⚠️ [Growth Workspace] Product Analysis failed:', error.message);
+      console.log('âš ï¸ [Growth Workspace] Product Analysis failed:', error.message);
       warnings.push(`Product Analysis fallback: ${error.message}`);
       results.product = validateProductAnalysis(null, input);
       steps[0].status = 'completed';
@@ -340,7 +343,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     // Step 2: Market Discovery
     await new Promise(resolve => setTimeout(resolve, 4000));
-    console.log('✨ [Growth Workspace] Running Market Discovery...');
+    console.log('âœ¨ [Growth Workspace] Running Market Discovery...');
     steps[1].status = 'running';
     steps[1].startTime = Date.now();
     try {
@@ -356,7 +359,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[1].jsonParsed = !!rawResult.data;
       steps[1].schemaValidated = true;
       steps[1].confidenceScore = results.market.confidenceScore ?? null;
-      console.log('✅ [Growth Workspace] Market Discovery complete & validated:', {
+      console.log('âœ… [Growth Workspace] Market Discovery complete & validated:', {
         trendsCount: results.market.marketTrends?.length || 0,
         opportunitiesCount: results.market.opportunities?.length || 0,
         provider: results.market.provider,
@@ -371,7 +374,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[1].responseReceived = false;
       steps[1].jsonParsed = false;
       steps[1].schemaValidated = false;
-      console.log('⚠️ [Growth Workspace] Market Discovery failed:', error.message);
+      console.log('âš ï¸ [Growth Workspace] Market Discovery failed:', error.message);
       warnings.push(`Market Discovery fallback: ${error.message}`);
       results.market = validateMarketDiscovery(null, input);
       steps[1].status = 'completed';
@@ -381,7 +384,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     // Step 3: Audience Intelligence
     await new Promise(resolve => setTimeout(resolve, 4000));
-    console.log('✨ [Growth Workspace] Running Audience Intelligence...');
+    console.log('âœ¨ [Growth Workspace] Running Audience Intelligence...');
     steps[2].status = 'running';
     steps[2].startTime = Date.now();
     try {
@@ -397,7 +400,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[2].jsonParsed = !!rawResult.data;
       steps[2].schemaValidated = true;
       steps[2].confidenceScore = results.audience.confidenceScore ?? null;
-      console.log('✅ [Growth Workspace] Audience Intelligence complete & validated:', {
+      console.log('âœ… [Growth Workspace] Audience Intelligence complete & validated:', {
         personasCount: results.audience.buyerPersonas?.length || 0,
         channelsCount: results.audience.bestChannels?.length || 0,
         provider: results.audience.provider,
@@ -412,7 +415,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[2].responseReceived = false;
       steps[2].jsonParsed = false;
       steps[2].schemaValidated = false;
-      console.log('⚠️ [Growth Workspace] Audience Intelligence failed:', error.message);
+      console.log('âš ï¸ [Growth Workspace] Audience Intelligence failed:', error.message);
       warnings.push(`Audience Intelligence fallback: ${error.message}`);
       results.audience = validateAudienceIntelligence(null, input);
       steps[2].status = 'completed';
@@ -422,7 +425,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     // Step 4: Competitor Analysis
     await new Promise(resolve => setTimeout(resolve, 4000));
-    console.log('✨ [Growth Workspace] Running Competitor Analysis...');
+    console.log('âœ¨ [Growth Workspace] Running Competitor Analysis...');
     steps[3].status = 'running';
     steps[3].startTime = Date.now();
     try {
@@ -438,7 +441,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[3].jsonParsed = !!rawResult.data;
       steps[3].schemaValidated = true;
       steps[3].confidenceScore = results.competitor.confidenceScore ?? null;
-      console.log('✅ [Growth Workspace] Competitor Analysis complete & validated:', {
+      console.log('âœ… [Growth Workspace] Competitor Analysis complete & validated:', {
         competitorsCount: results.competitor.directCompetitors?.length || 0,
         gapsCount: results.competitor.marketGaps?.length || 0,
         provider: results.competitor.provider,
@@ -454,7 +457,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[3].responseReceived = false;
       steps[3].jsonParsed = false;
       steps[3].schemaValidated = false;
-      console.log('⚠️ [Growth Workspace] Competitor Analysis failed:', error.message);
+      console.log('âš ï¸ [Growth Workspace] Competitor Analysis failed:', error.message);
       warnings.push(`Competitor Analysis fallback: ${error.message}`);
       results.competitor = validateCompetitorAnalysis(null, input);
       steps[3].status = 'completed';
@@ -464,7 +467,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     // Step 5: Intent Prediction
     await new Promise(resolve => setTimeout(resolve, 4000));
-    console.log('✨ [Growth Workspace] Running Intent Prediction...');
+    console.log('âœ¨ [Growth Workspace] Running Intent Prediction...');
     steps[4].status = 'running';
     steps[4].startTime = Date.now();
     try {
@@ -480,7 +483,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[4].jsonParsed = !!rawResult.data;
       steps[4].schemaValidated = true;
       steps[4].confidenceScore = results.intent.confidenceScore ?? null;
-      console.log('✅ [Growth Workspace] Intent Prediction complete & validated:', {
+      console.log('âœ… [Growth Workspace] Intent Prediction complete & validated:', {
         hotSegmentsCount: results.intent.hotSegments?.length || 0,
         signalsCount: results.intent.buyingSignals?.length || 0,
         provider: results.intent.provider,
@@ -495,7 +498,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[4].responseReceived = false;
       steps[4].jsonParsed = false;
       steps[4].schemaValidated = false;
-      console.log('⚠️ [Growth Workspace] Intent Prediction failed:', error.message);
+      console.log('âš ï¸ [Growth Workspace] Intent Prediction failed:', error.message);
       warnings.push(`Intent Prediction fallback: ${error.message}`);
       results.intent = validateIntentPrediction(null, input);
       steps[4].status = 'completed';
@@ -505,7 +508,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     // Step 6: Positioning Engine
     await new Promise(resolve => setTimeout(resolve, 4000));
-    console.log('✨ [Growth Workspace] Running Positioning Engine...');
+    console.log('âœ¨ [Growth Workspace] Running Positioning Engine...');
     steps[5].status = 'running';
     steps[5].startTime = Date.now();
     try {
@@ -521,7 +524,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[5].jsonParsed = !!rawResult.data;
       steps[5].schemaValidated = true;
       steps[5].confidenceScore = results.positioning.confidenceScore ?? null;
-      console.log('✅ [Growth Workspace] Positioning Engine complete & validated:', {
+      console.log('âœ… [Growth Workspace] Positioning Engine complete & validated:', {
         hasStatement: !!results.positioning.positioningStatement,
         pillarsCount: results.positioning.messagingPillars?.length || 0,
         provider: results.positioning.provider,
@@ -536,7 +539,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[5].responseReceived = false;
       steps[5].jsonParsed = false;
       steps[5].schemaValidated = false;
-      console.log('⚠️ [Growth Workspace] Positioning Engine failed:', error.message);
+      console.log('âš ï¸ [Growth Workspace] Positioning Engine failed:', error.message);
       warnings.push(`Positioning Engine fallback: ${error.message}`);
       results.positioning = validatePositioningEngine(null, input);
       steps[5].status = 'completed';
@@ -546,7 +549,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     // Step 7: Campaign Generator
     await new Promise(resolve => setTimeout(resolve, 4000));
-    console.log('✨ [Growth Workspace] Running Campaign Generator...');
+    console.log('âœ¨ [Growth Workspace] Running Campaign Generator...');
     steps[6].status = 'running';
     steps[6].startTime = Date.now();
     try {
@@ -562,7 +565,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[6].jsonParsed = !!rawResult.data;
       steps[6].schemaValidated = true;
       steps[6].confidenceScore = results.campaign.confidenceScore ?? null;
-      console.log('✅ [Growth Workspace] Campaign Generator complete & validated:', {
+      console.log('âœ… [Growth Workspace] Campaign Generator complete & validated:', {
         anglesCount: results.campaign.creativeAngles?.length || 0,
         hooksCount: results.campaign.copyHooks?.length || 0,
         hasActionPlan: !!(results.campaign.actionPlan?.sevenDay?.length || results.campaign.actionPlan?.thirtyDay?.length),
@@ -578,7 +581,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[6].responseReceived = false;
       steps[6].jsonParsed = false;
       steps[6].schemaValidated = false;
-      console.log('⚠️ [Growth Workspace] Campaign Generator failed:', error.message);
+      console.log('âš ï¸ [Growth Workspace] Campaign Generator failed:', error.message);
       warnings.push(`Campaign Generator fallback: ${error.message}`);
       results.campaign = validateCampaignGenerator(null, input);
       steps[6].status = 'completed';
@@ -588,7 +591,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     // Step 8: Channel Recommendation
     await new Promise(resolve => setTimeout(resolve, 4000));
-    console.log('✨ [Growth Workspace] Running Channel Recommendation...');
+    console.log('âœ¨ [Growth Workspace] Running Channel Recommendation...');
     steps[7].status = 'running';
     steps[7].startTime = Date.now();
     try {
@@ -604,7 +607,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[7].jsonParsed = !!rawResult.data;
       steps[7].schemaValidated = true;
       steps[7].confidenceScore = results.channel.confidenceScore ?? null;
-      console.log('✅ [Growth Workspace] Channel Recommendation complete & validated:', {
+      console.log('âœ… [Growth Workspace] Channel Recommendation complete & validated:', {
         channelsCount: results.channel.recommendedChannels?.length || 0,
         primaryChannel: results.channel.primaryChannel,
         provider: results.channel.provider,
@@ -619,7 +622,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       steps[7].responseReceived = false;
       steps[7].jsonParsed = false;
       steps[7].schemaValidated = false;
-      console.log('⚠️ [Growth Workspace] Channel Recommendation failed:', error.message);
+      console.log('âš ï¸ [Growth Workspace] Channel Recommendation failed:', error.message);
       warnings.push(`Channel Recommendation fallback: ${error.message}`);
       results.channel = validateChannelRecommendation(null, input);
       steps[7].status = 'completed';
@@ -634,86 +637,202 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
 
     // Normalize all results
     const normalizedResults = normalizeGrowthResults(results, input);
-    console.log('🔄 [Growth Workspace] Results normalized');
+    console.log('ðŸ”„ [Growth Workspace] Results normalized');
     console.log('[Growth Normalize] normalizedResults keys', Object.keys(normalizedResults || {}));
 
-    // Calculate growth scores from evidence completeness, not AI guesses
-    function calculateEvidenceBasedScore(evidenceGrowthData) {
-      if (!evidenceGrowthData?.sourceSummary) return null;
-      return evidenceGrowthData.sourceSummary.completenessScore || null;
-    }
+    // ============================================
+    // ENTERPRISE GROWTH SCORING ENGINE (12 components, never null)
+    // Every score is evidence-backed; when a component lacks direct evidence
+    // it uses conservative heuristic estimates with LOW confidence - never null.
+    // ============================================
 
-    function calculateGrowthScore(results) {
-      const modules = [
-        results?.product,
-        results?.market,
-        results?.audience,
-        results?.competitor,
-        results?.intent,
-        results?.positioning,
-        results?.campaign,
-        results?.channel
-      ].filter(Boolean);
-
-      if (!modules.length) return null;
-
-      // Use evidence completeness as basis, or null if no evidence
-      if (evidenceGrowthData?.sourceSummary?.completenessScore != null) {
-        return evidenceGrowthData.sourceSummary.completenessScore;
+    // Inject research/technology/pricing/competitor evidence into normalized results
+    if (researchData) {
+      if (researchData.technologyStack?.length) {
+        normalizedResults.product = normalizedResults.product || {};
+        normalizedResults.product.technologyStack = researchData.technologyStack;
       }
-
-      return null;
-    }
-
-    function calculateProductFitScore(product) {
-      if (!product) return null;
-      // Score from REAL product data (AI/validated output), not just evidence scan
-      const features = (product.features || []).filter(f => f && f.value && !/core functionality/i.test(f.value));
-      const benefits = (product.benefits || []).filter(b => b && b.value);
-      const count = Math.max(features.length, benefits.length);
-      return count > 0 ? Math.min(100, Math.round(count * 20)) : null;
-    }
-
-    function calculateMarketOpportunityScore(market) {
-      if (!market) return null;
-      // Real growth signals + opportunities (never empty after validation fix)
-      const signals = (market.growthSignals || []).filter(s => s && (s.signal || s.value) && !/unavailable/i.test(s.signal || s.value || ''));
-      const opportunities = (market.opportunities || []).filter(o => o && o.value && !/unavailable/i.test(o.value));
-      const count = signals.length + opportunities.length;
-      return count > 0 ? Math.min(100, Math.round(count * 12)) : null;
-    }
-
-    function calculateAudienceClarityScore(audience) {
-      if (!audience) return null;
-      // Only personas with real substance
-      const realPersonas = (audience.buyerPersonas || []).filter(p => p.name && p.name !== 'Target Persona' && p.name !== 'Persona Name' && !p.name.includes(','));
-      if (realPersonas.length) {
-        return Math.min(100, Math.round(realPersonas.length * 15 + (audience.buyingTriggers?.length || 0) * 10));
+      if (researchData.pricing?.tiers?.length) {
+        normalizedResults.market = normalizedResults.market || {};
+        normalizedResults.market.pricing = researchData.pricing;
       }
-      return null;
+      if (researchData.competitors?.length && !(normalizedResults.competitor?.directCompetitors || []).length) {
+        normalizedResults.competitor = normalizedResults.competitor || {};
+        normalizedResults.competitor.directCompetitors = researchData.competitors.map((c) => ({
+          name: c.name,
+          website: c.website,
+          domain: c.domain,
+          category: c.category,
+          strengths: c.strengths || [],
+          weaknesses: c.weaknesses || [],
+          pricing: c.pricing,
+          trafficEstimate: c.trafficEstimate,
+          seoAuthority: c.seoAuthority,
+          confidence: c.confidence,
+          evidence: c.evidence,
+          source: c.source,
+        }));
+      }
     }
 
-    function calculateCompetitiveDefensibilityScore(competitor) {
-      if (!competitor) return null;
-      // Only real competitor names
-      const realCompetitors = (competitor.directCompetitors || []).filter(c => c.name && !c.name.includes('Competitor') && !c.name.includes('competitor'));
-      const gaps = (competitor.marketGaps || []).filter(g => g && g.value && !/unavailable/i.test(g.value));
-      if (realCompetitors.length) {
-        return Math.min(100, Math.round(realCompetitors.length * 15 + gaps.length * 10));
-      }
-      return null;
+    const productData = normalizedResults.product || {};
+    const marketData = normalizedResults.market || {};
+    const audienceData = normalizedResults.audience || {};
+    const competitorData = normalizedResults.competitor || {};
+    const campaignData = normalizedResults.campaign || {};
+    const channelData = normalizedResults.channel || {};
+    const intentData = normalizedResults.intent || {};
+    const positioningData = normalizedResults.positioning || {};
+
+    const socialLinks = evidenceGrowthData?.socialLinks?.length || websiteData?.socialLinks?.length || 0;
+    const techStack = researchData?.technologyStack || productData.technologyStack || [];
+    const pricing = researchData?.pricing || marketData.pricing || null;
+    const pricingTiers = pricing?.tiers || [];
+    const hasWebsite = !!websiteData;
+    const domain = (input.websiteUrl || '').replace(/^https?:\/\//, '').replace(/^www\./, '');
+
+    const clamp = (v) => Math.max(0, Math.min(100, Math.round(v)));
+
+    const scoreFromCounts = (positive, total, maxPerItem, cap = 100) => {
+      const score = positive * maxPerItem;
+      return { value: clamp(score), count: positive, total: total || positive };
+    };
+
+    // 1) Market Opportunity â€” growthSignals + opportunities + trends + tam presence
+    const marketSignals = (marketData.growthSignals || []).filter((s) => s && (s.signal || s.value));
+    const opportunities = (marketData.opportunities || []).filter((o) => o && o.value);
+    const marketTrends = (marketData.marketTrends || []).filter((t) => t && (t.title || t.value));
+    const marketRaw = scoreFromCounts(marketSignals.length * 12 + opportunities.length * 10 + marketTrends.length * 5, marketSignals.length + opportunities.length, 12);
+    const marketOpportunityScore = marketRaw.value;
+
+    // 2) Competitive Position â€” real competitors + gaps + positioning strength
+    const realCompetitors = (competitorData.directCompetitors || []).filter(
+      (c) => c && c.name && !/competitor|unknown|^\s*$/i.test(c.name) && !c.name.includes(',')
+    );
+    const marketGaps = (competitorData.marketGaps || []).filter((g) => g && (g.value || g.gap));
+    const compPositionRaw = scoreFromCounts(realCompetitors.length * 12 + marketGaps.length * 10, realCompetitors.length, 15);
+    const competitivePositionScore = compPositionRaw.value;
+
+    // 3) Audience Clarity â€” real personas + triggers + best channels
+    const realPersonas = (audienceData.buyerPersonas || []).filter(
+      (p) => p && p.name && !/persona|unknown|^\s*$/i.test(p.name) && !p.name.includes(',')
+    );
+    const audienceTriggers = (audienceData.buyingTriggers || []).filter((t) => t && (t.value || t.trigger));
+    const audienceRaw = scoreFromCounts(realPersonas.length * 15 + audienceTriggers.length * 8, realPersonas.length, 18);
+    const audienceClarityScore = audienceRaw.value;
+
+    // 4) Campaign Readiness â€” angles + hooks + action plan buckets
+    const creativeAngles = (campaignData.creativeAngles || []).filter((a) => a && (a.value || a.title) && !/angle/i.test(a.value || a.title || ''));
+    const copyHooks = (campaignData.copyHooks || []).filter((h) => h && (h.value || h.hook));
+    const actionBuckets = (campaignData.actionPlan || {});
+    const bucketCount = Object.values(actionBuckets).filter((b) => Array.isArray(b) && b.length > 0).length;
+    const campaignRaw = scoreFromCounts(creativeAngles.length * 12 + copyHooks.length * 6 + bucketCount * 8, creativeAngles.length, 14);
+    const campaignReadinessScore = campaignRaw.value;
+
+    // 5) Brand Authority â€” social links + tech credibility + site presence + news signals
+    let brandAuthorityScore;
+    {
+      const socialCount = socialLinks;
+      const newsCount = researchData?.newsSignals?.length || 0;
+      const domainScore = hasWebsite ? 30 : 0;
+      const socialScore = Math.min(socialCount * 8, 35);
+      const newsScore = Math.min(newsCount * 10, 25);
+      brandAuthorityScore = clamp(domainScore + socialScore + newsScore + (techStack.length > 0 ? 10 : 0));
     }
 
-    function calculateCampaignReadinessScore(campaign, channel) {
-      if (!campaign && !channel) return null;
-      // Only evidence-backed campaign data
-      const angles = (campaign?.creativeAngles || []).filter(a => a.value && !a.value.includes('Angle'));
-      const channels = (channel?.recommendedChannels || []).filter(c => c.channel && !c.channel.includes('Channel'));
-      if (angles.length || channels.length) {
-        return Math.min(100, Math.round(angles.length * 10 + channels.length * 15));
-      }
-      return null;
+    // 6) Revenue Potential â€” pricing tiers + market opportunity + business model
+    let revenuePotentialScore;
+    {
+      const tierScore = Math.min(pricingTiers.length * 14, 45);
+      const marketFactor = marketOpportunityScore > 0 ? 30 : 15;
+      const modelScore = input.businessModel && !/unknown/i.test(input.businessModel) ? 15 : 5;
+      revenuePotentialScore = clamp(tierScore + marketFactor + modelScore + (opportunities.length ? 10 : 0));
     }
+
+    // 7) Product Maturity â€” features + benefits + USP + tech stack depth
+    const features = (productData.features || []).filter((f) => f && (f.value || f.feature));
+    const benefits = (productData.benefits || []).filter((b) => b && b.value);
+    let productMaturityScore;
+    {
+      const featureScore = Math.min(features.length * 10, 40);
+      const benefitScore = Math.min(benefits.length * 8, 25);
+      const uspScore = productData.usp && !/unknown/i.test(productData.usp) ? 15 : 5;
+      const techScore = Math.min(techStack.length * 3, 15);
+      productMaturityScore = clamp(featureScore + benefitScore + uspScore + techScore);
+    }
+
+    // 8) GTM Readiness â€” positioning + campaign + channel + intent
+    let goToMarketReadinessScore;
+    {
+      const positioningScore = positioningData.positioningStatement && !/unknown/i.test(positioningData.positioningStatement) ? 30 : 10;
+      const campaignFactor = campaignReadinessScore > 0 ? 30 : 15;
+      const channelFactor = (channelData.recommendedChannels || []).length ? 25 : 10;
+      const intentFactor = (intentData.hotSegments || []).length ? 15 : 5;
+      goToMarketReadinessScore = clamp(positioningScore + campaignFactor + channelFactor + intentFactor);
+    }
+
+    // 9) Channel Readiness â€” real recommended channels + primary channel
+    const realChannels = (channelData.recommendedChannels || []).filter(
+      (c) => c && (c.channel || c.name) && !/channel|unknown/i.test(c.channel || c.name || '')
+    );
+    let channelReadinessScore;
+    {
+      const channelCountScore = Math.min(realChannels.length * 16, 70);
+      const primaryScore = channelData.primaryChannel && !/unknown/i.test(channelData.primaryChannel) ? 20 : 10;
+      const budgetScore = input.budget && !/unknown/i.test(input.budget) ? 10 : 5;
+      channelReadinessScore = clamp(channelCountScore + primaryScore + budgetScore);
+    }
+
+    // 10) Pricing Competitiveness â€” tier count + price points found + free tier
+    let pricingCompetitivenessScore;
+    {
+      const hasFree = pricingTiers.some((t) => /free/i.test(t.name));
+      const tierScore = Math.min(pricingTiers.length * 15, 50);
+      const freeScore = hasFree ? 20 : 10;
+      const evidenceScore = pricingTiers.length > 0 ? 20 : 5;
+      const competitorPricing = realCompetitors.filter((c) => c.pricing).length;
+      const competitorScore = Math.min(competitorPricing * 6, 15);
+      pricingCompetitivenessScore = clamp(tierScore + freeScore + evidenceScore + competitorScore);
+    }
+
+    // 11) Virality â€” social links + campaign hooks + shareable positioning
+    let viralityScore;
+    {
+      const socialScore = Math.min(socialLinks * 12, 40);
+      const hookScore = Math.min(copyHooks.length * 12, 35);
+      const angleScore = Math.min(creativeAngles.length * 6, 15);
+      viralityScore = clamp(socialScore + hookScore + angleScore + (hasWebsite ? 10 : 0));
+    }
+
+    // 12) Confidence Score â€” how many components had direct evidence vs estimates
+    const evidenceComponents = [
+      marketSignals.length || opportunities.length,
+      realCompetitors.length,
+      realPersonas.length,
+      creativeAngles.length || copyHooks.length,
+      realChannels.length,
+      pricingTiers.length,
+      features.length,
+      techStack.length,
+      socialLinks,
+    ].filter((v) => v > 0).length;
+    const confidenceScore = clamp(25 + evidenceComponents * 8);
+
+    const overallGrowthScore = clamp(
+      (marketOpportunityScore +
+        competitivePositionScore +
+        audienceClarityScore +
+        campaignReadinessScore +
+        brandAuthorityScore +
+        revenuePotentialScore +
+        productMaturityScore +
+        goToMarketReadinessScore +
+        channelReadinessScore +
+        pricingCompetitivenessScore +
+        viralityScore) / 11
+    );
+
+    const growthScoreStatus = confidenceScore >= 60 ? null : NOT_ENOUGH_EVIDENCE;
 
     // Generate product-specific top recommendation from evidence
     function generateTopRecommendation(results, input) {
@@ -759,33 +878,40 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       return `Launch ${primaryChannel} campaign to validate ${productName} positioning.`;
     }
 
-    const marketOpportunityScore = calculateMarketOpportunityScore(normalizedResults.market);
-    const campaignViabilityScore = calculateCampaignReadinessScore(normalizedResults.campaign, normalizedResults.channel);
-    const productFitScore = calculateProductFitScore(normalizedResults.product);
-    const audienceClarityScore = calculateAudienceClarityScore(normalizedResults.audience);
-    const competitiveDefensibilityScore = calculateCompetitiveDefensibilityScore(normalizedResults.competitor);
-    const campaignReadinessScore = campaignViabilityScore;
-    const componentScores = [productFitScore, marketOpportunityScore, audienceClarityScore, competitiveDefensibilityScore, campaignReadinessScore].filter(s => s !== null && s !== undefined);
-    const measurableComponents = componentScores.length;
-    const overallGrowthScore = measurableComponents >= 2 ? Math.round(componentScores.reduce((a, b) => a + b, 0) / measurableComponents) : null;
-    const growthScoreStatus = measurableComponents >= 2 ? null : NOT_ENOUGH_EVIDENCE;
-
     console.log('[Growth Scores]', {
       overallGrowthScore,
       marketOpportunityScore,
-      campaignViabilityScore
+      competitivePositionScore,
+      audienceClarityScore,
+      campaignReadinessScore,
+      brandAuthorityScore,
+      revenuePotentialScore,
+      productMaturityScore,
+      goToMarketReadinessScore,
+      channelReadinessScore,
+      pricingCompetitivenessScore,
+      viralityScore,
+      confidenceScore
     });
 
     // Generate growth summary with calculated scores and recommendations
     const growthSummary = {
       overallGrowthScore,
       marketOpportunityScore,
-      campaignViabilityScore,
-      productFitScore,
-      marketSizeScore: marketOpportunityScore,
+      competitivePositionScore,
       audienceClarityScore,
-      competitiveDefensibilityScore,
       campaignReadinessScore,
+      brandAuthorityScore,
+      revenuePotentialScore,
+      productMaturityScore,
+      goToMarketReadinessScore,
+      channelReadinessScore,
+      pricingCompetitivenessScore,
+      viralityScore,
+      confidenceScore,
+      productFitScore: productMaturityScore,
+      marketSizeScore: marketOpportunityScore,
+      competitiveDefensibilityScore: competitivePositionScore,
       growthScoreStatus,
       // Generate product-specific recommendations
       topRecommendation: generateTopRecommendation(normalizedResults, input),
@@ -803,7 +929,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     console.log('[Growth Snapshot Source]', growthSummary.sourceModules || ['All 8 modules']);
 
     // [Business Intelligence] Generate executive story (Enterprise BI 2.0)
-    const companyName = input.companyName || input.productName || 'Unknown';
+    const companyName = input.companyName || input.productName || '';
     const formattedCompanyName = companyName.split(' ').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
     ).join(' ');
@@ -948,7 +1074,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     console.log('[Growth Save] actionPlan keys', Object.keys(growthActionPlan || {}));
 
     // Save to database using validated chat.id
-    console.log('💾 [Growth Workspace] Saving core intelligence to database...');
+    console.log('ðŸ’¾ [Growth Workspace] Saving core intelligence to database...');
     console.info('[Growth Stage]', { stage: 'TRANSACTION_STARTED', status: 'running', chatId: validChatId });
     
     await prisma.$transaction([
@@ -1033,7 +1159,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     // Preserve evidence snapshot after successful analysis
     try {
       if (input.websiteUrl && (researchData || websiteData)) {
-        console.log('💾 [Growth Workspace] Preserving evidence snapshot after analysis...');
+        console.log('ðŸ’¾ [Growth Workspace] Preserving evidence snapshot after analysis...');
         
         // Build evidence from research data if available
         const preservedEvidence = {
@@ -1066,7 +1192,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
         });
 
         if (savedSnapshot) {
-          console.log('✅ [Growth Workspace] Evidence snapshot preserved:', {
+          console.log('âœ… [Growth Workspace] Evidence snapshot preserved:', {
             snapshotId: savedSnapshot.id,
             sourcesCollected: sourcesCollected.length,
             sources: sourcesCollected
@@ -1074,7 +1200,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
         }
       }
     } catch (evidenceError) {
-      console.error('⚠️ [Growth Workspace] Evidence preservation failed (non-fatal):', evidenceError.message);
+      console.error('âš ï¸ [Growth Workspace] Evidence preservation failed (non-fatal):', evidenceError.message);
       warnings.push({ code: 'EVIDENCE_PRESERVATION_FAILED', message: 'Analysis completed successfully, but evidence snapshot could not be preserved.' });
     }
 
@@ -1104,8 +1230,8 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
       warnings.push({ code: 'DERIVED_DATA_SAVE_FAILED', message: 'Core intelligence was saved, but narrative data could not be persisted.' });
     }
 
-    console.log('💾 [Growth Workspace] Core intelligence saved to database');
-    console.log(`✅ [Growth Workspace] hasActionPlan: ${!!normalizedResults.campaign.actionPlan}`);
+    console.log('ðŸ’¾ [Growth Workspace] Core intelligence saved to database');
+    console.log(`âœ… [Growth Workspace] hasActionPlan: ${!!normalizedResults.campaign.actionPlan}`);
 
     // Verify database records
     try {
@@ -1184,7 +1310,7 @@ export async function runFullGrowthAnalysis({ chatId, userId, input }) {
     };
 
   } catch (error) {
-    console.error('❌ [Growth Workspace] Error:', error);
+    console.error('âŒ [Growth Workspace] Error:', error);
     
     // Mark failed step
     const failedStepIndex = steps.findIndex(s => s.status === 'running');
@@ -1318,14 +1444,14 @@ Product: ${input.productName}
 Industry: ${input.industry}
 USP: ${normalizeTextList(productData.usp)}
 
-Audience hints (from the user's form — treat ONLY as starting hints, NEVER echo them as persona names):
+Audience hints (from the user's form â€” treat ONLY as starting hints, NEVER echo them as persona names):
 ${normalizeTextList(input.targetAudience)}
 
 Provide JSON response:
 {
   "buyerPersonas": [
     {
-      "name": "Role-based persona name INVENTED by you (e.g. 'Growth Marketer', 'Ops Lead') — never a comma-separated list",
+      "name": "Role-based persona name INVENTED by you (e.g. 'Growth Marketer', 'Ops Lead') â€” never a comma-separated list",
       "demographics": "Detailed description",
       "intentScore": null,
       "goals": ["Goal 1"],
@@ -1542,15 +1668,15 @@ CRITICAL INSTRUCTION: Do NOT invent budget allocations or ROI percentages. Retur
 
 async function callBestAI(prompt, maxTokens = 2000, moduleName = 'unknown', fallbackData = null) {
   const start = Date.now();
-  console.log(`🚀 [AI][${moduleName}] Calling AI...`);
+  console.log(`ðŸš€ [AI][${moduleName}] Calling AI...`);
   const result = await callAI(prompt, maxTokens);
   const durationMs = Date.now() - start;
   if (result.success && result.data) {
-    console.log(`✅ [AI][${moduleName}] ${result.provider} succeeded in ${durationMs}ms`);
+    console.log(`âœ… [AI][${moduleName}] ${result.provider} succeeded in ${durationMs}ms`);
     return { ...result.data, provider: result.provider };
   }
   const diag = result.diagnostics || [];
-  console.log(`🗑️ [AI][${moduleName}] All ${diag.length} provider(s) failed in ${durationMs}ms:`, JSON.stringify(diag));
+  console.log(`ðŸ—‘ï¸ [AI][${moduleName}] All ${diag.length} provider(s) failed in ${durationMs}ms:`, JSON.stringify(diag));
   if (fallbackData) {
     return { ...fallbackData, provider: 'fallback' };
   }
@@ -1593,7 +1719,7 @@ export async function getGrowthWorkspaceResults({ chatId, userId }) {
 
     // Normalize results to ensure consistent format
     const results = normalizeGrowthResults(rawResults, productIntel.inputJson || {});
-    console.log('🔄 [Growth Workspace] Loaded results normalized');
+    console.log('ðŸ”„ [Growth Workspace] Loaded results normalized');
 
     // Add evidence data if available
     if (evidenceSnapshot) {
@@ -1675,7 +1801,7 @@ export async function getGrowthWorkspaceResults({ chatId, userId }) {
     };
 
   } catch (error) {
-    console.error('❌ [Growth Workspace] Error fetching results:', error);
+    console.error('âŒ [Growth Workspace] Error fetching results:', error);
     return { success: false, error: error.message };
   }
 }
@@ -1839,7 +1965,7 @@ function enforceGrowthQualityFilters(results) {
 // ============================================
 
 function normalizeGrowthResults(results, input) {
-  console.log('🔄 [Normalize] Normalizing growth results');
+  console.log('ðŸ”„ [Normalize] Normalizing growth results');
   
   const normalized = {};
   
@@ -1848,7 +1974,7 @@ function normalizeGrowthResults(results, input) {
     const data = results.product || results.productAnalysis;
     normalized.product = {
       productSummary: ensureString(data.summary || data.productSummary, 'Insufficient Data'),
-      usp: ensureString(data.usp || data.valuePropositions?.[0]?.value, 'Unknown'),
+      usp: ensureString(data.usp || data.valuePropositions?.[0]?.value, null),
       features: ensureArray(data.keyFeatures || data.features),
       benefits: ensureArray(data.coreBenefits || data.benefits),
       painPoints: ensureArray(data.painPointsSolved || data.painPoints),
@@ -1926,9 +2052,9 @@ function normalizeGrowthResults(results, input) {
   if (results.positioning || results.positioningEngine) {
     const data = results.positioning || results.positioningEngine;
     normalized.positioning = {
-      positioningStatement: ensureString(data.positioningStatement, 'Unknown'),
-      valueProposition: ensureString(data.valueProposition, 'Unknown'),
-      brandPromise: ensureString(data.brandPromise, 'Unknown'),
+      positioningStatement: ensureString(data.positioningStatement, null),
+      valueProposition: ensureString(data.valueProposition, null),
+      brandPromise: ensureString(data.brandPromise, null),
       messagingPillars: ensureArray(data.messagingPillars),
       competitorWeaknessesToAttack: ensureArray(data.competitorWeaknessesToAttack),
       confidenceScore: data.confidenceScore ?? null,
@@ -1960,28 +2086,32 @@ function normalizeGrowthResults(results, input) {
     normalizedChannels = normalizedChannels.map(ch => {
       if (typeof ch === 'string') return ch;
       if (typeof ch === 'object') {
+        const channelName = ch.name || ch.channel || ch.value || null;
         return {
-          name: ch.name || ch.channel || 'Unknown Channel',
-          channel: ch.channel || ch.name || 'Unknown Channel',
+          name: channelName,
+          channel: channelName,
           fit: ch.fit || ch.reason || '',
           reason: ch.reason || ch.fit || '',
-          budgetAllocation: ch.budgetAllocation || ch.budgetSplit || 'N/A',
-          budgetSplit: ch.budgetSplit || ch.budgetAllocation || 'N/A',
-          postingFrequency: ch.postingFrequency || 'N/A',
-          bestPostingTime: ch.bestPostingTime || 'N/A',
+          budgetAllocation: ch.budgetAllocation || ch.budgetSplit || null,
+          budgetSplit: ch.budgetSplit || ch.budgetAllocation || null,
+          postingFrequency: ch.postingFrequency || null,
+          bestPostingTime: ch.bestPostingTime || null,
           contentTypes: ensureArray(ch.contentTypes),
-          expectedReach: ch.expectedReach || 'N/A',
+          expectedReach: ch.expectedReach || null,
           difficultyScore: ch.difficultyScore || ch.difficulty || 3
         };
       }
       return ch;
+    }).filter(ch => {
+      if (typeof ch === 'string') return !!ch.trim();
+      return !!(ch && (ch.name || ch.channel));
     });
     
     normalized.channel = {
       recommendedChannels: normalizedChannels,
-      primaryChannel: ensureString(data.primaryChannel || normalizedChannels[0]?.name || normalizedChannels[0]?.channel, 'Unknown'),
-      channelStrategy: ensureString(data.channelStrategy, 'Insufficient Data'),
-      budgetRecommendation: ensureString(data.budgetRecommendation, 'Unknown'),
+      primaryChannel: ensureString(data.primaryChannel || normalizedChannels[0]?.name || normalizedChannels[0]?.channel, null),
+      channelStrategy: ensureString(data.channelStrategy, null),
+      budgetRecommendation: ensureString(data.budgetRecommendation, null),
       confidenceScore: data.confidenceScore ?? null,
       provider: ensureString(data.provider, 'unknown')
     };
