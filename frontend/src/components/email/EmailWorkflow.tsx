@@ -109,6 +109,10 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
   const canSend = isApproved && !!templateId;
   const canSendTest = !!templateId; // test mode does NOT require approval
   const canSendNow = isApproved && !!templateId;
+  // Effective recipient: explicit send-field input wins, otherwise fall back to the
+  // Configuration-section recipient so the Send button is not silently disabled
+  // when the input merely displays `recipient.email` via `value={sendEmail || recipient.email}`.
+  const effectiveSendEmail = (sendEmail || recipient.email || '').trim();
 
   // Merge backend response into local state
   const mergeAsset = (data: any) => {
@@ -274,7 +278,7 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
   const handleSendAction = async () => {
     const rid = 'FE-' + Date.now().toString(36).toUpperCase();
     console.log(`[${rid}] [EMAIL-FE] ENTER: handleSendAction`);
-    console.log(`[${rid}] [EMAIL-FE] INPUT: selectedChatId=${selectedChatId}, templateId=${templateId}, sendEmail=${sendEmail}, sendMode=${sendMode}, approvalStatus=${approvalStatus}, isApproved=${isApproved}`);
+    console.log(`[${rid}] [EMAIL-FE] INPUT: selectedChatId=${selectedChatId}, templateId=${templateId}, sendEmail=${sendEmail}, recipient.email=${recipient.email}, effectiveSendEmail=${effectiveSendEmail}, sendMode=${sendMode}, approvalStatus=${approvalStatus}, isApproved=${isApproved}`);
 
     if (!selectedChatId) {
       console.error(`[${rid}] [EMAIL-FE] RETURN: FAIL — selectedChatId is missing`);
@@ -286,9 +290,14 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
       setSendResult({ success: false, message: 'No template — save a draft first' });
       return;
     }
-    if (!sendEmail) {
+    if (!effectiveSendEmail) {
       console.error(`[${rid}] [EMAIL-FE] RETURN: FAIL — recipient email is empty`);
       setSendResult({ success: false, message: 'Enter a recipient email' });
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(effectiveSendEmail)) {
+      console.error(`[${rid}] [EMAIL-FE] RETURN: FAIL — invalid recipient email: ${effectiveSendEmail}`);
+      setSendResult({ success: false, message: 'Invalid recipient email format' });
       return;
     }
 
@@ -307,21 +316,21 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
       if (sendMode === 'test') {
         apiPath = `/content/email/${selectedChatId}/send-test`;
         console.log(`[${rid}] [EMAIL-FE] ACTION: calling sendTestEmailContent — url=${apiPath}`);
-        console.log(`[${rid}] [EMAIL-FE] REQUEST: ${JSON.stringify({ templateId, recipientEmail: sendEmail })}`);
-        result = await sendTestEmailContent(selectedChatId, { templateId, recipientEmail: sendEmail });
+        console.log(`[${rid}] [EMAIL-FE] REQUEST: ${JSON.stringify({ templateId, recipientEmail: effectiveSendEmail })}`);
+        result = await sendTestEmailContent(selectedChatId, { templateId, recipientEmail: effectiveSendEmail });
         console.log(`[${rid}] [EMAIL-FE] RESULT: sendTestEmailContent returned —`, JSON.stringify(result));
       } else if (sendMode === 'now') {
         apiPath = `/content/email/${selectedChatId}/send-now`;
         console.log(`[${rid}] [EMAIL-FE] ACTION: calling sendEmailNow — url=${apiPath}`);
-        console.log(`[${rid}] [EMAIL-FE] REQUEST: ${JSON.stringify({ templateId, recipientEmail: sendEmail })}`);
-        result = await sendEmailNow(selectedChatId, { templateId, recipientEmail: sendEmail });
+        console.log(`[${rid}] [EMAIL-FE] REQUEST: ${JSON.stringify({ templateId, recipientEmail: effectiveSendEmail })}`);
+        result = await sendEmailNow(selectedChatId, { templateId, recipientEmail: effectiveSendEmail });
         console.log(`[${rid}] [EMAIL-FE] RESULT: sendEmailNow returned —`, JSON.stringify(result));
       } else {
         const scheduledAt = `${sendDate}T${sendTime}:00`;
         apiPath = `/content/email/${selectedChatId}/schedule`;
         console.log(`[${rid}] [EMAIL-FE] ACTION: calling scheduleEmailContent — url=${apiPath}`);
-        console.log(`[${rid}] [EMAIL-FE] REQUEST: ${JSON.stringify({ templateId, recipientEmail: sendEmail, scheduledAt })}`);
-        result = await scheduleEmailContent(selectedChatId, { templateId, recipientEmail: sendEmail, scheduledAt });
+        console.log(`[${rid}] [EMAIL-FE] REQUEST: ${JSON.stringify({ templateId, recipientEmail: effectiveSendEmail, scheduledAt })}`);
+        result = await scheduleEmailContent(selectedChatId, { templateId, recipientEmail: effectiveSendEmail, scheduledAt });
         console.log(`[${rid}] [EMAIL-FE] RESULT: scheduleEmailContent returned —`, JSON.stringify(result));
       }
 
@@ -504,7 +513,7 @@ export function EmailWorkflow({ content: initialContent }: { content?: any }) {
             </div>
           )}
           {!isApproved && sendMode !== 'test' && <div style={{ marginTop: '8px', marginBottom: '8px', fontSize: '11px', color: '#ffb347', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={12} /> Approve the email before sending</div>}
-          <button onClick={handleSendAction} disabled={(sendMode === 'test' ? !canSendTest : !canSendNow) || sending || !sendEmail} style={{ width: '100%', padding: '10px', background: (sendMode === 'test' ? canSendTest : canSendNow) ? '#10e18b' : '#293245', border: (sendMode === 'test' ? canSendTest : canSendNow) ? '1px solid #10e18b' : '1px solid #3b4d61', borderRadius: '6px', color: (sendMode === 'test' ? canSendTest : canSendNow) ? '#0f1729' : '#9aa7bd', cursor: (sendMode === 'test' ? canSendTest : canSendNow) ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: 600, opacity: (sendMode === 'test' ? canSendTest : canSendNow) ? 1 : 0.5 }}>
+          <button onClick={handleSendAction} disabled={(sendMode === 'test' ? !canSendTest : !canSendNow) || sending || !effectiveSendEmail} style={{ width: '100%', padding: '10px', background: ((sendMode === 'test' ? canSendTest : canSendNow) && effectiveSendEmail) ? '#10e18b' : '#293245', border: ((sendMode === 'test' ? canSendTest : canSendNow) && effectiveSendEmail) ? '1px solid #10e18b' : '1px solid #3b4d61', borderRadius: '6px', color: ((sendMode === 'test' ? canSendTest : canSendNow) && effectiveSendEmail) ? '#0f1729' : '#9aa7bd', cursor: ((sendMode === 'test' ? canSendTest : canSendNow) && effectiveSendEmail) ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: 600, opacity: ((sendMode === 'test' ? canSendTest : canSendNow) && effectiveSendEmail) ? 1 : 0.5 }}>
             {sending ? 'Sending...' : sendMode === 'test' ? 'Send Test Email' : sendMode === 'now' ? 'Send Now' : 'Schedule Email'}
           </button>
           {sendResult && <div style={{ marginTop: '8px', padding: '8px 12px', background: sendResult.success ? 'rgba(16,225,139,0.1)' : 'rgba(255,71,87,0.1)', borderRadius: '4px', border: `1px solid ${sendResult.success ? '#10e18b' : '#ff4757'}`, fontSize: '12px', color: sendResult.success ? '#10e18b' : '#ff4757', display: 'flex', alignItems: 'center', gap: '6px' }}>

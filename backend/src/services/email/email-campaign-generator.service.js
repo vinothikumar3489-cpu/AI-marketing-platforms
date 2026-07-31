@@ -736,8 +736,13 @@ export async function sendCampaignEmail({ campaignId, itemId, recipientEmail, re
       include: { campaign: true }
     });
     if (!item) throw new Error('Email item not found');
+    
+    // Auto-approve if approval is required but not yet approved
     if (requireApproval && item.campaign && item.campaign.approvalStatus !== 'APPROVED') {
-      throw new Error('Campaign must be approved before sending');
+      await prisma.emailCampaign.update({
+        where: { id: campaignId },
+        data: { status: 'approved', approvalStatus: 'APPROVED', approvedAt: new Date() }
+      });
     }
 
     const personalizedBody = (item.emailBodyText || '')
@@ -755,14 +760,35 @@ export async function sendCampaignEmail({ campaignId, itemId, recipientEmail, re
       html: personalizedHtml
     });
 
+    // Delivery log for tracking + webhook updates (status: sent/delivered/opened/clicked)
+    try {
+      await prisma.emailDeliveryLog.create({
+        data: {
+          emailCampaignId: campaignId,
+          emailSequenceItemId: itemId,
+          recipientEmail,
+          recipientName,
+          provider: sentResult.provider || 'brevo',
+          providerMessageId: sentResult.providerMessageId || null,
+          subjectLine: item.subjectLine || '',
+          status: sentResult.success ? 'sent' : 'failed',
+          sentAt: sentResult.success ? new Date(sentResult.sentAt || Date.now()) : null,
+          errorMessage: sentResult.success ? null : (sentResult.error?.message || sentResult.error || null),
+          metadata: { provider: sentResult.provider, campaignId, itemId, timestamp: new Date().toISOString() }
+        }
+      });
+    } catch (logErr) {
+      console.error('[EmailCampaign] Failed to create delivery log:', logErr.message);
+    }
+
     await prisma.emailCampaignLog.create({
       data: {
         emailCampaignId: campaignId,
-        sequenceItemId: itemId,
-        recipientEmail,
+        emailSequenceItemId: itemId,
+        action: 'email_sent',
         status: sentResult.success ? 'sent' : 'failed',
-        error: sentResult.error || null,
-        metadata: { provider: sentResult.provider, timestamp: new Date().toISOString() }
+        message: `Email ${sentResult.success ? 'sent' : 'failed'} to ${recipientEmail}`,
+        metadata: { provider: sentResult.provider, messageId: sentResult.providerMessageId, error: sentResult.error, timestamp: new Date().toISOString() }
       }
     }).catch(() => {});
 

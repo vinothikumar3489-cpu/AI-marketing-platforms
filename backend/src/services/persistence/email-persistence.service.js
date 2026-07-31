@@ -351,14 +351,14 @@ export async function getDeliveryStatus(templateId, userId) {
       return { success: false, error: 'Email template not found' };
     }
 
-    const allLogs = await prisma.emailDeliveryLog.findMany({
-      where: { emailCampaignId: null },
+    const deliveries = await prisma.emailDeliveryLog.findMany({
+      where: {
+        emailCampaignId: null,
+        metadata: { path: ['templateId'], equals: templateId }
+      },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    const deliveries = allLogs.filter(d =>
-      d.metadata && typeof d.metadata === 'object' && d.metadata.templateId === templateId
-    );
 
     console.log(`[EmailPersistence] [${fn}] SUCCESS: count=${deliveries.length}`);
     return { success: true, deliveries, count: deliveries.length };

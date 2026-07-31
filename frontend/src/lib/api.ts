@@ -397,8 +397,16 @@ export async function sendTestCampaignEmail(chatId: string, campaignId: string, 
   return api.post<any>(`/chats/${chatId}/email-campaign/${campaignId}/test-send`, { recipientEmail, itemId });
 }
 
-export async function sendCampaignEmails(chatId: string, campaignId: string) {
-  return api.post<any>(`/chats/${chatId}/email-campaign/${campaignId}/send`);
+export async function sendCampaignEmails(chatId: string, campaignId: string, recipients?: string[] | { email: string; name?: string }[]) {
+  const payload: any = {};
+  if (recipients && recipients.length > 0) {
+    if (typeof recipients[0] === 'string') {
+      payload.recipientEmails = recipients;
+    } else {
+      payload.recipients = recipients;
+    }
+  }
+  return api.post<any>(`/chats/${chatId}/email-campaign/${campaignId}/send`, payload);
 }
 
 // ============================================
@@ -770,7 +778,22 @@ export async function sendEmailNow(chatId: string, data: any) {
 }
 
 export async function scheduleEmailContent(chatId: string, data: any) {
-  return api.post<any>(`/content/email/${chatId}/schedule`, data);
+  const rid = 'API-' + Date.now().toString(36).toUpperCase();
+  console.log(`[${rid}] [API] ENTER: scheduleEmailContent`);
+  console.log(`[${rid}] [API] INPUT: chatId=${chatId}, data=${JSON.stringify(data)}`);
+  const url = `/content/email/${chatId}/schedule`;
+  const fullUrl = `${API_BASE}${url}`;
+  console.log(`[${rid}] [API] URL: POST ${fullUrl}`);
+  try {
+    const result = await api.post<any>(url, data);
+    console.log(`[${rid}] [API] EXIT: SUCCESS — response=${JSON.stringify(result)}`);
+    return result;
+  } catch (err: any) {
+    console.error(`[${rid}] [API] EXIT: FAILED — ${err?.message || err}`);
+    if (err?.data) console.error(`[${rid}] [API] Error data:`, JSON.stringify(err.data));
+    if (err?.stack) console.error(`[${rid}] [API] Stack: ${err.stack}`);
+    throw err;
+  }
 }
 
 export async function cancelScheduledEmail(scheduledId: string) {

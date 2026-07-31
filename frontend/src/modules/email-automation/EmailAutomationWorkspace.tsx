@@ -35,6 +35,7 @@ export function EmailAutomationWorkspace() {
   const [feedbackText, setFeedbackText] = useState('');
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [testRecipient, setTestRecipient] = useState('');
+  const [bulkRecipients, setBulkRecipients] = useState('');
   const [sendingTest, setSendingTest] = useState(false);
   const [sendingReal, setSendingReal] = useState(false);
   const [sendResult, setSendResult] = useState<any>(null);
@@ -124,6 +125,7 @@ export function EmailAutomationWorkspace() {
     if (!selectedChatId) return;
     setLoading(true);
     try {
+      await fetchBrevoHealth();
       const result = await getEmailCampaign(selectedChatId, campaignId);
       setSelectedCampaign(result);
       setView('detail');
@@ -137,8 +139,10 @@ export function EmailAutomationWorkspace() {
 
   function computePreSendErrors(campaign: any): string[] {
     const errors: string[] = [];
-    if (!brevoHealth?.brevoConfigured) errors.push('Brevo API key not configured');
-    if (!brevoHealth?.from) errors.push('Sender email not verified in Brevo');
+    if (brevoHealth !== null) {
+      if (!brevoHealth?.brevoConfigured) errors.push('Brevo API key not configured');
+      if (!brevoHealth?.from) errors.push('Sender email not verified in Brevo');
+    }
     if (!campaign) { errors.push('No campaign selected'); return errors; }
     if (campaign.status !== 'approved' && campaign.approvalStatus !== 'APPROVED') errors.push('Campaign not approved');
     const item = campaign.sequenceItems?.[0];
@@ -262,10 +266,22 @@ export function EmailAutomationWorkspace() {
     const errors = computePreSendErrors(selectedCampaign);
     setVerificationErrors(errors);
     if (errors.length > 0) return;
+    
+    // Parse recipients from bulkRecipients textarea
+    const recipientList = bulkRecipients
+      .split(/[\n,;]/)
+      .map(r => r.trim())
+      .filter(r => r.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r));
+    
+    if (recipientList.length === 0) {
+      setSendResult({ success: false, error: 'No valid email addresses provided. Enter at least one email address.' });
+      return;
+    }
+    
     setSendingReal(true);
     setSendResult(null);
     try {
-      const result = await sendCampaignEmails(selectedChatId, selectedCampaign.id);
+      const result = await sendCampaignEmails(selectedChatId, selectedCampaign.id, recipientList);
       setSendResult(result);
       await openCampaign(selectedCampaign.id);
       setWorkflowStep(7);

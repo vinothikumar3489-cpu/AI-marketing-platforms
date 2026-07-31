@@ -113,6 +113,13 @@ function createEmailHandler() {
       return { success: allSuccess, results };
     }
 
+    if (job.name === 'send-email') {
+      const { deliverEmail } = await import('../services/email/email-delivery.service.js');
+      const result = await deliverEmail({ ...job.data, useQueue: false });
+      if (!result.success) throw new Error(result.error || 'Email send failed');
+      return result;
+    }
+
     const { sendEmail } = await import('../services/providers/email/email-provider-registry.js');
     const result = await sendEmail(job.data);
     if (!result.success) throw new Error(result.error || 'Email send failed');

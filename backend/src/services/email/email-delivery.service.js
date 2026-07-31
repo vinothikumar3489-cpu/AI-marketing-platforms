@@ -97,14 +97,14 @@ export async function deliverEmail({ templateId, chatId, userId, recipientEmail,
 
     console.log(`[${rid}] [deliverEmail] VALIDATION SUMMARY: subjectLen=${subject.length}, htmlLen=${htmlContent.length}, textLen=${textContent.length}`);
 
-    // Step 3: Verify approval
-    if (template.approvalStatus !== 'APPROVED') {
+    // Step 3: Verify approval (test sends are exempt — the UI allows test sends on drafts)
+    if (template.approvalStatus !== 'APPROVED' && mode !== 'test') {
       result.error = `Template must be approved before sending (current: ${template.approvalStatus})`;
       console.error(`[${rid}] [deliverEmail] STEP 3 FAIL: Approval check — current=${template.approvalStatus}, required=APPROVED`);
       console.error(`[${rid}] [deliverEmail] STEP 3 FIX: Call /templates/:id/approve endpoint first`);
       return result;
     }
-    console.log(`[${rid}] [deliverEmail] STEP 3 PASS: Approval verified: ${template.approvalStatus}`);
+    console.log(`[${rid}] [deliverEmail] STEP 3 PASS: Approval verified: ${template.approvalStatus}${mode === 'test' ? ' (test mode — approval bypassed)' : ''}`);
 
     // Step 4: Select provider
     console.log(`[${rid}] [deliverEmail] STEP 4: Loading provider from registry...`);

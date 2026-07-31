@@ -5,7 +5,7 @@ import { getEmailQueue } from '../../../jobs/queues.js';
 import { generateEmailCampaign, sendCampaignEmail, scheduleCampaign, approveCampaign, submitCampaignForReview, requestCampaignChanges, createCampaignVersion, restoreCampaignVersion, fromAssetToEmailCampaign, createRecurringCampaign, listAudienceSegments, createAudienceSegment } from '../../../services/email/email-campaign-generator.service.js';
 import prisma from "../../../config/prisma.js";
 
-export const emailCampaignRouter = express.Router();
+export const emailCampaignRouter = express.Router({ mergeParams: true });
 
 emailCampaignRouter.use(requireAuth);
 
@@ -224,18 +224,19 @@ emailCampaignRouter.post('/:chatId/email-campaign/:campaignId/send-test', async 
 });
 
 function resolveRecipients(body, campaign) {
+  // Priority 1: explicit recipients array
   if (body.recipients && Array.isArray(body.recipients) && body.recipients.length > 0) {
     return body.recipients.map(r => typeof r === 'string' ? { email: r, name: '' } : r);
   }
+  // Priority 2: explicit recipientEmails array
   if (body.recipientEmails && Array.isArray(body.recipientEmails) && body.recipientEmails.length > 0) {
     return body.recipientEmails.map(email => ({ email, name: '' }));
   }
+  // Priority 3: single recipientEmail
   if (body.recipientEmail && EMAIL_REGEX.test(body.recipientEmail)) {
     return [{ email: body.recipientEmail, name: body.recipientName || '' }];
   }
-  if (campaign.audienceSummary && EMAIL_REGEX.test(campaign.audienceSummary)) {
-    return [{ email: campaign.audienceSummary, name: campaign.name || '' }];
-  }
+  // No valid recipients found - do NOT use audienceSummary as fallback
   return [];
 }
 
@@ -500,7 +501,9 @@ export const brevoWebhookRouter = express.Router();
 brevoWebhookRouter.post('/brevo', async (req, res) => {
   try {
     const body = req.body;
-    if (!body?.event) return res.status(400).json({ success: false, error: 'Invalid webhook payload' });
+    // Brevo may deliver a single event object or an array of event objects
+    const events = Array.isArray(body) ? body : [body];
+    if (events.length === 0 || !events[0]?.event) return res.status(400).json({ success: false, error: 'Invalid webhook payload' });
 
     // Verify HMAC signature if BREVO_WEBHOOK_SECRET is configured
     const webhookSecret = process.env.BREVO_WEBHOOK_SECRET;
@@ -516,34 +519,97 @@ brevoWebhookRouter.post('/brevo', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Missing webhook signature' });
     }
 
-    const event = body;
-    const status = event.event === 'delivered' ? 'delivered' : event.event === 'open' ? 'opened' : event.event === 'click' ? 'clicked' : event.event === 'hard_bounce' ? 'bounced' : event.event === 'unsubscribe' ? 'unsubscribed' : event.event === 'complaint' ? 'complained' : 'unknown';
+    const eventStatus = (eventName) => eventName === 'delivered' ? 'delivered' : eventName === 'open' ? 'opened' : eventName === 'click' ? 'clicked' : eventName === 'hard_bounce' ? 'bounced' : eventName === 'unsubscribe' ? 'unsubscribed' : eventName === 'complaint' ? 'complained' : eventName === 'spam' ? 'spam' : eventName === 'soft_bounce' ? 'bounced' : eventName === 'blocked' ? 'failed' : eventName === 'invalid_email' ? 'failed' : 'unknown';
 
-    try {
-      await prisma.emailCampaignLog.create({
-        data: {
-          action: `webhook_${event.event}`,
-          status,
-          message: event.message || event.event,
-          metadata: event
-        }
-      });
-    } catch (dbErr) {
-      console.error('[BrevoWebhook] Failed to create campaign log:', dbErr.message);
-    }
+    for (const event of events) {
+      if (!event?.event) continue;
+      // Brevo transactional payloads use the kebab-case "message-id" field
+      const messageId = event['message-id'] || event.messageId || event.smtpId || event['message_id'] || '';
+      const status = eventStatus(event.event);
+      const occurredAt = event.ts || event.ts_event ? new Date((event.ts || event.ts_event) * 1000) : new Date();
 
-    try {
-      await prisma.emailDeliveryLog.updateMany({
-        where: { providerMessageId: event.messageId || event.smtpId || '' },
-        data: {
-          status,
-          ...(event.event === 'delivered' ? { deliveredAt: new Date() } : {}),
-          ...(event.event === 'open' ? { openedAt: new Date() } : {}),
-          ...(event.event === 'click' ? { clickedAt: new Date() } : {})
+      console.log(`[BrevoWebhook] event=${event.event}, email=${event.email || '?'}, messageId=${messageId ? messageId.slice(-24) : 'N/A'}, status=${status}`);
+
+      // Resolve the delivery log so we can link events and preserve campaign/sequence context
+      let deliveryLog = null;
+      try {
+        if (messageId) {
+          deliveryLog = await prisma.emailDeliveryLog.findFirst({
+            where: { providerMessageId: messageId },
+            orderBy: { createdAt: 'desc' }
+          });
         }
-      });
-    } catch (dbErr) {
-      console.error('[BrevoWebhook] Failed to update delivery log:', dbErr.message);
+      } catch (dbErr) {
+        console.error('[BrevoWebhook] Failed to resolve delivery log:', dbErr.message);
+      }
+
+      try {
+        if (deliveryLog) {
+          const updateData = {
+            status,
+            previousStatus: deliveryLog.status,
+            eventHistory: [...(deliveryLog.eventHistory || []), { status, timestamp: occurredAt.toISOString(), detail: event.event }],
+          };
+          if (event.event === 'delivered') updateData.deliveredAt = occurredAt;
+          if (event.event === 'open') updateData.openedAt = occurredAt;
+          if (event.event === 'click') updateData.clickedAt = occurredAt;
+          if (status === 'bounced') updateData.bouncedAt = occurredAt;
+          await prisma.emailDeliveryLog.update({ where: { id: deliveryLog.id }, data: updateData });
+          console.log(`[BrevoWebhook] Updated delivery log ${deliveryLog.id} → ${status}`);
+        } else if (messageId) {
+          await prisma.emailDeliveryLog.updateMany({
+            where: { providerMessageId: messageId },
+            data: {
+              status,
+              ...(event.event === 'delivered' ? { deliveredAt: occurredAt } : {}),
+              ...(event.event === 'open' ? { openedAt: occurredAt } : {}),
+              ...(event.event === 'click' ? { clickedAt: occurredAt } : {}),
+              ...(status === 'bounced' ? { bouncedAt: occurredAt } : {})
+            }
+          });
+        }
+      } catch (dbErr) {
+        console.error('[BrevoWebhook] Failed to update delivery log:', dbErr.message);
+      }
+
+      // Persist a structured EmailEvent record for full tracking history
+      try {
+        await prisma.emailEvent.create({
+          data: {
+            emailDeliveryLogId: deliveryLog?.id || null,
+            emailCampaignId: deliveryLog?.emailCampaignId || null,
+            emailSequenceItemId: deliveryLog?.emailSequenceItemId || null,
+            eventType: event.event,
+            eventData: event,
+            provider: 'brevo',
+            providerEventId: messageId || null,
+            recipientEmail: event.email || deliveryLog?.recipientEmail || null,
+            linkClicked: event.link || event.url || null,
+            bounceType: event['bounce-type'] || null,
+            bounceReason: event.reason || null,
+            occurredAt
+          }
+        });
+      } catch (dbErr) {
+        console.error('[BrevoWebhook] Failed to create EmailEvent:', dbErr.message);
+      }
+
+      // Campaign log entry — only when we can resolve the campaign (field is required)
+      try {
+        if (deliveryLog?.emailCampaignId) {
+          await prisma.emailCampaignLog.create({
+            data: {
+              emailCampaignId: deliveryLog.emailCampaignId,
+              action: `webhook_${event.event}`,
+              status,
+              message: event.message || event.event,
+              metadata: event
+            }
+          });
+        }
+      } catch (dbErr) {
+        console.error('[BrevoWebhook] Failed to create campaign log:', dbErr.message);
+      }
     }
 
     return res.status(200).json({ received: true });
