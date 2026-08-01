@@ -65,13 +65,23 @@ function Field({ label, value, reason, evidence }: {
 }) {
   if (!value && value !== 0) return null;
 
+  // Safe rendering: extract primitive value from object
+  let displayValue: string;
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    displayValue = value.value || value.goal || value.text || value.name || value.title || value.description || JSON.stringify(value);
+  } else if (Array.isArray(value)) {
+    displayValue = value.join(', ');
+  } else {
+    displayValue = String(value);
+  }
+
   return (
     <div style={{ marginBottom: '12px' }}>
       <div style={{ fontSize: '11px', fontWeight: 600, color: '#9aa7bd', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
         {label}
       </div>
       <div style={{ fontSize: '14px', color: '#e5e7eb', lineHeight: 1.5 }}>
-        {typeof value === 'object' ? (value.value || JSON.stringify(value)) : String(value)}
+        {displayValue}
       </div>
       {(reason || evidence) && (
         <div style={{ marginTop: '4px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -306,7 +316,7 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                   {normalizedPlan.executiveSummary.primaryChannels.map((ch: any, i: number) => (
                     <span key={i} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', background: 'rgba(83,167,255,0.1)', color: '#53a7ff', border: '1px solid rgba(83,167,255,0.2)' }}>
-                      {ch.channel || ch}
+                      {typeof ch === 'object' ? (ch.channel || ch.value || ch.name || String(ch)) : String(ch)}
                     </span>
                   ))}
                 </div>
@@ -536,7 +546,7 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
                 }`,
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <h4 style={{ margin: 0, fontSize: '13px', color: '#e5e7eb' }}>{r.risk || '—'}</h4>
+                  <h4 style={{ margin: 0, fontSize: '13px', color: '#e5e7eb' }}>{typeof r.risk === 'object' ? (r.risk.value || r.risk.name || r.risk.title || String(r.risk)) : (r.risk || '—')}</h4>
                   <span style={{
                     padding: '2px 8px',
                     borderRadius: '4px',
@@ -545,14 +555,14 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
                     background: r.severity === 'high' ? 'rgba(255,71,87,0.15)' : r.severity === 'medium' ? 'rgba(255,179,71,0.15)' : 'rgba(83,167,255,0.15)',
                     color: r.severity === 'high' ? '#ff4757' : r.severity === 'medium' ? '#ffb347' : '#53a7ff',
                   }}>
-                    {r.severity || '—'}
+                    {typeof r.severity === 'object' ? (r.severity.value || String(r.severity)) : (r.severity || '—')}
                   </span>
                 </div>
-                {r.cause && <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9aa7bd' }}>{r.cause}</p>}
-                {r.evidence && <div style={{ fontSize: '11px', color: '#a855f7', marginBottom: '4px' }}>Evidence: {r.evidence}</div>}
+                {r.cause && <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9aa7bd' }}>{typeof r.cause === 'object' ? (r.cause.value || r.cause.text || String(r.cause)) : r.cause}</p>}
+                {r.evidence && <div style={{ fontSize: '11px', color: '#a855f7', marginBottom: '4px' }}>Evidence: {typeof r.evidence === 'object' ? (r.evidence.value || r.evidence.text || String(r.evidence)) : r.evidence}</div>}
                 {r.mitigation && (
                   <div style={{ fontSize: '12px', color: '#10e18b', marginTop: '4px' }}>
-                    Mitigation: {r.mitigation}
+                    Mitigation: {typeof r.mitigation === 'object' ? (r.mitigation.value || r.mitigation.text || String(r.mitigation)) : r.mitigation}
                   </div>
                 )}
               </div>
@@ -573,16 +583,16 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
                 border: '1px solid #293245',
                 borderLeft: '4px solid #10e18b',
               }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#e5e7eb' }}>{o.opportunity || '—'}</h4>
-                {o.reason && <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9aa7bd' }}>{o.reason}</p>}
-                {o.evidence && <div style={{ fontSize: '11px', color: '#a855f7', marginBottom: '6px' }}>Evidence: {o.evidence}</div>}
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#e5e7eb' }}>{typeof o.opportunity === 'object' ? (o.opportunity.value || o.opportunity.name || o.opportunity.title || String(o.opportunity)) : (o.opportunity || '—')}</h4>
+                {o.reason && <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9aa7bd' }}>{typeof o.reason === 'object' ? (o.reason.value || o.reason.text || String(o.reason)) : o.reason}</p>}
+                {o.evidence && <div style={{ fontSize: '11px', color: '#a855f7', marginBottom: '6px' }}>Evidence: {typeof o.evidence === 'object' ? (o.evidence.value || o.evidence.text || String(o.evidence)) : o.evidence}</div>}
                 <div style={{ display: 'flex', gap: '8px', fontSize: '11px', color: '#6b7280' }}>
-                  {o.effort && <span>Effort: {o.effort}</span>}
-                  {o.priority && <span>Priority: {o.priority}</span>}
+                  {o.effort && <span>Effort: {typeof o.effort === 'object' ? (o.effort.value || String(o.effort)) : o.effort}</span>}
+                  {o.priority && <span>Priority: {typeof o.priority === 'object' ? (o.priority.value || String(o.priority)) : o.priority}</span>}
                 </div>
                 {o.expectedBusinessImpact && (
                   <div style={{ fontSize: '11px', color: '#53a7ff', marginTop: '4px' }}>
-                    Impact: {o.expectedBusinessImpact}
+                    Impact: {typeof o.expectedBusinessImpact === 'object' ? (o.expectedBusinessImpact.value || String(o.expectedBusinessImpact)) : o.expectedBusinessImpact}
                   </div>
                 )}
               </div>

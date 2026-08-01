@@ -98,6 +98,17 @@ async function request<T>(method: Method, path: string, body?: any, signal?: Abo
     }
   }
 
+  // Special handling for automation plan endpoint - extract automationPlan field
+  if (path.includes('/automation/') && path.includes('/plan') && data && typeof data === 'object') {
+    if (data.automationPlan !== undefined) {
+      console.log('[API] Extracting automationPlan from response:', {
+        hasAutomationPlan: !!data.automationPlan,
+        automationPlanKeys: data.automationPlan ? Object.keys(data.automationPlan) : [],
+      });
+      return data.automationPlan as T;
+    }
+  }
+
   // Normalize deep to prevent React error #31 while preserving data structure
   if (path.includes('full-results') && data && typeof data === 'object') {
     return {

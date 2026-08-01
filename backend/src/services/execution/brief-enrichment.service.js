@@ -254,6 +254,7 @@ export async function enrichContentBrief(prisma, userId, chatId, brief) {
     goal: enriched.campaign?.goal || derivedCampaignGoal,
     businessGoal: campaignData.businessGoal || campaignData.businessObjective || productAnalysis.businessGoal || enriched.campaign?.businessGoal || null,
     objective: campaignData.objective || campaignData.campaignGoals?.[0] || productAnalysis.objective || enriched.campaign?.objective || null,
+    primaryCTA: enriched.campaign?.primaryCTA || campaignData.primaryCTA || null,
     timeline: campaignData.timeline || campaignData.campaignTimeline || enriched.campaign?.timeline || null,
     channels: channelData?.recommendedChannels?.map(ch => ({
       channel: ch.channel || ch.name,
