@@ -348,7 +348,7 @@ model CampaignPlan {
   riskAssessment         Json? // [{ risk, cause, evidence, severity, mitigation }]
   opportunityAssessment  Json? // [{ opportunity, reason, evidence, effort, priority, expectedBusinessImpact }]
   marketingStrategy      Json? // { narrative, pillars, positioning, researchCoverage }
-  emailCampaigns         Json? // [{ name, objective, audience, sequence, angles, cta, evidence }]
+  emailCampaignsData     Json? // [{ name, objective, audience, sequence, angles, cta, evidence }]
   ads                    Json? // [{ platform, objective, headline, primaryText, audience, cta, angle, evidence }]
   landingPages           Json? // [{ name, purpose, headline, sections, seoKeywords, cta, evidence }]
   socialPosts            Json? // [{ platform, hook, body, cta, angle, audience, evidence }]
@@ -1248,17 +1248,17 @@ model EmailTemplate {
   category              String? // newsletter, promotional, transactional, onboarding, reengagement
   subjectLine           String?
   previewText           String?
-  emailBodyText         String? @db.Text
-  emailBodyHtml         String? @db.Text
-  responsiveHtml        String? @db.Text
+  emailBodyText         String?   @db.Text
+  emailBodyHtml         String?   @db.Text
+  responsiveHtml        String?   @db.Text
   personalizationFields Json?
-  approvalStatus        String  @default("DRAFT")
+  approvalStatus        String    @default("DRAFT")
   approvedAt            DateTime?
   approvedBy            String?
   quality               Json?
   contentAssetId        String?
-  generationStatus      String  @default("pending")
-  lastError             String? @db.Text
+  generationStatus      String    @default("pending")
+  lastError             String?   @db.Text
 
   // Brand settings
   senderName     String?
@@ -1897,8 +1897,8 @@ model SalesCopilotMemory {
 // ============================================
 
 model BrainExecution {
-  id        String   @id @default(cuid())
-  requestId String   @unique
+  id        String @id @default(cuid())
+  requestId String @unique
 
   requestType String?
   module      String?
@@ -1907,18 +1907,18 @@ model BrainExecution {
   chatId      String?
   userId      String?
 
-  processingTime    Int
-  enginesExecuted   Json?   // ["memory","knowledge",...]
-  confidenceBefore  Float?
-  confidenceAfter   Float?
-  memoryHits        Int     @default(0)
-  memoryMisses      Int     @default(0)
-  evidenceCount     Int     @default(0)
-  reasoningRulesTriggered Json? // [{ rule, severity }]
-  recommendationsGenerated Int @default(0)
-  graphNewEntities         Int @default(0)
-  graphRelationships       Int @default(0)
-  graphDuplicatesMerged    Int @default(0)
+  processingTime           Int
+  enginesExecuted          Json? // ["memory","knowledge",...]
+  confidenceBefore         Float?
+  confidenceAfter          Float?
+  memoryHits               Int    @default(0)
+  memoryMisses             Int    @default(0)
+  evidenceCount            Int    @default(0)
+  reasoningRulesTriggered  Json? // [{ rule, severity }]
+  recommendationsGenerated Int    @default(0)
+  graphNewEntities         Int    @default(0)
+  graphRelationships       Int    @default(0)
+  graphDuplicatesMerged    Int    @default(0)
   qualityScore             Float?
   errors                   Json?
 
@@ -1934,21 +1934,21 @@ model BrainExecution {
 }
 
 model BrainFeedback {
-  id        String   @id @default(cuid())
+  id          String  @id @default(cuid())
   executionId String?
   requestId   String?
 
-  feedbackType String   // explicit, implicit
-  action       String   // approved, edited, rejected, regenerated, published, reused, launched, rerun, refreshed
+  feedbackType String // explicit, implicit
+  action       String // approved, edited, rejected, regenerated, published, reused, launched, rerun, refreshed
   module       String?
-  targetType   String?  // recommendation, entity, relationship, evidence
+  targetType   String? // recommendation, entity, relationship, evidence
   targetId     String?
   targetValue  String?
 
   // Source context
-  chatId    String?
-  userId    String?
-  metadata  Json?
+  chatId   String?
+  userId   String?
+  metadata Json?
 
   createdAt DateTime @default(now())
 
@@ -1962,15 +1962,15 @@ model BrainFeedback {
 }
 
 model BrainPattern {
-  id        String   @id @default(cuid())
-  type      String   // competitor_cluster, keyword_cluster, audience_segment, feature_benefit, industry_strategy, campaign_sequence, evidence_source
+  id   String @id @default(cuid())
+  type String // competitor_cluster, keyword_cluster, audience_segment, feature_benefit, industry_strategy, campaign_sequence, evidence_source
 
-  name      String
+  name        String
   description String? @db.Text
 
-  entities  Json?    // ["entity1", "entity2"]
-  frequency Int      @default(1)
-  confidence Float   @default(0.5)
+  entities   Json? // ["entity1", "entity2"]
+  frequency  Int   @default(1)
+  confidence Float @default(0.5)
 
   // Source execution IDs
   sourceExecutions Json?
@@ -1989,45 +1989,45 @@ model BrainPattern {
 }
 
 model BrainRulePerformance {
-  id        String   @id @default(cuid())
-  ruleName  String   @unique
+  id       String @id @default(cuid())
+  ruleName String @unique
 
-  timesTriggered  Int     @default(0)
-  timesUseful     Int     @default(0)
-  falsePositives  Int     @default(0)
-  falseNegatives  Int     @default(0)
-  averageConfidence Float @default(0.5)
-  priority        String  @default("medium") // high, medium, low
-  effectiveness   Float   @default(0.5) // timesUseful / timesTriggered
+  timesTriggered    Int    @default(0)
+  timesUseful       Int    @default(0)
+  falsePositives    Int    @default(0)
+  falseNegatives    Int    @default(0)
+  averageConfidence Float  @default(0.5)
+  priority          String @default("medium") // high, medium, low
+  effectiveness     Float  @default(0.5) // timesUseful / timesTriggered
 
   lastTriggeredAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([effectiveness])
   @@index([priority])
 }
 
 model BrainLearningScore {
-  id        String   @id @default(cuid())
-  period    String   // daily, weekly, monthly
+  id     String @id @default(cuid())
+  period String // daily, weekly, monthly
 
-  overallScore        Float @default(0)
-  knowledgeCompleteness Float @default(0)
+  overallScore             Float @default(0)
+  knowledgeCompleteness    Float @default(0)
   recommendationUsefulness Float @default(0)
-  confidenceCalibration   Float @default(0)
-  evidenceReliability    Float @default(0)
-  memoryReuse           Float @default(0)
-  graphQuality          Float @default(0)
-  ruleEffectiveness     Float @default(0)
+  confidenceCalibration    Float @default(0)
+  evidenceReliability      Float @default(0)
+  memoryReuse              Float @default(0)
+  graphQuality             Float @default(0)
+  ruleEffectiveness        Float @default(0)
 
-  totalExecutions       Int @default(0)
-  totalFeedbacks        Int @default(0)
-  totalPatterns         Int @default(0)
-  totalEntities         Int @default(0)
-  totalRelationships    Int @default(0)
+  totalExecutions    Int @default(0)
+  totalFeedbacks     Int @default(0)
+  totalPatterns      Int @default(0)
+  totalEntities      Int @default(0)
+  totalRelationships Int @default(0)
 
-  brainIQ               Float @default(0)
+  brainIQ Float @default(0)
 
   periodStart DateTime
   periodEnd   DateTime
@@ -2084,23 +2084,23 @@ enum GraphRelationshipType {
 }
 
 model GraphEntity {
-  id        String          @id @default(cuid())
-  type      GraphEntityType
-  name      String
-  canonicalName String?     // normalized dedup key
-  aliases   Json?           // [ "alternative names" ]
+  id            String          @id @default(cuid())
+  type          GraphEntityType
+  name          String
+  canonicalName String? // normalized dedup key
+  aliases       Json? // [ "alternative names" ]
 
   // Context
-  chatId    String?
-  userId    String?
-  source    String?         // evidence, brain, import, manual
-  sourceId  String?         // ID of source record (productIntelligence, etc.)
+  chatId   String?
+  userId   String?
+  source   String? // evidence, brain, import, manual
+  sourceId String? // ID of source record (productIntelligence, etc.)
 
   // Confidence
-  confidence Float    @default(0.5)
-  sourceCount Int     @default(1)
-  lastSeen   DateTime @default(now())
-  freshness  String?  // fresh, stale, unknown
+  confidence  Float    @default(0.5)
+  sourceCount Int      @default(1)
+  lastSeen    DateTime @default(now())
+  freshness   String? // fresh, stale, unknown
 
   // Metadata
   metadata  Json?
@@ -2124,22 +2124,22 @@ model GraphEntity {
 }
 
 model GraphRelationship {
-  id        String                  @id @default(cuid())
-  type      GraphRelationshipType
+  id   String                @id @default(cuid())
+  type GraphRelationshipType
 
   // Source entity
-  fromId    String
-  from      GraphEntity             @relation("Outgoing", fields: [fromId], references: [id], onDelete: Cascade)
+  fromId String
+  from   GraphEntity @relation("Outgoing", fields: [fromId], references: [id], onDelete: Cascade)
 
   // Target entity
-  toId      String
-  to        GraphEntity             @relation("Incoming", fields: [toId], references: [id], onDelete: Cascade)
+  toId String
+  to   GraphEntity @relation("Incoming", fields: [toId], references: [id], onDelete: Cascade)
 
   // Confidence
-  confidence   Float    @default(0.7)
+  confidence    Float   @default(0.7)
   evidenceCount Int     @default(1)
   reason        String?
-  sources       Json?   // ["source1", "source2"]
+  sources       Json? // ["source1", "source2"]
 
   // Context
   chatId    String?
