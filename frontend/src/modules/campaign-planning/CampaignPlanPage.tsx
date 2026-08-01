@@ -219,6 +219,31 @@ function FunnelStage({ stage, data }: { stage: string; data: any }) {
 const funnelStages = ['awareness', 'interest', 'consideration', 'conversion', 'retention', 'advocacy'];
 
 export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
+  // Debug logging to diagnose blank UI
+  console.log('[CampaignPlanPage] Received plan:', {
+    hasPlan: !!plan,
+    planKeys: plan ? Object.keys(plan) : [],
+    hasExecutiveSummary: !!plan?.executiveSummary,
+    hasBusinessGoal: !!plan?.businessGoal,
+    hasCampaignObjective: !!plan?.campaignObjective,
+    hasAudienceSelection: !!plan?.audienceSelection,
+    hasChannelRecommendations: !!plan?.channelRecommendations,
+    hasTimeline: !!plan?.timeline,
+    hasMarketingFunnel: !!plan?.marketingFunnel,
+    hasKpiFramework: !!plan?.kpiFramework,
+    hasRiskAssessment: !!plan?.riskAssessment,
+    hasOpportunityAssessment: !!plan?.opportunityAssessment,
+    hasMarketingStrategy: !!plan?.marketingStrategy,
+    hasEmailCampaignsData: !!plan?.emailCampaignsData,
+    hasAds: !!plan?.ads,
+    hasLandingPages: !!plan?.landingPages,
+    hasSocialPosts: !!plan?.socialPosts,
+    hasCreativeAngles: !!plan?.creativeAngles,
+    hasBudget: !!plan?.budget,
+    hasForecast: !!plan?.forecast,
+    hasRoi: !!plan?.roi,
+  });
+
   if (!plan) {
     return (
       <div style={{

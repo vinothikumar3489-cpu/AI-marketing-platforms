@@ -87,6 +87,17 @@ async function request<T>(method: Method, path: string, body?: any, signal?: Abo
     data = data.data as T;
   }
 
+  // Special handling for campaign plan endpoint - extract campaignPlan field
+  if (path.includes('/campaign/') && path.includes('/plan') && data && typeof data === 'object') {
+    if (data.campaignPlan !== undefined) {
+      console.log('[API] Extracting campaignPlan from response:', {
+        hasCampaignPlan: !!data.campaignPlan,
+        campaignPlanKeys: data.campaignPlan ? Object.keys(data.campaignPlan) : [],
+      });
+      return data.campaignPlan as T;
+    }
+  }
+
   // Normalize deep to prevent React error #31 while preserving data structure
   if (path.includes('full-results') && data && typeof data === 'object') {
     return {

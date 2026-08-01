@@ -190,7 +190,14 @@ export async function buildContentBrief(prisma, userId, chatId) {
       name: p.name || p.title || null,
       role: p.role || null,
       painPoints: takeArray(p.painPoints, 5),
-      goals: takeArray(p.goals, 5),
+      goals: takeArray(p.goals, 5).map(g => {
+        // Normalize goals to strings - convert objects to strings preserving meaning
+        if (typeof g === 'string') return g;
+        if (typeof g === 'object' && g !== null) {
+          return g.goal || g.text || g.value || g.description || JSON.stringify(g);
+        }
+        return String(g);
+      }),
     })),
     painPoints: takeArray(audienceData.painPoints, 10),
     objections: asArray(productAnalysis.objections || audienceData.objections),

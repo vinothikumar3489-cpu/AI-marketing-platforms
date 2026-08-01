@@ -18,7 +18,7 @@ export function mapCampaignPlanToPersistence(generatedPlan, { userId, chatId, ex
     riskAssessment: mergeField(d.riskAssessment, existingPlan?.riskAssessment),
     opportunityAssessment: mergeField(d.opportunityAssessment, existingPlan?.opportunityAssessment),
     marketingStrategy: mergeField(d.marketingStrategy, existingPlan?.marketingStrategy),
-    emailCampaigns: mergeField(d.emailCampaigns, existingPlan?.emailCampaigns),
+    emailCampaignsData: mergeField(d.emailCampaigns, existingPlan?.emailCampaignsData),
     ads: mergeField(d.ads, existingPlan?.ads),
     landingPages: mergeField(d.landingPages, existingPlan?.landingPages),
     socialPosts: mergeField(d.socialPosts, existingPlan?.socialPosts),
