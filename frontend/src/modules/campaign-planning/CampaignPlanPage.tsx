@@ -5,6 +5,7 @@ import {
   ChevronDown, ChevronUp, Lightbulb, Shield, BarChart3, List,
   UserCheck, Radio, Filter, ShoppingCart, Heart, Share2,
 } from 'lucide-react';
+import { normalizeCampaignPlan } from '../../lib/normalizers/campaign-plan.normalizer';
 
 interface CampaignPlanPageProps {
   plan: any;
@@ -219,6 +220,12 @@ function FunnelStage({ stage, data }: { stage: string; data: any }) {
 const funnelStages = ['awareness', 'interest', 'consideration', 'conversion', 'retention', 'advocacy'];
 
 export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
+  // Normalize campaign plan data before rendering
+  const normalizedPlan = useMemo(() => {
+    if (!plan) return null;
+    return normalizeCampaignPlan(plan);
+  }, [plan]);
+
   // Debug logging to diagnose blank UI
   console.log('[CampaignPlanPage] Received plan:', {
     hasPlan: !!plan,
@@ -244,7 +251,7 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
     hasRoi: !!plan?.roi,
   });
 
-  if (!plan) {
+  if (!normalizedPlan) {
     return (
       <div style={{
         display: 'flex',
@@ -267,39 +274,39 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
   return (
     <div style={{ display: 'grid', gap: '20px' }}>
       {/* Executive Summary */}
-      {plan.executiveSummary && (
+      {normalizedPlan.executiveSummary && (
         <Section title="Executive Summary" icon={Zap} color="#a855f7">
           <div style={{ display: 'grid', gap: '16px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
               <div style={{ padding: '14px', background: '#151d2b', borderRadius: '8px' }}>
                 <div style={{ fontSize: '11px', color: '#9aa7bd', marginBottom: '4px' }}>Campaign Name</div>
-                <div style={{ fontSize: '16px', fontWeight: 600, color: '#e5e7eb' }}>{plan.executiveSummary.campaignName || '—'}</div>
+                <div style={{ fontSize: '16px', fontWeight: 600, color: '#e5e7eb' }}>{normalizedPlan.executiveSummary.campaignName || '—'}</div>
               </div>
               <div style={{ padding: '14px', background: '#151d2b', borderRadius: '8px' }}>
                 <div style={{ fontSize: '11px', color: '#9aa7bd', marginBottom: '4px' }}>Goal</div>
-                <div style={{ fontSize: '16px', fontWeight: 600, color: '#10e18b' }}>{plan.executiveSummary.campaignGoal || '—'}</div>
+                <div style={{ fontSize: '16px', fontWeight: 600, color: '#10e18b' }}>{normalizedPlan.executiveSummary.campaignGoal || '—'}</div>
               </div>
               <div style={{ padding: '14px', background: '#151d2b', borderRadius: '8px' }}>
                 <div style={{ fontSize: '11px', color: '#9aa7bd', marginBottom: '4px' }}>Duration</div>
-                <div style={{ fontSize: '16px', fontWeight: 600, color: '#53a7ff' }}>{plan.executiveSummary.recommendedDuration || '—'}</div>
+                <div style={{ fontSize: '16px', fontWeight: 600, color: '#53a7ff' }}>{normalizedPlan.executiveSummary.recommendedDuration || '—'}</div>
               </div>
               <div style={{ padding: '14px', background: '#151d2b', borderRadius: '8px' }}>
                 <div style={{ fontSize: '11px', color: '#9aa7bd', marginBottom: '4px' }}>Theme</div>
-                <div style={{ fontSize: '16px', fontWeight: 600, color: '#f59e0b' }}>{plan.executiveSummary.campaignTheme || '—'}</div>
+                <div style={{ fontSize: '16px', fontWeight: 600, color: '#f59e0b' }}>{normalizedPlan.executiveSummary.campaignTheme || '—'}</div>
               </div>
             </div>
 
-            {plan.executiveSummary.primaryAudience && (
-              <Field label="Primary Audience" value={plan.executiveSummary.primaryAudience.value} reason={plan.executiveSummary.primaryAudience.reason} evidence={plan.executiveSummary.primaryAudience.evidence} />
+            {normalizedPlan.executiveSummary.primaryAudience && (
+              <Field label="Primary Audience" value={normalizedPlan.executiveSummary.primaryAudience} />
             )}
 
-            {plan.executiveSummary.primaryChannels?.length > 0 && (
+            {normalizedPlan.executiveSummary.primaryChannels?.length > 0 && (
               <div>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: '#9aa7bd', textTransform: 'uppercase', marginBottom: '8px' }}>Primary Channels</div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {plan.executiveSummary.primaryChannels.map((ch: any, i: number) => (
+                  {normalizedPlan.executiveSummary.primaryChannels.map((ch: any, i: number) => (
                     <span key={i} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', background: 'rgba(83,167,255,0.1)', color: '#53a7ff', border: '1px solid rgba(83,167,255,0.2)' }}>
-                      {ch.channel || ch.value || ch}
+                      {ch.channel || ch}
                     </span>
                   ))}
                 </div>
@@ -310,7 +317,7 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
       )}
 
       {/* Business Goal */}
-      {plan.businessGoal && plan.businessGoal.goal && (
+      {normalizedPlan.businessGoal && normalizedPlan.businessGoal.goal && (
         <Section title="Business Goal" icon={Target} color="#10e18b">
           <div style={{ display: 'grid', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -323,43 +330,45 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
                 color: '#10e18b',
                 border: '1px solid rgba(16,225,139,0.3)',
               }}>
-                {plan.businessGoal.goal}
+                {normalizedPlan.businessGoal.goal}
               </span>
               <span style={{
                 padding: '4px 10px',
                 borderRadius: '6px',
                 fontSize: '11px',
                 fontWeight: 600,
-                background: plan.businessGoal.confidence === 'high' ? 'rgba(16,225,139,0.15)' : plan.businessGoal.confidence === 'medium' ? 'rgba(255,179,71,0.15)' : 'rgba(255,71,87,0.15)',
-                color: plan.businessGoal.confidence === 'high' ? '#10e18b' : plan.businessGoal.confidence === 'medium' ? '#ffb347' : '#ff4757',
+                background: normalizedPlan.businessGoal.confidence === 'high' ? 'rgba(16,225,139,0.15)' : normalizedPlan.businessGoal.confidence === 'medium' ? 'rgba(255,179,71,0.15)' : 'rgba(255,71,87,0.15)',
+                color: normalizedPlan.businessGoal.confidence === 'high' ? '#10e18b' : normalizedPlan.businessGoal.confidence === 'medium' ? '#ffb347' : '#ff4757',
               }}>
-                {plan.businessGoal.confidence} confidence
+                {normalizedPlan.businessGoal.confidence} confidence
               </span>
             </div>
-            {plan.businessGoal.reason && <Field label="Reason" value={plan.businessGoal.reason} />}
-            {plan.businessGoal.evidence && <Field label="Evidence" value={plan.businessGoal.evidence} />}
+            {normalizedPlan.businessGoal.reason && <Field label="Reason" value={normalizedPlan.businessGoal.reason} />}
+            {normalizedPlan.businessGoal.evidence && <Field label="Evidence" value={normalizedPlan.businessGoal.evidence} />}
+            {normalizedPlan.businessGoal.timeframe && <Field label="Timeframe" value={normalizedPlan.businessGoal.timeframe} />}
+            {normalizedPlan.businessGoal.numericTarget && <Field label="Target" value={normalizedPlan.businessGoal.numericTarget} />}
           </div>
         </Section>
       )}
 
       {/* Campaign Objective */}
-      {plan.campaignObjective && plan.campaignObjective.primary?.value && (
+      {normalizedPlan.campaignObjective && normalizedPlan.campaignObjective.primary && (
         <Section title="Campaign Objective" icon={TrendingUp} color="#53a7ff">
           <div style={{ display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
-            <Field label="Primary Objective" value={plan.campaignObjective.primary} reason={plan.campaignObjective.primary?.reason} evidence={plan.campaignObjective.primary?.evidence} />
-            {plan.campaignObjective.secondary?.value && <Field label="Secondary Objective" value={plan.campaignObjective.secondary} reason={plan.campaignObjective.secondary?.reason} evidence={plan.campaignObjective.secondary?.evidence} />}
-            {plan.campaignObjective.successDefinition?.value && <Field label="Success Definition" value={plan.campaignObjective.successDefinition} reason={plan.campaignObjective.successDefinition?.reason} evidence={plan.campaignObjective.successDefinition?.evidence} />}
-            {plan.campaignObjective.targetAudience?.value && <Field label="Target Audience" value={plan.campaignObjective.targetAudience} reason={plan.campaignObjective.targetAudience?.reason} evidence={plan.campaignObjective.targetAudience?.evidence} />}
-            {plan.campaignObjective.timeline?.value && <Field label="Timeline" value={plan.campaignObjective.timeline} reason={plan.campaignObjective.timeline?.reason} evidence={plan.campaignObjective.timeline?.evidence} />}
-            {plan.campaignObjective.priority && <Field label="Priority" value={plan.campaignObjective.priority} />}
+            <Field label="Primary Objective" value={normalizedPlan.campaignObjective.primary} />
+            {normalizedPlan.campaignObjective.secondary && <Field label="Secondary Objective" value={normalizedPlan.campaignObjective.secondary} />}
+            {normalizedPlan.campaignObjective.successDefinition && <Field label="Success Definition" value={normalizedPlan.campaignObjective.successDefinition} />}
+            {normalizedPlan.campaignObjective.targetAudience && <Field label="Target Audience" value={normalizedPlan.campaignObjective.targetAudience} />}
+            {normalizedPlan.campaignObjective.timeline && <Field label="Timeline" value={normalizedPlan.campaignObjective.timeline} />}
+            {normalizedPlan.campaignObjective.priority && <Field label="Priority" value={normalizedPlan.campaignObjective.priority} />}
           </div>
-          {plan.campaignObjective.dependencies?.length > 0 && (
+          {normalizedPlan.campaignObjective.dependencies?.length > 0 && (
             <div style={{ marginTop: '12px' }}>
               <div style={{ fontSize: '11px', fontWeight: 600, color: '#9aa7bd', marginBottom: '8px' }}>Dependencies</div>
               <div style={{ display: 'grid', gap: '6px' }}>
-                {plan.campaignObjective.dependencies.map((d: any, i: number) => (
+                {normalizedPlan.campaignObjective.dependencies.map((d: any, i: number) => (
                   <div key={i} style={{ padding: '8px', background: '#151d2b', borderRadius: '6px', fontSize: '12px', color: '#9aa7bd' }}>
-                    {d.dependency || d}
+                    {d.dependency}
                     {d.reason && <span style={{ color: '#6b7280' }}> — {d.reason}</span>}
                   </div>
                 ))}
@@ -370,46 +379,46 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
       )}
 
       {/* Audience Selection */}
-      {plan.audienceSelection && plan.audienceSelection.primaryAudience?.value && (
+      {normalizedPlan.audienceSelection && normalizedPlan.audienceSelection.primaryAudience && (
         <Section title="Audience Selection" icon={Users} color="#f59e0b">
           <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
             <div>
-              <Field label="Primary Audience" value={plan.audienceSelection.primaryAudience.value} reason={plan.audienceSelection.primaryAudience.reason} evidence={plan.audienceSelection.primaryAudience.evidence} />
-              {plan.audienceSelection.secondaryAudience?.value && <Field label="Secondary Audience" value={plan.audienceSelection.secondaryAudience.value} reason={plan.audienceSelection.secondaryAudience.reason} evidence={plan.audienceSelection.secondaryAudience.evidence} />}
-              {plan.audienceSelection.buyingStage?.value && <Field label="Buying Stage" value={plan.audienceSelection.buyingStage.value} reason={plan.audienceSelection.buyingStage.reason} evidence={plan.audienceSelection.buyingStage.evidence} />}
+              <Field label="Primary Audience" value={normalizedPlan.audienceSelection.primaryAudience} />
+              {normalizedPlan.audienceSelection.secondaryAudience && <Field label="Secondary Audience" value={normalizedPlan.audienceSelection.secondaryAudience} />}
+              {normalizedPlan.audienceSelection.buyingStage && <Field label="Buying Stage" value={normalizedPlan.audienceSelection.buyingStage} />}
             </div>
             <div>
-              {plan.audienceSelection.painPoints?.length > 0 && (
+              {normalizedPlan.audienceSelection.painPoints?.length > 0 && (
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{ fontSize: '11px', fontWeight: 600, color: '#9aa7bd', marginBottom: '4px' }}>Pain Points</div>
-                  {plan.audienceSelection.painPoints.map((p: any, i: number) => (
-                    <div key={i} style={{ fontSize: '12px', color: '#6b7280', padding: '2px 0' }}>• {p.value || p} {p.evidence && <span style={{ color: '#a855f7' }}>({p.evidence})</span>}</div>
+                  {normalizedPlan.audienceSelection.painPoints.map((p: string, i: number) => (
+                    <div key={i} style={{ fontSize: '12px', color: '#6b7280', padding: '2px 0' }}>• {p}</div>
                   ))}
                 </div>
               )}
-              {plan.audienceSelection.decisionDrivers?.length > 0 && (
+              {normalizedPlan.audienceSelection.decisionDrivers?.length > 0 && (
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{ fontSize: '11px', fontWeight: 600, color: '#9aa7bd', marginBottom: '4px' }}>Decision Drivers</div>
-                  {plan.audienceSelection.decisionDrivers.map((d: any, i: number) => (
-                    <div key={i} style={{ fontSize: '12px', color: '#6b7280', padding: '2px 0' }}>• {d.value || d} {d.evidence && <span style={{ color: '#a855f7' }}>({d.evidence})</span>}</div>
+                  {normalizedPlan.audienceSelection.decisionDrivers.map((d: string, i: number) => (
+                    <div key={i} style={{ fontSize: '12px', color: '#6b7280', padding: '2px 0' }}>• {d}</div>
                   ))}
                 </div>
               )}
-              {plan.audienceSelection.objections?.length > 0 && (
+              {normalizedPlan.audienceSelection.objections?.length > 0 && (
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{ fontSize: '11px', fontWeight: 600, color: '#9aa7bd', marginBottom: '4px' }}>Objections</div>
-                  {plan.audienceSelection.objections.map((o: any, i: number) => (
-                    <div key={i} style={{ fontSize: '12px', color: '#ffb347', padding: '2px 0' }}>• {o.value || o}</div>
+                  {normalizedPlan.audienceSelection.objections.map((o: string, i: number) => (
+                    <div key={i} style={{ fontSize: '12px', color: '#ffb347', padding: '2px 0' }}>• {o}</div>
                   ))}
                 </div>
               )}
-              {plan.audienceSelection.contentPreferences?.length > 0 && (
+              {normalizedPlan.audienceSelection.contentPreferences?.length > 0 && (
                 <div>
                   <div style={{ fontSize: '11px', fontWeight: 600, color: '#9aa7bd', marginBottom: '4px' }}>Content Preferences</div>
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                    {plan.audienceSelection.contentPreferences.map((c: any, i: number) => (
+                    {normalizedPlan.audienceSelection.contentPreferences.map((c: string, i: number) => (
                       <span key={i} style={{ padding: '3px 8px', borderRadius: '4px', fontSize: '11px', background: 'rgba(83,167,255,0.1)', color: '#53a7ff' }}>
-                        {c.value || c}
+                        {c}
                       </span>
                     ))}
                   </div>
@@ -421,10 +430,10 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
       )}
 
       {/* Channel Recommendations */}
-      {plan.channelRecommendations?.length > 0 && (
-        <Section title={`Channel Recommendations (${plan.channelRecommendations.length})`} icon={Radio} color="#a855f7">
+      {normalizedPlan.channelRecommendations?.length > 0 && (
+        <Section title={`Channel Recommendations (${normalizedPlan.channelRecommendations.length})`} icon={Radio} color="#a855f7">
           <div style={{ display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))' }}>
-            {plan.channelRecommendations.map((ch: any, i: number) => (
+            {normalizedPlan.channelRecommendations.map((ch: any, i: number) => (
               <ChannelCard key={i} channel={ch} />
             ))}
           </div>
@@ -432,10 +441,10 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
       )}
 
       {/* Campaign Timeline */}
-      {plan.timeline && (
+      {normalizedPlan.timeline && (
         <Section title="Campaign Timeline" icon={Clock} color="#53a7ff">
           <div style={{ display: 'grid', gap: '16px' }}>
-            {Object.entries(plan.timeline).map(([period, tasks]: [string, any]) => {
+            {Object.entries(normalizedPlan.timeline).map(([period, tasks]: [string, any]) => {
               if (!Array.isArray(tasks) || tasks.length === 0) return null;
               return (
                 <div key={period}>
@@ -461,19 +470,19 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
       )}
 
       {/* Marketing Funnel */}
-      {plan.marketingFunnel && (
+      {normalizedPlan.marketingFunnel && (
         <Section title="Marketing Funnel" icon={Filter} color="#10e18b">
           <div style={{ display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}>
             {funnelStages.map(stage => (
-              <FunnelStage key={stage} stage={stage} data={plan.marketingFunnel[stage]} />
+              <FunnelStage key={stage} stage={stage} data={normalizedPlan.marketingFunnel[stage]} />
             ))}
           </div>
         </Section>
       )}
 
       {/* KPI Framework */}
-      {plan.kpiFramework?.length > 0 && (
-        <Section title={`KPI Framework (${plan.kpiFramework.length})`} icon={BarChart3} color="#ffb347">
+      {normalizedPlan.kpiFramework?.length > 0 && (
+        <Section title={`KPI Framework (${normalizedPlan.kpiFramework.length})`} icon={BarChart3} color="#ffb347">
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
@@ -486,12 +495,12 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
                 </tr>
               </thead>
               <tbody>
-                {plan.kpiFramework.map((kpi: any, i: number) => (
+                {normalizedPlan.kpiFramework.map((kpi: any, i: number) => (
                   <tr key={i} style={{ borderBottom: '1px solid #1d2738' }}>
-                    <td style={{ padding: '10px 12px', color: '#e5e7eb' }}>{kpi.kpi}</td>
-                    <td style={{ padding: '10px 12px', color: '#9aa7bd' }}>{kpi.howToMeasure}</td>
-                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{kpi.tool}</td>
-                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{kpi.frequency}</td>
+                    <td style={{ padding: '10px 12px', color: '#e5e7eb' }}>{kpi.kpi || '—'}</td>
+                    <td style={{ padding: '10px 12px', color: '#9aa7bd' }}>{kpi.howToMeasure || '—'}</td>
+                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{kpi.tool || '—'}</td>
+                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{kpi.frequency || '—'}</td>
                     <td style={{ padding: '10px 12px' }}>
                       <span style={{
                         padding: '2px 8px',
@@ -501,7 +510,7 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
                         background: kpi.status === 'Measured' ? 'rgba(16,225,139,0.15)' : kpi.status === 'Estimated' ? 'rgba(255,179,71,0.15)' : 'rgba(255,71,87,0.15)',
                         color: kpi.status === 'Measured' ? '#10e18b' : kpi.status === 'Estimated' ? '#ffb347' : '#ff4757',
                       }}>
-                        {kpi.status}
+                        {kpi.status || '—'}
                       </span>
                     </td>
                   </tr>
@@ -513,10 +522,10 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
       )}
 
       {/* Risk Assessment */}
-      {plan.riskAssessment?.length > 0 && (
-        <Section title={`Risk Assessment (${plan.riskAssessment.length})`} icon={Shield} color="#ff4757">
+      {normalizedPlan.riskAssessment?.length > 0 && (
+        <Section title={`Risk Assessment (${normalizedPlan.riskAssessment.length})`} icon={Shield} color="#ff4757">
           <div style={{ display: 'grid', gap: '12px' }}>
-            {plan.riskAssessment.map((r: any, i: number) => (
+            {normalizedPlan.riskAssessment.map((r: any, i: number) => (
               <div key={i} style={{
                 padding: '12px',
                 background: '#151d2b',
@@ -527,7 +536,7 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
                 }`,
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <h4 style={{ margin: 0, fontSize: '13px', color: '#e5e7eb' }}>{r.risk}</h4>
+                  <h4 style={{ margin: 0, fontSize: '13px', color: '#e5e7eb' }}>{r.risk || '—'}</h4>
                   <span style={{
                     padding: '2px 8px',
                     borderRadius: '4px',
@@ -536,7 +545,7 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
                     background: r.severity === 'high' ? 'rgba(255,71,87,0.15)' : r.severity === 'medium' ? 'rgba(255,179,71,0.15)' : 'rgba(83,167,255,0.15)',
                     color: r.severity === 'high' ? '#ff4757' : r.severity === 'medium' ? '#ffb347' : '#53a7ff',
                   }}>
-                    {r.severity}
+                    {r.severity || '—'}
                   </span>
                 </div>
                 {r.cause && <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9aa7bd' }}>{r.cause}</p>}
@@ -553,10 +562,10 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
       )}
 
       {/* Opportunity Assessment */}
-      {plan.opportunityAssessment?.length > 0 && (
-        <Section title={`Opportunity Assessment (${plan.opportunityAssessment.length})`} icon={Lightbulb} color="#10e18b">
+      {normalizedPlan.opportunityAssessment?.length > 0 && (
+        <Section title={`Opportunity Assessment (${normalizedPlan.opportunityAssessment.length})`} icon={Lightbulb} color="#10e18b">
           <div style={{ display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))' }}>
-            {plan.opportunityAssessment.map((o: any, i: number) => (
+            {normalizedPlan.opportunityAssessment.map((o: any, i: number) => (
               <div key={i} style={{
                 padding: '12px',
                 background: '#151d2b',
@@ -564,7 +573,7 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
                 border: '1px solid #293245',
                 borderLeft: '4px solid #10e18b',
               }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#e5e7eb' }}>{o.opportunity}</h4>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#e5e7eb' }}>{o.opportunity || '—'}</h4>
                 {o.reason && <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#9aa7bd' }}>{o.reason}</p>}
                 {o.evidence && <div style={{ fontSize: '11px', color: '#a855f7', marginBottom: '6px' }}>Evidence: {o.evidence}</div>}
                 <div style={{ display: 'flex', gap: '8px', fontSize: '11px', color: '#6b7280' }}>
@@ -583,10 +592,10 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
       )}
 
       {/* Next Actions */}
-      {plan.executiveSummary?.nextActions?.length > 0 && (
+      {normalizedPlan.executiveSummary?.nextActions?.length > 0 && (
         <Section title="Next Actions" icon={List} color="#a855f7">
           <div style={{ display: 'grid', gap: '8px' }}>
-            {plan.executiveSummary.nextActions.map((a: any, i: number) => (
+            {normalizedPlan.executiveSummary.nextActions.map((a: any, i: number) => (
               <div key={i} style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -597,7 +606,7 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
               }}>
                 <ArrowRight size={14} style={{ color: '#53a7ff', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
-                  <span style={{ color: '#e5e7eb', fontSize: '13px' }}>{a.action}</span>
+                  <span style={{ color: '#e5e7eb', fontSize: '13px' }}>{a.action || '—'}</span>
                   {a.owner && <span style={{ color: '#6b7280', fontSize: '11px', marginLeft: '8px' }}>— {a.owner}</span>}
                 </div>
                 {a.priority && (
@@ -619,7 +628,7 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
       )}
 
       {/* Metadata */}
-      {plan._metadata && (
+      {normalizedPlan._metadata && (
         <div style={{
           padding: '12px 16px',
           background: '#0a0f1a',
@@ -628,9 +637,9 @@ export function CampaignPlanPage({ plan }: CampaignPlanPageProps) {
           color: '#4a5568',
           border: '1px solid #1d2738',
         }}>
-          Generated via {plan._metadata.provider || 'unknown'}
-          {plan._metadata.fallbackUsed && ' (fallback)'} —
-          {new Date(plan._metadata.generatedAt || Date.now()).toLocaleString()}
+          Generated via {normalizedPlan._metadata.provider || 'unknown'}
+          {normalizedPlan._metadata.fallbackUsed && ' (fallback)'} —
+          {new Date(normalizedPlan._metadata.generatedAt || Date.now()).toLocaleString()}
         </div>
       )}
     </div>
