@@ -66,34 +66,85 @@ export async function generateCampaignPlan(planType, context) {
   if (ctaTexts.length) evidenceLines.push(`Existing CTAs: ${ctaTexts.slice(0, 3).join('; ')}`);
   if (evidence?.sourceSummary?.sourcesCollected?.length) evidenceLines.push(`Evidence Sources: ${evidence.sourceSummary.sourcesCollected.join(', ')}`);
 
-  const prompt = `Generate a ${typeConfig.label} (exactly ${typeConfig.days} days) campaign plan. Use ONLY verified data below.
+  const prompt = `Generate a comprehensive ${typeConfig.label} (exactly ${typeConfig.days} days) marketing campaign plan. Use ONLY verified data below.
 
 CONTEXT:
 Product/Company: ${productName || 'N/A'}${companyName ? `\nCompany: ${companyName}` : ''}${targetAudience ? `\nTarget Audience: ${targetAudience}` : ''}${industry ? `\nIndustry: ${industry}` : ''}
 ${evidenceLines.join('\n')}
 
-CAMPAIGN PLAN STRUCTURE (return valid JSON array of campaign items):
-[
-  {
-    "objective": "Specific campaign objective based on evidence",
-    "targetPersona": "Persona name from audience data, or null",
-    "message": "Core message referencing product-specific evidence from CONTEXT",
-    "channel": "Channel from verified data",
-    "asset": "Asset type needed (blog post, email, social post, etc.)",
-    "cta": "Single call to action",
-    "measurement": "How to measure (e.g. 'track landing page visits in analytics')",
-    "dependency": "Prerequisite for this item, or null",
-    "schedule": { "phase": "Phase label", "weekRange": "Weeks X-Y" },
-    "responsibleRole": "Team or role responsible"
+COMPREHENSIVE CAMPAIGN PLAN STRUCTURE (return valid JSON object):
+{
+  "marketingStrategy": {
+    "objective": "Primary campaign objective based on evidence",
+    "goToMarket": "Go-to-market approach (direct, partner-led, product-led, etc.)",
+    "positioning": "Market positioning statement",
+    "differentiation": "Key differentiators from competitors"
+  },
+  "targeting": {
+    "primaryPersona": "Primary buyer persona from evidence",
+    "secondaryPersonas": ["Secondary persona 1", "Secondary persona 2"],
+    "icp": "Ideal customer profile summary"
+  },
+  "customerJourney": {
+    "awareness": ["Tactics for awareness stage"],
+    "consideration": ["Tactics for consideration stage"],
+    "decision": ["Tactics for decision stage"],
+    "retention": ["Tactics for retention stage"]
+  },
+  "funnels": [
+    {
+      "name": "Funnel name (e.g., 'Lead Generation Funnel')",
+      "stages": [
+        {"stage": "Stage name", "tactic": "Tactic description", "channel": "Channel", "asset": "Asset type"}
+      ]
+    }
+  ],
+  "channels": [
+    {
+      "channel": "Channel name",
+      "objective": "Channel-specific objective",
+      "tactics": ["Tactic 1", "Tactic 2"],
+      "contentTypes": ["Blog post", "Social post", "Email", etc.]
+    }
+  ],
+  "contentCalendar": [
+    {
+      "week": "Week X-Y",
+      "theme": "Weekly theme",
+      "deliverables": [
+        {"asset": "Asset type", "channel": "Channel", "topic": "Topic from evidence", "cta": "Call to action"}
+      ]
+    }
+  ],
+  "campaignItems": [
+    {
+      "objective": "Specific campaign objective based on evidence",
+      "targetPersona": "Persona name from audience data, or null",
+      "message": "Core message referencing product-specific evidence from CONTEXT",
+      "channel": "Channel from verified data",
+      "asset": "Asset type needed (blog post, email, social post, etc.)",
+      "cta": "Single call to action",
+      "measurement": "How to measure (e.g. 'track landing page visits in analytics')",
+      "dependency": "Prerequisite for this item, or null",
+      "schedule": { "phase": "Phase label", "weekRange": "Weeks X-Y" },
+      "responsibleRole": "Team or role responsible"
+    }
+  ],
+  "kpiFramework": {
+    "awarenessMetrics": ["Metric 1", "Metric 2"],
+    "considerationMetrics": ["Metric 1", "Metric 2"],
+    "conversionMetrics": ["Metric 1", "Metric 2"],
+    "retentionMetrics": ["Metric 1", "Metric 2"]
   }
-]
+}
 
 RULES:
-1. Do NOT include: budget, ROI projections, lead counts, conversion metrics, revenue estimates.
+1. Do NOT include: specific budget amounts, ROI projections, lead counts, conversion metrics, revenue estimates.
 2. Every item must reference product-specific evidence from the CONTEXT section above.
 3. Do NOT invent sample data, past performance, or conversion metrics.
 4. Schedule phases must span exactly ${typeConfig.days} days.
-5. Return ONLY valid JSON array. No markdown.`;
+5. Content calendar must align with phases and evidence-based topics.
+6. Return ONLY valid JSON object. No markdown.`;
 
   function isTacticSupportedByContext(item, ctx) {
     const evidenceText = JSON.stringify(ctx.evidence || {}).toLowerCase();

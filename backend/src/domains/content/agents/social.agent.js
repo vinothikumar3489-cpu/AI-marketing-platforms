@@ -16,26 +16,34 @@ export async function generateLinkedInPost(brief, aiFunction = callAI, normalize
   const campaignGoal = brief.campaign?.goal?.value || brief.campaign?.goal || '';
   const brandVoice = brief.campaign?.brandVoice?.value || brief.campaign?.brandVoice || brief.brandVoice?.value || brief.brandVoice || 'professional';
 
-  const prompt = `You are an executive thought-leadership strategist advising the C-suite at ${productName}. Your audience is ${persona} â€” senior leaders who evaluate decisions on strategic impact and ROI.
+  const prompt = `You are a senior executive thought-leadership strategist for ${productName}, writing at the level of top-tier marketing agencies. You establish the author as a peer-level authority for ${persona} — senior leaders who evaluate decisions on strategic impact and ROI.
 
-Write a LinkedIn post that establishes the author as a peer-level authority for ${persona}.
+Write a LinkedIn post that combines deep strategic insight with persuasive storytelling and discussion-driving engagement.
 
 ${productContext}
 
 Platform: LinkedIn
 Format: Executive insight post (1,300-2,000 characters)
-Tone: ${brandVoice || 'Executive, authoritative, contrarian'}
+Tone: ${brandVoice || 'Executive, authoritative, contrarian, peer-to-peer'}
 
-STRATEGIC REQUIREMENTS:
-- Hook: Open with a provocative industry insight, contrarian take, or an observation that challenges a widely held assumption about "${painPoint}". Max 200 chars. Must stop the scroll. No questions â€” state a thesis.
-- Body: 3-4 tight paragraphs, separated by line breaks. Educate through a specific framework, methodology, or approach. Reference ${productName}'s features and benefits organically as proof points. Every paragraph must tie back to a business outcome â€” efficiency gain, revenue impact, cost reduction, or strategic advantage.
-- Evidence Anchoring: Every substantive claim must reference a specific feature, benefit, pain point, or campaign goal from the evidence above. Use natural language, not bullet lists.
-- CTA: Discussion-oriented. Invite debate or ask a question that positions the author as a leader willing to challenge convention. Examples: "I'd push back on that â€” here is why.", "What is your team doing differently?", "The data I have seen suggests otherwise â€” agree or disagree?"
-- Hashtags: Max 3. Branded + industry. Place only at the end of the post.
+AUDIENCE PSYCHOLOGY:
+- ${persona} are senior leaders who make high-stakes decisions under uncertainty
+- They value: data-driven insights, contrarian perspectives, strategic frameworks, peer validation
+- They reject: generic advice, platitudes, vendor pitches, superficial observations
+- They respond to: challenges to conventional wisdom, specific frameworks, ROI clarity, strategic positioning
+
+MARKETING-AGENCY QUALITY REQUIREMENTS:
+- Hook (Scroll-stopper): Open with a provocative industry insight, contrarian take, or observation that challenges a widely held assumption about "${painPoint}". Max 200 chars. State a thesis, not a question.
+- Authority Building: Demonstrate deep domain knowledge through specific frameworks, methodologies, or strategic approaches. Use executive-level terminology.
+- Storytelling: Weave a brief narrative—industry trend → strategic challenge → your contrarian take → evidence-backed solution.
+- Business Impact: Every paragraph must tie back to a business outcome—efficiency gain, revenue impact, cost reduction, or strategic advantage.
+- Evidence Anchoring: Every substantive claim must reference a specific feature, benefit, pain point, or campaign goal from evidence. Use natural language, not bullet lists.
+- Discussion CTA: Invite debate or ask a question that positions the author as a leader willing to challenge convention. Examples: "I'd push back on that — here is why.", "What is your team doing differently?", "The data I have seen suggests otherwise — agree or disagree?"
+- Hashtags: Max 3. Branded + industry. Place only at the end.
 ${campaignGoal ? `- Campaign Alignment: Align with the goal: "${campaignGoal}"` : ''}
 
 CRITICAL CONSTRAINTS:
-- You MUST NOT include: fake statistics, percentages, "studies show", "research finds", "data shows", invented testimonials, competitor bashing, superlatives ("best", "leading", "#1"), clichÃ© openers ("In today's world", "The modern era", "It's no secret").
+- You MUST NOT include: fake statistics, percentages, "studies show", "research finds", "data shows", invented testimonials, competitor bashing, superlatives ("best", "leading", "#1"), cliché openers ("In today's world", "The modern era", "It's no secret").
 - You MUST use only evidence explicitly present in the brief above.
 - Any claim not directly supported by the brief MUST be listed in claimsRequiringReview.
 - EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
@@ -119,8 +127,8 @@ STRATEGIC REQUIREMENTS:
 - Visual Brief: Write a detailed paragraph for the designer covering color palette, mood, composition, and typography.
 - Image Prompt: Write a detailed DALL-E/Midjourney-style prompt for the cover image. Include specific visual elements, lighting, color scheme, camera angle, and mood.
 - Reel Idea: Include a "reelIdea" field with a short script outline, suggested duration (15-30s), and music suggestion.
-- CallToAction: Use one of these exact CTAs â€” "Save for later", "Share with a teammate", "Comment your thoughts".
-- Hashtags: 8-10 hashtags â€” mix of branded + industry + niche tags.
+- CTA (cta field): Use one of these exact CTAs — "Save for later", "Share with a teammate", "Comment your thoughts".
+- Hashtags: 8-10 hashtags — mix of branded + industry + niche tags.
 - Evidence Reference: EVERY slide must reference specific evidence (features, benefits, pain points, data points from the brief above).
 ${trendNote ? `\nNOTE: ${trendNote}` : ''}
 
@@ -129,16 +137,16 @@ Do NOT use: fake stats, testimonials, awards, ROI claims, "stay ahead of the cur
 
 Return valid JSON:
 {
-  "hook": "string â€” max 100 chars, scroll-stopping",
-  "caption": "string â€” Hook â†’ Problem â†’ Solution â†’ CTA â†’ Hashtags, emojis, line breaks",
-  "visualConcept": "string â€” detailed visual brief for designer (color palette, mood, composition, typography)",
-  "carouselSlides": [{"headline": "string â€” bold value prop", "body": "string â€” 1-2 sentences", "visualHint": "string or null"}],
-  "imagePrompt": "string â€” detailed DALL-E/Midjourney-style prompt for cover image",
-  "reelIdea": "string â€” script outline, duration (15-30s), music suggestion",
-  "callToAction": "string â€” one of: Save for later, Share with a teammate, Comment your thoughts",
+  "hook": "string — max 100 chars, scroll-stopping",
+  "caption": "string — Hook → Problem → Solution → CTA → Hashtags, emojis, line breaks",
+  "visualConcept": "string — detailed visual brief for designer (color palette, mood, composition, typography)",
+  "carouselSlides": [{"headline": "string — bold value prop", "body": "string — 1-2 sentences", "visualHint": "string or null"}],
+  "imagePrompt": "string — detailed DALL-E/Midjourney-style prompt for cover image",
+  "reelIdea": "string — script outline, duration (15-30s), music suggestion",
+  "cta": "string — one of: Save for later, Share with a teammate, Comment your thoughts",
   "hashtags": ["8-10", "mix", "branded", "industry", "niche"],
-  "audience": "string â€” target persona",
-  "angle": "string â€” creative angle used",
+  "audience": "string — target persona",
+  "angle": "string — creative angle used",
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
 }`;
@@ -177,7 +185,7 @@ function generateInstagramPostFallback(brief, productName, persona, painPoint) {
     ],
     imagePrompt: `Product screenshot of ${productName} dashboard, clean UI, modern design, technology context, professional lighting`,
     reelIdea: `Quick-cut reel (20s): Open with "${painPoint} \u2014 sound familiar?" \u2192 show ${persona} working through it \u2192 transition to ${productName} being used \u2192 feature close-ups \u2192 end card "Save for later". Music: upbeat lo-fi / trending instrumental.`,
-    callToAction: 'Save for later',
+    cta: 'Save for later',
     hashtags: ['#' + productName.toLowerCase().replace(/\s+/g, ''), '#Productivity', '#Innovation', '#Tech', '#Growth', '#Efficiency', '#Digital', '#FutureOfWork', '#Platform', '#Solution'].slice(0, 10),
     audience: persona,
     angle: 'feature highlight',
@@ -199,42 +207,48 @@ export async function generateTwitterPost(brief, aiFunction = callAI, normalized
   const persona = getPersonaName(brief);
   const painPoint = getFirstPainPoint(brief);
 
-  const prompt = `You are a senior X (Twitter) strategist for ${productName}, writing viral, high-engagement posts for ${persona}.
+  const prompt = `You are a senior X (Twitter) strategist for ${productName}, writing at the level of top-tier marketing agencies. You create viral, high-engagement posts for ${persona} that drive conversation and brand visibility.
 
 ${productContext}
 
 Platform: X (Twitter)
 Format: Short-form posts (max 280 chars each)
-Tone: Sharp, contrarian, conversational
+Tone: Sharp, contrarian, conversational, opinionated
 
-VIRAL STRUCTURE REQUIREMENTS:
-- Hook in the FIRST 60 characters. Open with a question, bold claim, or contrarian take.
-- Create a curiosity gap â€” make them need the next line.
-- Short, punchy sentences. One idea per sentence.
-- Max 280 characters per post including hashtags.
-- HIGH engagement mechanics: include a question, poll suggestion, or opinion that invites replies.
+AUDIENCE PSYCHOLOGY:
+- ${persona} scroll quickly and respond to: bold takes, contrarian insights, specific examples, questions that invite debate
+- They ignore: generic advice, platitudes, obvious statements, vendor pitches
+- They engage with: challenges to conventional wisdom, hot takes, specific data points, "unpopular opinions"
+
+MARKETING-AGENCY QUALITY REQUIREMENTS:
+- Hook (First 60 chars): Open with a question, bold claim, or contrarian take about ${painPoint}. Must stop the scroll instantly.
+- Curiosity Gap: Make them need the next line. Use "→" or line breaks to create tension.
+- Punchy Sentences: One idea per sentence. No filler. Every word earns its place.
+- Engagement Mechanics: Include a question, poll suggestion, or opinion that invites replies. Examples: "Unpopular opinion:", "Here's a hot take:", "What if I told you:"
+- Evidence Anchoring: Reference a specific pain point, feature, or insight from evidence. Make it feel grounded, not generic.
+- Variants: Generate 3 different angles (same core message, different framing): contrarian, data-driven, story-based.
 
 OUTPUT REQUIREMENTS:
-- Generate 3 different tweet variants (different angles, same core message).
-- Max 2 hashtags: 1 branded + 1 trending/niche.
-- Reference a specific pain point or insight from evidence.
-- No filler words, no "In today's world", no generic statements.
+- Max 280 characters per post including hashtags
+- Max 2 hashtags: 1 branded + 1 trending/niche
+- No filler words, no "In today's world", no generic statements
+- Each variant must have a distinct angle
 
 EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 CRITICAL: Every character must earn its place.
 
 Return valid JSON:
 {
-  "post": "string â€” primary tweet, max 280 chars",
+  "post": "string — primary tweet, max 280 chars",
   "variants": [
-    "string â€” alternative tweet 1, different angle, max 280 chars",
-    "string â€” alternative tweet 2, different angle, max 280 chars",
-    "string â€” alternative tweet 3, different angle, max 280 chars"
+    "string — alternative tweet 1, different angle, max 280 chars",
+    "string — alternative tweet 2, different angle, max 280 chars",
+    "string — alternative tweet 3, different angle, max 280 chars"
   ],
-  "cta": "string or null â€” question, poll suggestion, or reply-bait",
+  "cta": "string or null — question, poll suggestion, or reply-bait",
   "hashtags": ["branded", "niche"],
-  "audience": "string â€” target persona",
-  "angle": "string â€” concise angle description",
+  "audience": "string — target persona",
+  "angle": "string — concise angle description",
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
 }`;

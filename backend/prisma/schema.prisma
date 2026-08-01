@@ -12,112 +12,104 @@ model User {
   name                    String
   email                   String                   @unique
   password                String
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  lastActiveAt            DateTime?
   profileImage            String?
   role                    String?                  @default("member")
-  lastActiveAt            DateTime?
-  chats                   Chat[]
-  analyses                Analysis[]
-  seoAnalyses             SeoAnalysis[]
-  productProfiles         ProductProfile[]
-  productAnalyses         ProductAnalysis[]
-  productIntelligence     ProductIntelligence[]
-  competitorIntelligence  CompetitorIntelligence[]
-  campaignIntelligence    CampaignIntelligence[]
-  seoIntelligence         SeoIntelligence[]
   agentRuns               AgentRun[]
-  notifications           Notification[]
-  automationPlans         AutomationPlan[]
+  analyses                Analysis[]
   automationLogs          AutomationLog[]
-  executionRecords        ExecutionRecord[]
-  evidenceSnapshots       EvidenceSnapshot[]
+  automationPlans         AutomationPlan[]
+  crmActivities           CRMActivity[]
+  crmCompanies            CRMCompany[]
+  crmContacts             CRMContact[]
+  crmDeals                CRMDeal[]
+  crmImportJobs           CRMImportJob[]
+  crmPipelines            CRMPipeline[]
+  crmTasks                CRMTask[]
+  crmWorkflows            CRMWorkflow[]
+  campaignIntelligence    CampaignIntelligence[]
   campaignPlans           CampaignPlan[]
+  chats                   Chat[]
+  competitorIntelligence  CompetitorIntelligence[]
+  customerHealthSnapshots CustomerHealthSnapshot[]
+  dealInsights            DealInsight[]
+  emailAutomations        EmailAutomation[]
   emailCampaigns          EmailCampaign[]
   emailTemplates          EmailTemplate[]
-  emailAutomations        EmailAutomation[]
-  crmContacts             CRMContact[]
-  crmCompanies            CRMCompany[]
-  crmDeals                CRMDeal[]
-  crmActivities           CRMActivity[]
-  crmTasks                CRMTask[]
-  crmPipelines            CRMPipeline[]
-  crmWorkflows            CRMWorkflow[]
-  crmImportJobs           CRMImportJob[]
-  salesCopilotMemories    SalesCopilotMemory[]
-  dealInsights            DealInsight[]
+  evidenceSnapshots       EvidenceSnapshot[]
+  executionRecords        ExecutionRecord[]
+  growthSprints           GrowthSprint[]
+  growthTasks             GrowthTask[]
+  notifications           Notification[]
+  productAnalyses         ProductAnalysis[]
+  productIntelligence     ProductIntelligence[]
+  productProfiles         ProductProfile[]
   proposals               Proposal[]
-  customerHealthSnapshots CustomerHealthSnapshot[]
-
-  // Growth Execution Layer relations
-  growthSprints GrowthSprint[]
-  growthTasks   GrowthTask[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  salesCopilotMemories    SalesCopilotMemory[]
+  seoAnalyses             SeoAnalysis[]
+  seoIntelligence         SeoIntelligence[]
 }
 
 model Chat {
-  id                     String                  @id @default(cuid())
-  user                   User                    @relation(fields: [userId], references: [id])
-  userId                 String
-  title                  String
-  productName            String?
-  messages               Message[]
-  analysis               Analysis[]
-  seoAnalysis            SeoAnalysis?
-  productProfile         ProductProfile?
-  productAnalysis        ProductAnalysis?
-  productIntelligence    ProductIntelligence?
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
-  competitorIntelligence CompetitorIntelligence?
-  campaignIntelligence   CampaignIntelligence?
-
-  seoIntelligence SeoIntelligence?
-  AgentRun        AgentRun[]
-  automationPlan  AutomationPlan?
-
-  // Growth Execution Layer relations
-  growthSprints           GrowthSprint[]
-  growthTasks             GrowthTask[]
-  executionRecords        ExecutionRecord[]
-  evidenceSnapshots       EvidenceSnapshot[]
-  campaignPlans           CampaignPlan[]
+  id                      String                   @id @default(cuid())
+  userId                  String
+  title                   String
+  productName             String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  AgentRun                AgentRun[]
+  analysis                Analysis[]
+  automationPlan          AutomationPlan?
+  crmActivities           CRMActivity[]
+  crmCompanies            CRMCompany[]
+  crmContacts             CRMContact[]
+  crmDeals                CRMDeal[]
+  crmImportJobs           CRMImportJob[]
+  crmPipelines            CRMPipeline[]
+  crmTasks                CRMTask[]
+  crmWorkflows            CRMWorkflow[]
+  campaignIntelligence    CampaignIntelligence?
+  campaignPlans           CampaignPlan?
+  user                    User                     @relation(fields: [userId], references: [id])
+  competitorIntelligence  CompetitorIntelligence?
+  customerHealthSnapshots CustomerHealthSnapshot[]
+  dealInsights            DealInsight[]
+  emailAutomations        EmailAutomation[]
   emailCampaigns          EmailCampaign[]
   emailTemplates          EmailTemplate[]
-  emailAutomations        EmailAutomation[]
-  crmContacts             CRMContact[]
-  crmCompanies            CRMCompany[]
-  crmDeals                CRMDeal[]
-  crmActivities           CRMActivity[]
-  crmTasks                CRMTask[]
-  crmPipelines            CRMPipeline[]
-  crmWorkflows            CRMWorkflow[]
-  crmImportJobs           CRMImportJob[]
-  salesCopilotMemories    SalesCopilotMemory[]
-  dealInsights            DealInsight[]
+  evidenceSnapshots       EvidenceSnapshot[]
+  executionRecords        ExecutionRecord[]
+  growthSprints           GrowthSprint[]
+  growthTasks             GrowthTask[]
+  messages                Message[]
+  productAnalysis         ProductAnalysis?
+  productIntelligence     ProductIntelligence?
+  productProfile          ProductProfile?
   proposals               Proposal[]
-  customerHealthSnapshots CustomerHealthSnapshot[]
+  salesCopilotMemories    SalesCopilotMemory[]
+  seoAnalysis             SeoAnalysis?
+  seoIntelligence         SeoIntelligence?
 
   @@index([userId])
 }
 
 model Message {
   id           String   @id @default(cuid())
-  chat         Chat     @relation(fields: [chatId], references: [id])
   chatId       String
   role         String
   content      String
   analysisData Json?
   createdAt    DateTime @default(now())
+  chat         Chat     @relation(fields: [chatId], references: [id])
 
   @@index([chatId])
 }
 
 model Analysis {
   id                  String             @id @default(cuid())
-  chat                Chat               @relation(fields: [chatId], references: [id])
   chatId              String
-  user                User               @relation(fields: [userId], references: [id])
   userId              String
   productName         String
   productDescription  String
@@ -126,8 +118,10 @@ model Analysis {
   competitorInsights  Json?
   campaignSuggestions Json?
   roiSuggestions      Json?
-  evidenceSnapshots   EvidenceSnapshot[]
   createdAt           DateTime           @default(now())
+  chat                Chat               @relation(fields: [chatId], references: [id])
+  user                User               @relation(fields: [userId], references: [id])
+  evidenceSnapshots   EvidenceSnapshot[]
 
   @@index([chatId])
   @@index([userId])
@@ -135,16 +129,14 @@ model Analysis {
 
 model SeoAnalysis {
   id                 String   @id @default(cuid())
-  chat               Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
   chatId             String   @unique
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId             String
   websiteUrl         String?
   seoScore           Int?
   visibilityScore    Int?
   organicTraffic     Int?
-  backlinkCount      Int?
   keywordCount       Int?
+  backlinkCount      Int?
   avgPosition        Float?
   ctr                Float?
   topKeywords        Json?
@@ -157,6 +149,8 @@ model SeoAnalysis {
   source             String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+  chat               Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([chatId])
@@ -164,22 +158,20 @@ model SeoAnalysis {
 
 model Notification {
   id        String   @id @default(cuid())
-  user      User     @relation(fields: [userId], references: [id])
   userId    String
   title     String
   message   String
   type      String
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
 }
 
 model ProductProfile {
   id             String   @id @default(cuid())
-  chat           Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
   chatId         String   @unique
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId         String
   productName    String
   companyName    String?
@@ -195,6 +187,8 @@ model ProductProfile {
   scrapeStatus   String   @default("pending")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  chat           Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([chatId])
@@ -202,237 +196,207 @@ model ProductProfile {
 
 model ProductAnalysis {
   id                  String   @id @default(cuid())
-  chat                Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
   chatId              String   @unique
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId              String
   productSummary      String?
   category            String?
   confidenceScore     Int?
   usp                 Json?
-  features            Json?
-  benefits            Json?
   painPoints          Json?
   targetUsers         Json?
   competitorTypes     Json?
-  competitors         Json?
-  directCompetitors   Json?
-  indirectCompetitors Json?
-  emergingCompetitors Json?
-  businessModel       String?
-  revenueModel        String?
-  marketSegment       String?
-  pricingPosition     String?
-  marketMaturity      String?
   marketingAngles     Json?
-  seoOpportunities    Json?
-  campaignIdeas       Json?
-  recommendedChannels Json?
-  confidenceBreakdown Json?
+  pricingPosition     String?
   recommendedModules  Json?
-  apiStatus           Json?
-  buyerPersonas       Json?
-  dataSourcesUsed     Json?
-  providers           Json?
-  aiWarnings          Json?
-  warnings            Json?
   source              String?
-  useCases            Json?
-  customerSegments    Json?
-  testimonials        Json?
-  caseStudies         Json?
-  technologyStack     Json?
-  schemaOrg           Json?
-  faq                 Json?
-  resources           Json?
-  // Custom fields for our new flow
-  provider            String?
-  fallbackUsed        Boolean? @default(false)
-  inputJson           Json?
-  outputJson          Json?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+  aiWarnings          Json?
+  benefits            Json?
+  buyerPersonas       Json?
+  competitors         Json?
+  dataSourcesUsed     Json?
+  features            Json?
+  marketMaturity      String?
+  providers           Json?
+  warnings            Json?
+  businessModel       String?
+  campaignIdeas       Json?
+  marketSegment       String?
+  revenueModel        String?
+  seoOpportunities    Json?
+  apiStatus           Json?
+  confidenceBreakdown Json?
+  directCompetitors   Json?
+  emergingCompetitors Json?
+  fallbackUsed        Boolean? @default(false)
+  indirectCompetitors Json?
+  inputJson           Json?
+  outputJson          Json?
+  provider            String?
+  recommendedChannels Json?
+  caseStudies         Json?
+  customerSegments    Json?
+  faq                 Json?
+  resources           Json?
+  schemaOrg           Json?
+  technologyStack     Json?
+  testimonials        Json?
+  useCases            Json?
+  chat                Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([chatId])
 }
 
 model ProductIntelligence {
-  id     String @id @default(cuid())
-  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-
+  id                   String   @id @default(cuid())
+  chatId               String   @unique
+  userId               String
   productAnalysis      Json?
   marketDiscovery      Json?
   audienceIntelligence Json?
-
-  // Common fields for all modules
-  provider     String?
-  fallbackUsed Boolean? @default(false)
-  inputJson    Json?
-  status       String?  @default("pending")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  provider             String?
+  fallbackUsed         Boolean? @default(false)
+  inputJson            Json?
+  status               String?  @default("pending")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  chat                 Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([chatId])
 }
 
 model CompetitorIntelligence {
-  id     String @id @default(cuid())
-  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-
+  id                 String   @id @default(cuid())
+  chatId             String   @unique
+  userId             String
   competitorAnalysis Json?
   intentPrediction   Json?
   positioningEngine  Json?
-
-  // Custom fields for our new flow
-  provider     String?
-  fallbackUsed Boolean? @default(false)
-  inputJson    Json?
-  status       String?  @default("pending")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  provider           String?
+  fallbackUsed       Boolean? @default(false)
+  inputJson          Json?
+  status             String?  @default("pending")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  chat               Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([chatId])
 }
 
 model CampaignIntelligence {
-  id     String @id @default(cuid())
-  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-
+  id                    String   @id @default(cuid())
+  chatId                String   @unique
+  userId                String
   campaignGenerator     Json?
   channelRecommendation Json?
-  executiveStory        Json?
+  provider              String?
+  fallbackUsed          Boolean? @default(false)
+  inputJson             Json?
+  status                String?  @default("pending")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
   actionPlan            Json?
-
-  provider     String?
-  fallbackUsed Boolean? @default(false)
-  inputJson    Json?
-  status       String?  @default("pending")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  executiveStory        Json?
+  chat                  Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([chatId])
 }
 
 model CampaignPlan {
-  id     String @id @default(cuid())
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId String @unique
-
-  // Campaign Intelligence (all derived from evidence, never fabricated)
-  executiveSummary       Json? // campaignName, campaignTheme, campaignGoal, duration, primaryAudience, primaryChannels, topOpportunities, topRisks, nextActions
-  businessGoal           Json? // goal, confidence, reason, evidence
-  campaignObjective      Json? // primary, secondary, successDefinition, targetAudience, idealCustomer, timeline, priority, dependencies
-  audienceSelection      Json? // primary, secondary, buyingStage, painPoints, decisionDrivers, objections, contentPreferences
-  channelRecommendations Json? // [{ channel, fit, priority, reason, evidence, recommendedContent, recommendedCTA, organicOrPaid }]
-  timeline               Json? // week1, week2, week3, week4, month2, month3 — each with tasks
-  marketingFunnel        Json? // awareness, interest, consideration, conversion, retention, advocacy
-  kpiFramework           Json? // [{ kpi, howToMeasure, tool, frequency, status }]
-  riskAssessment         Json? // [{ risk, cause, evidence, severity, mitigation }]
-  opportunityAssessment  Json? // [{ opportunity, reason, evidence, effort, priority, expectedBusinessImpact }]
-  marketingStrategy      Json? // { narrative, pillars, positioning, researchCoverage }
-  emailCampaignsData     Json? // [{ name, objective, audience, sequence, angles, cta, evidence }]
-  ads                    Json? // [{ platform, objective, headline, primaryText, audience, cta, angle, evidence }]
-  landingPages           Json? // [{ name, purpose, headline, sections, seoKeywords, cta, evidence }]
-  socialPosts            Json? // [{ platform, hook, body, cta, angle, audience, evidence }]
-  creativeAngles         Json? // [{ angle, source, evidence, bestFor }]
-  budget                 Json? // { status, total, currency, allocation, notes, inputSummary }
-  forecast               Json? // { status, disclaimer, scenarios, metricsToTrack }
-  roi                    Json? // { formula, inputs, limitations, measurementPlan }
-  nextActions            Json? // [{ action, owner, priority, evidence }]
-
-  // Metadata
-  status       String?  @default("draft")
-  provider     String?
-  fallbackUsed Boolean? @default(false)
-  inputJson    Json?
-  version      Int?     @default(1)
-
-  emailCampaigns EmailCampaign[]
-  crmDeals       CRMDeal[]
-  crmWorkflows   CRMWorkflow[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                     String          @id @default(cuid())
+  userId                 String
+  chatId                 String          @unique
+  executiveSummary       Json?
+  businessGoal           Json?
+  campaignObjective      Json?
+  audienceSelection      Json?
+  channelRecommendations Json?
+  timeline               Json?
+  marketingFunnel        Json?
+  kpiFramework           Json?
+  riskAssessment         Json?
+  opportunityAssessment  Json?
+  nextActions            Json?
+  status                 String?         @default("draft")
+  provider               String?
+  fallbackUsed           Boolean?        @default(false)
+  inputJson              Json?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  version                Int?            @default(1)
+  marketingStrategy      Json?
+  emailCampaignsData     Json?
+  ads                    Json?
+  landingPages           Json?
+  socialPosts            Json?
+  creativeAngles         Json?
+  budget                 Json?
+  forecast               Json?
+  roi                    Json?
+  crmDeals               CRMDeal[]
+  crmWorkflows           CRMWorkflow[]
+  chat                   Chat            @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user                   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailCampaigns         EmailCampaign[]
 
   @@index([chatId])
   @@index([userId])
 }
 
-// ============================================
-// GROWTH WORKSPACE EXECUTION MODELS
-// ============================================
-
 model GrowthSprint {
   id        String       @id @default(cuid())
-  chat      Chat         @relation(fields: [chatId], references: [id], onDelete: Cascade)
   chatId    String
-  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  name      String // e.g., "Immediate", "Day 7", "This Month"
+  name      String
   startDate DateTime?
   endDate   DateTime?
-  status    String       @default("active") // active, completed, planned
+  status    String       @default("active")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  chat      Chat         @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   tasks     GrowthTask[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
   @@index([chatId])
   @@index([userId])
 }
 
 model GrowthTask {
-  id       String        @id @default(cuid())
-  chat     Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId   String
-  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId   String
-  sprint   GrowthSprint? @relation(fields: [sprintId], references: [id])
-  sprintId String?
-
-  title       String
-  description String? @db.Text
-  status      String  @default("todo") // todo, in_progress, in_review, done
-  priority    String  @default("Medium") // High, Medium, Low, Critical
-  difficulty  String? // Hard, Medium, Easy
-  impact      String? // Business value / Impact description
-  owner       String? @default("Marketing Team")
-  kpi         String?
-
-  estimatedTime String? // e.g., "3 hours", "2 days"
-  targetKeyword String?
-  affectedPage  String?
-
-  // Progress tracking
-  progress    Int       @default(0) // 0-100
-  isCompleted Boolean   @default(false)
-  completedAt DateTime?
-  dueDate     DateTime?
-
-  // Generative AI Context
-  aiGeneratedType String? // e.g., "meta_tags", "blog_post", "faq"
-  aiPromptContext Json? // Stores the context needed to run inline generation
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String        @id @default(cuid())
+  chatId          String
+  userId          String
+  sprintId        String?
+  title           String
+  description     String?
+  status          String        @default("todo")
+  priority        String        @default("Medium")
+  difficulty      String?
+  impact          String?
+  owner           String?       @default("Marketing Team")
+  kpi             String?
+  estimatedTime   String?
+  targetKeyword   String?
+  affectedPage    String?
+  progress        Int           @default(0)
+  isCompleted     Boolean       @default(false)
+  completedAt     DateTime?
+  dueDate         DateTime?
+  aiGeneratedType String?
+  aiPromptContext Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  chat            Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sprint          GrowthSprint? @relation(fields: [sprintId], references: [id])
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([chatId])
   @@index([userId])
@@ -440,17 +404,10 @@ model GrowthTask {
 }
 
 model SeoIntelligence {
-  id     String @id @default(cuid())
-  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-
+  id                     String                      @id @default(cuid())
+  chatId                 String                      @unique
+  userId                 String
   websiteUrl             String?
-  domain                 String?
-  companyName            String?
-  productName            String?
-  analyzedAt             DateTime? @default(now())
   seoScore               Int?
   technicalAudit         Json?
   keywordOpportunities   Json?
@@ -460,101 +417,77 @@ model SeoIntelligence {
   landingPageSuggestions Json?
   blogIdeas              Json?
   actionPlan             Json?
-
-  // Metadata
-  providers    Json?
-  warnings     Json?
-  status       String?  @default("pending")
-  fallbackUsed Boolean? @default(false)
-  inputJson    Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // New Relations for Enhanced SEO + GEO
-  rawCrawlData           RawCrawlData[]
-  technicalAuditDetail   TechnicalSeoAudit?
-  scoreBreakdown         SeoScoreBreakdown?
-  keywordIntelligence    KeywordIntelligenceRecord?
-  topicClusters          TopicCluster[]
-  seoCompetitors         SeoCompetitorIntelligence[]
-  geoIntelligence        GeoIntelligenceRecord?
+  providers              Json?
+  warnings               Json?
+  status                 String?                     @default("pending")
+  fallbackUsed           Boolean?                    @default(false)
+  inputJson              Json?
+  createdAt              DateTime                    @default(now())
+  updatedAt              DateTime                    @updatedAt
+  analyzedAt             DateTime?                   @default(now())
+  companyName            String?
+  domain                 String?
+  productName            String?
+  blogIntelligenceItems  BlogIntelligence[]
+  blogIntelligenceRecord BlogIntelligenceRecord?
   competitorSeoRecord    CompetitorSeoRecord?
   contentGapDetails      ContentGap[]
-  blogIntelligenceItems  BlogIntelligence[]
   contentGapRecord       ContentGapRecord?
-  blogIntelligenceRecord BlogIntelligenceRecord?
   executiveDashboard     ExecutiveSeoDashboard?
+  geoIntelligence        GeoIntelligenceRecord?
+  keywordIntelligence    KeywordIntelligenceRecord?
+  rawCrawlData           RawCrawlData[]
+  seoCompetitors         SeoCompetitorIntelligence[]
+  chat                   Chat                        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user                   User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scoreBreakdown         SeoScoreBreakdown?
+  technicalAuditDetail   TechnicalSeoAudit?
+  topicClusters          TopicCluster[]
 
   @@index([userId])
   @@index([chatId])
 }
 
-// ============================================
-// RAW CRAWL DATA
-// ============================================
-
 model RawCrawlData {
   id                String          @id @default(cuid())
-  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
   seoIntelligenceId String
-
-  url        String
-  html       String   @db.Text
-  text       String   @db.Text
-  metadata   Json
-  technical  Json
-  content    Json
-  structured Json
-  provider   String
-  scrapedAt  DateTime @default(now())
+  url               String
+  html              String
+  text              String
+  metadata          Json
+  technical         Json
+  content           Json
+  structured        Json
+  provider          String
+  scrapedAt         DateTime        @default(now())
+  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
 
   @@index([seoIntelligenceId])
 }
 
-// ============================================
-// TECHNICAL SEO AUDIT (DETAILED)
-// ============================================
-
 model TechnicalSeoAudit {
   id                String          @id @default(cuid())
-  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
   seoIntelligenceId String          @unique
-
-  // Full audit data structure
-  auditData Json
-
-  // Individual scores for quick access (null if evidence not available)
-  overallScore  Int?
-  titleScore    Int?
-  metaScore     Int?
-  securityScore Int?
-  mobileScore   Int?
-  headingScore  Int?
-  schemaScore   Int?
-
-  // Issues by priority
-  criticalIssues Json
-  highIssues     Json
-  mediumIssues   Json
-  lowIssues      Json
-
-  // Recommendations
-  recommendations Json
-
-  analyzedAt DateTime @default(now())
+  auditData         Json
+  overallScore      Int?
+  titleScore        Int?
+  metaScore         Int?
+  securityScore     Int?
+  mobileScore       Int?
+  headingScore      Int?
+  schemaScore       Int?
+  criticalIssues    Json
+  highIssues        Json
+  mediumIssues      Json
+  lowIssues         Json
+  recommendations   Json
+  analyzedAt        DateTime        @default(now())
+  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
 }
-
-// ============================================
-// SEO SCORE BREAKDOWN
-// ============================================
 
 model SeoScoreBreakdown {
   id                String          @id @default(cuid())
-  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
   seoIntelligenceId String          @unique
-
-  // Dimensional scores (null if evidence not available)
   technicalScore    Int?
   onPageScore       Int?
   contentScore      Int?
@@ -562,450 +495,284 @@ model SeoScoreBreakdown {
   aiVisibilityScore Int?
   localSeoScore     Int?
   overallScore      Int?
-
-  // Score history for trend tracking
-  scoreHistory Json?
-
-  lastCalculated DateTime @default(now())
+  scoreHistory      Json?
+  lastCalculated    DateTime        @default(now())
+  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
 }
 
-// ============================================
-// KEYWORD INTELLIGENCE (Consolidated Model)
-// ============================================
-
 model KeywordIntelligenceRecord {
-  id                String          @id @default(cuid())
-  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
-  seoIntelligenceId String          @unique
-
-  // Keyword Categories (JSON arrays of keyword objects)
-  primaryKeywords   Json // [{ keyword, intent, difficulty, opportunity, confidenceScore, reason }]
-  secondaryKeywords Json // [{ keyword, intent, difficulty, opportunity, confidenceScore, reason }]
-  longTailKeywords  Json // [{ keyword, intent, difficulty, opportunity, confidenceScore, reason }]
-  questionKeywords  Json // [{ keyword, intent, difficulty, opportunity, confidenceScore, reason }]
-
-  // Topic Clusters
-  clusters Json // [{ name, keywords[], priority, contentSuggestions[] }]
-
-  // Competitor Keywords
-  competitorKeywords Json // [{ keyword, competitorUsing, reason, opportunity, intent, difficulty }]
-
-  // Content Opportunities
-  contentOpportunities Json // [{ keyword, pageSuggestion, reason, impact, type, priority }]
-
-  // GEO Keywords (AI Search Optimization)
-  geoKeywords Json // [{ question, platform, answerOpportunity, contentSuggestion, intent }]
-
-  // Metadata
-  totalKeywords      Int? @default(0)
-  clustersCount      Int? @default(0)
-  opportunitiesCount Int? @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String          @id @default(cuid())
+  seoIntelligenceId    String          @unique
+  primaryKeywords      Json
+  secondaryKeywords    Json
+  longTailKeywords     Json
+  questionKeywords     Json
+  clusters             Json
+  competitorKeywords   Json
+  contentOpportunities Json
+  geoKeywords          Json
+  totalKeywords        Int?            @default(0)
+  clustersCount        Int?            @default(0)
+  opportunitiesCount   Int?            @default(0)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  seoIntelligence      SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
 
   @@index([seoIntelligenceId])
 }
 
-// ============================================
-// TOPIC CLUSTERS
-// ============================================
-
 model TopicCluster {
-  id                String          @id @default(cuid())
-  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
-  seoIntelligenceId String
-
+  id                 String          @id @default(cuid())
+  seoIntelligenceId  String
   name               String
-  keywords           Json // array of keyword IDs or strings
+  keywords           Json
   priority           Int
   contentSuggestions Json
-
-  createdAt DateTime @default(now())
+  createdAt          DateTime        @default(now())
+  seoIntelligence    SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
 
   @@index([seoIntelligenceId, priority])
 }
 
-// ============================================
-// SEO COMPETITOR INTELLIGENCE
-// ============================================
-
 model SeoCompetitorIntelligence {
   id                String          @id @default(cuid())
-  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
   seoIntelligenceId String
-
-  name    String
-  website String
-  type    String // direct, indirect
-  reason  String @db.Text
-
-  // Analysis
-  strengths       Json
-  weaknesses      Json
-  contentStrategy String? @db.Text
-  positioning     String? @db.Text
-  seoAdvantages   Json
-
-  // Gaps
-  keywordGaps   Json
-  contentGaps   Json
-  authorityGaps Json
-
+  name              String
+  website           String
+  type              String
+  reason            String
+  strengths         Json
+  weaknesses        Json
+  contentStrategy   String?
+  positioning       String?
+  seoAdvantages     Json
+  keywordGaps       Json
+  contentGaps       Json
+  authorityGaps     Json
   authorityEstimate Int?
-  createdAt         DateTime @default(now())
+  createdAt         DateTime        @default(now())
+  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
 
   @@index([seoIntelligenceId, type])
 }
 
-// ============================================
-// GEO INTELLIGENCE (Generative Engine Optimization)
-// ============================================
-
 model GeoIntelligenceRecord {
-  id                String          @id @default(cuid())
-  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
-  seoIntelligenceId String          @unique
-
-  // Overall AI Visibility Score (null if not measured)
-  aiVisibilityScore Int?
-
-  // Individual Platform Scores (null if not measured)
-  chatGptScore          Int?
-  geminiScore           Int?
-  claudeScore           Int?
-  perplexityScore       Int?
-  googleAiOverviewScore Int?
-
-  // Component Scores (null if not measured)
+  id                           String          @id @default(cuid())
+  seoIntelligenceId            String          @unique
+  aiVisibilityScore            Int?
+  chatGptScore                 Int?
+  geminiScore                  Int?
+  claudeScore                  Int?
+  perplexityScore              Int?
+  googleAiOverviewScore        Int?
   entityCoverageScore          Int?
   knowledgeGraphReadinessScore Int?
   citationReadinessScore       Int?
   answerabilityScore           Int?
   topicalAuthorityScore        Int?
-
-  // Detailed Analysis Data (JSON)
-  entities               Json // [{ entity, type, confidenceScore, context }]
-  knowledgeGraphEntities Json // [{ type, status }]
-  citationOpportunities  Json // [{ type, opportunity, impact, reason }]
-  faqOpportunities       Json // [{ question, reason, impact, recommendation }]
-  aiContentOpportunities Json // [{ type, opportunity, reason, impact, difficulty, priority }]
-  trustSignals           Json // { score, signals, recommendations }
-  recommendations        Json // { immediate, day30, day90 }
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  entities                     Json
+  knowledgeGraphEntities       Json
+  citationOpportunities        Json
+  faqOpportunities             Json
+  aiContentOpportunities       Json
+  trustSignals                 Json
+  recommendations              Json
+  createdAt                    DateTime        @default(now())
+  updatedAt                    DateTime        @updatedAt
+  seoIntelligence              SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
 
   @@index([seoIntelligenceId])
 }
 
-// ============================================
-// CONTENT GAPS
-// ============================================
-
 model ContentGap {
   id                String          @id @default(cuid())
-  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
   seoIntelligenceId String
-
-  type             String // missing-topic, missing-page, missing-blog, missing-use-case, missing-faq
-  title            String
-  reason           String  @db.Text
-  opportunityScore Int?
-  priority         String // critical, high, medium, low
-  competitors      Json // which competitors have this
-  suggestedPage    String? @db.Text
-
-  createdAt DateTime @default(now())
+  type              String
+  title             String
+  reason            String
+  opportunityScore  Int?
+  priority          String
+  competitors       Json
+  suggestedPage     String?
+  createdAt         DateTime        @default(now())
+  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
 
   @@index([seoIntelligenceId, opportunityScore])
 }
 
-// ============================================
-// BLOG INTELLIGENCE
-// ============================================
-
 model BlogIntelligence {
   id                String          @id @default(cuid())
-  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
   seoIntelligenceId String
-
-  title           String
-  keyword         String
-  intent          String
-  difficulty      String
-  opportunity     String
-  estimatedImpact String
-  outline         Json?
-  metaDescription String? @db.Text
-
-  createdAt DateTime @default(now())
+  title             String
+  keyword           String
+  intent            String
+  difficulty        String
+  opportunity       String
+  estimatedImpact   String
+  outline           Json?
+  metaDescription   String?
+  createdAt         DateTime        @default(now())
+  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
 
   @@index([seoIntelligenceId, opportunity])
 }
 
-// ============================================
-// CONTENT GAP INTELLIGENCE (Consolidated Record)
-// ============================================
-
 model ContentGapRecord {
-  id                String          @id @default(cuid())
-  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
-  seoIntelligenceId String          @unique
-
-  // Missing Content & Pages
-  contentGaps Json // [{ title, contentType, priority, opportunityScore, competitorExample, reason, suggestedAction, estimatedImpact }]
-
-  // Landing Page Opportunities
-  landingPageIdeas Json // [{ pageTitle, targetKeyword, intent, headline, subHeadline, keySections, CTA, trustElements, recommendedSchema, opportunityScore, priority }]
-
-  // Comparison Page Opportunities
-  comparisonPageIdeas Json // [{ title, targetKeyword, comparisonPoints, whyCreate, rankingPotential, opportunityScore, priority, estimatedImpact }]
-
-  // FAQ Opportunities
-  faqOpportunities Json // [{ question, answerIntent, targetAudience, geoPotential, seoPotential, reason, recommendedAnswer, priority }]
-
-  // GEO Content Ideas (AI-Optimized)
-  geoContentIdeas Json // [{ title, contentType, aiVisibilityImpact, citationPotential, answerabilityPotential, targetPlatforms, keySections, priority, estimatedImpact }]
-
-  // Resource Page Ideas
-  resourcePageIdeas Json // [{ title, contentType, targetKeyword, opportunityScore, priority, sections }]
-
-  // Content Calendar (30/60/90 days)
-  contentCalendar Json // { day30: [...], day60: [...], day90: [...] }
-
-  // Summary Metrics
-  summary Json // { totalGaps, totalOpportunities, criticalPriority, highPriority }
-
-  // Metadata
-  metadata Json? // { analyzedAt, analysisVersion }
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String          @id @default(cuid())
+  seoIntelligenceId   String          @unique
+  contentGaps         Json
+  landingPageIdeas    Json
+  comparisonPageIdeas Json
+  faqOpportunities    Json
+  geoContentIdeas     Json
+  resourcePageIdeas   Json
+  contentCalendar     Json
+  summary             Json
+  metadata            Json?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  seoIntelligence     SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
 
   @@index([seoIntelligenceId])
 }
-
-// ============================================
-// BLOG INTELLIGENCE (Consolidated Record)
-// ============================================
 
 model BlogIntelligenceRecord {
-  id                String          @id @default(cuid())
-  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
-  seoIntelligenceId String          @unique
-
-  // Blog Ideas (50+ ideas)
-  blogIdeas Json // [{ title, targetKeyword, searchIntent, difficulty, opportunity, contentType, estimatedImpact, priority, reason }]
-
-  // Blog Clusters
-  blogClusters Json // [{ clusterName, authorityScore, blogIdeas, targetAudience, publishingFrequency }]
-
-  // Blog Briefs (SEO Briefs for top ideas)
-  blogBriefs Json // [{ title, primaryKeyword, secondaryKeywords, targetAudience, searchIntent, contentOutline, faqSuggestions, schemaSuggestions, internalLinkSuggestions, wordCountTarget, estimatedReadTime, priority }]
-
-  // Publishing Calendar
-  publishingCalendar Json // { week1: [...], week2: [...], week3: [...], week4: [...], month2: [...], month3: [...] }
-
-  // Summary Metrics
-  summary Json // { totalIdeas, totalClusters, highPriorityIdeas }
-
-  // Metadata
-  metadata Json? // { analyzedAt, analysisVersion }
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String          @id @default(cuid())
+  seoIntelligenceId  String          @unique
+  blogIdeas          Json
+  blogClusters       Json
+  blogBriefs         Json
+  publishingCalendar Json
+  summary            Json
+  metadata           Json?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  seoIntelligence    SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
 
   @@index([seoIntelligenceId])
 }
 
-// ============================================
-// COMPETITOR SEO INTELLIGENCE
-// ============================================
-
 model CompetitorSeoRecord {
-  id                String          @id @default(cuid())
-  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
-  seoIntelligenceId String          @unique
-
-  // Discovered Competitors
-  competitors Json // [{ name, website, description, competitorType, reason, confidenceScore, sources }]
-
-  // Competitor Profiles
-  competitorProfiles Json // [{ name, domain, website, mainKeywords, contentThemes, positioning, strengths, weaknesses, estimatedAuthority, aiVisibilityEstimate }]
-
-  // Keyword Gaps
-  keywordGaps Json // { missingKeywords, sharedKeywords, competitorOnlyKeywords, highOpportunityKeywords, lowCompetitionKeywords, summary }
-
-  // Content Gaps
-  contentGaps Json // [{ gapType, title, reason, competitorExample, opportunityScore, priority, suggestedAction }]
-
-  // Authority Gaps
-  authorityGaps Json // { authorityGapScore, userStrengths, competitorAdvantages, backlinkOpportunities, citationOpportunities, trustSignalGaps }
-
-  // GEO Gaps
-  geoGaps Json // { entityCoverageGap, citationReadinessGap, answerabilityGap, topicalAuthorityGap, aiVisibilityGap, recommendedFixes }
-
-  // Competitor Matrix
-  competitorMatrix Json // [{ name, website, keywordStrength, contentStrength, authorityStrength, geoStrength, overallThreatScore, weaknessToExploit, recommendedStrategy }]
-
-  // Recommendations
-  recommendations Json // { immediate, day30, day90, competitivePriorities }
-
-  // Metadata
-  metadata Json? // { totalCompetitors, directCompetitors, analyzedAt }
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String          @id @default(cuid())
+  seoIntelligenceId  String          @unique
+  competitors        Json
+  competitorProfiles Json
+  keywordGaps        Json
+  contentGaps        Json
+  authorityGaps      Json
+  geoGaps            Json
+  competitorMatrix   Json
+  recommendations    Json
+  metadata           Json?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  seoIntelligence    SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
 
   @@index([seoIntelligenceId])
 }
 
 model AgentRun {
-  id     String @id @default(cuid())
-  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-
+  id        String   @id @default(cuid())
+  chatId    String
+  userId    String
   agentType String
   status    String
   input     Json?
   output    Json?
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([chatId])
   @@index([userId])
 }
 
-// ============================================
-// AUTOMATION MODELS
-// ============================================
-
 model AutomationPlan {
-  id     String @id @default(cuid())
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId String @unique
-
-  // Campaign Details
-  campaignName      String
-  campaignObjective String?
-  targetAudience    Json?
-  channels          Json? // array of channel objects
-  weeklyPlan        Json?
-  kpis              Json?
-  budgetSplit       Json?
-
-  // Email Automation
-  emailSequence Json?
-  emailSubjects Json?
-  emailSchedule Json?
-  leadCriteria  Json?
-
-  // LinkedIn Automation
+  id                  String            @id @default(cuid())
+  userId              String
+  chatId              String            @unique
+  campaignName        String
+  campaignObjective   String?
+  targetAudience      Json?
+  channels            Json?
+  weeklyPlan          Json?
+  kpis                Json?
+  budgetSplit         Json?
+  emailSequence       Json?
+  emailSubjects       Json?
+  emailSchedule       Json?
+  leadCriteria        Json?
   linkedInCalendar    Json?
   linkedInPosts       Json?
   linkedInDmTemplates Json?
   linkedInSchedule    Json?
-
-  // Instagram Automation
-  instagramCaptions  Json?
-  instagramReelIdeas Json?
-  instagramSchedule  Json?
-  instagramHashtags  Json?
-
-  // Creative Generation
-  posterPrompts Json?
-  imageAdIdeas  Json?
-  designStyles  Json?
-
-  // Video Ad Generation
-  videoScripts  Json?
-  videoScenes   Json?
-  videoSchedule Json?
-
-  // Campaign Generation
-  googleAds       Json?
-  contentCalendar Json?
-  crmWorkflows    Json?
-  workflows       Json?
-
-  // Lead Generation
-  idealLeadProfile Json?
-  leadSources      Json?
-  outreachAngles   Json?
-  sampleLeads      Json?
-
-  // Phase 6 — Marketing Execution Platform
-  contentStudio   Json? // Blog articles, landing pages, case studies, etc.
-  emailCampaigns  Json? // Email campaign drafts with compliance checklists
-  creativeStudio  Json? // Creative briefs for posters, banners, carousels, etc.
-  videoStudio     Json? // Video scripts with storyboards
-  campaignPlans   Json? // 30/60/90 day campaign plans
-  socialCalendars Json? // Social media content calendars
-  analyticsData   Json? // Execution analytics and metrics tracking
-
-  // Opportunities & Risks (Phase 3)
-  opportunities Json?
-  risks         Json?
-
-  // Automation Assets
-  assets AutomationAsset[]
-
-  // Metadata
-  readinessScore     Int?              @default(0)
-  readinessChecklist Json? // { status, items, missing } (Phase 2)
-  contextSnapshotId  String? // ctx_<chatId>_<timestamp> (Phase 1)
-  executionRecords   ExecutionRecord[] // Phase 9
-  status             String            @default("draft") // draft, approved, scheduled, running, paused, completed
-  provider           String?
-  fallbackUsed       Boolean?          @default(false)
-
-  // Campaign Plan Synchronization
-  campaignPlanId      String? // Reference to the CampaignPlan used
-  campaignPlanVersion Int? // Version of CampaignPlan at generation time
-  generatedAt         DateTime? // When this automation plan was generated
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  instagramCaptions   Json?
+  instagramReelIdeas  Json?
+  instagramSchedule   Json?
+  instagramHashtags   Json?
+  posterPrompts       Json?
+  imageAdIdeas        Json?
+  designStyles        Json?
+  videoScripts        Json?
+  videoScenes         Json?
+  videoSchedule       Json?
+  idealLeadProfile    Json?
+  leadSources         Json?
+  outreachAngles      Json?
+  sampleLeads         Json?
+  readinessScore      Int?              @default(0)
+  status              String            @default("draft")
+  provider            String?
+  fallbackUsed        Boolean?          @default(false)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  contentCalendar     Json?
+  crmWorkflows        Json?
+  googleAds           Json?
+  workflows           Json?
+  contentStudio       Json?
+  emailCampaigns      Json?
+  creativeStudio      Json?
+  videoStudio         Json?
+  campaignPlans       Json?
+  socialCalendars     Json?
+  analyticsData       Json?
+  opportunities       Json?
+  risks               Json?
+  readinessChecklist  Json?
+  contextSnapshotId   String?
+  campaignPlanId      String?
+  campaignPlanVersion Int?
+  generatedAt         DateTime?
+  assets              AutomationAsset[]
+  chat                Chat              @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  executionRecords    ExecutionRecord[]
 
   @@index([userId])
   @@index([chatId])
 }
 
-// ============================================
-// EVIDENCE SNAPSHOT (Phase 1 — Evidence Engine)
-// ============================================
-
 model EvidenceSnapshot {
-  id         String    @id @default(cuid())
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId     String
-  chat       Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId     String
-  analysis   Analysis? @relation(fields: [analysisId], references: [id], onDelete: SetNull)
-  analysisId String?
-
-  websiteUrl    String
-  companyName   String?
-  sourceSummary Json? // { sourcesCollected: [...], missingSources: [...] }
-
-  // Evidence collections (all nullable — never fake)
-  websiteEvidence      Json? // title, meta, headings, hero, CTA, features, page detection
-  technicalSeoEvidence Json? // pagespeed scores, robots, sitemap
-  contentEvidence      Json? // opengraph, schema, technology detection
-  competitorEvidence   Json? // reserved for later
-  githubEvidence       Json? // repo stats if github link found
-
-  // Raw collection for debugging
-  rawEvidence Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String    @id @default(cuid())
+  userId               String
+  chatId               String
+  analysisId           String?
+  websiteUrl           String
+  companyName          String?
+  sourceSummary        Json?
+  websiteEvidence      Json?
+  technicalSeoEvidence Json?
+  contentEvidence      Json?
+  competitorEvidence   Json?
+  githubEvidence       Json?
+  rawEvidence          Json?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  analysis             Analysis? @relation(fields: [analysisId], references: [id])
+  chat                 Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([chatId])
   @@index([userId])
@@ -1014,28 +781,22 @@ model EvidenceSnapshot {
 
 model AutomationAsset {
   id               String         @id @default(cuid())
-  automationPlan   AutomationPlan @relation(fields: [automationPlanId], references: [id], onDelete: Cascade)
   automationPlanId String
-
-  assetType    String // email, linkedin_post, instagram_post, image_ad, video_ad, dm_template, lead_list
-  assetTitle   String
-  assetContent Json
-  channel      String?
-  status       String  @default("draft") // draft, needs_review, approved, scheduled, published_demo
-
-  // Scheduling
-  scheduledFor DateTime?
-  publishedAt  DateTime?
-
-  // Approval
-  approvedBy  String?
-  approvedAt  DateTime?
-  rejectedBy  String?
-  rejectedAt  DateTime?
-  reviewNotes String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  assetType        String
+  assetTitle       String
+  assetContent     Json
+  channel          String?
+  status           String         @default("draft")
+  scheduledFor     DateTime?
+  publishedAt      DateTime?
+  approvedBy       String?
+  approvedAt       DateTime?
+  rejectedBy       String?
+  rejectedAt       DateTime?
+  reviewNotes      String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  automationPlan   AutomationPlan @relation(fields: [automationPlanId], references: [id], onDelete: Cascade)
 
   @@index([automationPlanId, status])
   @@index([automationPlanId, assetType])
@@ -1043,147 +804,104 @@ model AutomationAsset {
 
 model AutomationLog {
   id        String   @id @default(cuid())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
   chatId    String?
   assetId   String?
-  action    String // generated, approved, scheduled, published_demo, edited, regenerated
+  action    String
   message   String?
   metadata  Json?
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@index([chatId, action])
 }
 
-// ============================================
-// EXECUTION RECORD (Phase 9 — Execution History)
-// ============================================
-
 model ExecutionRecord {
-  id               String          @id @default(cuid())
-  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId           String
-  chat             Chat            @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId           String
-  automationPlan   AutomationPlan? @relation(fields: [automationPlanId], references: [id], onDelete: SetNull)
-  automationPlanId String?
-
-  module             String // email, poster, video, crm_workflow, campaign_plan, content, social
-  contextSnapshotId  String? // ctx_<chatId>_<timestamp>
-  provider           String? // gmail, sendgrid, pollinations, shotstack, etc.
-  requestStatus      String // pending, running, success, failed, retrying
-  providerResponseId String? // provider's tracking ID
-  assetUrls          Json? // [{ type, url }]
-  errorCategory      String? // auth_failed, timeout, provider_unavailable, invalid_request, unknown
-
-  retryCount Int @default(0)
-  maxRetries Int @default(3)
-
-  requestPayload  Json? // what was sent
-  responseSummary Json? // what came back (no secrets)
-
-  startedAt   DateTime?
-  completedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                 String          @id @default(cuid())
+  userId             String
+  chatId             String
+  automationPlanId   String?
+  module             String
+  contextSnapshotId  String?
+  provider           String?
+  requestStatus      String
+  providerResponseId String?
+  assetUrls          Json?
+  errorCategory      String?
+  retryCount         Int             @default(0)
+  maxRetries         Int             @default(3)
+  requestPayload     Json?
+  responseSummary    Json?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  automationPlan     AutomationPlan? @relation(fields: [automationPlanId], references: [id])
+  chat               Chat            @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, chatId, module])
   @@index([chatId, requestStatus])
   @@index([automationPlanId])
 }
 
-// ============================================
-// EXECUTIVE SEO DASHBOARD
-// ============================================
-
 model ExecutiveSeoDashboard {
-  id                String          @id @default(cuid())
-  seoIntelligence   SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
-  seoIntelligenceId String          @unique
-
-  // Executive Overview
-  executiveOverview Json // { overallSeoScore, overallGeoScore, keywordOpportunityScore, competitivePositionScore, contentReadinessScore, growthOpportunityScore }
-
-  // SEO Health Summary
-  seoHealthSummary Json // { categories, strengths, weaknesses, topIssues }
-
-  // Key Opportunities
-  keyOpportunities Json // [{ title, impact, effort, priority, recommendation, category }]
-
-  // Competitor Snapshot
-  competitorSnapshot Json // { topCompetitors, recommendations, summary }
-
-  // AI Search Visibility
-  aiSearchVisibility Json // { platformScores, componentScores, overallAiVisibility, recommendations }
-
-  // Content Strategy Summary
-  contentStrategySummary Json // { missingPages, blogOpportunities, faqOpportunities, highPriorityContent, contentCalendarSummary }
-
-  // Executive Action Plan
-  executiveActionPlan Json // { immediateActions, day30Plan, day60Plan, day90Plan, summary }
-
-  // Measurement Readiness (replaces ROI Forecast)
-  measurementReadiness Json? // { analyticsConnected, searchConsoleConnected, conversionTrackingConnected, revenueDataConnected, status, message }
-
-  // ROI Forecast (nullable for backward compatibility)
-  roiForecast Json?
-
-  // Metadata
-  metadata Json? // { generatedAt, dataCompleteness }
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                     String          @id @default(cuid())
+  seoIntelligenceId      String          @unique
+  executiveOverview      Json
+  seoHealthSummary       Json
+  keyOpportunities       Json
+  competitorSnapshot     Json
+  aiSearchVisibility     Json
+  contentStrategySummary Json
+  executiveActionPlan    Json
+  roiForecast            Json?
+  metadata               Json?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  measurementReadiness   Json?
+  seoIntelligence        SeoIntelligence @relation(fields: [seoIntelligenceId], references: [id], onDelete: Cascade)
 
   @@index([seoIntelligenceId])
 }
 
-// ============================================
-// EMAIL CAMPAIGN MODULE (Phase 16)
-// ============================================
-
 model EmailCampaign {
-  id             String        @id @default(cuid())
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId         String
-  chat           Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId         String
-  campaignPlan   CampaignPlan? @relation(fields: [campaignPlanId], references: [id], onDelete: SetNull)
-  campaignPlanId String?
-
-  name            String
-  objective       String?
-  audienceSummary String?
-  funnelStage     String?
-  sequenceType    String?
-  senderName      String?
-  senderEmail     String?
-  replyToEmail    String?
-  totalEmails     Int     @default(0)
-
-  status           String @default("DRAFT")
-  approvalStatus   String @default("NOT_SUBMITTED")
-  generationStatus String @default("pending")
-
-  evidenceSummary Json?
-  missingEvidence Json?
-
-  sequenceItems EmailSequenceItem[]
-  versions      EmailCampaignVersion[]
-  logs          EmailCampaignLog[]
-  crmDeals      CRMDeal[]
-  crmWorkflows  CRMWorkflow[]
-  automations   EmailAutomation[]
-  schedules     EmailSchedule[]
-  deliveryLogs  EmailDeliveryLog[]
-  emailEvents   EmailEvent[]
-
-  approvedAt  DateTime?
-  scheduledAt DateTime?
-  submittedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String                 @id @default(cuid())
+  userId           String
+  chatId           String
+  campaignPlanId   String?
+  name             String
+  objective        String?
+  audienceSummary  String?
+  funnelStage      String?
+  sequenceType     String?
+  senderName       String?
+  senderEmail      String?
+  replyToEmail     String?
+  totalEmails      Int                    @default(0)
+  status           String                 @default("DRAFT")
+  approvalStatus   String                 @default("NOT_SUBMITTED")
+  generationStatus String                 @default("pending")
+  evidenceSummary  Json?
+  missingEvidence  Json?
+  approvedAt       DateTime?
+  scheduledAt      DateTime?
+  submittedAt      DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  crmDeals         CRMDeal[]
+  crmWorkflows     CRMWorkflow[]
+  automations      EmailAutomation[]
+  campaignPlan     CampaignPlan?          @relation(fields: [campaignPlanId], references: [id])
+  chat             Chat                   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs             EmailCampaignLog[]
+  versions         EmailCampaignVersion[]
+  deliveryLogs     EmailDeliveryLog[]
+  emailEvents      EmailEvent[]
+  schedules        EmailSchedule[]
+  sequenceItems    EmailSequenceItem[]
 
   @@index([chatId])
   @@index([userId])
@@ -1193,159 +911,126 @@ model EmailCampaign {
 }
 
 model EmailSequenceItem {
-  id              String        @id @default(cuid())
-  campaign        EmailCampaign @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
-  emailCampaignId String
-
-  sequenceOrder          Int
-  emailName              String
-  purpose                String?
-  funnelStage            String?
-  delayAfterPreviousDays Int?    @default(0)
-
+  id                      String             @id @default(cuid())
+  emailCampaignId         String
+  sequenceOrder           Int
+  emailName               String
+  purpose                 String?
+  funnelStage             String?
+  delayAfterPreviousDays  Int?               @default(0)
   subjectLine             String?
   alternativeSubjectLines Json?
   previewText             String?
   greetingStrategy        String?
-  emailBodyText           String? @db.Text
-  emailBodyHtml           String? @db.Text
+  emailBodyText           String?
+  emailBodyHtml           String?
   primaryCta              String?
   secondaryCta            String?
   personalizationFields   Json?
-
-  evidenceUsed    Json?
-  inferenceStatus String?
-  complianceNotes String? @db.Text
-
-  responsiveHtml String? @db.Text
-  preview        Json?
-
-  status String @default("draft")
-
-  logEntries   EmailCampaignLog[]
-  deliveryLogs EmailDeliveryLog[]
-  emailEvents  EmailEvent[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  evidenceUsed            Json?
+  inferenceStatus         String?
+  complianceNotes         String?
+  status                  String             @default("draft")
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+  preview                 Json?
+  responsiveHtml          String?
+  logEntries              EmailCampaignLog[]
+  deliveryLogs            EmailDeliveryLog[]
+  emailEvents             EmailEvent[]
+  campaign                EmailCampaign      @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
 
   @@index([emailCampaignId, sequenceOrder])
 }
 
-// ============================================
-// EMAIL TEMPLATES (Reusable templates)
-// ============================================
-
 model EmailTemplate {
-  id     String  @id @default(cuid())
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-  chat   Chat?   @relation(fields: [chatId], references: [id], onDelete: SetNull)
-  chatId String?
-
+  id                    String    @id @default(cuid())
+  userId                String
+  chatId                String?
   name                  String
   description           String?
-  category              String? // newsletter, promotional, transactional, onboarding, reengagement
+  category              String?
   subjectLine           String?
   previewText           String?
-  emailBodyText         String?   @db.Text
-  emailBodyHtml         String?   @db.Text
-  responsiveHtml        String?   @db.Text
+  emailBodyText         String?
+  emailBodyHtml         String?
+  responsiveHtml        String?
   personalizationFields Json?
+  senderName            String?
+  senderEmail           String?
+  replyToEmail          String?
+  headerImageUrl        String?
+  footerText            String?
+  socialLinks           Json?
+  brandColors           Json?
+  useCount              Int       @default(0)
+  isDefault             Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
   approvalStatus        String    @default("DRAFT")
   approvedAt            DateTime?
-  approvedBy            String?
   quality               Json?
   contentAssetId        String?
   generationStatus      String    @default("pending")
-  lastError             String?   @db.Text
-
-  // Brand settings
-  senderName     String?
-  senderEmail    String?
-  replyToEmail   String?
-  headerImageUrl String?
-  footerText     String?
-  socialLinks    Json?
-  brandColors    Json?
-
-  useCount  Int     @default(0)
-  isDefault Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  lastError             String?
+  approvedBy            String?
+  chat                  Chat?     @relation(fields: [chatId], references: [id])
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([category])
   @@index([chatId])
 }
 
-// ============================================
-// EMAIL AUTOMATION RULES
-// ============================================
-
 model EmailAutomation {
-  id     String @id @default(cuid())
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId String
-
-  name          String
-  description   String?
-  triggerType   String // schedule, campaign_approval, form_submission, lead_created, deal_stage_change
-  triggerConfig Json? // { field, operator, value, schedule }
-  conditions    Json? // [{ field, operator, value }]
-  actions       Json? // [{ type: 'send_email', templateId, delay, config }]
-
-  status          String @default("DRAFT") // DRAFT, ACTIVE, PAUSED, COMPLETED, FAILED
-  executionStatus String @default("never_run")
-
-  campaign        EmailCampaign? @relation(fields: [emailCampaignId], references: [id], onDelete: SetNull)
+  id              String             @id @default(cuid())
+  userId          String
+  chatId          String
+  name            String
+  description     String?
+  triggerType     String
+  triggerConfig   Json?
+  conditions      Json?
+  actions         Json?
+  status          String             @default("DRAFT")
+  executionStatus String             @default("never_run")
   emailCampaignId String?
-
-  schedules    EmailSchedule[]
-  deliveryLogs EmailDeliveryLog[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  chat            Chat               @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  campaign        EmailCampaign?     @relation(fields: [emailCampaignId], references: [id])
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveryLogs    EmailDeliveryLog[]
+  schedules       EmailSchedule[]
 
   @@index([chatId])
   @@index([userId])
   @@index([status])
 }
 
-// ============================================
-// EMAIL SCHEDULE
-// ============================================
-
 model EmailSchedule {
   id                String           @id @default(cuid())
-  automation        EmailAutomation? @relation(fields: [emailAutomationId], references: [id], onDelete: Cascade)
   emailAutomationId String?
-  campaign          EmailCampaign?   @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
   emailCampaignId   String?
-
-  scheduleType   String // once, daily, weekly, monthly, custom
-  scheduledAt    DateTime?
-  timezone       String?
-  dayOfWeek      Int?
-  dayOfMonth     Int?
-  timeOfDay      String?
-  cronExpression String?
-  startDate      DateTime?
-  endDate        DateTime?
-  repeatCount    Int?      @default(1)
-  repeatInterval Int? // in days
-
-  status String @default("pending") // pending, scheduled, running, completed, cancelled, failed
-
-  lastRunAt   DateTime?
-  nextRunAt   DateTime?
-  completedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  scheduleType      String
+  scheduledAt       DateTime?
+  timezone          String?
+  dayOfWeek         Int?
+  dayOfMonth        Int?
+  timeOfDay         String?
+  cronExpression    String?
+  startDate         DateTime?
+  endDate           DateTime?
+  repeatCount       Int?             @default(1)
+  repeatInterval    Int?
+  status            String           @default("pending")
+  lastRunAt         DateTime?
+  nextRunAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  automation        EmailAutomation? @relation(fields: [emailAutomationId], references: [id], onDelete: Cascade)
+  campaign          EmailCampaign?   @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
 
   @@index([emailAutomationId])
   @@index([emailCampaignId])
@@ -1353,48 +1038,36 @@ model EmailSchedule {
   @@index([nextRunAt])
 }
 
-// ============================================
-// EMAIL DELIVERY LOG
-// ============================================
-
 model EmailDeliveryLog {
-  id String @id @default(cuid())
-
-  campaign            EmailCampaign?     @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
+  id                  String             @id @default(cuid())
   emailCampaignId     String?
-  sequenceItem        EmailSequenceItem? @relation(fields: [emailSequenceItemId], references: [id], onDelete: SetNull)
   emailSequenceItemId String?
-  automation          EmailAutomation?   @relation(fields: [emailAutomationId], references: [id], onDelete: SetNull)
   emailAutomationId   String?
-
-  recipientEmail    String
-  recipientName     String?
-  provider          String // brevo, sendgrid, resend, gmail_smtp
-  providerMessageId String?
-  subjectLine       String?
-
-  status         String // pending, sent, delivered, opened, clicked, bounced, failed, spam, unsubscribed
-  previousStatus String?
-  errorMessage   String? @db.Text
-  errorCategory  String? // rate_limit, invalid_email, provider_error, authentication, unknown
-
-  attemptCount  Int       @default(1)
-  maxAttempts   Int       @default(3)
-  lastAttemptAt DateTime?
-  sentAt        DateTime?
-  deliveredAt   DateTime?
-  openedAt      DateTime?
-  clickedAt     DateTime?
-  bouncedAt     DateTime?
-
-  metadata Json? // provider response, headers, tracking data
-
-  eventHistory Json? // [{ status, timestamp, detail }]
-
-  emailEvents EmailEvent[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  recipientEmail      String
+  recipientName       String?
+  provider            String
+  providerMessageId   String?
+  subjectLine         String?
+  status              String
+  previousStatus      String?
+  errorMessage        String?
+  errorCategory       String?
+  attemptCount        Int                @default(1)
+  maxAttempts         Int                @default(3)
+  lastAttemptAt       DateTime?
+  sentAt              DateTime?
+  deliveredAt         DateTime?
+  openedAt            DateTime?
+  clickedAt           DateTime?
+  bouncedAt           DateTime?
+  metadata            Json?
+  eventHistory        Json?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  automation          EmailAutomation?   @relation(fields: [emailAutomationId], references: [id])
+  campaign            EmailCampaign?     @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
+  sequenceItem        EmailSequenceItem? @relation(fields: [emailSequenceItemId], references: [id])
+  emailEvents         EmailEvent[]
 
   @@index([emailCampaignId])
   @@index([emailSequenceItemId])
@@ -1404,32 +1077,26 @@ model EmailDeliveryLog {
   @@index([emailAutomationId])
 }
 
-// ============================================
-// EMAIL EVENTS (Tracking webhook events)
-// ============================================
-
 model EmailEvent {
   id                  String             @id @default(cuid())
-  deliveryLog         EmailDeliveryLog?  @relation(fields: [emailDeliveryLogId], references: [id], onDelete: Cascade)
   emailDeliveryLogId  String?
-  campaign            EmailCampaign?     @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
   emailCampaignId     String?
-  sequenceItem        EmailSequenceItem? @relation(fields: [emailSequenceItemId], references: [id], onDelete: SetNull)
   emailSequenceItemId String?
-
-  eventType       String // sent, delivered, opened, clicked, bounced, complained, unsubscribed, failed
-  eventData       Json? // provider-specific event data
-  provider        String? // brevo, sendgrid, resend
-  providerEventId String?
-  recipientEmail  String?
-  userAgent       String?
-  ipAddress       String?
-  linkClicked     String? // for click events
-  bounceType      String? // hard, soft
-  bounceReason    String? @db.Text
-
-  occurredAt DateTime?
-  receivedAt DateTime  @default(now())
+  eventType           String
+  eventData           Json?
+  provider            String?
+  providerEventId     String?
+  recipientEmail      String?
+  userAgent           String?
+  ipAddress           String?
+  linkClicked         String?
+  bounceType          String?
+  bounceReason        String?
+  occurredAt          DateTime?
+  receivedAt          DateTime           @default(now())
+  campaign            EmailCampaign?     @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
+  deliveryLog         EmailDeliveryLog?  @relation(fields: [emailDeliveryLogId], references: [id], onDelete: Cascade)
+  sequenceItem        EmailSequenceItem? @relation(fields: [emailSequenceItemId], references: [id])
 
   @@index([emailDeliveryLogId])
   @@index([emailCampaignId])
@@ -1440,72 +1107,61 @@ model EmailEvent {
 
 model EmailCampaignVersion {
   id              String        @id @default(cuid())
-  campaign        EmailCampaign @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
   emailCampaignId String
-
-  versionNumber Int
-  snapshot      Json
-  changeReason  String? @db.Text
-  createdBy     String?
-
-  createdAt DateTime @default(now())
+  versionNumber   Int
+  snapshot        Json
+  changeReason    String?
+  createdBy       String?
+  createdAt       DateTime      @default(now())
+  campaign        EmailCampaign @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
 
   @@index([emailCampaignId, versionNumber])
 }
 
 model EmailCampaignLog {
   id                  String             @id @default(cuid())
-  campaign            EmailCampaign      @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
   emailCampaignId     String
-  sequenceItem        EmailSequenceItem? @relation(fields: [emailSequenceItemId], references: [id], onDelete: SetNull)
   emailSequenceItemId String?
-
-  action   String
-  status   String?
-  message  String? @db.Text
-  metadata Json?
-
-  createdAt DateTime @default(now())
+  action              String
+  status              String?
+  message             String?
+  metadata            Json?
+  createdAt           DateTime           @default(now())
+  campaign            EmailCampaign      @relation(fields: [emailCampaignId], references: [id], onDelete: Cascade)
+  sequenceItem        EmailSequenceItem? @relation(fields: [emailSequenceItemId], references: [id])
 
   @@index([emailCampaignId, action])
 }
 
-// ============================================
-// CRM MODULE (Phase 17 — CRM Workflow & Lead Journey Automation)
-// ============================================
-
 model CRMContact {
-  id        String      @id @default(cuid())
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String
-  chat      Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId    String
-  company   CRMCompany? @relation("ContactCompany", fields: [companyId], references: [id], onDelete: SetNull)
-  companyId String?
-
-  firstName      String
-  lastName       String?
-  email          String?
-  phone          String?
-  jobTitle       String?
-  lifecycleStage String  @default("NOT_MEASURED")
-  source         String?
-  consentStatus  String  @default("NOT_MEASURED")
-  ownerId        String?
-  status         String  @default("ACTIVE")
-  customFields   Json?
-
-  deals                CRMDeal[]
+  id                   String                   @id @default(cuid())
+  userId               String
+  chatId               String
+  companyId            String?
+  firstName            String
+  lastName             String?
+  email                String?
+  phone                String?
+  jobTitle             String?
+  lifecycleStage       String                   @default("NOT_MEASURED")
+  source               String?
+  consentStatus        String                   @default("NOT_MEASURED")
+  ownerId              String?
+  status               String                   @default("ACTIVE")
+  customFields         Json?
+  archivedAt           DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
   activities           CRMActivity[]
+  chat                 Chat                     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  company              CRMCompany?              @relation("ContactCompany", fields: [companyId], references: [id])
+  user                 User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deals                CRMDeal[]
   tasks                CRMTask[]
   workflowExecutions   CRMWorkflowExecution[]
-  salesCopilotMemories SalesCopilotMemory[]
-  proposals            Proposal[]
   healthSnapshots      CustomerHealthSnapshot[]
-
-  archivedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  proposals            Proposal[]
+  salesCopilotMemories SalesCopilotMemory[]
 
   @@index([chatId])
   @@index([userId])
@@ -1516,33 +1172,30 @@ model CRMContact {
 }
 
 model CRMCompany {
-  id     String @id @default(cuid())
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId String
-
-  name          String
-  website       String?
-  industry      String?
-  employeeRange String?
-  location      String?
-  description   String?
-  source        String?
-  customFields  Json?
-
+  id                   String                   @id @default(cuid())
+  userId               String
+  chatId               String
+  name                 String
+  website              String?
+  industry             String?
+  employeeRange        String?
+  location             String?
+  description          String?
+  source               String?
+  customFields         Json?
+  archivedAt           DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  activities           CRMActivity[]
+  chat                 Chat                     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user                 User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   contacts             CRMContact[]             @relation("ContactCompany")
   deals                CRMDeal[]
-  activities           CRMActivity[]
   tasks                CRMTask[]
   workflowExecutions   CRMWorkflowExecution[]
-  salesCopilotMemories SalesCopilotMemory[]
-  proposals            Proposal[]
   healthSnapshots      CustomerHealthSnapshot[]
-
-  archivedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  proposals            Proposal[]
+  salesCopilotMemories SalesCopilotMemory[]
 
   @@index([chatId])
   @@index([userId])
@@ -1550,85 +1203,76 @@ model CRMCompany {
 }
 
 model CRMPipeline {
-  id     String @id @default(cuid())
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId String
-
+  id          String             @id @default(cuid())
+  userId      String
+  chatId      String
   name        String
   description String?
-  status      String  @default("ACTIVE")
-
-  stages CRMPipelineStage[]
-  deals  CRMDeal[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  status      String             @default("ACTIVE")
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  deals       CRMDeal[]
+  chat        Chat               @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stages      CRMPipelineStage[]
 
   @@index([chatId])
   @@index([userId])
 }
 
 model CRMPipelineStage {
-  id         String      @id @default(cuid())
-  pipeline   CRMPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
-  pipelineId String
-
+  id          String      @id @default(cuid())
+  pipelineId  String
   name        String
   order       Int
   description String?
-  stageType   String? // lead, qualified, contacted, meeting, proposal, won, lost
-  isClosed    Boolean @default(false)
-
-  deals CRMDeal[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  stageType   String?
+  isClosed    Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deals       CRMDeal[]
+  pipeline    CRMPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
 
   @@index([pipelineId, order])
 }
 
 model CRMDeal {
-  id              String            @id @default(cuid())
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId          String
-  chat            Chat              @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId          String
-  company         CRMCompany?       @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  companyId       String?
-  contact         CRMContact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  contactId       String?
-  pipeline        CRMPipeline?      @relation(fields: [pipelineId], references: [id], onDelete: SetNull)
-  pipelineId      String?
-  stage           CRMPipelineStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
-  stageId         String?
-  campaignPlan    CampaignPlan?     @relation(fields: [campaignPlanId], references: [id], onDelete: SetNull)
-  campaignPlanId  String?
-  emailCampaign   EmailCampaign?    @relation(fields: [emailCampaignId], references: [id], onDelete: SetNull)
-  emailCampaignId String?
-
-  name              String
-  description       String?
-  currency          String?   @default("USD")
-  value             Float?
-  expectedCloseDate DateTime?
-  status            String    @default("OPEN")
-  source            String?
-  ownerId           String?
-  metadata          Json?
-
+  id                   String                   @id @default(cuid())
+  userId               String
+  chatId               String
+  companyId            String?
+  contactId            String?
+  pipelineId           String?
+  stageId              String?
+  campaignPlanId       String?
+  emailCampaignId      String?
+  name                 String
+  description          String?
+  currency             String?                  @default("USD")
+  value                Float?
+  expectedCloseDate    DateTime?
+  status               String                   @default("OPEN")
+  source               String?
+  ownerId              String?
+  metadata             Json?
+  archivedAt           DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
   activities           CRMActivity[]
+  campaignPlan         CampaignPlan?            @relation(fields: [campaignPlanId], references: [id])
+  chat                 Chat                     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  company              CRMCompany?              @relation(fields: [companyId], references: [id])
+  contact              CRMContact?              @relation(fields: [contactId], references: [id])
+  emailCampaign        EmailCampaign?           @relation(fields: [emailCampaignId], references: [id])
+  pipeline             CRMPipeline?             @relation(fields: [pipelineId], references: [id])
+  stage                CRMPipelineStage?        @relation(fields: [stageId], references: [id])
+  user                 User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   tasks                CRMTask[]
   workflowExecutions   CRMWorkflowExecution[]
-  salesCopilotMemories SalesCopilotMemory[]
+  healthSnapshots      CustomerHealthSnapshot[]
   dealInsights         DealInsight[]
   proposals            Proposal[]
-  healthSnapshots      CustomerHealthSnapshot[]
-
-  archivedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  salesCopilotMemories SalesCopilotMemory[]
 
   @@index([chatId])
   @@index([userId])
@@ -1643,33 +1287,30 @@ model CRMDeal {
 }
 
 model CRMActivity {
-  id        String      @id @default(cuid())
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String
-  chat      Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId    String
-  contact   CRMContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  contactId String?
-  company   CRMCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  companyId String?
-  deal      CRMDeal?    @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  dealId    String?
-
-  activityType String // note, call, meeting, email, stage_change, task_completion, campaign_association, workflow_execution
-  title        String
-  description  String?  @db.Text
-  activityDate DateTime @default(now())
-  outcome      String?
-  source       String? // MANUALLY_RECORDED, PROVIDER_DELIVERED, IMPORTED, SYSTEM
-  createdBy    String?
-
-  provider          String? // email provider name if provider-delivered
-  providerMessageId String? // provider's tracking ID if provider-delivered
-  deliveryStatus    String? // sent, delivered, bounced, failed — only for provider-delivered
+  id                String      @id @default(cuid())
+  userId            String
+  chatId            String
+  contactId         String?
+  companyId         String?
+  dealId            String?
+  activityType      String
+  title             String
+  description       String?
+  activityDate      DateTime    @default(now())
+  outcome           String?
+  source            String?
+  createdBy         String?
+  provider          String?
+  providerMessageId String?
+  deliveryStatus    String?
   metadata          Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  chat              Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  company           CRMCompany? @relation(fields: [companyId], references: [id])
+  contact           CRMContact? @relation(fields: [contactId], references: [id])
+  deal              CRMDeal?    @relation(fields: [dealId], references: [id])
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([chatId])
   @@index([userId])
@@ -1682,29 +1323,27 @@ model CRMActivity {
 }
 
 model CRMTask {
-  id        String      @id @default(cuid())
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String
-  chat      Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId    String
-  contact   CRMContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  contactId String?
-  company   CRMCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  companyId String?
-  deal      CRMDeal?    @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  dealId    String?
-
+  id          String      @id @default(cuid())
+  userId      String
+  chatId      String
+  contactId   String?
+  companyId   String?
+  dealId      String?
   assignedTo  String?
   title       String
-  description String?   @db.Text
-  priority    String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
-  status      String    @default("TODO") // TODO, IN_PROGRESS, COMPLETED, CANCELLED
+  description String?
+  priority    String      @default("MEDIUM")
+  status      String      @default("TODO")
   dueAt       DateTime?
   completedAt DateTime?
-  source      String? // MANUAL, WORKFLOW, IMPORT, AI_RECOMMENDATION
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  source      String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  chat        Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  company     CRMCompany? @relation(fields: [companyId], references: [id])
+  contact     CRMContact? @relation(fields: [contactId], references: [id])
+  deal        CRMDeal?    @relation(fields: [dealId], references: [id])
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([chatId])
   @@index([userId])
@@ -1717,42 +1356,36 @@ model CRMTask {
 }
 
 model CRMWorkflow {
-  id              String         @id @default(cuid())
-  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String                 @id @default(cuid())
   userId          String
-  chat            Chat           @relation(fields: [chatId], references: [id], onDelete: Cascade)
   chatId          String
-  campaignPlan    CampaignPlan?  @relation(fields: [campaignPlanId], references: [id], onDelete: SetNull)
   campaignPlanId  String?
-  emailCampaign   EmailCampaign? @relation(fields: [emailCampaignId], references: [id], onDelete: SetNull)
   emailCampaignId String?
-
-  name          String
-  description   String? @db.Text
-  triggerType   String // CONTACT_CREATED, CONTACT_UPDATED, DEAL_CREATED, DEAL_STAGE_CHANGED, TASK_COMPLETED, EMAIL_CAMPAIGN_APPROVED, DATE_REACHED, MANUAL_TRIGGER
-  triggerConfig Json? // { field, operator, value }
-  conditions    Json? // [{ field, operator, value }]
-  actions       Json? // [{ type, config }]
-
-  status          String @default("DRAFT") // DRAFT, READY_FOR_REVIEW, APPROVED, ACTIVE, PAUSED, COMPLETED, FAILED, ARCHIVED
-  approvalStatus  String @default("NOT_SUBMITTED") // NOT_SUBMITTED, PENDING_REVIEW, CHANGES_REQUESTED, APPROVED, REJECTED
-  executionStatus String @default("never_run") // never_run, running, completed, failed, paused
-
-  versionNumber  Int     @default(1)
-  maxDepth       Int     @default(10)
-  maxActions     Int     @default(20)
-  idempotencyKey String?
-
-  approvedAt  DateTime?
-  pausedAt    DateTime?
-  activatedAt DateTime?
-
-  versions   CRMWorkflowVersion[]
-  executions CRMWorkflowExecution[]
-  logs       CRMWorkflowLog[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  name            String
+  description     String?
+  triggerType     String
+  triggerConfig   Json?
+  conditions      Json?
+  actions         Json?
+  status          String                 @default("DRAFT")
+  approvalStatus  String                 @default("NOT_SUBMITTED")
+  executionStatus String                 @default("never_run")
+  versionNumber   Int                    @default(1)
+  maxDepth        Int                    @default(10)
+  maxActions      Int                    @default(20)
+  idempotencyKey  String?
+  approvedAt      DateTime?
+  pausedAt        DateTime?
+  activatedAt     DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  campaignPlan    CampaignPlan?          @relation(fields: [campaignPlanId], references: [id])
+  chat            Chat                   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  emailCampaign   EmailCampaign?         @relation(fields: [emailCampaignId], references: [id])
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  executions      CRMWorkflowExecution[]
+  logs            CRMWorkflowLog[]
+  versions        CRMWorkflowVersion[]
 
   @@index([chatId])
   @@index([userId])
@@ -1762,44 +1395,39 @@ model CRMWorkflow {
 }
 
 model CRMWorkflowVersion {
-  id         String      @id @default(cuid())
-  workflow   CRMWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  workflowId String
-
+  id            String      @id @default(cuid())
+  workflowId    String
   versionNumber Int
-  snapshot      Json // full workflow + conditions + actions
-  changeReason  String? @db.Text
+  snapshot      Json
+  changeReason  String?
   createdBy     String?
-
-  createdAt DateTime @default(now())
+  createdAt     DateTime    @default(now())
+  workflow      CRMWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   @@index([workflowId, versionNumber])
 }
 
 model CRMWorkflowExecution {
-  id         String      @id @default(cuid())
-  workflow   CRMWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  workflowId String
-  contact    CRMContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  contactId  String?
-  company    CRMCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  companyId  String?
-  deal       CRMDeal?    @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  dealId     String?
-
-  status         String  @default("pending") // pending, running, completed, failed, cancelled
-  currentStep    Int     @default(0)
-  maxSteps       Int     @default(10)
-  executionData  Json? // { triggerResult, conditionResults, actionResults }
-  errorMessage   String? @db.Text
+  id             String           @id @default(cuid())
+  workflowId     String
+  contactId      String?
+  companyId      String?
+  dealId         String?
+  status         String           @default("pending")
+  currentStep    Int              @default(0)
+  maxSteps       Int              @default(10)
+  executionData  Json?
+  errorMessage   String?
   idempotencyKey String?
-
-  workflowLogs CRMWorkflowLog[]
-
-  startedAt   DateTime?
-  completedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  company        CRMCompany?      @relation(fields: [companyId], references: [id])
+  contact        CRMContact?      @relation(fields: [contactId], references: [id])
+  deal           CRMDeal?         @relation(fields: [dealId], references: [id])
+  workflow       CRMWorkflow      @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflowLogs   CRMWorkflowLog[]
 
   @@index([workflowId])
   @@index([status])
@@ -1808,81 +1436,69 @@ model CRMWorkflowExecution {
 
 model CRMWorkflowLog {
   id          String                @id @default(cuid())
-  workflow    CRMWorkflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   workflowId  String
-  execution   CRMWorkflowExecution? @relation(fields: [executionId], references: [id], onDelete: SetNull)
   executionId String?
-
-  action   String // workflow_created, submitted_review, approved, changes_requested, activated, paused, completed, failed, execution_started, execution_step, execution_completed, execution_failed, cancelled, version_created, version_restored
-  status   String?
-  message  String? @db.Text
-  metadata Json?
-
-  createdAt DateTime @default(now())
+  action      String
+  status      String?
+  message     String?
+  metadata    Json?
+  createdAt   DateTime              @default(now())
+  execution   CRMWorkflowExecution? @relation(fields: [executionId], references: [id])
+  workflow    CRMWorkflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   @@index([workflowId, action])
 }
 
 model CRMImportJob {
-  id     String @id @default(cuid())
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId String
-
-  fileName      String
-  fileType      String // csv
-  status        String @default("UPLOADED") // UPLOADED, PARSED, MAPPED, VALIDATED, CONFIRMED, IMPORTING, COMPLETED, FAILED, CANCELLED
-  totalRows     Int    @default(0)
-  validRows     Int    @default(0)
-  invalidRows   Int    @default(0)
-  importedRows  Int    @default(0)
-  duplicateRows Int    @default(0)
-  errorRows     Int    @default(0)
-
-  columnMapping     Json? // { sourceColumn -> targetField }
-  validationSummary Json? // [{ row, errors }]
-  errorDetails      Json? // [{ row, field, message }]
-  duplicateStrategy String @default("SKIP_EXISTING") // SKIP_EXISTING, UPDATE_EMPTY_FIELDS, UPDATE_ALL_MAPPED_FIELDS, CREATE_DUPLICATE
-
-  importType String // contact, company
-  parsedData Json? // raw parsed rows for preview
-  mappedData Json? // rows after column mapping
-
-  createdAt   DateTime  @default(now())
-  completedAt DateTime?
+  id                String    @id @default(cuid())
+  userId            String
+  chatId            String
+  fileName          String
+  fileType          String
+  status            String    @default("UPLOADED")
+  totalRows         Int       @default(0)
+  validRows         Int       @default(0)
+  invalidRows       Int       @default(0)
+  importedRows      Int       @default(0)
+  duplicateRows     Int       @default(0)
+  errorRows         Int       @default(0)
+  columnMapping     Json?
+  validationSummary Json?
+  errorDetails      Json?
+  duplicateStrategy String    @default("SKIP_EXISTING")
+  importType        String
+  parsedData        Json?
+  mappedData        Json?
+  createdAt         DateTime  @default(now())
+  completedAt       DateTime?
+  chat              Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([chatId])
   @@index([userId])
   @@index([status])
 }
 
-// ============================================
-// SALES COPILOT MODULE (Phase 18 — FleetNimble AI Sales Copilot)
-// ============================================
-
 model SalesCopilotMemory {
-  id        String      @id @default(cuid())
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String
-  chat      Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId    String
-  contact   CRMContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  contactId String?
-  company   CRMCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  companyId String?
-  deal      CRMDeal?    @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  dealId    String?
-
-  interactionType String // deal_insight, follow_up, nba, meeting_prep, proposal, health_check, scoring, timeline
-  summary         String? @db.Text
+  id              String      @id @default(cuid())
+  userId          String
+  chatId          String
+  contactId       String?
+  companyId       String?
+  dealId          String?
+  interactionType String
+  summary         String?
   intent          String?
-  recommendations Json? // [{ action, reason, priority }]
-  nextAction      Json? // { action, dueDate, owner }
-  metadata        Json? // provider used, tokens, model version
-  source          String // AI_GENERATED, USER_ENTERED, SYSTEM
-
-  createdAt DateTime @default(now())
+  recommendations Json?
+  nextAction      Json?
+  metadata        Json?
+  source          String
+  createdAt       DateTime    @default(now())
+  chat            Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  company         CRMCompany? @relation(fields: [companyId], references: [id])
+  contact         CRMContact? @relation(fields: [contactId], references: [id])
+  deal            CRMDeal?    @relation(fields: [dealId], references: [id])
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([chatId, interactionType])
   @@index([contactId])
@@ -1892,37 +1508,30 @@ model SalesCopilotMemory {
   @@index([createdAt])
 }
 
-// ============================================
-// BRAIN LEARNING SYSTEM (Phase 4)
-// ============================================
-
 model BrainExecution {
-  id        String @id @default(cuid())
-  requestId String @unique
-
-  requestType String?
-  module      String?
-  company     String?
-  product     String?
-  chatId      String?
-  userId      String?
-
+  id                       String   @id @default(cuid())
+  requestId                String   @unique
+  requestType              String?
+  module                   String?
+  company                  String?
+  product                  String?
+  chatId                   String?
+  userId                   String?
   processingTime           Int
-  enginesExecuted          Json? // ["memory","knowledge",...]
+  enginesExecuted          Json?
   confidenceBefore         Float?
   confidenceAfter          Float?
-  memoryHits               Int    @default(0)
-  memoryMisses             Int    @default(0)
-  evidenceCount            Int    @default(0)
-  reasoningRulesTriggered  Json? // [{ rule, severity }]
-  recommendationsGenerated Int    @default(0)
-  graphNewEntities         Int    @default(0)
-  graphRelationships       Int    @default(0)
-  graphDuplicatesMerged    Int    @default(0)
+  memoryHits               Int      @default(0)
+  memoryMisses             Int      @default(0)
+  evidenceCount            Int      @default(0)
+  reasoningRulesTriggered  Json?
+  recommendationsGenerated Int      @default(0)
+  graphNewEntities         Int      @default(0)
+  graphRelationships       Int      @default(0)
+  graphDuplicatesMerged    Int      @default(0)
   qualityScore             Float?
   errors                   Json?
-
-  createdAt DateTime @default(now())
+  createdAt                DateTime @default(now())
 
   @@index([module])
   @@index([company])
@@ -1934,23 +1543,19 @@ model BrainExecution {
 }
 
 model BrainFeedback {
-  id          String  @id @default(cuid())
-  executionId String?
-  requestId   String?
-
-  feedbackType String // explicit, implicit
-  action       String // approved, edited, rejected, regenerated, published, reused, launched, rerun, refreshed
+  id           String   @id @default(cuid())
+  executionId  String?
+  requestId    String?
+  feedbackType String
+  action       String
   module       String?
-  targetType   String? // recommendation, entity, relationship, evidence
+  targetType   String?
   targetId     String?
   targetValue  String?
-
-  // Source context
-  chatId   String?
-  userId   String?
-  metadata Json?
-
-  createdAt DateTime @default(now())
+  chatId       String?
+  userId       String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
 
   @@index([executionId])
   @@index([feedbackType])
@@ -1962,24 +1567,18 @@ model BrainFeedback {
 }
 
 model BrainPattern {
-  id   String @id @default(cuid())
-  type String // competitor_cluster, keyword_cluster, audience_segment, feature_benefit, industry_strategy, campaign_sequence, evidence_source
-
-  name        String
-  description String? @db.Text
-
-  entities   Json? // ["entity1", "entity2"]
-  frequency  Int   @default(1)
-  confidence Float @default(0.5)
-
-  // Source execution IDs
+  id               String   @id @default(cuid())
+  type             String
+  name             String
+  description      String?
+  entities         Json?
+  frequency        Int      @default(1)
+  confidence       Float    @default(0.5)
   sourceExecutions Json?
-
-  firstSeen DateTime @default(now())
-  lastSeen  DateTime @default(now())
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  firstSeen        DateTime @default(now())
+  lastSeen         DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@unique([type, name])
   @@index([type])
@@ -1989,50 +1588,43 @@ model BrainPattern {
 }
 
 model BrainRulePerformance {
-  id       String @id @default(cuid())
-  ruleName String @unique
-
-  timesTriggered    Int    @default(0)
-  timesUseful       Int    @default(0)
-  falsePositives    Int    @default(0)
-  falseNegatives    Int    @default(0)
-  averageConfidence Float  @default(0.5)
-  priority          String @default("medium") // high, medium, low
-  effectiveness     Float  @default(0.5) // timesUseful / timesTriggered
-
-  lastTriggeredAt DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  ruleName          String    @unique
+  timesTriggered    Int       @default(0)
+  timesUseful       Int       @default(0)
+  falsePositives    Int       @default(0)
+  falseNegatives    Int       @default(0)
+  averageConfidence Float     @default(0.5)
+  priority          String    @default("medium")
+  effectiveness     Float     @default(0.5)
+  lastTriggeredAt   DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([effectiveness])
   @@index([priority])
 }
 
 model BrainLearningScore {
-  id     String @id @default(cuid())
-  period String // daily, weekly, monthly
-
-  overallScore             Float @default(0)
-  knowledgeCompleteness    Float @default(0)
-  recommendationUsefulness Float @default(0)
-  confidenceCalibration    Float @default(0)
-  evidenceReliability      Float @default(0)
-  memoryReuse              Float @default(0)
-  graphQuality             Float @default(0)
-  ruleEffectiveness        Float @default(0)
-
-  totalExecutions    Int @default(0)
-  totalFeedbacks     Int @default(0)
-  totalPatterns      Int @default(0)
-  totalEntities      Int @default(0)
-  totalRelationships Int @default(0)
-
-  brainIQ Float @default(0)
-
-  periodStart DateTime
-  periodEnd   DateTime
-
-  createdAt DateTime @default(now())
+  id                       String   @id @default(cuid())
+  period                   String
+  overallScore             Float    @default(0)
+  knowledgeCompleteness    Float    @default(0)
+  recommendationUsefulness Float    @default(0)
+  confidenceCalibration    Float    @default(0)
+  evidenceReliability      Float    @default(0)
+  memoryReuse              Float    @default(0)
+  graphQuality             Float    @default(0)
+  ruleEffectiveness        Float    @default(0)
+  totalExecutions          Int      @default(0)
+  totalFeedbacks           Int      @default(0)
+  totalPatterns            Int      @default(0)
+  totalEntities            Int      @default(0)
+  totalRelationships       Int      @default(0)
+  brainIQ                  Float    @default(0)
+  periodStart              DateTime
+  periodEnd                DateTime
+  createdAt                DateTime @default(now())
 
   @@unique([period, periodStart])
   @@index([period])
@@ -2040,9 +1632,150 @@ model BrainLearningScore {
   @@index([overallScore])
 }
 
-// ============================================
-// MARKETING KNOWLEDGE GRAPH (Phase 3)
-// ============================================
+model GraphEntity {
+  id                    String              @id @default(cuid())
+  type                  GraphEntityType
+  name                  String
+  canonicalName         String?
+  aliases               Json?
+  chatId                String?
+  userId                String?
+  source                String?
+  sourceId              String?
+  confidence            Float               @default(0.5)
+  sourceCount           Int                 @default(1)
+  lastSeen              DateTime            @default(now())
+  freshness             String?
+  metadata              Json?
+  embedding             Json?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  outgoingRelationships GraphRelationship[] @relation("Outgoing")
+  incomingRelationships GraphRelationship[] @relation("Incoming")
+
+  @@unique([type, canonicalName])
+  @@index([type])
+  @@index([name])
+  @@index([canonicalName])
+  @@index([chatId])
+  @@index([userId])
+  @@index([confidence])
+  @@index([lastSeen])
+}
+
+model GraphRelationship {
+  id            String                @id @default(cuid())
+  type          GraphRelationshipType
+  fromId        String
+  toId          String
+  confidence    Float                 @default(0.7)
+  evidenceCount Int                   @default(1)
+  reason        String?
+  sources       Json?
+  chatId        String?
+  metadata      Json?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  from          GraphEntity           @relation("Outgoing", fields: [fromId], references: [id], onDelete: Cascade)
+  to            GraphEntity           @relation("Incoming", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId, type])
+  @@index([fromId])
+  @@index([toId])
+  @@index([type])
+  @@index([confidence])
+  @@index([chatId])
+}
+
+model DealInsight {
+  id                      String   @id @default(cuid())
+  userId                  String
+  chatId                  String
+  dealId                  String
+  aiSummary               String?
+  buyingSignals           Json?
+  riskFactors             Json?
+  recommendedNextStep     Json?
+  competitorMention       String?
+  fleetSizeEstimate       Json?
+  decisionMakerConfidence Json?
+  timelinePrediction      Json?
+  generationStatus        String   @default("pending")
+  provider                String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  chat                    Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  deal                    CRMDeal  @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+  @@index([chatId])
+  @@index([userId])
+}
+
+model Proposal {
+  id                     String      @id @default(cuid())
+  userId                 String
+  chatId                 String
+  dealId                 String?
+  contactId              String?
+  companyId              String?
+  title                  String
+  proposalType           String
+  executiveSummary       String?
+  pricingSummary         Json?
+  fleetRecommendations   Json?
+  implementationTimeline Json?
+  status                 String      @default("DRAFT")
+  content                Json?
+  generatedBy            String?
+  provider               String?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+  chat                   Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  company                CRMCompany? @relation(fields: [companyId], references: [id])
+  contact                CRMContact? @relation(fields: [contactId], references: [id])
+  deal                   CRMDeal?    @relation(fields: [dealId], references: [id])
+  user                   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+  @@index([chatId])
+  @@index([status])
+  @@index([userId])
+}
+
+model CustomerHealthSnapshot {
+  id                    String      @id @default(cuid())
+  userId                String
+  chatId                String
+  contactId             String?
+  companyId             String?
+  dealId                String?
+  healthStatus          String
+  riskFlags             Json?
+  inactivityDays        Int?
+  daysSinceLastActivity Int?
+  daysSinceLastTask     Int?
+  daysSinceLastMeeting  Int?
+  openDealCount         Int         @default(0)
+  overdueTaskCount      Int         @default(0)
+  hasUpcomingRenewal    Boolean     @default(false)
+  missingOwner          Boolean     @default(false)
+  staleDeal             Boolean     @default(false)
+  calculatedAt          DateTime    @default(now())
+  chat                  Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  company               CRMCompany? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact               CRMContact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  deal                  CRMDeal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([chatId, healthStatus])
+  @@index([contactId])
+  @@index([companyId])
+  @@index([dealId])
+  @@index([calculatedAt])
+  @@index([userId])
+}
 
 enum GraphEntityType {
   Company
@@ -2081,175 +1814,4 @@ enum GraphRelationshipType {
   PROMOTES
   OPERATES_IN
   CONNECTS_TO
-}
-
-model GraphEntity {
-  id            String          @id @default(cuid())
-  type          GraphEntityType
-  name          String
-  canonicalName String? // normalized dedup key
-  aliases       Json? // [ "alternative names" ]
-
-  // Context
-  chatId   String?
-  userId   String?
-  source   String? // evidence, brain, import, manual
-  sourceId String? // ID of source record (productIntelligence, etc.)
-
-  // Confidence
-  confidence  Float    @default(0.5)
-  sourceCount Int      @default(1)
-  lastSeen    DateTime @default(now())
-  freshness   String? // fresh, stale, unknown
-
-  // Metadata
-  metadata  Json?
-  embedding Json? // reserved for future vector search [Float[]]
-
-  // Relationships
-  outgoingRelationships GraphRelationship[] @relation("Outgoing")
-  incomingRelationships GraphRelationship[] @relation("Incoming")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([type, canonicalName])
-  @@index([type])
-  @@index([name])
-  @@index([canonicalName])
-  @@index([chatId])
-  @@index([userId])
-  @@index([confidence])
-  @@index([lastSeen])
-}
-
-model GraphRelationship {
-  id   String                @id @default(cuid())
-  type GraphRelationshipType
-
-  // Source entity
-  fromId String
-  from   GraphEntity @relation("Outgoing", fields: [fromId], references: [id], onDelete: Cascade)
-
-  // Target entity
-  toId String
-  to   GraphEntity @relation("Incoming", fields: [toId], references: [id], onDelete: Cascade)
-
-  // Confidence
-  confidence    Float   @default(0.7)
-  evidenceCount Int     @default(1)
-  reason        String?
-  sources       Json? // ["source1", "source2"]
-
-  // Context
-  chatId    String?
-  metadata  Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([fromId, toId, type])
-  @@index([fromId])
-  @@index([toId])
-  @@index([type])
-  @@index([confidence])
-  @@index([chatId])
-}
-
-model DealInsight {
-  id     String   @id @default(cuid())
-  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-  chat   Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId String
-  deal   CRMDeal? @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  dealId String
-
-  // AI Summary
-  aiSummary               String? @db.Text
-  buyingSignals           Json? // [{ signal, evidence, inferenceStatus }]
-  riskFactors             Json? // [{ risk, severity, evidence, inferenceStatus }]
-  recommendedNextStep     Json? // { action, reason, evidence, inferenceStatus }
-  competitorMention       String?
-  fleetSizeEstimate       Json? // { estimate, evidence, inferenceStatus }
-  decisionMakerConfidence Json? // { confidence, evidence, inferenceStatus }
-  timelinePrediction      Json? // { predictedCloseDate, probability, inferenceStatus }
-
-  generationStatus String  @default("pending") // pending, completed, failed
-  provider         String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([dealId])
-  @@index([chatId])
-  @@index([userId])
-}
-
-model Proposal {
-  id        String      @id @default(cuid())
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String
-  chat      Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId    String
-  deal      CRMDeal?    @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  dealId    String?
-  contact   CRMContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  contactId String?
-  company   CRMCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  companyId String?
-
-  title                  String
-  proposalType           String // standard, fleet_recommendation, pricing, implementation
-  executiveSummary       String? @db.Text
-  pricingSummary         Json? // [{ item, description, unitPrice, quantity, total }]
-  fleetRecommendations   Json? // [{ vehicleType, quantity, reason, estimatedCost }]
-  implementationTimeline Json? // [{ phase, duration, milestones }]
-  status                 String  @default("DRAFT") // DRAFT, FINALIZED, SENT, ACCEPTED, REJECTED
-  content                Json? // full proposal body
-
-  generatedBy String? // AI_GENERATED, MANUAL
-  provider    String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([dealId])
-  @@index([chatId])
-  @@index([status])
-  @@index([userId])
-}
-
-model CustomerHealthSnapshot {
-  id        String      @id @default(cuid())
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String
-  chat      Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId    String
-  contact   CRMContact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  contactId String?
-  company   CRMCompany? @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  companyId String?
-  deal      CRMDeal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  dealId    String?
-
-  healthStatus          String // HEALTHY, AT_RISK, CRITICAL, NOT_MEASURED
-  riskFlags             Json? // [{ flag, reason, severity }]
-  inactivityDays        Int?
-  daysSinceLastActivity Int?
-  daysSinceLastTask     Int?
-  daysSinceLastMeeting  Int?
-  openDealCount         Int     @default(0)
-  overdueTaskCount      Int     @default(0)
-  hasUpcomingRenewal    Boolean @default(false)
-  missingOwner          Boolean @default(false)
-  staleDeal             Boolean @default(false)
-
-  calculatedAt DateTime @default(now())
-
-  @@index([chatId, healthStatus])
-  @@index([contactId])
-  @@index([companyId])
-  @@index([dealId])
-  @@index([calculatedAt])
-  @@index([userId])
 }

@@ -37,6 +37,18 @@ function extractText(item) {
   return null;
 }
 
+function normalizeGoals(goals) {
+  if (!Array.isArray(goals)) return [];
+  return goals.map(goal => {
+    if (typeof goal === 'string') return goal.trim();
+    if (typeof goal === 'object' && goal !== null) {
+      // Extract text from object, preserving meaning
+      return goal.text || goal.value || goal.name || goal.title || goal.description || goal.goal || JSON.stringify(goal);
+    }
+    return String(goal);
+  }).filter(Boolean).map(g => g.trim());
+}
+
 function deriveFeaturesFromEvidence(evidence) {
   const derived = new Map();
   const raw = evidence?.evidence || {};
@@ -218,12 +230,30 @@ export async function enrichContentBrief(prisma, userId, chatId, brief) {
 
   const summary = productAnalysis.summary || productAnalysis.productSummary || enriched.product?.summary || '';
 
-  // --- Campaign Goal Mapping (Task 4) ---
+  // --- Campaign Goal Mapping (Task 5: Auto-derive campaignGoal) ---
+  // Derive campaignGoal from multiple sources in priority order
+  const campaignGoalSources = [
+    campaignData.campaignGoals?.[0],
+    campaignData.goals?.[0],
+    campaignData.objective,
+    campaignData.businessGoal,
+    campaignData.businessObjective,
+    productAnalysis.campaignGoal,
+    productAnalysis.marketingObjective,
+    audienceData?.campaignObjective,
+    growthWs?.campaignGoal,
+    website.heroText,
+    productAnalysis.usp,
+    summary?.substring(0, 100),
+  ].filter(Boolean);
+
+  const derivedCampaignGoal = campaignGoalSources[0] || null;
+
   enriched.campaign = {
     ...(enriched.campaign || {}),
-    goal: enriched.campaign?.goal || campaignData.campaignGoals?.[0] || campaignData.goals?.[0] || campaignData.objective || campaignData.businessGoal || campaignData.businessObjective || null,
-    businessGoal: campaignData.businessGoal || campaignData.businessObjective || enriched.campaign?.businessGoal || null,
-    objective: campaignData.objective || campaignData.campaignGoals?.[0] || enriched.campaign?.objective || null,
+    goal: enriched.campaign?.goal || derivedCampaignGoal,
+    businessGoal: campaignData.businessGoal || campaignData.businessObjective || productAnalysis.businessGoal || enriched.campaign?.businessGoal || null,
+    objective: campaignData.objective || campaignData.campaignGoals?.[0] || productAnalysis.objective || enriched.campaign?.objective || null,
     timeline: campaignData.timeline || campaignData.campaignTimeline || enriched.campaign?.timeline || null,
     channels: channelData?.recommendedChannels?.map(ch => ({
       channel: ch.channel || ch.name,
@@ -341,14 +371,39 @@ export async function enrichContentBrief(prisma, userId, chatId, brief) {
   }
   console.info('[Enrich] Campaign goal', { goal: enriched.campaign.goal || null });
 
-  // --- CTA Derivation ---
+  // --- CTA Derivation (Task 5: Auto-derive Primary CTA) ---
+  // Derive Primary CTA from multiple sources in priority order
   const ctaCount = enriched.CTA?.length || 0;
-  if (ctaCount === 0 && website.ctaTexts?.length) {
-    enriched.CTA = website.ctaTexts.slice(0, 3).map(t => ({ text: t, url: null }));
-    diagnostics.enriched.push('Derived CTA from website evidence');
-  } else if (ctaCount === 0) {
-    enriched.CTA = [];
-    diagnostics.missing.push('Primary CTA');
+  if (ctaCount === 0) {
+    const primaryCtaSources = [
+      campaignData.primaryCTA,
+      campaignData.callToAction,
+      campaignData.cta,
+      productAnalysis.primaryCTA,
+      productAnalysis.callToAction,
+      audienceData?.primaryCTA,
+      growthWs?.primaryCTA,
+      website.ctaTexts?.[0],
+      website.heroCTA,
+      productAnalysis.positioning?.cta,
+      productAnalysis.landingPageCTA,
+    ].filter(Boolean);
+
+    // Standard CTA mappings to ensure valid CTAs
+    const standardCTAs = ['Buy Now', 'Book Demo', 'Start Trial', 'Contact Sales', 'Download', 'Schedule Meeting', 'Request Quote', 'Learn More'];
+    const derivedCTA = primaryCtaSources[0] || (productAnalysis.usp ? 'Learn More' : 'Contact Sales');
+
+    // Ensure derived CTA is one of the standard CTAs or a reasonable fallback
+    const normalizedCTA = standardCTAs.includes(derivedCTA) ? derivedCTA : 'Learn More';
+
+    enriched.CTA = [{ text: normalizedCTA, url: null }];
+    enriched.campaign.primaryCTA = normalizedCTA;
+
+    if (primaryCtaSources.length > 0) {
+      diagnostics.enriched.push(`Derived Primary CTA from ${primaryCtaSources[0].substring(0, 30)}...`);
+    } else {
+      diagnostics.enriched.push('Derived Primary CTA from product USP/fallback');
+    }
   }
   console.info('[Enrich] CTA', { count: enriched.CTA?.length || 0, cta: enriched.CTA?.[0]?.text });
 
@@ -415,11 +470,21 @@ export async function enrichContentBrief(prisma, userId, chatId, brief) {
         name: extractText(p.name || p.title) || null,
         role: p.role || null,
         painPoints: takeArray(Array.isArray(p.painPoints) ? p.painPoints : [], 5),
-        goals: takeArray(Array.isArray(p.goals) ? p.goals : [], 5),
+        goals: normalizeGoals(takeArray(Array.isArray(p.goals) ? p.goals : [], 5)),
       }));
       diagnostics.enriched.push(`Added ${enriched.targetPersonas.length} personas from audience intelligence`);
     }
   }
+  
+  // Normalize existing personas goals to strings (Task 6)
+  if (enriched.targetPersonas?.length > 0) {
+    enriched.targetPersonas = enriched.targetPersonas.map(p => ({
+      ...p,
+      goals: normalizeGoals(p.goals || []),
+    }));
+    diagnostics.enriched.push('Normalized persona goals to strings');
+  }
+  
   if ((enriched.targetPersonas?.length || 0) < MINIMUM_REQUIREMENTS.personas.count) {
     diagnostics.missing.push('Audience Personas');
   }

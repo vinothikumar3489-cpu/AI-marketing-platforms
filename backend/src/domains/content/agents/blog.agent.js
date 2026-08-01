@@ -14,34 +14,56 @@ export async function generateBlogArticle(brief, aiFunction = callAI, normalized
   const keyword = getKeyword(brief, 0) || painPoint.toLowerCase().replace(/\s+/g, '-');
   const campaignGoal = brief.campaign?.goal?.value || brief.campaign?.goal || '';
 
-  const prompt = `You are a subject-matter expert writing for ${productName} â€” not a marketer, but a trusted authority with deep domain knowledge.
+  const prompt = `You are a senior marketing copywriter and subject-matter expert for ${productName}. You write at the level of top-tier marketing agencies—combining deep expertise with psychological persuasion, storytelling, and conversion optimization.
 
-Write an EEAT-optimized blog article for ${persona} grounded in evidence, not marketing fluff.
+Write an EEAT-optimized blog article for ${persona} that converts readers through authority, empathy, and evidence-backed persuasion.
 
 ${productContext}
 
 Format: Long-form educational article (1,200-1,800 words)
-Tone: Authoritative, evidence-driven, expert-level
+Tone: Authoritative yet empathetic, expert-level, conversion-focused
 
-STRUCTURE REQUIREMENTS â€” follow Problem â†’ Agitate â†’ Solution â†’ Proof â†’ Benefit â†’ CTA arc:
-- Headline: Must follow one of these formats: "How to [Achieve X]" or "[Number] Ways to [Solve Y]" or "[Keyword]: [Benefit]". Max 60 chars.
-- Meta Title: SEO-optimized, includes primary keyword "${keyword}". Max 60 chars.
-- Meta Description: SEO-optimized with primary keyword, benefit, and clear value proposition. Max 160 chars.
-- Introduction: Hook â†’ Name the pain point "${painPoint}" â†’ Agitate the frustration â†’ Preview the evidence-backed solution.
+AUDIENCE PSYCHOLOGY:
+- ${persona} are experiencing ${painPoint} as a daily frustration that impacts their work, reputation, or outcomes
+- They have likely tried multiple solutions that failed or underdelivered
+- They are skeptical of marketing claims but hungry for genuine expertise
+- They respond to: data-backed claims, specific examples, clear ROI, peer validation
+- They object to: complexity, long implementation times, unclear pricing, vendor lock-in
+
+MARKETING-AGENCY QUALITY REQUIREMENTS:
+- Hook (Scroll-stopper): First sentence must stop the scroll. Use a surprising statistic, contrarian insight, or provocative question about ${painPoint}. Max 15 words.
+- Storytelling: Weave a brief narrative arc—real-world scenario → tension → resolution. Make it feel like their experience.
+- Emotional Triggers: Address frustration (current state), hope (solution possible), confidence (your expertise), urgency (why now).
+- Authority Building: Demonstrate deep domain knowledge through specific terminology, nuanced understanding, and evidence-backed claims.
+- Social Proof: Reference industry trends, common challenges, or "many ${persona} report" patterns from evidence.
+- Objection Handling: Preemptively address 2-3 common objections (complexity, time, cost) within the content.
+- Benefits Over Features: Translate every feature into a specific benefit for ${persona}. Use "What → So What → Now What" framework.
+- SEO Keywords: Naturally integrate "${keyword}" and 2-3 variants. No keyword stuffing.
+
+STRUCTURE REQUIREMENTS — Problem → Agitate → Solution → Proof → Benefit → CTA arc:
+- Headline: Must follow one of these formats: "How to [Achieve X]" or "[Number] Ways to [Solve Y]" or "[Keyword]: [Benefit]". Max 60 chars. Include benefit + curiosity.
+- Meta Title: SEO-optimized, includes primary keyword "${keyword}". Max 60 chars. Compelling + benefit-driven.
+- Meta Description: SEO-optimized with primary keyword, benefit, and clear value proposition. Max 160 chars. Include emotional hook.
+- Introduction: 
+  * Hook: Scroll-stopping first sentence
+  * Problem: Name ${painPoint} with empathy
+  * Agitate: Why this matters—impact on work, outcomes, stress
+  * Solution Preview: Evidence-backed approach ${productName} offers
 - Sections: 3-4 in-depth sections. Each with:
-  - heading: H2 keyword-variant
-  - body: 2-3 paragraphs. Every claim must trace to an evidence field. No invented data.
-  - keyTakeaways: 2-3 actionable takeaways per section
-- FAQ Section: 3-4 actual questions from evidence, schema-ready Q&A format. Not generic.
+  * heading: H2 with keyword variant + benefit
+  * body: 2-3 paragraphs. Every claim traces to evidence. Include specific examples.
+  * keyTakeaways: 2-3 actionable takeaways per section
+  * objection handling: Address one concern per section
+- FAQ Section: 3-4 actual questions from evidence, schema-ready Q&A format. Address real objections.
 - Internal Links: Suggest 2-3 internal links to related product features with anchor text and URL.
-- Conclusion: Summarize key points, reinforce value proposition, specific CTA.
-- CTA: Action-oriented, specific to ${productName}. Not "Learn more".
+- Conclusion: Summarize key points, reinforce value proposition, specific CTA, create urgency.
+- CTA: Action-oriented, specific to ${productName}. Use one of: "Start your free trial", "Book a demo", "See how it works". Not "Learn more".
 
 ${campaignGoal ? `Campaign Alignment: This article supports the goal "${campaignGoal}".` : ''}
 
-BANNED: "studies show", "research indicates", any percentages or invented data, fake statistics, invented testimonials, superlatives ("best", "ultimate", "revolutionary"), generic advice.
+BANNED: "studies show", "research indicates", any percentages or invented data, fake statistics, invented testimonials, superlatives ("best", "ultimate", "revolutionary"), generic advice, "in today's world", "game-changer".
 
-EVIDENCE RULE: Every factual claim in the article must be traceable to a specific evidence field provided in the context. If evidence is insufficient, set claimsRequiringReview accordingly.
+EVIDENCE RULE: Every factual claim must trace to a specific evidence field. If evidence is insufficient, set claimsRequiringReview accordingly.
 
 EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 
