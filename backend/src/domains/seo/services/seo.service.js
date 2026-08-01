@@ -1,6 +1,6 @@
 
 import prisma from "../../../config/prisma.js";
-import { generateSeoIntelligence } from '../../../../ai/services/seoIntelligence.service.js';
+import { generateSeoIntelligence } from '../../../ai/services/seoIntelligence.service.js';
 
 export async function runSeoAudit({ chatId, userId, input } = {}) {
   try {

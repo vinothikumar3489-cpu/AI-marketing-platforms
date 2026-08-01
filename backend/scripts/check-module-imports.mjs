@@ -8,13 +8,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const BACKEND_SRC = join(__dirname, '../src');
 
 const CRITICAL_MODULES = [
-  'services/integrations/email/brevo.provider.js',
-  'services/integrations/email/email-provider-registry.js',
-  'services/integrations/email/index.js',
-  'services/automation/email-campaign.service.js',
-  'services/execution/email-campaign.service.js',
-  'controllers/email-workflow.controller.js',
-  'routes/email-workflow.routes.js',
+  'services/providers/email/brevo.provider.js',
+  'services/providers/email/email-provider-registry.js',
+  'services/providers/email/index.js',
+  'services/email/email-campaign-types.service.js',
+  'domains/email/controllers/email-workflow.controller.js',
+  'domains/email/routes/email-workflow.routes.js',
 ];
 
 let errors = [];

@@ -471,8 +471,6 @@ Return valid JSON:
   return null;
 }
 
-export { generatePressRelease, generateCaseStudy, generateSalesPage, FRAMEWORKS, checkRepetitiveLanguage, sanitizeRepetitiveLanguage, applyFramework };
-
 const INVALID_PRODUCT_LABELS = new Set([
   'unknown product', 'new analysis', 'new & featured', 'untitled',
   'new project', 'growth analysis', 'featured', 'home',

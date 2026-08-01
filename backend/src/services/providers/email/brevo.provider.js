@@ -133,7 +133,7 @@ export async function sendTransactionalEmail({ to, subject, html, text, senderNa
   }
 }
 
-export { sendTransactionalEmail as sendViaBrevo };
+export const sendViaBrevo = sendTransactionalEmail;
 
 export async function sendTestEmail({ to, subject, html, text, senderName, replyTo, tags = ['TEST_EMAIL'] }) {
   const rid = getRid({ requestId: 'test-' + Date.now() });

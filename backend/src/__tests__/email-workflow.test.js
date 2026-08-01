@@ -23,7 +23,7 @@ import {
   sendTestEmail,
   scheduleEmail,
   cancelScheduledEmail
-} from '../services/integrations/email/brevo.provider.js';
+} from '../services/providers/email/brevo.provider.js';
 
 // Mock Prisma
 jest.mock('../config/prisma.js', () => ({
