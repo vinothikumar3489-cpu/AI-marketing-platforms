@@ -125,58 +125,98 @@ export async function collectAudienceIntelligence({ company, competitors, market
   }
 
   if (matchedPatterns.length > 0) {
-    audience.icp = matchedPatterns.map(p => ({
-      name: p.icpName,
-      role: p.role,
-      painPoints: p.painPoints,
-      goals: p.goals,
-      objections: p.objections,
-      preferredContent: p.preferredContent,
-      evidence: p.evidence
-    }));
+    // Evidence-aware confidence: industry patterns are only inference candidates.
+    // Confidence scales with how much of the pattern's content is corroborated by the
+    // actual website text. With no corroboration, confidence stays low and source is
+    // clearly labeled as inference.
+    const textWords = lower.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 3);
+    const hasWebsiteContent = textWords.length > 20;
 
-    audience.personas = matchedPatterns.map(p => ({
-      name: p.icpName,
-      role: p.role,
-      painPoints: p.painPoints,
-      goals: p.goals,
-      objections: p.objections,
-      preferredContent: p.preferredContent,
-      source: 'industry_evidence_pattern',
-      evidence: p.evidence
-    }));
+    function patternSignalScore(pattern) {
+      if (!hasWebsiteContent) return 0;
+      const candidates = [
+        ...(pattern.painPoints || []),
+        ...(pattern.goals || []),
+        ...(pattern.preferredContent || []),
+        ...(pattern.role || '').split(' '),
+      ].map(s => s.toLowerCase());
+      const keywordSet = new Set();
+      for (const c of candidates) {
+        const words = c.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 3);
+        words.forEach(w => keywordSet.add(w));
+      }
+      const hits = [...keywordSet].filter(k => lower.includes(k)).length;
+      return keywordSet.size === 0 ? 0 : hits / keywordSet.size;
+    }
+
+    function patternConfidence(pattern) {
+      const ratio = patternSignalScore(pattern);
+      return {
+        confidence: Math.round(20 + ratio * 35),
+        source: ratio > 0.3 ? 'website_evidence + industry pattern' : 'industry_pattern_inferred',
+      };
+    }
+
+    audience.icp = matchedPatterns.map(p => {
+      const conf = patternConfidence(p);
+      return {
+        name: p.icpName,
+        role: p.role,
+        painPoints: p.painPoints,
+        goals: p.goals,
+        objections: p.objections,
+        preferredContent: p.preferredContent,
+        evidence: { source: conf.source, confidence: conf.confidence, collectedAt: now }
+      };
+    });
+
+    audience.personas = matchedPatterns.map(p => {
+      const conf = patternConfidence(p);
+      return {
+        name: p.icpName,
+        role: p.role,
+        painPoints: p.painPoints,
+        goals: p.goals,
+        objections: p.objections,
+        preferredContent: p.preferredContent,
+        source: conf.source,
+        evidence: { source: conf.source, confidence: conf.confidence, collectedAt: now }
+      };
+    });
+
+    const avgConfidence = Math.round(matchedPatterns.reduce((acc, p) => acc + patternConfidence(p).confidence, 0) / matchedPatterns.length);
 
     audience.decisionMakers = [...new Set(matchedPatterns.map(p => p.role))].map(role => ({
       title: role,
-      confidence: 70,
-      evidence: { source: 'Industry evidence pattern', confidence: 70, collectedAt: now }
+      confidence: avgConfidence,
+      evidence: { source: avgConfidence < 50 ? 'Industry pattern inference' : 'Website evidence + industry pattern', confidence: avgConfidence, collectedAt: now }
     }));
 
     audience.buyingCommittee = [...new Set(matchedPatterns.flatMap(p => [p.role]))].map(role => ({
       title: role,
       influence: 'Unknown - Insufficient evidence',
-      evidence: { source: 'Industry evidence pattern', confidence: 60, collectedAt: now }
+      evidence: { source: 'Industry pattern inference', confidence: Math.min(60, avgConfidence), collectedAt: now }
     }));
 
     audience.objections = [...new Set(matchedPatterns.flatMap(p => p.objections))].map(obj => ({
       value: obj,
-      confidence: 70,
+      confidence: Math.min(70, avgConfidence),
       impact: 'Unknown - Insufficient evidence',
-      evidence: { source: 'Industry evidence pattern', confidence: 70, collectedAt: now }
+      evidence: { source: 'Industry pattern inference', confidence: Math.min(70, avgConfidence), collectedAt: now }
     }));
 
     audience.painPoints = [...new Set(matchedPatterns.flatMap(p => p.painPoints))].map(pp => ({
       value: pp,
-      confidence: 70,
+      confidence: Math.min(70, avgConfidence),
       impact: 'Unknown - Insufficient evidence',
-      evidence: { source: 'Industry evidence pattern', confidence: 70, collectedAt: now }
+      evidence: { source: 'Industry pattern inference', confidence: Math.min(70, avgConfidence), collectedAt: now }
     }));
 
     audience.buyingTriggers = [...new Set(matchedPatterns.flatMap(p => p.preferredContent || []))].map(bt => ({
       value: bt,
-      confidence: 60,
+      confidence: Math.min(60, avgConfidence),
       impact: 'Unknown - Insufficient evidence',
-      evidence: { source: 'Industry evidence pattern', confidence: 60, collectedAt: now }
+      evidence: { source: 'Industry pattern inference', confidence: Math.min(60, avgConfidence), collectedAt: now }
     }));
 
     audience.budget = null;
@@ -185,7 +225,17 @@ export async function collectAudienceIntelligence({ company, competitors, market
     audience.techMaturity = null;
     audience.lifetimeValue = null;
 
-    audience.sources.push({ type: 'personas', source: 'industry_evidence', count: matchedPatterns.length });
+    audience.sources.push({
+      type: 'personas',
+      source: hasWebsiteContent ? 'website_evidence + industry_pattern' : 'industry_pattern_inferred',
+      count: matchedPatterns.length,
+      hasWebsiteContent,
+    });
+  }
+
+  if (audience.personas.length === 0) {
+    audience.personas.push({ name: 'Unknown - Insufficient evidence', role: null, painPoints: [], goals: [], objections: [], preferredContent: [], source: 'no_evidence', evidence: { source: 'No website or industry evidence collected', confidence: 0, collectedAt: now } });
+    audience.icp = [];
   }
 
   if (audience.decisionMakers.length === 0) {

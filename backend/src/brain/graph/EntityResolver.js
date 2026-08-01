@@ -46,6 +46,10 @@ export class EntityResolver {
     const resolved = await this.resolve(type, name, opts);
     if (resolved) {
       await this._store.updateConfidence(resolved.entity.id, 0.05);
+      // Link the variant spelling as an alias so future exact lookups hit.
+      try {
+        await this._store.addAlias(resolved.entity.id, name);
+      } catch { /* alias linking is best-effort */ }
       return { entity: resolved.entity, resolved: true, match: resolved.match };
     }
 
@@ -89,7 +93,12 @@ export class EntityResolver {
           entities[i].canonicalName,
           entities[j].canonicalName
         );
-        if (score > 0.8) {
+        // Aliases ("Acme Inc" stored as alias of "acme") and shared
+        // website metadata are strong duplicate signals, even when
+        // the canonical names differ.
+        const aliasHit = this._aliasMatches(entities[i], entities[j]);
+        const websiteHit = this._websiteMatches(entities[i], entities[j]);
+        if (score > 0.8 || aliasHit || websiteHit) {
           group.push(entities[j]);
           processed.add(entities[j].id);
         }
@@ -129,9 +138,31 @@ export class EntityResolver {
     if (a.includes(b) || b.includes(a)) return 0.9;
     const aBigrams = this._bigrams(a);
     const bBigrams = this._bigrams(b);
+    if (aBigrams.size === 0 || bBigrams.size === 0) return 0;
     const intersection = new Set([...aBigrams].filter(x => bBigrams.has(x)));
     const union = new Set([...aBigrams, ...bBigrams]);
     return intersection.size / union.size;
+  }
+
+  _aliasMatches(a, b) {
+    const aAliases = (a.aliases || []).map(x => this._canonicalize(x));
+    const bAliases = (b.aliases || []).map(x => this._canonicalize(x));
+    const aCanon = this._canonicalize(a.name || a.canonicalName);
+    const bCanon = this._canonicalize(b.name || b.canonicalName);
+    return (
+      (aAliases.length > 0 && bAliases.includes(aCanon)) ||
+      (bAliases.length > 0 && aAliases.includes(bCanon)) ||
+      (aAliases.some(x => bAliases.includes(x)))
+    );
+  }
+
+  _websiteMatches(a, b) {
+    const aUrl = a.metadata?.website || a.metadata?.url || a.metadata?.websiteUrl || '';
+    const bUrl = b.metadata?.website || b.metadata?.url || b.metadata?.websiteUrl || '';
+    if (!aUrl || !bUrl) return false;
+    const aDomain = this._canonicalize(aUrl);
+    const bDomain = this._canonicalize(bUrl);
+    return aDomain === bDomain && aDomain.length > 0;
   }
 
   _bigrams(str) {

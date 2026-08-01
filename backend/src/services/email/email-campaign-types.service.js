@@ -92,8 +92,8 @@ export function emailCopyToBrevoCampaign(emailCopy, campaignName) {
     htmlContent: emailCopy.html,
     textContent: emailCopy.plainText,
     sender: {
-      name: emailCopy.signature?.split(' - ')[0] || emailCopy.productIdentity?.brandName || 'Team',
-      email: process.env.BREVO_FROM_EMAIL || 'noreply@example.com'
+      name: emailCopy.signature?.split(' - ')[0] || emailCopy.productIdentity?.brandName || '',
+      email: process.env.BREVO_FROM_EMAIL || ''
     },
     recipients: {
       listIds: [] // To be populated by caller

@@ -6,6 +6,7 @@ import { asArray, takeArray } from "../normalizers/array-helpers.js";
 
 const graphCache = new Map();
 const CACHE_TTL = 10 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 200;
 
 function getCached(userId, chatId) {
   const key = `${userId}:${chatId}`;
@@ -18,6 +19,12 @@ function getCached(userId, chatId) {
 function setCached(userId, chatId, data) {
   const key = `${userId}:${chatId}`;
   graphCache.set(key, { data, timestamp: Date.now() });
+  // Bound cache growth across chats — evict oldest entry past the cap.
+  while (graphCache.size > MAX_CACHE_ENTRIES) {
+    const oldest = graphCache.keys().next().value;
+    if (!oldest) break;
+    graphCache.delete(oldest);
+  }
 }
 
 export function invalidateCache(userId, chatId) {
@@ -103,6 +110,29 @@ export async function buildUnifiedEvidenceGraph(prisma, userId, chatId) {
   const painPoints = extractArray(audienceData.painPoints || pa.painPoints || pa.problemsSolved || pa.challenges || []);
   const useCases = extractArray(pa.useCases || pa.jobsToBeDone || []);
   const pricing = pa.pricing || pa.pricingModel || null;
+
+  const md = productIntel.marketDiscovery || {};
+  const market = {
+    overview: extractText(md.overview || md.marketOverview || md.summary || null),
+    size: md.size ?? md.marketSize ?? null,
+    growthRate: md.growthRate ?? md.cagr ?? null,
+    segments: takeArray(extractArray(md.segments || md.segmentAnalysis || []), 8),
+    trends: takeArray(extractArray(md.trends || md.marketTrends || []), 8),
+    drivers: takeArray(extractArray(md.drivers || md.growthDrivers || []), 8),
+    barriers: takeArray(extractArray(md.barriers || md.marketBarriers || md.challenges || []), 8),
+    competitors: takeArray(extractArray(md.competitors || md.marketCompetitors || []).map(c => extractText(c.name || c.company || c) || (typeof c === 'string' ? c : '')), 8),
+    opportunities: takeArray(extractArray(md.opportunities || md.marketOpportunities || []), 8),
+    status: md && Object.keys(md).length > 0 ? 'measured' : 'unavailable',
+  };
+
+  const techHints = takeArray(extractArray(website.technologyHints || website.technologies || pa.technologyStack || pa.technologies || []).map(t => extractText(t) || (typeof t === 'string' ? t : '')).filter(Boolean), 10);
+  const technology = {
+    stack: techHints,
+    platforms: takeArray(extractArray(website.platforms || pa.platforms || []).map(t => extractText(t) || (typeof t === 'string' ? t : '')).filter(Boolean), 6),
+    integrations: takeArray(extractArray(pa.integrations || pa.integrationEcosystem || []).map(t => extractText(t) || (typeof t === 'string' ? t : '')).filter(Boolean), 8),
+    language: extractText(website.language || pa.language || null),
+    status: techHints.length > 0 ? 'measured' : 'unavailable',
+  };
 
   const cpPainPoints = extractArray(cpAudience.painPoints || []);
   const cpDecisionDrivers = extractArray(cpAudience.decisionDrivers || []);
@@ -198,6 +228,11 @@ export async function buildUnifiedEvidenceGraph(prisma, userId, chatId) {
       positioning: competitorIntel?.positioningEngine || null,
       snapshot: execCompetitorSnapshot,
     },
+
+    market,
+    technology,
+    positioning: competitorIntel?.positioningEngine || execCompetitorSnapshot.positioning || null,
+    pricing,
 
     seo: {
       score: seoIntel?.seoScore || null,

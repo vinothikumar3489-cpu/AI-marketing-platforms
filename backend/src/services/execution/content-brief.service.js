@@ -5,6 +5,7 @@ import { normalizeProductForContentStudio, normalizeFeatures, normalizeBenefits,
 import { getSeoIntelligenceForChat } from "../loaders/seo-intelligence.loader.js";
 import { getProductIntelligenceForChat } from "../loaders/product-intelligence.loader.js";
 import { resolveProductIdentity } from '../resolvers/product-identity.resolver.js';
+import { isValidProductIdentity } from '../resolvers/canonical-product-identity.resolver.js';
 import { validateContentBrief } from "../validators/content-brief.schema.js";
 import { InferenceStatus } from '../../shared/schemas/enums.js';
 
@@ -28,10 +29,11 @@ export async function buildContentBrief(prisma, userId, chatId) {
   const evidenceSnapshot = await getLatestEvidenceSnapshot({ prisma, userId, chatId });
   const raw = evidenceSnapshot?.evidence || {};
 
-  const [productIntel, competitorIntel, seoIntel] = await Promise.all([
+  const [productIntel, competitorIntel, seoIntel, campaignIntel] = await Promise.all([
     getProductIntelligenceForChat({ prisma, userId, chatId }),
     prisma.competitorIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
     getSeoIntelligenceForChat({ prisma, userId, chatId }),
+    prisma.campaignIntelligence.findFirst({ where: { chatId, userId } }).catch(() => null),
   ]);
 
   console.info("[Content Brief] Evidence loaded", {
@@ -40,12 +42,14 @@ export async function buildContentBrief(prisma, userId, chatId) {
     hasProductIntel: Boolean(productIntel),
     hasCompetitorIntel: Boolean(competitorIntel),
     hasSeoIntel: Boolean(seoIntel),
+    hasCampaignIntel: Boolean(campaignIntel),
     hasEvidenceSnapshot: Boolean(evidenceSnapshot)
   });
 
   const productAnalysis = productIntel?.productAnalysis || {};
   const audienceData = productIntel?.audienceIntelligence || {};
   const competitorData = competitorIntel?.competitorAnalysis || {};
+  const campaignData = campaignIntel || {};
   const seoInfo = seoIntel || {};
   const website = raw.website || {};
 
@@ -139,7 +143,7 @@ export async function buildContentBrief(prisma, userId, chatId) {
 
   const brief = {
     company: {
-      name: productIdentity.companyName || chat.title || null,
+      name: productIdentity.companyName || productIdentity.productName || (isValidProductIdentity({ productName: chat.title }) ? chat.title : null),
       productName: productIdentity.productName,
       brandName: productIdentity.brandName,
       websiteUrl: productIdentity.websiteUrl || null,
@@ -190,6 +194,40 @@ export async function buildContentBrief(prisma, userId, chatId) {
     })),
     painPoints: takeArray(audienceData.painPoints, 10),
     objections: asArray(productAnalysis.objections || audienceData.objections),
+    audience: {
+      primary: audienceData.primaryAudience || productAnalysis.targetAudience || null,
+      painPoints: takeArray(audienceData.painPoints, 10),
+      decisionDrivers: asArray(audienceData.decisionDrivers || productAnalysis.decisionDrivers),
+      buyingStage: campaignData?.buyingStage || audienceData.buyingStage || null,
+      contentPreferences: asArray(audienceData.contentPreferences),
+    },
+    seo: {
+      score: seoInfo?.seoScore ?? seoInfo?.score ?? null,
+      visibility: seoInfo?.aiVisibility?.overallScore ?? seoInfo?.visibility ?? null,
+      primary: filteredKeywords.slice(0, 10),
+      primaryKeywords: filteredKeywords.slice(0, 10),
+      clusters: asArray(seoInfo?.keywordIntelligence?.clusters || seoInfo?.clusters).slice(0, 5),
+      intent: seoInfo?.keywordIntelligence?.metadata?.searchIntent || seoInfo?.searchIntent || null,
+      contentGaps: normalizedSeo.contentGaps.slice(0, 10),
+    },
+    campaign: {
+      goal: campaignData?.businessGoal || campaignData?.campaignGoal || null,
+      businessGoal: campaignData?.businessGoal || null,
+      objective: campaignData?.campaignObjective || campaignData?.objective || null,
+      primaryCTA: campaignData?.primaryCTA || null,
+      channels: asArray(campaignData?.channels),
+      brandVoice: campaignData?.brandVoice || null,
+      executiveStory: campaignData?.executiveStory || null,
+      actionPlan: campaignData?.actionPlan || null,
+    },
+    executive: {
+      story: campaignData?.executiveStory || null,
+      overview: campaignData?.executiveOverview || null,
+      actionPlan: campaignData?.actionPlan || null,
+      recommendations: asArray(campaignData?.executiveRecommendations || campaignData?.recommendations),
+      keyOpportunities: asArray(campaignData?.keyOpportunities || campaignData?.opportunities),
+    },
+    growthWorkspace: campaignData?.growthWorkspace || campaignData?.growthSummary || null,
     validatedCompetitors: takeArray(competitorData.competitors || competitorData.directCompetitors, 10).map(c => ({
       name: c.name || c.url || null,
       domain: c.domain || c.url || null,
@@ -206,6 +244,8 @@ export async function buildContentBrief(prisma, userId, chatId) {
       hasProductIntel: !!productIntel,
       hasCompetitorIntel: !!competitorIntel,
       hasSeoIntel: !!seoIntel,
+      hasCampaignIntel: !!campaignIntel,
+      websiteScrape: !!evidenceSnapshot,
     },
     limitations: [],
     warnings: [],

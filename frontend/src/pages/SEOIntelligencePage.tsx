@@ -6,7 +6,7 @@ import { asArray, asNumber, asText, normalizeSeo, normalizeSeoDisplay, seoSafeTe
 import { Badge, Card, EmptyState, Loading, PageHeader, ScoreCard, SectionTitle } from '../components/UI';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { Shield, Target, TrendingUp, Zap, Search, Globe, Code, FileText, Cpu, LayoutList, CheckCircle, AlertTriangle, Loader2, Building, Activity, Map, Clock, Layers, Eye, Users, Star, PieChart, Info, Sliders, GripHorizontal } from 'lucide-react';
-import { KPIDashboard, EnterpriseInsightCard, SmartNavigation, SearchBar, LoadingSkeleton, EnterpriseEmptyState, ProgressBar, StatusBadge, MiniRadarLegend, StorySection, ScoreSection, ExpandableSection } from '../components/EnterpriseComponents';
+import { KPIDashboard, EnterpriseInsightCard, SmartNavigation, SearchBar, LoadingSkeleton, EnterpriseEmptyState, StatusBadge, MiniRadarLegend, StorySection, ScoreSection, ExpandableSection } from '../components/EnterpriseComponents';
 import { ExecutiveSummaryCards, BusinessHealthScore, AIDecisionPanel, RecommendationPriorities, CrossModuleInsights, ExplainButton, CompareResults, OpportunityMatrix, RiskMatrix, ConfidenceVisualization, InteractiveFilters, SmartSearch, EnterpriseReportPreview, ProductivityBar, ExecutiveCommandCenter, StoryDrivenResults, AIBusinessAdvisor, DecisionSimulator, CompetitorPositioningMap, MarketOpportunityHeatmap, BusinessTimeline, ExecutiveKPIDashboard, InsightRelationships, EvidenceExplorer, ReportPreview20, PresentationMode, useWorkspaceMemory, SmartEmptyState } from '../components/EnterpriseDecisionSuite';
 import { EnterpriseActionWorkspace } from '../components/EnterpriseActionWorkspace';
 import SafeValue from '../components/SafeValue';
@@ -158,35 +158,7 @@ export default function SEOIntelligencePage() {
   const [error, setError] = useState('');
   const [mode, setMode] = useState<'form' | 'creating' | 'restoring' | 'running' | 'results' | 'error'>(isNewAnalysis ? 'form' : (selectedChatId ? 'restoring' : 'form'));
   const [creatingChat, setCreatingChat] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentStage, setCurrentStage] = useState('Starting...');
   const seoInFlightRef = useRef(false);
-  const seoProgressStages = [
-    'Starting...',
-    'Scraping website',
-    'Technical audit',
-    'Keyword intelligence',
-    'Competitor SEO',
-    'GEO / AI visibility',
-    'Content gaps + blog intelligence',
-    'Saving results'
-  ];
-  useEffect(() => {
-    if (mode === 'running') {
-      const interval = setInterval(() => {
-        setProgress(p => {
-          if (p >= 7) { clearInterval(interval); return 7; }
-          const next = p + 1;
-          setCurrentStage(seoProgressStages[next] || 'Processing...');
-          return next;
-        });
-      }, 10000);
-      return () => clearInterval(interval);
-    } else {
-      setProgress(0);
-      setCurrentStage('Starting...');
-    }
-  }, [mode]);
 
   // Helper: check if seo object has meaningful data (not just normalized empty keys)
   function hasRealSeoData(d: any): boolean {
@@ -422,11 +394,11 @@ export default function SEOIntelligencePage() {
 
       {mode === 'form' && (
       <Card>
-        <SectionTitle title="Analyze Website" subtitle="Enter your URL to generate thousands of data points." />
+        <SectionTitle title="Analyze Website" subtitle="Enter your URL to run the full SEO intelligence analysis." />
         <div style={{ display: 'flex', gap: '15px' }}>
           <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://example.com" style={{ flex: 1, padding: '12px 16px', borderRadius: '8px', border: '1px solid #303849', background: '#0b1220', color: '#fff' }} disabled={loading} />
           <button onClick={run} className="primary-btn" disabled={loading || !url} style={{ padding: '0 30px' }}>
-            {loading ? 'Running 14-Step Audit...' : 'Run SEO Intelligence'}
+            {loading ? 'Running SEO Analysis...' : 'Run SEO Intelligence'}
           </button>
         </div>
       </Card>
@@ -439,10 +411,8 @@ export default function SEOIntelligencePage() {
               <h3 style={{ margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Loader2 className="spin" size={20} /> Running SEO Intelligence
               </h3>
-              <ProgressBar value={Math.min((progress / 8) * 100, 90)} max={100} color="#53a7ff" />
-              <div style={{ color: '#9aa7bd', fontSize: '14px', display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-                <span>{currentStage}</span>
-                <span>{Math.round((progress / 8) * 100)}%</span>
+              <div style={{ color: '#9aa7bd', fontSize: '14px' }}>
+                Analysis in progress. This runs the full technical, keyword, competitor, and AI-visibility audit and can take 1–2 minutes.
               </div>
             </div>
           </Card>
@@ -697,12 +667,13 @@ function ExecutiveDashboard({ data }: { data: any }) {
     })).filter((r: any) => r.title),
   ].slice(0, 6) : [];
 
+  const seoSourceCount = Array.isArray(data.sourceSummary?.sourcesCollected) ? data.sourceSummary.sourcesCollected.length : 0;
   const confidenceData = useMemo(() => [
-    technicalHealth != null ? { section: 'Technical Audit', confidence: technicalHealth, evidenceStrength: 80, sourceCount: 3, dataFreshness: 'Today' } : null,
-    data.keywordIntelligence?.keywordCount ? { section: 'Keyword Analysis', confidence: Math.min(data.keywordIntelligence.keywordCount, 100), evidenceStrength: 75, sourceCount: 2, dataFreshness: 'Today' } : null,
-    contentAuthority != null ? { section: 'Content Analysis', confidence: contentAuthority, evidenceStrength: 70, sourceCount: 4, dataFreshness: 'Today' } : null,
-    aiVisibility != null ? { section: 'AI/GEO Visibility', confidence: aiVisibility, evidenceStrength: 65, sourceCount: 2, dataFreshness: 'Today' } : null,
-  ].filter(Boolean), [technicalHealth, data.keywordIntelligence, contentAuthority, aiVisibility]);
+    technicalHealth != null ? { section: 'Technical Audit', confidence: technicalHealth, evidenceStrength: null, sourceCount: seoSourceCount, dataFreshness: 'N/A' } : null,
+    data.keywordIntelligence?.keywordCount ? { section: 'Keyword Analysis', confidence: Math.min(data.keywordIntelligence.keywordCount, 100), evidenceStrength: null, sourceCount: seoSourceCount, dataFreshness: 'N/A' } : null,
+    contentAuthority != null ? { section: 'Content Analysis', confidence: contentAuthority, evidenceStrength: null, sourceCount: seoSourceCount, dataFreshness: 'N/A' } : null,
+    aiVisibility != null ? { section: 'AI/GEO Visibility', confidence: aiVisibility, evidenceStrength: null, sourceCount: seoSourceCount, dataFreshness: 'N/A' } : null,
+  ].filter(Boolean), [technicalHealth, data.keywordIntelligence, contentAuthority, aiVisibility, seoSourceCount]);
 
   const filterOptions = [
     { key: 'impact', label: 'Impact', values: ['High', 'Medium', 'Low'] },
@@ -822,9 +793,9 @@ function ExecutiveDashboard({ data }: { data: any }) {
       {/* Phase 6C: Compare + Confidence */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         <CompareResults metrics={[
-          overallSeoScore != null ? { label: 'SEO Score', current: overallSeoScore, previous: (overallSeoScore) - 5 } : null,
-          technicalHealth != null ? { label: 'Technical Health', current: technicalHealth, previous: (technicalHealth) - 8 } : null,
-          contentAuthority != null ? { label: 'Content Authority', current: contentAuthority, previous: (contentAuthority) - 3 } : null,
+          overallSeoScore != null ? { label: 'SEO Score', current: overallSeoScore, previous: null } : null,
+          technicalHealth != null ? { label: 'Technical Health', current: technicalHealth, previous: null } : null,
+          contentAuthority != null ? { label: 'Content Authority', current: contentAuthority, previous: null } : null,
         ].filter(Boolean)} />
         <ConfidenceVisualization items={confidenceData} />
       </div>
@@ -903,7 +874,7 @@ function ExecutiveStory({ data }: { data: any }) {
     perplexityScore: data.geoIntelligence?.perplexityScore ?? null,
     topOpportunities: (data.geoIntelligence?.aiContentOpportunities || []).slice(0, 5).map((o: any) => ({
       opportunity: o.opportunity || o.type || '',
-      impact: o.impact || o.priority || 'Medium'
+      impact: o.impact || o.priority || ''
     }))
   };
   const risks = story.mainRisks || [];
@@ -1787,7 +1758,7 @@ function ContentGaps({ data }: { data: any }) {
               <div key={i} className="list-row" style={{ borderLeft: '4px solid #ff4757', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '10px', background: '#151d2b', padding: '15px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                   <b style={{ fontSize: '15px' }}>{asText(g?.title || g?.pageTitle, g?.targetKeyword || 'Content opportunity')}</b>
-                  <Badge className="pink">{asText(g?.priority || g?.businessImpact || 'High')}</Badge>
+                  <Badge className="pink">{asText(g?.priority || g?.businessImpact || '')}</Badge>
                 </div>
                 {g.source && g.source !== 'Unavailable' && (
                   <Badge className="blue" style={{ fontSize: '10px' }}>{renderSafeValue(g.source)}</Badge>
@@ -2109,18 +2080,18 @@ function ActionPlan({ data }: { data: any }) {
                (data.technicalAudit?.recommendations || data.contentGaps?.contentGaps || data.blogIntelligence?.blogIdeas ? {
                  immediate: (data.technicalAudit?.recommendations || []).slice(0, 3).map((r: any) => ({ 
                    title: r.recommendation || r.title || r.issue || String(r), 
-                   priority: 'High', 
-                   reason: r.impact || r.area || 'Technical improvement' 
+                   priority: r.priority || r.severity || '', 
+                   reason: r.impact || r.area || '' 
                  })),
                  day7: (data.contentGaps?.contentGaps || data.contentGaps || []).slice(0, 3).map((g: any) => ({ 
                    title: g.title || g.topic || String(g), 
-                   priority: g.severity || g.priority || 'Medium', 
-                   reason: g.reason || g.description || g.opportunity || 'Content gap to address' 
+                   priority: g.severity || g.priority || '', 
+                   reason: g.reason || g.description || g.opportunity || '' 
                  })),
                  day30: (data.keywordIntelligence?.contentOpportunities || []).filter((o: any) => isStrongKeyword(o.title || o.keyword || '')).slice(0, 3).map((o: any) => ({ 
                    title: o.title || o.keyword || String(o), 
-                   priority: 'Medium', 
-                   reason: o.reason || 'Keyword opportunity' 
+                   priority: o.priority || o.severity || '', 
+                   reason: o.reason || '' 
                  })),
                  day60: [],
                  day90: []
@@ -2189,8 +2160,8 @@ function ActionPlan({ data }: { data: any }) {
                   <div key={i} style={{ background: '#151d2b', padding: '15px', borderRadius: '8px', borderLeft: '3px solid #53a7ff', boxShadow: '0 4px 6px rgba(0,0,0,0.2)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
                       <b style={{ fontSize: '14px', lineHeight: '1.4' }}>{asText(item?.title || item?.action || item?.task || item?.step)}</b>
-                      <Badge className={(asText(item?.priority || 'High') || '').toLowerCase().includes('high') ? 'pink' : 'blue'}>
-                        {asText(item?.priority || 'High')}
+                      <Badge className={(asText(item?.priority || '') || '').toLowerCase().includes('high') ? 'pink' : 'blue'}>
+                        {asText(item?.priority || '')}
                       </Badge>
                     </div>
                     <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#9aa7bd', lineHeight: '1.5' }}>

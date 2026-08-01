@@ -1,4 +1,4 @@
-export function generateExecutiveStory(intelligence) {
+export function generateExecutiveStory(intelligence, context = {}) {
   const company = intelligence.companyIntelligence || {};
   const technology = intelligence.technologyIntelligence || {};
   const pricing = intelligence.pricingIntelligence || {};
@@ -12,11 +12,26 @@ export function generateExecutiveStory(intelligence) {
   const evidenceSources = evidence.sources || [];
   const evidenceWarnings = evidence.warnings || [];
 
+  // Growth Workspace context: real evidence + scores from the unified pipeline
+  const growthSummary = context.growthSummary || null;
+  const evidenceGrowthData = context.evidenceGrowthData || null;
+  const researchData = context.researchData || null;
+
   const confidenceLevel = evidenceSources.length > 5 ? 'High' : evidenceSources.length > 0 ? 'Medium' : 'Low';
 
   const allCompetitors = (competitors.direct || []).concat(competitors.indirect || []);
   const directCompetitorNames = (competitors.direct || []).map(c => c.name).join(', ') || 'Unknown';
   const personifyCount = (audience.personas || []).length;
+
+  // Evidence-backed market sizing: BI value first, then keyword-derived estimate
+  let tamValue = market.tam;
+  if (tamValue === 'Unknown' || tamValue === null) {
+    const verifiedKeywords = (researchData?.keywords || []).filter((k) => k && k.keyword && Number(k.searchVolume) > 0);
+    if (verifiedKeywords.length > 0) {
+      const totalVolume = verifiedKeywords.slice(0, 25).reduce((sum, k) => sum + Number(k.searchVolume), 0);
+      tamValue = `Estimated from ${verifiedKeywords.length} verified keywords (${totalVolume.toLocaleString()} combined monthly searches)`;
+    }
+  }
 
   return {
     executiveSummary: {
@@ -29,7 +44,13 @@ export function generateExecutiveStory(intelligence) {
       evidenceSourcesUsed: evidenceSources.length,
       dataGaps: evidenceWarnings.length,
       reportType: 'Enterprise Business Intelligence 2.0',
-      version: '2.0.0'
+      version: '2.0.0',
+      ...(growthSummary ? {
+        growthScore: growthSummary.overallGrowthScore ?? null,
+        dataCompletenessScore: growthSummary.dataCompletenessScore ?? null,
+        evidenceBasedCount: growthSummary.evidenceBasedCount ?? null,
+        hypothesisCount: growthSummary.hypothesisCount ?? null,
+      } : {})
     },
     companyOverview: {
       name: companyName,
@@ -101,7 +122,7 @@ export function generateExecutiveStory(intelligence) {
       }
     },
     marketPosition: {
-      tam: market.tam ?? 'Unknown',
+      tam: tamValue ?? 'Unknown',
       sam: market.sam ?? 'Unknown',
       som: market.som ?? 'Unknown',
       growthRate: market.growthRate ?? 'Unknown',
@@ -110,24 +131,24 @@ export function generateExecutiveStory(intelligence) {
       indirectCompetitors: (competitors.indirect || []).length,
       totalCompetitorsIdentified: allCompetitors.length,
       evidence: {
-        source: market.tam !== 'Unknown' ? 'DataForSEO & Tavily market analysis' : 'Unknown',
-        confidence: market.tam !== 'Unknown' ? 75 : 0,
+        source: tamValue !== 'Unknown' ? 'DataForSEO & Tavily market analysis' : 'Unknown',
+        confidence: tamValue !== 'Unknown' ? 75 : 0,
         collectedAt: new Date().toISOString()
       }
     },
     swot: {
-      strengths: generateStrengths(company, technology, pricing),
-      weaknesses: generateWeaknesses(company, technology, pricing, evidenceWarnings),
-      opportunities: generateOpportunities(market, competitors, audience),
-      threats: generateThreats(competitors, market, evidenceWarnings),
+      strengths: generateStrengths(company, technology, pricing, context),
+      weaknesses: generateWeaknesses(company, technology, pricing, evidenceWarnings, context),
+      opportunities: generateOpportunities(market, competitors, audience, context),
+      threats: generateThreats(competitors, market, evidenceWarnings, context),
       evidence: {
         source: 'Synthesized from all intelligence sources',
         confidence: evidenceSources.length > 3 ? 75 : 50,
         collectedAt: new Date().toISOString()
       }
     },
-    keyFindings: generateKeyFindings(company, competitors, market, technology, audience, pricing, evidenceWarnings),
-    topPriorities: generateTopPriorities(company, competitors, market, technology, audience, pricing),
+    keyFindings: generateKeyFindings(company, competitors, market, technology, audience, pricing, evidenceWarnings, context),
+    topPriorities: generateTopPriorities(company, competitors, market, technology, audience, pricing, context),
     executiveRecommendation: generateExecutiveRecommendation({
       company,
       competitors,
@@ -136,7 +157,9 @@ export function generateExecutiveStory(intelligence) {
       audience,
       pricing,
       confidenceLevel,
-      evidenceSources
+      evidenceSources,
+      growthSummary,
+      tamValue
     })
   };
 }
@@ -179,8 +202,11 @@ function inferProductMaturity(company, competitors) {
   return 'Unknown - Insufficient evidence';
 }
 
-function generateStrengths(company, technology, pricing) {
+function generateStrengths(company, technology, pricing, context = {}) {
   const strengths = [];
+  const evCompany = context.evidenceGrowthData?.companyOverview || {};
+  const evProduct = context.evidenceGrowthData?.productIntelligence || {};
+  const evTech = context.evidenceGrowthData?.technicalSeo || {};
   if (company.employeeEstimate !== 'Unknown' && parseInt(company.employeeEstimate) > 20) {
     strengths.push({ value: `Established team of ${company.employeeEstimate} employees indicating operational capacity`, confidence: null, impact: 'High' });
   }
@@ -196,14 +222,24 @@ function generateStrengths(company, technology, pricing) {
   if (company.socialChannels?.length > 2) {
     strengths.push({ value: `Active presence on ${company.socialChannels.length}+ social channels`, confidence: null, impact: 'Medium' });
   }
+  if (evTech?.performanceScore != null) {
+    strengths.push({ value: `PageSpeed performance of ${evTech.performanceScore}/100 indicates a technically sound web experience`, confidence: 80, impact: 'Medium' });
+  }
+  if ((evProduct?.features || []).length > 0) {
+    strengths.push({ value: `${evProduct.features.length} features verified directly from website content analysis`, confidence: 80, impact: 'Medium' });
+  }
+  if (evCompany?.hasBlog) {
+    strengths.push({ value: 'Active blog detected on website supporting content-led acquisition', confidence: 75, impact: 'Low' });
+  }
   if (strengths.length === 0) {
     strengths.push({ value: 'Insufficient evidence to determine strengths', confidence: 0, impact: 'Low' });
   }
   return strengths;
 }
 
-function generateWeaknesses(company, technology, pricing, warnings) {
+function generateWeaknesses(company, technology, pricing, warnings, context = {}) {
   const weaknesses = [];
+  const evTech = context.evidenceGrowthData?.technicalSeo || {};
   if (pricing.tiers?.length === 0 && !pricing.hasFree && !pricing.hasTrial) {
     weaknesses.push({ value: 'Pricing information not publicly available on website', confidence: null, impact: 'High' });
   }
@@ -219,13 +255,19 @@ function generateWeaknesses(company, technology, pricing, warnings) {
   if (warnings?.length > 0) {
     weaknesses.push({ value: `${warnings.length} data quality warnings during intelligence collection`, confidence: null, impact: 'Medium' });
   }
+  if (evTech?.performanceScore != null && evTech.performanceScore < 70) {
+    weaknesses.push({ value: `PageSpeed performance of ${evTech.performanceScore}/100 is below the 70-point threshold — conversion and SEO may suffer`, confidence: 80, impact: 'High' });
+  }
+  if (context.evidenceGrowthData?.sourceSummary?.missingSources?.length) {
+    weaknesses.push({ value: `Unavailable evidence sources: ${context.evidenceGrowthData.sourceSummary.missingSources.slice(0, 4).join(', ')}`, confidence: null, impact: 'Medium' });
+  }
   if (weaknesses.length === 0) {
     weaknesses.push({ value: 'Insufficient evidence to determine weaknesses', confidence: 0, impact: 'Low' });
   }
   return weaknesses;
 }
 
-function generateOpportunities(market, competitors, audience) {
+function generateOpportunities(market, competitors, audience, context = {}) {
   const opportunities = [];
   if (market.trends?.length > 0) {
     const topTrends = market.trends.slice(0, 3);
@@ -244,13 +286,22 @@ function generateOpportunities(market, competitors, audience) {
   if ((competitors.direct || []).length === 0) {
     opportunities.push({ value: 'Potential first-mover advantage in identified market space', confidence: null, impact: 'High' });
   }
+  const signals = context.evidenceGrowthData?.growthSignals || [];
+  for (const s of signals.slice(0, 3)) {
+    if (s.signal) opportunities.push({ value: `Growth signal: ${s.signal}`, confidence: s.confidence ?? null, impact: 'High' });
+  }
+  const verifiedKeywords = (context.researchData?.keywords || []).filter((k) => k && k.keyword && Number(k.searchVolume) > 0);
+  if (verifiedKeywords.length > 0) {
+    const totalVolume = verifiedKeywords.slice(0, 25).reduce((sum, k) => sum + Number(k.searchVolume), 0);
+    opportunities.push({ value: `${verifiedKeywords.length} verified keywords with real search demand (${totalVolume.toLocaleString()} combined monthly searches) — a measurable acquisition surface`, confidence: 70, impact: 'High' });
+  }
   if (opportunities.length === 0) {
     opportunities.push({ value: 'Insufficient evidence to determine opportunities', confidence: 0, impact: 'Low' });
   }
   return opportunities;
 }
 
-function generateThreats(competitors, market, warnings) {
+function generateThreats(competitors, market, warnings, context = {}) {
   const threats = [];
   if ((competitors.direct || []).length > 3) {
     threats.push({ value: `High competitive intensity with ${competitors.direct.length} direct competitors`, confidence: null, impact: 'High' });
@@ -263,13 +314,16 @@ function generateThreats(competitors, market, warnings) {
   if (warnings?.length > 3) {
     threats.push({ value: 'Data quality gaps may indicate opaque market positioning', confidence: null, impact: 'Medium' });
   }
+  if (context.growthSummary?.primaryRisk) {
+    threats.push({ value: context.growthSummary.primaryRisk, confidence: null, impact: 'High' });
+  }
   if (threats.length === 0) {
     threats.push({ value: 'Insufficient evidence to determine threats', confidence: 0, impact: 'Low' });
   }
   return threats;
 }
 
-function generateKeyFindings(company, competitors, market, technology, audience, pricing, warnings) {
+function generateKeyFindings(company, competitors, market, technology, audience, pricing, warnings, context = {}) {
   const findings = [];
   const directCount = (competitors.direct || []).length;
   const indirectCount = (competitors.indirect || []).length;
@@ -294,13 +348,43 @@ function generateKeyFindings(company, competitors, market, technology, audience,
   });
 
   findings.push({
-    finding: market.tam !== 'Unknown'
+    finding: market.tam !== 'Unknown' && market.tam !== null
       ? `Total Addressable Market estimated at ${market.tam} with growth rate of ${market.growthRate || 'Unknown'}.`
       : 'Market size (TAM/SAM/SOM) could not be verified from available data sources.',
-    confidence: market.tam !== 'Unknown' ? 75 : 0,
-    evidence: market.tam !== 'Unknown' ? 'DataForSEO keyword data and Tavily market signals' : 'Unknown',
+    confidence: market.tam !== 'Unknown' && market.tam !== null ? 75 : 0,
+    evidence: market.tam !== 'Unknown' && market.tam !== null ? 'DataForSEO keyword data and Tavily market signals' : 'Unknown',
     impact: 'High'
   });
+
+  const verifiedKeywords = (context.researchData?.keywords || []).filter((k) => k && k.keyword && Number(k.searchVolume) > 0);
+  if (verifiedKeywords.length > 0) {
+    const totalVolume = verifiedKeywords.slice(0, 25).reduce((sum, k) => sum + Number(k.searchVolume), 0);
+    findings.push({
+      finding: `${verifiedKeywords.length} keywords verified with real search volume (${totalVolume.toLocaleString()} combined monthly searches), giving a measurable demand baseline.`,
+      confidence: 80,
+      evidence: 'DataForSEO keyword metrics',
+      impact: 'High'
+    });
+  }
+
+  const signals = context.evidenceGrowthData?.growthSignals || [];
+  if (signals.length > 0) {
+    findings.push({
+      finding: `Website evidence surfaced ${signals.length} growth signal(s): ${signals.slice(0, 2).map((s) => s.signal).join('; ')}.`,
+      confidence: signals[0]?.confidence ?? 70,
+      evidence: 'Website scanning and structured data analysis',
+      impact: 'High'
+    });
+  }
+
+  if (context.growthSummary?.overallGrowthScore != null) {
+    findings.push({
+      finding: `Growth Workspace assessment scored the company ${context.growthSummary.overallGrowthScore}/100 overall (${context.growthSummary.evidenceBasedCount ?? 0} evidence-backed dimensions, ${context.growthSummary.hypothesisCount ?? 0} hypotheses).`,
+      confidence: context.growthSummary.confidenceScore ?? null,
+      evidence: 'Unified growth scoring across 12 dimensions',
+      impact: 'High'
+    });
+  }
 
   if (technology.technologies?.length > 0) {
     findings.push({
@@ -332,14 +416,43 @@ function generateKeyFindings(company, competitors, market, technology, audience,
   return findings;
 }
 
-function generateTopPriorities(company, competitors, market, technology, audience, pricing) {
+function generateTopPriorities(company, competitors, market, technology, audience, pricing, context = {}) {
   const priorities = [];
   const directCount = (competitors.direct || []).length;
   const totalCompetitors = directCount + (competitors.indirect || []).length;
 
-  if (totalCompetitors === 0) {
+  // Evidence-derived priorities from the Growth Workspace take precedence
+  const growthSummary = context.growthSummary || {};
+  if (growthSummary.topRecommendation) {
     priorities.push({
       priority: 1,
+      action: growthSummary.topRecommendation,
+      rationale: 'Highest-leverage move identified from combined evidence and scoring.',
+      roi: 'Direct impact on the strongest growth dimension',
+      timeline: '0-30 days',
+      owner: 'Growth Team',
+      kpi: 'Progress on the top growth dimension',
+      evidence: 'Derived from verified evidence and the unified 12-dimension growth score.',
+      confidence: growthSummary.confidenceScore ?? null
+    });
+  }
+  if (growthSummary.immediateAction) {
+    priorities.push({
+      priority: 2,
+      action: growthSummary.immediateAction,
+      rationale: 'Actionable from currently collected evidence without additional research.',
+      roi: 'Quick win with existing evidence',
+      timeline: '0-14 days',
+      owner: 'Growth Team',
+      kpi: 'Execution of the immediate action',
+      evidence: 'Derived from website evidence and growth signals.',
+      confidence: growthSummary.confidenceScore ?? null
+    });
+  }
+
+  if (totalCompetitors === 0) {
+    priorities.push({
+      priority: priorities.length + 1,
       action: 'Establish competitive intelligence foundation',
       rationale: 'No competitors identified. Conduct primary market research to identify and profile competitors.',
       roi: 'Critical foundation for all strategic decisions',
@@ -351,7 +464,7 @@ function generateTopPriorities(company, competitors, market, technology, audienc
     });
   } else {
     priorities.push({
-      priority: 1,
+      priority: priorities.length + 1,
       action: 'Deepen competitive analysis with feature-level comparison',
       rationale: `${directCount} direct competitors identified. Feature-level comparison needed to identify differentiation opportunities.`,
       roi: 'Informs product roadmap and positioning strategy',
@@ -365,7 +478,7 @@ function generateTopPriorities(company, competitors, market, technology, audienc
 
   if (market.tam === 'Unknown' || market.tam === null) {
     priorities.push({
-      priority: 2,
+      priority: priorities.length + 1,
       action: 'Commission verified market sizing report',
       rationale: 'TAM/SAM/SOM not available from current data sources. Industry report integration required.',
       roi: 'Quantified market opportunity for investor and strategic planning',
@@ -377,7 +490,7 @@ function generateTopPriorities(company, competitors, market, technology, audienc
     });
   } else {
     priorities.push({
-      priority: 2,
+      priority: priorities.length + 1,
       action: 'Validate and refine market size estimates',
       rationale: `TAM of ${market.tam} identified. Cross-validate with industry reports for investor-grade accuracy.`,
       roi: 'Investor confidence and accurate market planning',
@@ -391,7 +504,7 @@ function generateTopPriorities(company, competitors, market, technology, audienc
 
   if ((audience.personas || []).length < 2) {
     priorities.push({
-      priority: 3,
+      priority: priorities.length + 1,
       action: 'Develop evidence-based buyer personas',
       rationale: 'Insufficient persona data for targeted marketing. Primary research required.',
       roi: 'Improved targeting, messaging, and conversion rates',
@@ -404,7 +517,7 @@ function generateTopPriorities(company, competitors, market, technology, audienc
   }
 
   priorities.push({
-    priority: 4,
+    priority: priorities.length + 1,
     action: 'Define and implement GTM strategy',
     rationale: 'Channel and messaging strategy needed based on competitive and audience intelligence.',
     roi: 'Efficient customer acquisition and market penetration',
@@ -416,7 +529,7 @@ function generateTopPriorities(company, competitors, market, technology, audienc
   });
 
   priorities.push({
-    priority: 5,
+    priority: priorities.length + 1,
     action: 'Establish continuous intelligence monitoring',
     rationale: 'Markets and competitors evolve. Ongoing intelligence collection required for sustained advantage.',
     roi: 'Early warning of competitive threats and market opportunities',
@@ -438,10 +551,12 @@ function generateExecutiveRecommendation({
   audience,
   pricing,
   confidenceLevel,
-  evidenceSources = []
+  evidenceSources = [],
+  growthSummary = null,
+  tamValue = null
 }) {
   const directCount = (competitors.direct || []).length;
-  const hasMarket = market.tam !== 'Unknown' && market.tam !== null;
+  const hasMarket = tamValue !== null && tamValue !== undefined && tamValue !== 'Unknown';
   const hasPersonas = (audience.personas || []).length > 0;
   const hasTech = (technology.technologies || []).length > 0;
 
@@ -466,11 +581,15 @@ function generateExecutiveRecommendation({
       recommendation += ` The competitive landscape includes ${directCount} direct competitors, suggesting a structured differentiation strategy should be maintained.`;
     }
     if (hasMarket) {
-      recommendation += ` The addressable market (TAM: ${market.tam}) provides sufficient headroom for growth.`;
+      recommendation += ` The addressable market (TAM: ${tamValue}) provides sufficient headroom for growth.`;
     }
     if (hasTech) {
       recommendation += ' The technology stack is well-defined and can support scaling efforts.';
     }
+  }
+
+  if (growthSummary?.primaryRisk) {
+    recommendation += ` Primary risk to monitor: ${growthSummary.primaryRisk}`;
   }
 
   return {
@@ -478,6 +597,7 @@ function generateExecutiveRecommendation({
     confidenceLevel,
     basedOn: evidenceSummary(evidenceSources),
     nextSteps: [
+      ...(growthSummary?.topRecommendation ? [growthSummary.topRecommendation] : []),
       hasMarket ? 'Validate market size with secondary sources' : 'Commission market sizing report',
       directCount > 0 ? 'Build competitive feature matrix' : 'Identify and profile competitors',
       hasPersonas ? 'Activate targeted campaigns based on personas' : 'Develop buyer personas',

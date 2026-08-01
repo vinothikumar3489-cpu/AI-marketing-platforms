@@ -4,40 +4,46 @@ export class RelationshipStore {
   }
 
   async upsert({ fromId, toId, type, reason, sources, chatId, confidence, metadata }) {
-    const rel = await this._prisma.graphRelationship.upsert({
+    const existing = await this._prisma.graphRelationship.findUnique({
       where: { fromId_toId_type: { fromId, toId, type } },
-      create: {
-        fromId, toId, type,
-        reason: reason || null,
-        sources: sources || [],
-        chatId: chatId || null,
-        confidence: Math.min(confidence || 0.7, 1.0),
-        evidenceCount: 1,
-        metadata: metadata || {},
-      },
-      update: {
-        reason: reason || undefined,
-        sources: sources ? this._mergeSources(null, sources) : undefined,
-        chatId: chatId || undefined,
-        confidence: { increment: 0.1 },
-        evidenceCount: { increment: 1 },
-        metadata: metadata || undefined,
-      },
     });
 
-    return rel;
+    if (!existing) {
+      return this._prisma.graphRelationship.create({
+        data: {
+          fromId, toId, type,
+          reason: reason || null,
+          sources: sources || [],
+          chatId: chatId || null,
+          confidence: Math.min(confidence || 0.7, 1.0),
+          evidenceCount: 1,
+          metadata: metadata || {},
+        },
+      });
+    }
+
+    // Update path: UNION sources so evidence provenance is never lost.
+    return this._prisma.graphRelationship.update({
+      where: { id: existing.id },
+      data: {
+        reason: reason || existing.reason,
+        sources: this._mergeSources(existing.sources, sources),
+        chatId: chatId || existing.chatId,
+        confidence: this._round(Math.min((existing.confidence || 0.7) + 0.1, 1.0)),
+        evidenceCount: (existing.evidenceCount || 1) + 1,
+        metadata: this._mergeMetadata(existing.metadata, metadata),
+      },
+    });
+  }
+
+  async updateConfidence(id, adjustment) {
+    return this._prisma.graphRelationship.update({
+      where: { id },
+      data: { confidence: { increment: adjustment } },
+    });
   }
 
   async findByEntity(entityId, opts = {}) {
-    const where = {
-      OR: [
-        { fromId: entityId },
-        ...(opts.direction === 'outgoing' ? [] : [{ toId: entityId }]),
-      ],
-    };
-    if (opts.type) where.type = opts.type;
-    if (opts.minConfidence) where.confidence = { gte: opts.minConfidence };
-
     const outgoing = opts.direction !== 'incoming'
       ? await this._prisma.graphRelationship.findMany({
           where: { fromId: entityId, ...(opts.type ? { type: opts.type } : {}) },
@@ -121,5 +127,14 @@ export class RelationshipStore {
       if (s) set.add(s);
     }
     return Array.from(set);
+  }
+
+  _round(value) {
+    return Math.round((value || 0) * 10000) / 10000;
+  }
+
+  _mergeMetadata(existing, incoming) {
+    if (!incoming || typeof incoming !== 'object') return existing || {};
+    return { ...(existing || {}), ...incoming };
   }
 }

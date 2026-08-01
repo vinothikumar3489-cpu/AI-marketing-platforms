@@ -3,7 +3,7 @@ import { FileText, Target, Search, Code, Copy, Settings, HelpCircle, Activity, C
 import SafeValue from '../SafeValue';
 
 export const PriorityBadge = ({ priority }: { priority: string }) => {
-  const p = (priority && typeof priority === 'string' ? priority.toLowerCase() : '') || 'medium';
+  const p = (priority && typeof priority === 'string' ? priority.toLowerCase() : '') || '';
   let color = '#ffa502';
   let bg = 'rgba(255, 165, 2, 0.1)';
   let icon = '🟡';
@@ -31,7 +31,7 @@ export const PriorityBadge = ({ priority }: { priority: string }) => {
       alignItems: 'center',
       gap: '6px'
     }}>
-      {icon} {priority || 'Medium'} PRIORITY
+      {icon} {priority || 'N/A'} PRIORITY
     </span>
   );
 };
@@ -178,12 +178,12 @@ export const PriorityCard = ({ data }: { data: any }) => {
   // Render technical action card
   if (isTechnical) {
     const title = data.title || data.action || data.issue || 'Technical Issue';
-    const priority = data.priority || data.severity || 'High';
-    const description = data.description || data.reason || data.whyItMatters || 'Fix this technical issue to improve SEO performance.';
-    const impact = data.impact || data.expectedImpact || data.technicalImpact || 'Improved SEO score';
-    const difficulty = data.difficulty || data.implementationDifficulty || 'Medium';
-    const time = data.estimatedTime || data.time || '1-2 hours';
-    const source = data.source || 'Technical Audit';
+    const priority = data.priority || data.severity || '';
+    const description = data.description || data.reason || data.whyItMatters;
+    const impact = data.impact || data.expectedImpact || data.technicalImpact;
+    const difficulty = data.difficulty || data.implementationDifficulty;
+    const time = data.estimatedTime || data.time;
+    const source = data.source;
     const affectedMetric = data.affectedMetric || data.metric || 'N/A';
 
     return (
@@ -231,10 +231,10 @@ export const PriorityCard = ({ data }: { data: any }) => {
   // Render GEO/AI visibility action card
   if (isGEO) {
     const title = data.title || data.action || data.opportunity || 'AI Visibility Opportunity';
-    const priority = data.priority || 'High';
-    const description = data.description || data.reason || 'Improve AI search engine visibility.';
-    const platforms = data.platforms || data.aiPlatforms || ['ChatGPT', 'Gemini', 'Claude'];
-    const impact = data.impact || data.expectedImpact || '+25% AI Traffic';
+    const priority = data.priority || '';
+    const description = data.description || data.reason;
+    const platforms = Array.isArray(data.platforms || data.aiPlatforms) ? (data.platforms || data.aiPlatforms) : [];
+    const impact = data.impact || data.expectedImpact;
 
     return (
       <div style={{
@@ -255,9 +255,9 @@ export const PriorityCard = ({ data }: { data: any }) => {
         <div style={{ marginBottom: '12px' }}>
           <span style={{ display: 'block', fontSize: '11px', color: '#9aa7bd', textTransform: 'uppercase', marginBottom: '6px' }}>Target Platforms</span>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-            {Array.isArray(platforms) ? platforms.map((p, i) => (
+            {Array.isArray(platforms) && platforms.length > 0 ? platforms.map((p, i) => (
               <span key={i} style={{ background: '#1d2738', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', color: '#e2e8f0' }}><SafeValue value={p} /></span>
-            )) : <span style={{ fontSize: '13px', color: '#e2e8f0' }}><SafeValue value={platforms} /></span>}
+            )) : <span style={{ fontSize: '13px', color: '#9aa7bd' }}>—</span>}
           </div>
         </div>
         <div style={{ background: '#0b1220', padding: '12px', borderRadius: '6px' }}>
@@ -270,22 +270,22 @@ export const PriorityCard = ({ data }: { data: any }) => {
   
   // Default: Render content/landing page card (original behavior)
   const title = data.pageTitle || data.title || data.action || data.opportunity || 'Recommendation';
-  const priority = data.priority || data.impact || 'High';
-  const contentType = data.contentType || 'Landing Page';
+  const priority = data.priority || data.impact || '';
+  const contentType = data.contentType;
   const targetKeyword = data.targetKeyword || data.keyword || 'Target Keyword Missing';
-  const searchIntent = data.searchIntent || data.intent || 'Informational';
-  const suggestedH1 = data.suggestedH1 || data.h1 || title;
-  const whyItMatters = data.whyItMatters || data.reason || data.description || 'Improve search visibility and traffic potential.';
-  const sections = data.contentSections || data.sections || ['Introduction', 'Core Benefits', 'Next Steps'];
-  const cta = data.CTASuggestion || data.cta || 'Explore Features';
+  const searchIntent = data.searchIntent || data.intent;
+  const suggestedH1 = data.suggestedH1 || data.h1;
+  const whyItMatters = data.whyItMatters || data.reason || data.description;
+  const sections = data.contentSections || data.sections || [];
+  const cta = data.CTASuggestion || data.cta;
   const rawScore = data.opportunityScore ?? data.confidenceScore ?? data.score ?? null;
   const score = typeof rawScore === 'object' && rawScore !== null ? (rawScore.value ?? rawScore.score ?? null) : rawScore;
 
   // Extract expected impacts
-  const estimatedTraffic = data.estimatedTraffic || '+18% Organic Traffic';
-  const visibility = data.aiVisibility || 'Better AI Visibility';
-  const difficulty = data.implementationDifficulty || data.difficulty || 'Medium';
-  const time = data.estimatedTime || data.time || '2 Days';
+  const estimatedTraffic = data.estimatedTraffic;
+  const visibility = data.aiVisibility;
+  const difficulty = data.implementationDifficulty || data.difficulty;
+  const time = data.estimatedTime || data.time;
 
   return (
     <div style={{

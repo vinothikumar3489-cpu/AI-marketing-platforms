@@ -8,6 +8,11 @@ const CALENDAR_TYPES = {
 
 export { CALENDAR_TYPES };
 
+function unwrapSourced(v) {
+  if (v && typeof v === 'object' && 'value' in v && 'source' in v) return v.value;
+  return v;
+}
+
 export async function generateSocialCalendar(calendarType, context) {
   const typeConfig = CALENDAR_TYPES[calendarType];
   if (!typeConfig) throw new Error(`Unknown calendar type: ${calendarType}`);
@@ -17,10 +22,14 @@ export async function generateSocialCalendar(calendarType, context) {
 
   const evidenceLines = [];
   if (productUsp) evidenceLines.push(`Product USP: ${productUsp}`);
-  if (evidence?.website?.featuresText?.length) evidenceLines.push(`Product Features: ${evidence.website.featuresText.slice(0, 5).join('; ')}`);
-  if (evidence?.website?.heroText) evidenceLines.push(`Website Hero: ${evidence.website.heroText}`);
-  if (evidence?.audience?.painPoints?.length) evidenceLines.push(`Audience Pain Points: ${evidence.audience.painPoints.slice(0, 3).join('; ')}`);
-  if (evidence?.seo?.contentOpportunities?.length) evidenceLines.push(`SEO Content Topics: ${evidence.seo.contentOpportunities.slice(0, 5).map(o => o.opportunity).join('; ')}`);
+  const featuresText = Array.isArray(unwrapSourced(evidence?.website?.featuresText)) ? unwrapSourced(evidence?.website?.featuresText) : [];
+  if (featuresText.length) evidenceLines.push(`Product Features: ${featuresText.slice(0, 5).join('; ')}`);
+  const websiteHero = unwrapSourced(evidence?.website?.heroText);
+  if (websiteHero) evidenceLines.push(`Website Hero: ${websiteHero}`);
+  const painPoints = Array.isArray(unwrapSourced(evidence?.audience?.painPoints)) ? unwrapSourced(evidence?.audience?.painPoints) : [];
+  if (painPoints.length) evidenceLines.push(`Audience Pain Points: ${painPoints.slice(0, 3).join('; ')}`);
+  const seoGaps = Array.isArray(unwrapSourced(evidence?.seo?.contentGaps)) ? unwrapSourced(evidence?.seo?.contentGaps) : [];
+  if (seoGaps.length) evidenceLines.push(`SEO Content Topics: ${seoGaps.slice(0, 5).map(o => typeof o === 'string' ? o : (o.opportunity || o.title || '')).filter(Boolean).join('; ')}`);
   if (evidence?.sourceSummary?.sourcesCollected?.length) evidenceLines.push(`Evidence Sources: ${evidence.sourceSummary.sourcesCollected.join(', ')}`);
 
   const prompt = `Generate a ${typeConfig.label} (${typeConfig.days} days) social media content calendar. Use ONLY the verified product/company data below. Every post topic must reference actual product features, audience pain points, or evidence-backed content opportunities.

@@ -15,10 +15,10 @@ export default function ExecutiveStoryPage() {
   const { product, market, audience, competitor, intent, positioning, campaign, channel } = fullResults;
 
   // Derive top insights for the executive summary
-  const topTrend = market?.marketTrends?.[0]?.value || 'Market expanding rapidly';
-  const topRisk = market?.risks?.[0]?.value || 'Growing competition';
+  const topTrend = market?.marketTrends?.[0]?.value || 'Not available';
+  const topRisk = market?.risks?.[0]?.value || 'Not available';
   const bestChannel = channel?.recommendedChannels?.[0]?.channel || null;
-  const expectedRoi = channel?.recommendedChannels?.[0]?.expectedRoi || null;
+  const expectedRoi = channel?.recommendedChannels?.[0]?.expectedRoi ?? null;
 
   return (
     <div className="page-container" style={{ animation: 'fadeIn 0.5s ease-out' }}>
@@ -28,7 +28,7 @@ export default function ExecutiveStoryPage() {
             Executive Story & Strategy
           </h1>
           <p className="subtitle" style={{ fontSize: '18px', color: '#9aa7bd', marginTop: '8px' }}>
-            A McKinsey-style comprehensive strategy document for {product?.productName || 'your business'}.
+            A comprehensive enterprise strategy document for {product?.productName || 'your business'}.
           </p>
         </div>
         <div className="dropdown" style={{ position: 'relative', marginTop: '4px' }}>
@@ -64,7 +64,7 @@ export default function ExecutiveStoryPage() {
             </div>
             <div style={{ padding: '15px', background: '#101622', borderRadius: '8px', borderLeft: '3px solid #53a7ff' }}>
               <h4 style={{ color: '#9aa7bd', margin: '0 0 5px 0' }}>Expected ROI</h4>
-              <div style={{ fontSize: '24px', color: '#fff', fontWeight: 'bold' }}>{expectedRoi != null ? `${renderSafeValue(expectedRoi)}%` : 'Not measured'}</div>
+              <div style={{ fontSize: '24px', color: '#fff', fontWeight: 'bold' }}>{typeof expectedRoi === 'number' ? `${expectedRoi}%` : renderSafeValue(expectedRoi) || 'Not measured'}</div>
             </div>
           </div>
           <div style={{ marginTop: '20px', padding: '20px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
@@ -80,7 +80,7 @@ export default function ExecutiveStoryPage() {
           <SectionTitle title="Market Dynamics" subtitle="Growth drivers and unexploited opportunities." />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px' }}>
             {(market?.opportunities || market?.growthOpportunities || []).slice(0, 4).map((opp: any, idx: number) => (
-              <InsightCard key={idx} insight={{ value: typeof opp === 'object' ? opp.value : opp, impact: typeof opp === 'object' ? opp.impact : 'High', confidence: typeof opp === 'object' ? opp.confidence : null }} icon={TrendingUp} />
+              <InsightCard key={idx} insight={{ value: typeof opp === 'object' ? opp.value : opp, impact: typeof opp === 'object' ? opp.impact : null, confidence: typeof opp === 'object' ? opp.confidence : null }} icon={TrendingUp} />
             ))}
           </div>
         </Card>

@@ -22,6 +22,7 @@ import { callAI } from "../ai/services/aiRouter.service.js";
 import { getSerpCompetitors, normalizeSerpCompetitors, getDomainData, isDataForSEOConfigured } from "./dataforseo.service.js";
 import { researchCompetitors } from "./tavily.service.js";
 import { cleanValue, cleanNumber } from "../utils/clean-value.util.js";
+import { memoize } from "../utils/research-cache.util.js";
 
 const DDG_URL = "https://html.duckduckgo.com/html/";
 const UA =
@@ -272,6 +273,8 @@ export async function discoverFromTavily(productName, industry, targetDomain, ma
 
     for (const name of names) {
       if (typeof name !== "string" || name.length < 2 || name.length > 80) continue;
+      // The domain is SYNTHESIZED from the company name — it must be flagged so
+      // consumers can distinguish measured domains from inferred ones.
       const domain = name.replace(/\s+/g, "").toLowerCase() + ".com";
       if (isNoiseDomain(domain) || domainMatchesTarget(domain, targetDomain)) continue;
       if (candidates.some((c) => c.domain === domain)) continue;
@@ -284,6 +287,7 @@ export async function discoverFromTavily(productName, industry, targetDomain, ma
         evidence: `Named as competitor by Tavily search across ${(result.queries || []).length} queries`,
         confidence: 55,
         category: null,
+        domainVerified: false,
       });
     }
     return candidates;
@@ -401,6 +405,8 @@ export async function discoverFromGitHub(productName, targetDomain, max = 5) {
           evidence: `GitHub repository "${repo.full_name}" (${repo.stargazers_count || 0}★) matches "${query}"`,
           confidence: 50,
           category: null,
+          // .github.io domains synthesized from repo names are not verified.
+          domainVerified: Boolean(homepage),
         });
       }
     }
@@ -493,6 +499,7 @@ export async function discoverFromProductHunt(productName, targetDomain, max = 5
       if (candidates.length >= max) return false;
       const name = $(el).attr("aria-label") || $(el).text().trim();
       if (!name || name.length < 2) return;
+      // Synthesized from the product name — never claimed as verified.
       const domain = name.replace(/\s+/g, "").toLowerCase() + ".com";
       if (isNoiseDomain(domain) || domainMatchesTarget(domain, targetDomain) || seen.has(domain)) return;
       seen.add(domain);
@@ -505,6 +512,7 @@ export async function discoverFromProductHunt(productName, targetDomain, max = 5
         evidence: `Listed on Product Hunt for query "${productName}"`,
         confidence: 50,
         category: null,
+        domainVerified: false,
       });
     });
     return candidates;
@@ -548,6 +556,8 @@ Rules:
           evidence: "AI reasoning from trained market knowledge (LOW confidence - verify manually)",
           confidence: 35,
           category: c.category || null,
+          // The AI provided a real website → verified; synthesized `.com` → not.
+          domainVerified: Boolean(c.website && extractDomain(c.website)),
         };
       });
   } catch (error) {
@@ -577,6 +587,8 @@ export function mergeAndRankCompetitors(sourceSets, targetDomain, max = 12) {
       if (candidate.website && !existing.website) existing.website = candidate.website;
       if (!existing.name || existing.name === existing.domain) existing.name = candidate.name;
       if (candidate.category && !existing.category) existing.category = candidate.category;
+      // Any measured source verifying the domain overrides an inferred one.
+      if (candidate.domainVerified) existing.domainVerified = true;
     } else {
       byDomain.set(domain, {
         name: candidate.name || domain,
@@ -588,6 +600,7 @@ export function mergeAndRankCompetitors(sourceSets, targetDomain, max = 12) {
         evidence: [candidate.evidence].filter(Boolean),
         snippets: [candidate.snippet].filter(Boolean),
         confidence: candidate.confidence || 40,
+        domainVerified: candidate.domainVerified === true,
         similarityScore: null,
         marketPosition: null,
         pricing: null,
@@ -768,6 +781,8 @@ export async function enrichCompetitorsWithPricing(competitors) {
 // ============================================
 // MAIN ENTRY
 // ============================================
+const COMPETITOR_CACHE_TTL_MS = 60 * 60 * 1000;
+
 export async function discoverCompetitors({
   websiteUrl,
   productName,
@@ -791,87 +806,110 @@ export async function discoverCompetitors({
 
   log(`Starting discovery for "${productName}" @ ${target}`);
 
-  const schemaCandidates = html ? discoverFromSchemaOrg(html, 6) : [];
-  if (schemaCandidates.length) sourcesUsed.push("schema_org");
-  else sourceFailures.push("schema_org");
+  // Memoized per (target, product, location, max, enrich) so the orchestrator,
+  // business intelligence and SEO phases of one run never re-issue the ~12
+  // source calls for the same competitor set. A cloned result is returned so
+  // callers cannot mutate the shared cache entry.
+  const cacheKey = `competitors:${target}|${(productName || "").toLowerCase()}|${location}|m:${max}|e:${enrich}`;
 
-  let candidates = [...schemaCandidates];
-  if (candidates.length < 4) {
-    const serp = await discoverFromSerp(productName, target, location, 10);
-    if (serp.length) {
-      sourcesUsed.push("dataforseo_serp");
-      candidates.push(...serp);
+  const result = await memoize(cacheKey, COMPETITOR_CACHE_TTL_MS, async () => {
+    const schemaCandidates = html ? discoverFromSchemaOrg(html, 6) : [];
+    if (schemaCandidates.length) sourcesUsed.push("schema_org");
+    else sourceFailures.push("schema_org");
+
+    let candidates = [...schemaCandidates];
+    if (candidates.length < 4) {
+      const serp = await discoverFromSerp(productName, target, location, 10);
+      if (serp.length) {
+        sourcesUsed.push("dataforseo_serp");
+        candidates.push(...serp);
+      } else {
+        sourceFailures.push("dataforseo_serp");
+      }
     } else {
-      sourceFailures.push("dataforseo_serp");
+      log("Skipped SERP - schema.org provided enough candidates");
     }
-  } else {
-    log("Skipped SERP - schema.org provided enough candidates");
-  }
 
-  if (candidates.length < 4) {
-    const links = html ? discoverFromWebsiteLinks(html, websiteUrl, target, 8) : [];
-    if (links.length) {
-      sourcesUsed.push("website_links");
-      candidates.push(...links);
-    } else {
-      sourceFailures.push("website_links");
+    if (candidates.length < 4) {
+      const links = html ? discoverFromWebsiteLinks(html, websiteUrl, target, 8) : [];
+      if (links.length) {
+        sourcesUsed.push("website_links");
+        candidates.push(...links);
+      } else {
+        sourceFailures.push("website_links");
+      }
     }
-  }
 
-  const [tavilyRes, ddgRes, exaRes, githubRes, phRes] = await Promise.allSettled([
-    candidates.length < 4 ? discoverFromTavily(productName, industry, target, 8) : Promise.resolve([]),
-    candidates.length < 4 ? discoverFromDuckDuckGo(productName, target, 8) : Promise.resolve([]),
-    candidates.length < 4 ? discoverFromExa(productName, target, 8) : Promise.resolve([]),
-    candidates.length < 4 ? discoverFromGitHub(productName, target, 5) : Promise.resolve([]),
-    candidates.length < 4 ? discoverFromProductHunt(productName, target, 5) : Promise.resolve([]),
-  ]);
+    // Web sources run in TWO waves: the highest-value free/keyed sources
+    // (Tavily + DuckDuckGo) go first in parallel; the remaining three only fire
+    // if the first wave still left the pool under the gate — so a rich first
+    // wave never over-fetches, and a poor one still gets full coverage at only
+    // two parallel round-trips of latency.
+    const wave1 = await Promise.allSettled([
+      candidates.length < 4 ? discoverFromTavily(productName, industry, target, 8) : Promise.resolve([]),
+      candidates.length < 4 ? discoverFromDuckDuckGo(productName, target, 8) : Promise.resolve([]),
+    ]);
 
-  const extra = [tavilyRes, ddgRes, exaRes, githubRes, phRes].map((r) =>
-    r.status === "fulfilled" ? r.value : []
-  );
-  if (extra.some((list) => list.length)) sourcesUsed.push("web_search_multi");
-  candidates.push(...extra.flat());
+    const wave1Results = wave1.map((r) => (r.status === "fulfilled" ? r.value : []));
+    if (wave1Results.some((list) => list.length)) sourcesUsed.push("web_search_multi");
+    candidates.push(...wave1Results.flat());
 
-  const merged = mergeAndRankCompetitors([candidates], target, max);
+    let wave2 = [];
+    if (candidates.length < 4) {
+      const settled = await Promise.allSettled([
+        discoverFromExa(productName, target, 8),
+        discoverFromGitHub(productName, target, 5),
+        discoverFromProductHunt(productName, target, 5),
+      ]);
+      wave2 = settled.map((r) => (r.status === "fulfilled" ? r.value : []));
+      if (wave2.some((list) => list.length)) sourcesUsed.push("web_search_multi");
+      candidates.push(...wave2.flat());
+    }
 
-  if (merged.length === 0) {
-    log("No competitors from any structured source - falling back to AI reasoning");
-    const ai = await discoverFromAI(productName, industry, target, 5);
-    sourcesUsed.push("ai_reasoning");
-    candidates.push(...ai);
-  }
+    let merged = mergeAndRankCompetitors([candidates], target, max);
 
-  let final = merged;
-  if (final.length < 3) {
-    const ai = await discoverFromAI(productName, industry, target, 5);
-    if (ai.length) sourcesUsed.push("ai_reasoning");
-    final = mergeAndRankCompetitors([candidates, ai], target, max);
-  }
+    if (merged.length === 0) {
+      log("No competitors from any structured source - falling back to AI reasoning");
+      const ai = await discoverFromAI(productName, industry, target, 5);
+      sourcesUsed.push("ai_reasoning");
+      candidates.push(...ai);
+    }
 
-  if (enrich && final.length > 0) {
-    log(`Enriching ${final.length} competitors with AI + domain data`);
-    final = await enrichCompetitorsWithAI(final, productName, industry);
-    final = await enrichCompetitorsWithPricing(final);
-    final = await enrichCompetitorsWithDomainData(final);
-  }
+    let final = merged;
+    if (final.length < 3) {
+      const ai = await discoverFromAI(productName, industry, target, 5);
+      if (ai.length) sourcesUsed.push("ai_reasoning");
+      final = mergeAndRankCompetitors([candidates, ai], target, max);
+    }
 
-  const missingFields = {
-    pricing: final.filter((c) => !c.pricing).length,
-    strengths: final.filter((c) => !c.strengths?.length).length,
-    traffic: final.filter((c) => !c.trafficEstimate && !c.organicTraffic).length,
-  };
+    if (enrich && final.length > 0) {
+      log(`Enriching ${final.length} competitors with AI + domain data`);
+      final = await enrichCompetitorsWithAI(final, productName, industry);
+      final = await enrichCompetitorsWithPricing(final);
+      final = await enrichCompetitorsWithDomainData(final);
+    }
 
-  log(`Done in ${Date.now() - startTime}ms: ${final.length} competitors (${sourcesUsed.join(", ") || "none"})`);
+    const missingFields = {
+      pricing: final.filter((c) => !c.pricing).length,
+      strengths: final.filter((c) => !c.strengths?.length).length,
+      traffic: final.filter((c) => !c.trafficEstimate && !c.organicTraffic).length,
+    };
 
-  return {
-    success: true,
-    competitors: final,
-    totalFound: final.length,
-    sourcesUsed: [...new Set(sourcesUsed)],
-    sourceFailures: [...new Set(sourceFailures)],
-    missingFields,
-    durationMs: Date.now() - startTime,
-  };
+    log(`Done in ${Date.now() - startTime}ms: ${final.length} competitors (${sourcesUsed.join(", ") || "none"})`);
+
+    return {
+      success: true,
+      competitors: final,
+      totalFound: final.length,
+      sourcesUsed: [...new Set(sourcesUsed)],
+      sourceFailures: [...new Set(sourceFailures)],
+      missingFields,
+      durationMs: Date.now() - startTime,
+    };
+  });
+
+  // Return a deep clone so no caller can mutate the shared cache entry.
+  return result ? structuredClone(result) : result;
 }
 
 export function extractDomainFromUrl(url) {

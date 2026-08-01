@@ -56,9 +56,10 @@ function redirectToLogin() {
 
 async function request<T>(method: Method, path: string, body?: any, signal?: AbortSignal): Promise<T> {
   const token = getToken();
+  const normalizedPath = path.replace(/^\/api(?=\/|$)/, '') || '/';
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, {
+    res = await fetch(`${API_BASE}${normalizedPath}`, {
       method,
       headers: {
         'Content-Type': 'application/json',

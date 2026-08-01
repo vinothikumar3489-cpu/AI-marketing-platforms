@@ -73,6 +73,8 @@ export const CONTENT_TYPES = {
   comparison_page: { label: 'Comparison Page' },
   feature_announcement: { label: 'Feature Announcement' },
   whitepaper: { label: 'Whitepaper' },
+  press_release: { label: 'Press Release' },
+  sales_page: { label: 'Sales Page' },
   creative_brief: { label: 'Creative Brief' },
   video_script: { label: 'Video Script' },
 };
@@ -112,7 +114,7 @@ export const CONTENT_TYPE_GROUPS = {
   email: ['email_copy', 'email_campaign', 'email_nurture', 'email_newsletter', 'email_welcome', 'email_promotional', 'email_follow_up', 'email_event_invitation', 'email_reengagement', 'email_final_cta'],
   social: ['linkedin_post', 'instagram_post', 'instagram_carousel', 'instagram_reel_script', 'facebook_post', 'facebook_ad', 'x_post', 'x_thread'],
   video: ['youtube_description', 'youtube_script'],
-  longForm: ['blog_article', 'landing_page', 'case_study', 'product_announcement', 'faq_page', 'product_page', 'comparison_page', 'feature_announcement', 'whitepaper'],
+  longForm: ['blog_article', 'landing_page', 'case_study', 'product_announcement', 'faq_page', 'product_page', 'comparison_page', 'feature_announcement', 'whitepaper', 'press_release', 'sales_page'],
   brief: ['creative_brief', 'video_script'],
 };
 
@@ -296,6 +298,24 @@ export const CONTENT_TYPE_REGISTRY = {
     generator: 'whitepaperGenerator',
     validator: 'blogArticleValidator',
     renderer: 'BlogArticlePreview',
+  },
+  press_release: {
+    canonicalType: 'press_release',
+    generator: 'pressReleaseGenerator',
+    validator: 'pressReleaseValidator',
+    renderer: 'PressReleasePreview',
+  },
+  case_study: {
+    canonicalType: 'case_study',
+    generator: 'caseStudyGenerator',
+    validator: 'caseStudyValidator',
+    renderer: 'CaseStudyPreview',
+  },
+  sales_page: {
+    canonicalType: 'sales_page',
+    generator: 'salesPageGenerator',
+    validator: 'salesPageValidator',
+    renderer: 'SalesPagePreview',
   },
   creative_brief: {
     canonicalType: 'creative_brief',

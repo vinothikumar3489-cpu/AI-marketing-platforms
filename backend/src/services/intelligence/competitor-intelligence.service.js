@@ -1,5 +1,6 @@
 import { researchCompetitors } from "../../providers/tavily.service.js";
 import { getSerpCompetitors, normalizeSerpCompetitors, getKeywordMetrics, isDataForSEOConfigured } from "../../providers/dataforseo.service.js";
+import { discoverCompetitors } from "../../providers/competitor-discovery.service.js";
 
 function isGenericIndustry(industry) {
   if (!industry) return true;
@@ -43,7 +44,7 @@ function buildCompetitorSearchTerms(productName, companyName, industry, category
   return [...new Set(terms)].filter(Boolean).slice(0, 5);
 }
 
-export async function collectCompetitorIntelligence({ websiteUrl, productName, companyName, industry, marketData, category, domain }) {
+export async function collectCompetitorIntelligence({ websiteUrl, productName, companyName, industry, marketData, category, domain, html = null }) {
   const competitors = [];
   const sources = [];
   const warnings = [];
@@ -140,21 +141,25 @@ export async function collectCompetitorIntelligence({ websiteUrl, productName, c
     const tavilyIndustry = !isGenericIndustry(industry) ? industry : 'technology';
     const tavilyResult = await researchCompetitors(tavilyQuery, tavilyIndustry, 'software');
     if (tavilyResult?.success && tavilyResult?.competitors?.length > 0) {
-      for (const comp of tavilyResult.competitors) {
-        const compDomain = extractDomain(comp.website || comp.url || '');
-        if (compDomain && compDomain !== domain_extracted && !competitors.find(c => c.domain === compDomain)) {
+      for (const raw of tavilyResult.competitors) {
+        // Tavily returns competitor entries as plain strings (names) — never objects.
+        const name = typeof raw === 'string' ? raw : (raw.name || raw.title || '');
+        const url = typeof raw === 'string' ? '' : (raw.website || raw.url || '');
+        const description = typeof raw === 'string' ? '' : (raw.description || '');
+        const compDomain = extractDomain(url) || (name ? extractDomain(name) : '');
+        if (name && compDomain && compDomain !== domain_extracted && !competitors.find(c => c.domain === compDomain)) {
           competitors.push({
-            name: comp.name || compDomain,
+            name: name || compDomain,
             domain: compDomain,
-            url: comp.website || comp.url || '',
+            url,
             type: 'direct',
             similarityScore: 70,
             featureOverlap: null,
             pricingOverlap: null,
             trafficEstimate: null,
-            evidence: comp.description || 'Identified via Tavily competitive research',
+            evidence: description || 'Identified via Tavily competitive research',
             source: 'Tavily',
-            snippet: comp.description || '',
+            snippet: description || '',
             confidence: null,
             enterpriseFields: {
               pricing: null,
@@ -183,6 +188,67 @@ export async function collectCompetitorIntelligence({ websiteUrl, productName, c
     }
   } catch (e) {
     warnings.push(`Tavily competitor research failed: ${e.message}`);
+  }
+
+  // Cascading fallback: never return zero competitors while discovery sources remain.
+  // Reuses the existing multi-provider cascade (schema.org, DuckDuckGo, Product Hunt,
+  // GitHub, Exa, website links, AI reasoning) — free/no-key sources included.
+  if (competitors.length === 0) {
+    try {
+      const discovery = await discoverCompetitors({
+        websiteUrl,
+        productName: productName || companyName || '',
+        companyName: companyName || productName || '',
+        industry: industry || 'technology',
+        html,
+        max: 8,
+        enrich: true,
+      });
+      if (discovery.success && discovery.competitors.length > 0) {
+        for (const dc of discovery.competitors) {
+          const compDomain = extractDomain(dc.url || dc.domain || '');
+          if (!compDomain || compDomain === domain_extracted) continue;
+          if (competitors.find(c => c.domain === compDomain)) continue;
+          competitors.push({
+            name: dc.name || compDomain,
+            domain: compDomain,
+            url: dc.url || '',
+            type: 'direct',
+            similarityScore: Math.round(dc.similarityScore || 70),
+            featureOverlap: null,
+            pricingOverlap: null,
+            trafficEstimate: dc.trafficEstimate || null,
+            evidence: dc.description || `Identified via ${dc.source || 'cascading discovery'}`,
+            source: dc.source || 'CompetitorDiscovery',
+            snippet: dc.snippet || dc.description || '',
+            confidence: null,
+            enterpriseFields: {
+              pricing: dc.pricing || null,
+              funding: null,
+              employeeCount: null,
+              trafficEstimate: dc.trafficEstimate || null,
+              technologies: Array.isArray(dc.technologies) ? dc.technologies : null,
+              customerSegments: null,
+              reviewScore: null,
+              positioning: dc.positioning || null,
+              strengths: Array.isArray(dc.strengths) ? dc.strengths : null,
+              weaknesses: Array.isArray(dc.weaknesses) ? dc.weaknesses : null,
+              marketShare: null,
+              estimatedARR: null,
+              acquisitionStrategy: null,
+              evidence: {
+                source: `${dc.source || 'cascading discovery'} (${discovery.sourcesUsed.join(', ')})`,
+                confidence: null,
+                collectedAt: new Date().toISOString()
+              }
+            }
+          });
+        }
+        sources.push({ type: 'competitor_discovery', source: `Cascade: ${discovery.sourcesUsed.join(', ')}`, count: discovery.competitors.length });
+      }
+    } catch (e) {
+      warnings.push(`Cascading competitor discovery failed: ${e.message}`);
+    }
   }
 
   for (const comp of competitors) {

@@ -186,14 +186,15 @@ function getReportStyles() {
 }
 
 function priorityBadge(priority) {
+  if (!priority || priority === 'unknown') return '<span class="na">—</span>';
   const map = {
     critical: '<span class="badge badge-critical">Critical</span>',
     high: '<span class="badge badge-high">High</span>',
     medium: '<span class="badge badge-medium">Medium</span>',
     low: '<span class="badge badge-low">Low</span>'
   };
-  const p = (priority || 'medium').toLowerCase();
-  return map[p] || map.medium;
+  const p = String(priority).toLowerCase();
+  return map[p] || '<span class="na">—</span>';
 }
 
 function confidenceBadge(score) {
@@ -213,25 +214,16 @@ function buildSwotSection(market, product, channel) {
   const hasSwot = opportunities.length > 0 || risks.length > 0 || strengths.length > 0 || weaknesses.length > 0;
 
   if (!hasSwot) {
-    const productName = product?.productSummary ? product.productSummary.substring(0, 40) : '';
     return `
     <h2>SWOT Analysis</h2>
     <div class="swot-grid">
       <div class="swot-card swot-s">
         <h4>Strengths</h4>
-        <ul>
-          ${productName ? `<li>Clear product-market fit in target segments</li>` : ''}
-          <li>Product-driven approach with evidence-backed decision making</li>
-          ${channel?.primaryChannel ? `<li>Strategic focus on ${esc(channel.primaryChannel)} as primary channel</li>` : ''}
-        </ul>
+        <div class="na">Strength data unavailable. Run product analysis to identify verified strengths.</div>
       </div>
       <div class="swot-card swot-w">
         <h4>Weaknesses</h4>
-        <ul>
-          ${market?.tam ? `<li>Market share capture requires sustained investment</li>` : ''}
-          <li>Data completeness dependent on API integrations and evidence collection</li>
-          <li>Analytics connectivity needed for comprehensive performance metrics</li>
-        </ul>
+        <div class="na">Weakness data unavailable. Run competitive and product analysis to identify verified weaknesses.</div>
       </div>
       <div class="swot-card swot-o">
         <h4>Opportunities</h4>
@@ -273,24 +265,29 @@ function buildSwotSection(market, product, channel) {
 
 function buildRoadmapTable(actionPlan, company) {
   const phases = [
-    { key: 'day7', label: '7 Days', color: '#059669', defaultItems: ['Set up analytics and tracking infrastructure', 'Run evidence collection for complete data foundation', 'Validate core market assumptions with real data'] },
-    { key: 'day30', label: '30 Days', color: '#2563eb', defaultItems: ['Build SEO content strategy and initial keyword targets', 'Launch initial campaign based on audience intelligence', 'Establish competitor monitoring and market positioning'] },
-    { key: 'day60', label: '60 Days', color: '#7c3aed', defaultItems: ['Scale high-performing channels with data-driven optimization', 'Develop product comparison content for competitive differentiation', 'Implement conversion optimization based on evidence'] },
-    { key: 'day90', label: '90 Days', color: '#d97706', defaultItems: ['Evaluate campaign performance and reallocate budget accordingly', 'Expand content strategy with AI-optimized topics and clusters', 'Review competitive landscape shifts and adjust positioning'] },
-    { key: 'day180', label: '180 Days', color: '#dc2626', defaultItems: ['Complete market penetration analysis and growth roadmap v2', 'Establish thought leadership content across all channels', 'Evaluate strategic partnerships and channel expansion opportunities', 'Review pricing strategy based on competitive intelligence'] },
-    { key: 'day365', label: '365 Days', color: '#1e293b', defaultItems: ['Annual strategic review and competitive repositioning', 'Product roadmap alignment with market intelligence findings', 'Scale operations with evidence-based growth playbook', 'Evaluate international expansion opportunities', 'Build predictable revenue engine with optimized funnel'] }
+    { key: 'day7', label: '7 Days', color: '#059669' },
+    { key: 'day30', label: '30 Days', color: '#2563eb' },
+    { key: 'day60', label: '60 Days', color: '#7c3aed' },
+    { key: 'day90', label: '90 Days', color: '#d97706' },
+    { key: 'day180', label: '180 Days', color: '#dc2626' },
+    { key: 'day365', label: '365 Days', color: '#1e293b' }
   ];
   const hasItems = phases.some(p => {
     const items = arr(actionPlan?.[p.key]);
     return items.length > 0;
   });
 
+  if (!hasItems) {
+    return `
+    <h2>Implementation Roadmap</h2>
+    <div class="notice warn">Roadmap data unavailable. Complete growth workspace and campaign planning to generate a verified implementation roadmap.</div>`;
+  }
+
   let html = '<h2>Implementation Roadmap</h2>';
   html += '<table class="roadmap-table"><thead><tr><th>Phase</th><th>Actions</th><th>Impact</th></tr></thead><tbody>';
   phases.forEach(p => {
     const items = arr(actionPlan?.[p.key]);
-    const displayItems = items.length > 0 ? items : p.defaultItems;
-    html += `<tr><td class="roadmap-period" style="color:${p.color}">${p.label}</td><td><ul class="bullet-list" style="margin:0">${displayItems.slice(0, 5).map(i => `<li class="roadmap-item">${esc(i.title || i.task || i.action || i.recommendation || i)}</li>`).join('')}</ul></td><td style="font-size:9pt">${items.length > 0 ? safe(items[0]?.impact || items[0]?.reason || items[0]?.businessImpact || items[0]?.evidence, 'Strategic milestone') : 'Strategic milestone'}</td></tr>`;
+    html += `<tr><td class="roadmap-period" style="color:${p.color}">${p.label}</td><td><ul class="bullet-list" style="margin:0">${items.slice(0, 5).map(i => `<li class="roadmap-item">${esc(i.title || i.task || i.action || i.recommendation || i)}</li>`).join('')}</ul></td><td style="font-size:9pt">${safe(items[0]?.impact || items[0]?.reason || items[0]?.businessImpact || items[0]?.evidence, '—')}</td></tr>`;
   });
   html += '</tbody></table>';
   return html;
@@ -420,7 +417,7 @@ ${getReportStyles()}
     <div class="kpi-card"><div class="kpi-icon" style="color:#0891b2">■</div><div class="kpi-value" style="color:#0891b2">${techStack.length}</div><div class="kpi-label">Technologies Detected</div></div>
   </div>
   <div class="callout primary">
-    <strong>${esc(name)}</strong> operates in <strong>${safe(company?.industry, 'a verified')}</strong> industry with a <strong>${safe(company?.businessModel, 'defined')}</strong> business model. The platform has identified <strong>${directCompetitors.length} direct competitors</strong> and <strong>${techStack.length} technology components</strong>, with a market opportunity score of <strong>${Number.isFinite(Number(scores?.marketOpportunityScore)) ? Math.round(Number(scores?.marketOpportunityScore)) + '/100' : 'Data unavailable'}</strong>.
+    <strong>${esc(name)}</strong> operates in <strong>${safe(company?.industry, 'Data unavailable')}</strong> industry with a <strong>${safe(company?.businessModel, 'Data unavailable')}</strong> business model. The platform has identified <strong>${directCompetitors.length} direct competitors</strong> and <strong>${techStack.length} technology components</strong>, with a market opportunity score of <strong>${Number.isFinite(Number(scores?.marketOpportunityScore)) ? Math.round(Number(scores?.marketOpportunityScore)) + '/100' : 'Data unavailable'}</strong>.
   </div>
 </div>
 
@@ -574,9 +571,9 @@ ${buildSwotSection(market, data?.product, data?.channelData?.[0])}
   <h3>Risk Register</h3>
   ${risks.length > 0 ? `<div class="risk-register">${risks.slice(0, 6).map(r => {
     const riskText = typeof r === 'string' ? r : (r.value || r.name || r.risk || r.description || 'Risk factor');
-    const level = r.severity || r.priority || 'Medium';
+    const level = r.severity || r.priority || '';
     const badge = priorityBadge(level);
-    return `<div class="risk-item"><div class="risk-level">${badge}</div><div class="risk-desc">${esc(riskText)}</div><div class="risk-mitigation">${safe(r.mitigation || r.recommendation || r.evidence, 'Monitor and reassess')}</div></div>`;
+    return `<div class="risk-item"><div class="risk-level">${badge}</div><div class="risk-desc">${esc(riskText)}</div><div class="risk-mitigation">${safe(r.mitigation || r.recommendation || r.evidence, 'No mitigation strategy recorded')}</div></div>`;
   }).join('')}</div>` : '<div class="notice info">No risk factors recorded from verified sources.</div>'}
 </div>
 
@@ -712,7 +709,7 @@ ${getReportStyles()}
     ${scoreCard('Campaign Readiness', scores?.campaignReadinessScore)}
   </div>
   <div class="callout primary">
-    <strong>${esc(name)}</strong> — <strong>${safe(company?.industry, 'verified')}</strong> | <strong>${safe(company?.businessModel, 'defined')}</strong> business model targeting <strong>${safe(company?.targetMarket, 'verified')}</strong>.
+    <strong>${esc(name)}</strong> — <strong>${safe(company?.industry, 'Data unavailable')}</strong> | <strong>${safe(company?.businessModel, 'Data unavailable')}</strong> business model targeting <strong>${safe(company?.targetMarket, 'Data unavailable')}</strong>.
     Overall growth score: <strong>${Number.isFinite(Number(overallScore)) ? Math.round(Number(overallScore)) + '/100' : 'Data unavailable'}</strong> across ${trends.length} market trends, ${opportunities.length} opportunities, and ${directCompetitors.length} competitors.
   </div>
 </div>
@@ -954,7 +951,7 @@ ${getReportStyles()}
     <div class="kpi-card"><div class="kpi-icon" style="color:#0891b2">■</div><div class="kpi-value" style="color:#0891b2">${blogs.length}</div><div class="kpi-label">Blog Opportunities</div></div>
   </div>
   <div class="callout primary">
-    <strong>${esc(name)}</strong> — <strong>${safe(company?.industry, 'verified')}</strong> industry.
+    <strong>${esc(name)}</strong> — <strong>${safe(company?.industry, 'Data unavailable')}</strong> industry.
     SEO score: <strong>${Number.isFinite(Number(scores.seoScore ?? scores.overall)) ? Math.round(Number(scores.seoScore ?? scores.overall)) + '/100' : 'Data unavailable'}</strong>.
     ${keywords.length > 0 ? `${keywords.length} keywords evaluated with ${gaps.length} content gaps identified.` : ''}
     ${competitors.length > 0 ? `${competitors.length} SEO competitors mapped.` : ''}
@@ -993,7 +990,7 @@ ${getReportStyles()}
       safe(k.keyword || k.term || k.title || k.value || k.name || (typeof k === 'string' ? k : null)),
       k.volume || k.searchVolume ? `${k.volume || k.searchVolume}` : '<span class="na">—</span>',
       k.keywordDifficulty || k.difficulty ? `${k.keywordDifficulty || k.difficulty}/100` : '<span class="na">—</span>',
-      safe(k.intent, 'Informational'),
+      safe(k.intent, '—'),
       confidenceBadge(k.confidence ?? k.confidenceScore ?? null)
     ]),
     'Keyword data unavailable. Configure DataForSEO API for verified keyword intelligence.'
@@ -1013,7 +1010,7 @@ ${getReportStyles()}
       safe(c.overlapReason || c.reason || c.description),
       confidenceBadge(c.confidence || c.relevanceScore)
     ]),
-    'Competitor intelligence incomplete — estimated data available.'
+    'No competitor SEO data available for this report session.'
   ) : hasPlatformCompetitors ? '<div class="notice info">Competitor intelligence partially available — platform-level estimates present. Connect DataForSEO for detailed SERP analysis.</div>' : '<div class="notice warn">Competitor SEO data unavailable. Configure DataForSEO for competitor analysis.</div>'}
 </div>
 
@@ -1024,7 +1021,7 @@ ${getReportStyles()}
     ['Topic', 'Priority', 'Volume', 'Difficulty', 'Confidence'],
     gaps.slice(0, 20).map(g => [
       safe(g.value || g.topic || g.title || (typeof g === 'string' ? g : null)),
-      priorityBadge(g.priority || g.severity || 'medium'),
+      priorityBadge(g.priority || g.severity),
       g.searchVolume || g.volume ? `${g.searchVolume || g.volume}` : '<span class="na">—</span>',
       g.keywordDifficulty || g.difficulty ? `${g.keywordDifficulty || g.difficulty}/100` : '<span class="na">—</span>',
       confidenceBadge(g.confidence)
@@ -1054,7 +1051,7 @@ ${getReportStyles()}
       safe(b.targetKeyword || b.keyword),
       b.searchVolume || b.volume ? `${b.searchVolume || b.volume}` : '<span class="na">—</span>',
       b.keywordDifficulty || b.difficulty ? `${b.keywordDifficulty || b.difficulty}/100` : '<span class="na">—</span>',
-      safe(b.intent, 'Informational'),
+      safe(b.intent, '—'),
       confidenceBadge(b.confidence)
     ]),
     'Blog intelligence data unavailable. Run keyword research to generate blog ideas.'
@@ -1085,7 +1082,7 @@ ${getReportStyles()}
         ['Action', 'Priority', 'Impact', 'Confidence'],
         p.items.slice(0, 8).map(a => [
           safe(a.title || a.action || a.task || a.recommendation || (typeof a === 'string' ? a : null)),
-          priorityBadge(a.priority || a.severity || 'medium'),
+          priorityBadge(a.priority || a.severity),
           safe(a.impact || a.area || a.reason, 'Metrics pending'),
           confidenceBadge(a.confidence)
         ])

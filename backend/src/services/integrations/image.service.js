@@ -9,9 +9,9 @@ function escapeXml(str) {
 function generateSvgPoster({ prompt, headline, cta, platform, brandColors }) {
   const bgColor = brandColors?.[0] || '#2563eb';
   const accentColor = brandColors?.[1] || '#111827';
-  const safeTitle = escapeXml(headline || 'AI Marketing Platform');
-  const safeCta = escapeXml(cta || 'Learn More');
-  const safePlatform = escapeXml(platform || 'Digital');
+  const safeTitle = escapeXml(headline || '');
+  const safeCta = escapeXml(cta || '');
+  const safePlatform = escapeXml(platform || '');
   const safePrompt = escapeXml(prompt ? (prompt.slice(0, 120) + (prompt.length > 120 ? '...' : '')) : '');
 
   const wrapText = (text, maxChars) => {

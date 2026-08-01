@@ -168,7 +168,7 @@ export function generateEmailHtmlTemplate(emailData) {
               
               <!-- Primary CTA -->
               <div style="text-align: center; margin: 32px 0;">
-                <a class="cta-button" href="${primaryCta?.url || '#'}" style="background: linear-gradient(135deg, ${brandColor} 0%, #004499 100%); color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 8px; display: inline-block; font-size: 16px; font-weight: 700; box-shadow: 0 4px 12px rgba(0,102,204,0.3); transition: transform 0.2s;">${primaryCta?.label || 'Learn More'}</a>
+                <a class="cta-button" href="${primaryCta?.url || '#'}" style="background: linear-gradient(135deg, ${brandColor} 0%, #004499 100%); color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 8px; display: inline-block; font-size: 16px; font-weight: 700; box-shadow: 0 4px 12px rgba(0,102,204,0.3); transition: transform 0.2s;">${primaryCta?.label || ''}</a>
               </div>
               
               <!-- Secondary CTA -->
@@ -180,7 +180,7 @@ export function generateEmailHtmlTemplate(emailData) {
               <!-- Signature -->
               <p style="margin: 0 0 20px 0; font-size: 16px; color: #333;">
                 Best regards,<br>
-                <strong>${signature || sender?.name || 'The Team'}</strong>
+                <strong>${signature || sender?.name || ''}</strong>
               </p>
               
               <!-- Postscript -->
@@ -196,7 +196,7 @@ export function generateEmailHtmlTemplate(emailData) {
                 <a href="#" style="color: #666; text-decoration: underline;">${unsubscribeText}</a>
               </p>
               <p style="margin: 12px 0 0 0; font-size: 11px; color: #999;">
-                ${productIdentity?.displayName || 'Our Company'} • ${sender?.email || 'contact@example.com'}
+                ${productIdentity?.displayName || ''} • ${sender?.email || ''}
               </p>
             </td>
           </tr>

@@ -13,6 +13,11 @@ const CREATIVE_TYPES = {
 
 export { CREATIVE_TYPES };
 
+function unwrapSourced(v) {
+  if (v && typeof v === 'object' && 'value' in v && 'source' in v) return v.value;
+  return v;
+}
+
 export async function generateCreativeBrief(creativeType, context) {
   const typeConfig = CREATIVE_TYPES[creativeType];
   if (!typeConfig) throw new Error(`Unknown creative type: ${creativeType}`);
@@ -21,11 +26,16 @@ export async function generateCreativeBrief(creativeType, context) {
 
   const evidenceLines = [];
   if (productUsp) evidenceLines.push(`Product USP: ${productUsp}`);
-  if (evidence?.website?.heroText) evidenceLines.push(`Website Hero: ${evidence.website.heroText}`);
-  if (evidence?.website?.ctaTexts?.length) evidenceLines.push(`Website CTAs: ${evidence.website.ctaTexts.join('; ')}`);
-  if (evidence?.website?.featuresText?.length) evidenceLines.push(`Features Mentioned: ${evidence.website.featuresText.slice(0, 3).join('; ')}`);
-  if (evidence?.audience?.painPoints?.length) evidenceLines.push(`Audience Pain Points: ${evidence.audience.painPoints.slice(0, 3).join('; ')}`);
-  if (evidence?.competitors?.list?.length) evidenceLines.push(`Competitors: ${evidence.competitors.list.slice(0, 3).map(c => c.name || c.url).filter(Boolean).join(', ')}`);
+  const websiteHero = unwrapSourced(evidence?.website?.heroText);
+  if (websiteHero) evidenceLines.push(`Website Hero: ${websiteHero}`);
+  const ctaTexts = Array.isArray(unwrapSourced(evidence?.website?.ctaTexts)) ? unwrapSourced(evidence?.website?.ctaTexts) : [];
+  if (ctaTexts.length) evidenceLines.push(`Website CTAs: ${ctaTexts.join('; ')}`);
+  const featuresText = Array.isArray(unwrapSourced(evidence?.website?.featuresText)) ? unwrapSourced(evidence?.website?.featuresText) : [];
+  if (featuresText.length) evidenceLines.push(`Features Mentioned: ${featuresText.slice(0, 3).join('; ')}`);
+  const painPoints = Array.isArray(unwrapSourced(evidence?.audience?.painPoints)) ? unwrapSourced(evidence?.audience?.painPoints) : [];
+  if (painPoints.length) evidenceLines.push(`Audience Pain Points: ${painPoints.slice(0, 3).join('; ')}`);
+  const competitors = Array.isArray(unwrapSourced(evidence?.competitors?.list)) ? unwrapSourced(evidence?.competitors?.list) : [];
+  if (competitors.length) evidenceLines.push(`Competitors: ${competitors.slice(0, 3).map(c => typeof c === 'string' ? c : (c.name || c.url || '')).filter(Boolean).join(', ')}`);
   if (evidence?.sourceSummary?.sourcesCollected?.length) evidenceLines.push(`Evidence Sources: ${evidence.sourceSummary.sourcesCollected.join(', ')}`);
 
   const prompt = `Generate a creative brief for a ${typeConfig.label} (${typeConfig.dimensions}) for marketing execution. Use the verified product/company data below.

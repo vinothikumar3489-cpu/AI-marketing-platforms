@@ -290,6 +290,57 @@ function normalizeSearchResult(item) {
   };
 }
 
+/**
+ * Extract a Google AI Overview (AI Overviews / AI mode) from a raw SerpAPI
+ * response. SerpAPI represents AI Overviews as an `ai_overview` object inside
+ * an organic_results entry and, on newer layouts, as a top-level `ai_overview`
+ * array. Every cited URL becomes explicit evidence.
+ */
+function normalizeAiOverview(d) {
+  const fromEntry = (d.organic_results || []).find(r => r && typeof r === 'object' && r.ai_overview);
+  const entry = fromEntry?.ai_overview || d.ai_overview || null;
+
+  if (!entry) return null;
+
+  const text = entry.text || entry.summary || entry.answer || '';
+  const citedDomains = [];
+
+  for (const ref of entry.references || []) {
+    const refUrl = ref?.link || ref?.url || '';
+    const domain = extractDomain(refUrl);
+    if (domain) citedDomains.push({ domain, url: refUrl });
+  }
+  if (citedDomains.length === 0 && text) {
+    const found = text.match(/https?:\/\/[^\s)"']+/g) || [];
+    for (const u of found) {
+      const domain = extractDomain(u);
+      if (domain) citedDomains.push({ domain, url: u });
+    }
+  }
+
+  return {
+    present: true,
+    text,
+    citedDomains,
+    citedDomainCount: citedDomains.length,
+    source: 'SerpAPI',
+    status: 'measured'
+  };
+}
+
+function normalizeFeaturedSnippet(d) {
+  const ab = d.answer_box || null;
+  if (!ab) return null;
+  return {
+    title: ab.title || '',
+    url: ab.link || '',
+    domain: extractDomain(ab.link),
+    snippet: ab.snippet || ab.answer || '',
+    source: 'SerpAPI',
+    status: 'measured'
+  };
+}
+
 function normalizeAutocompleteResult(data) {
   if (!data?.suggestions) return [];
   return data.suggestions
@@ -400,19 +451,27 @@ export async function googleSearch(query, options = {}) {
   if (!result.success) return result;
 
   const d = result.data;
-  const organic = (d.organic_results || []).map(normalizeSearchResult);
+  const organic = (d.organic_results || [])
+    .filter(r => !(r && typeof r === 'object' && r.ai_overview))
+    .map(normalizeSearchResult);
+  const aiOverview = normalizeAiOverview(d);
+  const featuredSnippet = normalizeFeaturedSnippet(d);
 
   return {
     success: true,
     data: {
       organic,
+      aiOverview,
+      featuredSnippet,
       totalResults: d.search_information?.total_results || 0,
       features: {
         knowledgeGraph: normalizeKnowledgeGraph(d),
         relatedSearches: normalizeRelatedSearches(d),
         peopleAlsoAsk: normalizePeopleAlsoAsk(d),
         topStories: (d.top_stories || []).map(normalizeSearchResult),
-        localResults: (d.local_results || []).map(normalizeSearchResult)
+        localResults: (d.local_results || []).map(normalizeSearchResult),
+        aiOverview,
+        featuredSnippet
       },
       raw: {
         searchParameters: d.search_parameters || {},
@@ -727,6 +786,14 @@ export async function searchOpportunityScore(query, productName) {
     (competition * 0.20)
   );
 
+  const signalValues = [serpStrength, autocompleteSignal, trendSignal, commercialIntent, competition];
+  const availableSignals = signalValues.filter(v => v > 0);
+  const coverageRatio = availableSignals.length / signalValues.length;
+  const meanSignal = availableSignals.length
+    ? availableSignals.reduce((a, b) => a + b, 0) / availableSignals.length
+    : 0;
+  const confidence = Math.min(100, Math.round(meanSignal * 0.5 + coverageRatio * 100 * 0.5));
+
   return {
     opportunityScore: Math.min(100, opportunityScore),
     searchVolume: null,
@@ -737,7 +804,7 @@ export async function searchOpportunityScore(query, productName) {
     commercialIntent,
     competition,
     provider: 'SerpAPI',
-    confidence: 70,
+    confidence,
     retrievedAt: new Date().toISOString(),
     status: 'estimated'
   };

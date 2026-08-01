@@ -44,53 +44,94 @@ export const runProductAnalysis = async (userId, chatId, inputData) => {
   console.log("🏷️ AI Provider used:", aiResult.provider);
   console.log("🔄 Fallback used:", aiResult.fallbackUsed);
 
+  const data = aiResult.data && typeof aiResult.data === "object" ? aiResult.data : {};
+
+  // Map AI output to the canonical ProductAnalysis columns. Fields that the AI
+  // could not ground in evidence are omitted (undefined) so Prisma stores null
+  // instead of fabricated content.
+  const toArray = (value, ...fallbacks) => {
+    const candidates = [value, ...fallbacks];
+    for (const c of candidates) {
+      if (Array.isArray(c)) {
+        const cleaned = c.map((v) => (typeof v === "string" ? v.trim() : v)).filter(Boolean);
+        if (cleaned.length) return cleaned;
+      }
+      if (typeof c === "string") {
+        const cleaned = c.split(/[;,\n]/).map((s) => s.trim()).filter(Boolean);
+        if (cleaned.length) return cleaned;
+      }
+    }
+    return undefined;
+  };
+  const toStr = (value, ...fallbacks) => {
+    for (const c of [value, ...fallbacks]) {
+      if (typeof c === "string" && c.trim()) return c.trim();
+      if (typeof c === "number" && Number.isFinite(c)) return String(c);
+    }
+    return undefined;
+  };
+
+  const productSummary = toStr(data.productSummary, data.summary);
+  const usp = toArray(data.usp, data.uniqueValueProposition);
+  const features = toArray(data.features, data.keyFeatures, scrapedData?.features);
+  const benefits = toArray(data.benefits, data.coreBenefits, scrapedData?.benefits);
+  const painPoints = toArray(data.painPoints, data.painPointsSolved);
+  const targetUsers = toArray(data.targetUsers, data.targetAudience);
+  const buyerPersonas = toArray(data.buyerPersonas);
+  const competitors = toArray(data.competitors, data.directCompetitors, data.competitorIdeas);
+  const seoOpportunities = toArray(data.seoOpportunities, data.seoSuggestions);
+  const campaignIdeas = toArray(data.campaignIdeas);
+  const recommendedChannels = toArray(data.recommendedChannels);
+
   // Save to ProductAnalysis table
   const savedAnalysis = await prisma.productAnalysis.upsert({
     where: { chatId: finalChatId },
     create: {
       userId,
       chatId: finalChatId,
-      productSummary: aiResult.data.productSummary,
-      usp: [aiResult.data.uniqueValueProposition],
-      features: aiResult.data.campaignIdeas, // repurpose for now
-      benefits: aiResult.data.marketOpportunities,
-      painPoints: aiResult.data.painPoints,
-      targetUsers: aiResult.data.targetAudience,
-      buyerPersonas: aiResult.data.targetAudience.map(name => ({ name })),
-      competitors: aiResult.data.competitorIdeas,
-      seoOpportunities: aiResult.data.seoSuggestions,
-      campaignIdeas: aiResult.data.campaignIdeas,
+      productSummary,
+      usp,
+      features,
+      benefits,
+      painPoints,
+      targetUsers,
+      buyerPersonas,
+      competitors,
+      seoOpportunities,
+      campaignIdeas,
+      recommendedChannels,
       dataSourcesUsed: [
         "Manual input",
         ...(scrapedData ? ["Website scraping"] : []),
-        `AI: ${aiResult.provider}`
+        `AI: ${aiResult.provider || "unknown"}`
       ],
       source: aiResult.provider,
       // Save our custom fields in inputJson/outputJson
       inputJson: { productName, websiteUrl, description, targetMarket },
-      outputJson: aiResult.data,
+      outputJson: data,
       provider: aiResult.provider,
       fallbackUsed: aiResult.fallbackUsed
     },
     update: {
-      productSummary: aiResult.data.productSummary,
-      usp: [aiResult.data.uniqueValueProposition],
-      features: aiResult.data.campaignIdeas,
-      benefits: aiResult.data.marketOpportunities,
-      painPoints: aiResult.data.painPoints,
-      targetUsers: aiResult.data.targetAudience,
-      buyerPersonas: aiResult.data.targetAudience.map(name => ({ name })),
-      competitors: aiResult.data.competitorIdeas,
-      seoOpportunities: aiResult.data.seoSuggestions,
-      campaignIdeas: aiResult.data.campaignIdeas,
+      productSummary,
+      usp,
+      features,
+      benefits,
+      painPoints,
+      targetUsers,
+      buyerPersonas,
+      competitors,
+      seoOpportunities,
+      campaignIdeas,
+      recommendedChannels,
       dataSourcesUsed: [
         "Manual input",
         ...(scrapedData ? ["Website scraping"] : []),
-        `AI: ${aiResult.provider}`
+        `AI: ${aiResult.provider || "unknown"}`
       ],
       source: aiResult.provider,
       inputJson: { productName, websiteUrl, description, targetMarket },
-      outputJson: aiResult.data,
+      outputJson: data,
       provider: aiResult.provider,
       fallbackUsed: aiResult.fallbackUsed,
       updatedAt: new Date()
@@ -102,14 +143,14 @@ export const runProductAnalysis = async (userId, chatId, inputData) => {
     data: {
       chatId: finalChatId,
       role: "assistant",
-      content: aiResult.data.productSummary,
-      analysisData: aiResult.data
+      content: productSummary || `${productName || "Product"} analysis complete.`,
+      analysisData: data
     }
   });
 
   return {
     success: true,
-    data: aiResult.data,
+    data,
     provider: aiResult.provider,
     fallbackUsed: aiResult.fallbackUsed,
     savedAnalysis,

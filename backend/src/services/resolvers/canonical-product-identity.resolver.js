@@ -397,10 +397,11 @@ export function resolveProductIdentity({
   }
   
   // Priority 9: validated user-provided name
-  const userProvided = chat?.productName || 
-                      productIntelligence?.productName ||
-                      productIntelligence?.inputJson?.productName;
-  if (userProvided && !isRejectedIdentity(userProvided)) {
+  const userProvided = [chat?.productName,
+                        productIntelligence?.productName,
+                        productIntelligence?.inputJson?.productName]
+    .find(candidate => candidate && !isRejectedIdentity(candidate)) || null;
+  if (userProvided) {
     result.productName = userProvided;
     result.brandName = userProvided;
     result.source = 'user_provided';

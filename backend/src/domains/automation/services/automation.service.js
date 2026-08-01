@@ -272,8 +272,8 @@ function generateEvidenceBasedPlan(context) {
       ...ch,
       tool: ch.channel === 'email' ? 'email_platform' : ch.channel === 'linkedin' ? 'linkedin' : ch.channel === 'instagram' ? 'instagram' : ch.channel === 'google_ads' ? 'google_ads' : 'content_platform',
       owner: ch.channel === 'email' ? 'email_marketing' : ch.channel === 'linkedin' ? 'content_marketing' : ch.channel === 'instagram' ? 'social_media' : ch.channel === 'google_ads' ? 'ppc_specialist' : 'marketing_team',
-      budgetAllocation: ch.budgetAllocation || 'N/A',
-      expectedReach: ch.expectedReach || 'N/A',
+      budgetAllocation: ch.budgetAllocation || null,
+      expectedReach: ch.expectedReach || null,
       effort: ch.priority === 'high' ? 'high' : ch.priority === 'low' ? 'low' : 'medium',
       evidence: ch.evidence || 'channel_recommendation',
       confidence: ch.priority === 'high' ? 'high' : 'medium',
@@ -292,13 +292,13 @@ function generateEvidenceBasedPlan(context) {
     primaryKpis.push({ kpi: `SEO Score: ${seoInfo.seoScore}/100`, measurementSource: 'seo_intelligence', trackingTool: 'seo_dashboard', reportingFrequency: 'monthly', baseline: seoInfo.seoScore, target: Math.min(100, seoInfo.seoScore + 10), evidence: 'seo_technical_audit', confidence: 'high' });
   }
   if (hasProductData && productAnalysis.usp) {
-    secondaryKpis.push({ kpi: 'Product Awareness Lift', measurementSource: 'campaign_analytics', trackingTool: 'analytics_platform', reportingFrequency: 'weekly', baseline: 0, target: 25, evidence: 'product_analysis', confidence: 'medium' });
+    secondaryKpis.push({ kpi: 'Product Awareness Lift', measurementSource: 'campaign_analytics', trackingTool: 'analytics_platform', reportingFrequency: 'weekly', baseline: null, target: null, evidence: 'product_analysis', confidence: 'medium' });
   }
   if (hasCampaignData && campaignData.creativeAngles?.length) {
-    secondaryKpis.push({ kpi: 'Campaign Engagement Rate', measurementSource: 'channel_analytics', trackingTool: 'channel_specific_tools', reportingFrequency: 'weekly', baseline: 0, target: 3.5, unit: '%', evidence: 'campaign_generator', confidence: 'medium' });
+    secondaryKpis.push({ kpi: 'Campaign Engagement Rate', measurementSource: 'channel_analytics', trackingTool: 'channel_specific_tools', reportingFrequency: 'weekly', baseline: null, target: null, unit: '%', evidence: 'campaign_generator', confidence: 'medium' });
   }
   if (channels.length > 0) {
-    secondaryKpis.push({ kpi: `Channel Reach (${channels.map(c => c.channel).join(', ')})`, measurementSource: 'channel_analytics', trackingTool: 'channel_specific_tools', reportingFrequency: 'weekly', baseline: 0, target: 10000, unit: 'impressions', evidence: 'channel_recommendation', confidence: 'medium' });
+    secondaryKpis.push({ kpi: `Channel Reach (${channels.map(c => c.channel).join(', ')})`, measurementSource: 'channel_analytics', trackingTool: 'channel_specific_tools', reportingFrequency: 'weekly', baseline: null, target: null, unit: 'impressions', evidence: 'channel_recommendation', confidence: 'medium' });
   }
 
   plan.kpis = {
@@ -557,9 +557,9 @@ function generateEvidenceBasedPlan(context) {
       title: `${product || 'Brand'} Search Campaign`,
       headline: `${product || 'Professional'} Solutions for ${personaName}`,
       description: `Discover how ${companyName || product} helps ${targetAudience || 'professionals'} achieve better outcomes.`,
-      cta: 'Learn More',
-      destinationUrl: website || 'https://example.com',
-      budget: 'N/A - Requires budget configuration',
+      cta: null,
+      destinationUrl: website || null,
+      budget: null,
       targeting: { keywords: adGroup1, audience: targetAudience || personaName, location: 'Target markets', device: 'All devices' },
       campaignName: `${companyName || product} Search`,
       objective: 'Lead generation and brand awareness',
@@ -569,7 +569,7 @@ function generateEvidenceBasedPlan(context) {
       descriptions: [`Learn more about ${companyName || product}`],
       landingPageRecommendation: website || 'Homepage',
       negativeKeywords: ['free', 'cheap', 'jobs', 'career'].filter(k => !keywordsTexts.some((kt) => kt.includes(k))),
-      budgetSuggestion: 'Start with $500-1000/month test budget',
+      budgetSuggestion: null,
       evidence: 'seo_keyword_analysis',
       confidence: 'medium',
       dataSource: 'seo_intelligence',
@@ -586,9 +586,9 @@ function generateEvidenceBasedPlan(context) {
         title: `${product || 'Brand'} - Secondary Keywords`,
         headline: `Advanced ${product || 'Solutions'} for ${industry || 'Professionals'}`,
         description: `Explore additional ways ${companyName || product} serves ${targetAudience || 'its customers'} with tailored solutions.`,
-        cta: product ? `Explore ${product}` : 'Learn More',
-        destinationUrl: website || 'https://example.com',
-        budget: 'N/A',
+        cta: product ? `Explore ${product}` : null,
+        destinationUrl: website || null,
+        budget: null,
         targeting: { keywords: adGroup2, audience: targetAudience || personaName },
         campaignName: `${companyName || product} - Secondary`,
         objective: 'Expand reach',
@@ -598,7 +598,7 @@ function generateEvidenceBasedPlan(context) {
         descriptions: [`Explore ${companyName || product}'s offerings for ${industry || 'professionals'}`],
         landingPageRecommendation: website || 'Homepage',
         negativeKeywords: ['free', 'cheap'],
-        budgetSuggestion: 'Allocate 30% of primary campaign budget',
+        budgetSuggestion: null,
         evidence: 'seo_keyword_secondary_analysis',
         confidence: 'medium',
         dataSource: 'seo_intelligence',
@@ -616,9 +616,9 @@ function generateEvidenceBasedPlan(context) {
       title: `${companyName || product} - Brand Awareness`,
       headline: `Grow with ${companyName || product}`,
       description: `Targeted campaigns to reach ${targetAudience || 'ideal customers'} in the ${industry || 'business'} space.`,
-      cta: 'Contact Us',
-      destinationUrl: website || 'https://example.com',
-      budget: 'N/A - Requires budget configuration',
+      cta: null,
+      destinationUrl: website || null,
+      budget: null,
       targeting: { audience: targetAudience || personaName, location: 'Primary markets' },
       campaignName: `${companyName || product} Awareness`,
       objective: 'Brand awareness',
@@ -628,7 +628,7 @@ function generateEvidenceBasedPlan(context) {
       descriptions: [`Reach ${targetAudience || 'your audience'} with targeted campaigns`],
       landingPageRecommendation: website || 'Homepage',
       negativeKeywords: ['free', 'cheap'],
-      budgetSuggestion: 'Start with $300-500/month test budget',
+      budgetSuggestion: null,
       evidence: 'seo_analysis_brand',
       confidence: 'low',
       dataSource: 'seo_intelligence',
@@ -653,13 +653,13 @@ function generateEvidenceBasedPlan(context) {
       campaignGoal: campaignData.campaignObjectives || plan.campaignObjective || `Promote ${productAnalysis.usp || product}`,
       targetAudience: targetAudience || personaName,
       visualStyle: 'Modern, clean, professional with brand colors',
-      headline: productAnalysis.usp || `Discover ${product || 'Our Solution'}`,
-      cta: 'Learn More',
+      headline: productAnalysis.usp || null,
+      cta: null,
       format: 'Social media graphic (1080x1080)',
       platform: 'Instagram / LinkedIn',
-      brandNotes: `Use ${companyName || 'brand'} colors and logo. Maintain professional tone.`,
-      prompt: `Create a poster for ${companyName || product} highlighting their key value: ${productAnalysis.usp || 'innovative solutions'}. Target audience: ${targetAudience || personaName}. Style: Modern and professional. CTA: Learn more.`,
-      description: `Visual highlighting ${productAnalysis.usp || 'value proposition'} for ${targetAudience || 'target audience'}.`,
+      brandNotes: companyName ? `Use ${companyName} colors and logo. Maintain professional tone.` : 'Maintain professional tone.',
+      prompt: `Create a poster for ${companyName || product} highlighting their key value: ${productAnalysis.usp}. Target audience: ${targetAudience || personaName}. Style: Modern and professional.`,
+      description: `Visual highlighting ${productAnalysis.usp} for ${targetAudience || 'target audience'}.`,
       trigger: 'campaign_launch',
       condition: 'creative_assets_needed',
       action: 'generate_poster_prompt',

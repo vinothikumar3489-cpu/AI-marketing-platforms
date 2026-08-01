@@ -1,6 +1,16 @@
-import { fetchJson } from "../../utils/http.util.js";
+import { getPageSpeedAudit } from "../../providers/pagespeed.service.js";
 import { logEvidenceError } from "../../utils/evidence-logger.js";
 
+/**
+ * PageSpeed evidence collector.
+ *
+ * Routes through the single shared PageSpeed provider (providers/pagespeed.service.js)
+ * so there is exactly ONE implementation and ONE cache key space in the pipeline:
+ * the research orchestrator, the evidence module and the technical-SEO analyzer all
+ * share the same 5-minute cached audit — no duplicate API calls for the same URL.
+ *
+ * Output shape is preserved for backward compatibility with evidence.normalizer.
+ */
 export async function collectPageSpeedEvidence(websiteUrl) {
   const result = {
     performanceScore: null,
@@ -13,66 +23,43 @@ export async function collectPageSpeedEvidence(websiteUrl) {
     ttfb: null,
     topOpportunities: [],
     diagnostics: [],
+    source: 'pagespeed_api',
     error: null,
   };
 
-  const apiKey = process.env.GOOGLE_PAGESPEED_INSIGHTS_API_KEY || process.env.PAGESPEED_API_KEY || null;
-  if (!apiKey) {
-    result.error = "No API key configured (set GOOGLE_PAGESPEED_INSIGHTS_API_KEY or PAGESPEED_API_KEY)";
-    return result;
-  }
-
   try {
-    const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(websiteUrl)}&key=${apiKey}&strategy=mobile&category=PERFORMANCE&category=ACCESSIBILITY&category=BEST_PRACTICES&category=SEO`;
+    const audit = await getPageSpeedAudit(websiteUrl, 'mobile');
 
-    const data = await fetchJson(apiUrl, 30000);
-    if (!data || !data.lighthouseResult) {
-      result.error = "PageSpeed API returned no lighthouse result";
+    if (!audit.success || !audit.data) {
+      result.error = audit.error || 'PageSpeed API request failed';
       return result;
     }
 
-    const lh = data.lighthouseResult;
-    const categories = lh.categories || {};
-    const audits = lh.audits || {};
+    const data = audit.data;
+    const scores = data.lighthouseScores || {};
 
-    result.performanceScore = categories.performance?.score != null ? Math.round(categories.performance.score * 100) : null;
-    result.accessibilityScore = categories.accessibility?.score != null ? Math.round(categories.accessibility.score * 100) : null;
-    result.bestPracticesScore = categories["best-practices"]?.score != null ? Math.round(categories["best-practices"].score * 100) : null;
-    result.seoScore = categories.seo?.score != null ? Math.round(categories.seo.score * 100) : null;
+    result.performanceScore = scores.performance ?? null;
+    result.accessibilityScore = scores.accessibility ?? null;
+    result.bestPracticesScore = scores.bestPractices ?? null;
+    result.seoScore = scores.seo ?? null;
 
-    result.lcp = audits["largest-contentful-paint"]?.numericValue || null;
-    result.cls = audits["cumulative-layout-shift"]?.numericValue || null;
-    result.inp = audits["interaction-to-next-paint"]?.numericValue || null;
-    result.ttfb = audits["time-to-first-byte"]?.numericValue || null;
+    const vitals = data.coreWebVitals || {};
+    result.lcp = vitals.lcp ?? null;
+    result.cls = vitals.cls ?? null;
+    result.inp = vitals.inp ?? null;
+    result.ttfb = vitals.ttfb ?? null;
 
-    const opps = [];
-    for (const [key, audit] of Object.entries(audits)) {
-      if (audit.score != null && audit.score < 1 && audit.title && audit.details?.items) {
-        opps.push({
-          title: audit.title,
-          score: Math.round(audit.score * 100),
-          description: audit.description?.slice(0, 300) || null,
-          items: audit.details.items.slice(0, 3).map(item => ({
-            url: item.url || null,
-            wastedMs: item.wastedMs || null,
-            totalBytes: item.totalBytes || null,
-          })),
-        });
-      }
-    }
-    opps.sort((a, b) => a.score - b.score);
-    result.topOpportunities = opps.slice(0, 10);
+    result.topOpportunities = (data.opportunities || []).slice(0, 10).map((o) => ({
+      title: o.title || null,
+      score: o.score != null ? Math.round(o.score * 100) : null,
+      description: (o.description || "").slice(0, 300) || null,
+      items: [],
+    }));
 
-    const diags = [];
-    for (const [key, audit] of Object.entries(audits)) {
-      if (audit.scoreDisplayMode === "informative" && audit.title) {
-        diags.push({
-          title: audit.title,
-          description: audit.description?.slice(0, 200) || null,
-        });
-      }
-    }
-    result.diagnostics = diags.slice(0, 15);
+    result.diagnostics = (data.diagnostics || []).slice(0, 15).map((d) => ({
+      title: d.title || null,
+      description: (d.description || "").slice(0, 200) || null,
+    }));
   } catch (err) {
     logEvidenceError("pageSpeedEvidence", websiteUrl, err);
     result.error = err.message || "PageSpeed API request failed";

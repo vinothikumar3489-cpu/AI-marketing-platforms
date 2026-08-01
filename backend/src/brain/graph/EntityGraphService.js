@@ -48,22 +48,52 @@ export class EntityGraphService {
 
     const stats = { newEntities: 0, updatedEntities: 0, relationshipsCreated: 0, duplicatesMerged: 0, errors: [] };
 
-    await this._updateCompany(request, knowledge, memory, stats);
-    await this._updateProduct(request, knowledge, memory, stats);
-    await this._updateCompetitors(knowledge, memory, stats);
-    await this._updateFromProfile(memory, stats);
-    await this._updateFromEvidenceSources(evidence, stats);
+    // Each step is isolated: one failing extractor must not abort the rest.
+    const steps = [
+      ['company', () => this._updateCompany(request, knowledge, memory, stats)],
+      ['product', () => this._updateProduct(request, knowledge, memory, stats)],
+      ['competitors', () => this._updateCompetitors(request, knowledge, memory, stats)],
+      ['profile', () => this._updateFromProfile(memory, stats)],
+      ['evidenceSources', () => this._updateFromEvidenceSources(evidence, request, knowledge, stats)],
+      ['features', () => this._updateFeatures(memory, knowledge, request, stats)],
+      ['keywords', () => this._updateKeywords(knowledge, request, stats)],
+      ['painPoints', () => this._updatePainPoints(memory, request, stats)],
+      ['audience', () => this._updateAudience(memory, request, stats)],
+    ];
 
-    const dupGroups = await this.resolver.detectDuplicates('Company', 50);
-    const moreGroups = await this.resolver.detectDuplicates('Product', 50);
-    const allGroups = [...dupGroups, ...moreGroups];
-
-    if (allGroups.length > 0) {
-      const merged = await this.resolver.mergeDuplicateGroups(allGroups);
-      stats.duplicatesMerged = merged.length;
+    for (const [name, fn] of steps) {
+      try {
+        await fn();
+      } catch (err) {
+        stats.errors.push({ step: name, error: err.message });
+      }
     }
 
-    await this.store.updateFreshness();
+    try {
+      const dupGroups = [
+        ...(await this.resolver.detectDuplicates('Company', 50)),
+        ...(await this.resolver.detectDuplicates('Product', 50)),
+        ...(await this.resolver.detectDuplicates('Competitor', 50)),
+      ];
+
+      if (dupGroups.length > 0) {
+        const merged = await this.resolver.mergeDuplicateGroups(dupGroups);
+        stats.duplicatesMerged = merged.length;
+      }
+    } catch (err) {
+      stats.errors.push({ step: 'dedupe', error: err.message });
+    }
+
+    try {
+      await this.store.updateFreshness();
+    } catch (err) {
+      stats.errors.push({ step: 'freshness', error: err.message });
+    }
+    try {
+      await this.store.decayConfidence({ thresholdDays: 14 });
+    } catch (err) {
+      stats.errors.push({ step: 'decay', error: err.message });
+    }
 
     stats.elapsed = Date.now() - start;
     return stats;
@@ -123,7 +153,7 @@ export class EntityGraphService {
     }
   }
 
-  async _updateCompetitors(knowledge, memory, stats) {
+  async _updateCompetitors(request, knowledge, memory, stats) {
     const productName = knowledge?.product?.name || memory?.product?.data?.productName || '';
     const competitors = knowledge?.competitors?.entities || [];
 
@@ -132,7 +162,7 @@ export class EntityGraphService {
       if (!compName || compName === 'Unknown') continue;
 
       const result = await this.resolver.resolveOrCreate('Competitor', compName, {
-        chatId: null,
+        chatId: request?.chatId,
         source: comp.source || 'evidence',
         confidence: 0.6,
         metadata: { website: comp.website || '' },
@@ -150,9 +180,33 @@ export class EntityGraphService {
           relType: 'COMPETES_WITH',
           reason: `Product ${productName} competes with ${compName}`,
           sources: [comp.source || 'evidence'],
-          chatId: null,
+          chatId: request?.chatId,
         });
         if (rel.success) stats.relationshipsCreated++;
+      }
+
+      // Link the competitor's website as its own node so competitor dedupe
+      // can use domain evidence and retrieval can resolve websites.
+      if (comp.website) {
+        const wsResult = await this.resolver.resolveOrCreate('Website', comp.website, {
+          chatId: request?.chatId,
+          source: comp.source || 'evidence',
+          confidence: 0.7,
+          metadata: { url: comp.website },
+        });
+        if (!wsResult.resolved) stats.newEntities++;
+
+        const wsRel = await this.relationshipResolver.ensureRelationship({
+          fromType: 'Competitor',
+          fromName: compName,
+          toType: 'Website',
+          toName: comp.website,
+          relType: 'BELONGS_TO',
+          reason: `Website ${comp.website} belongs to competitor ${compName}`,
+          sources: [comp.source || 'evidence'],
+          chatId: request?.chatId,
+        });
+        if (wsRel.success) stats.relationshipsCreated++;
       }
     }
   }
@@ -193,21 +247,190 @@ export class EntityGraphService {
     }
   }
 
-  async _updateFromEvidenceSources(evidence, stats) {
+  async _updateFromEvidenceSources(evidence, request, knowledge, stats) {
     const sources = evidence?.sources || [];
+    const companyName = knowledge?.company?.name || request?.companyName || '';
+
     for (const source of sources) {
-      if (source.type === 'product' && source.value) {
+      if (source.type === 'product' && source.value && source.value !== 'Unknown') {
         const result = await this.resolver.resolveOrCreate('Product', source.value, {
           source: source.subType || 'evidence',
           confidence: source.confidence || 0.5,
         });
         if (!result.resolved) stats.newEntities++;
+
+        // Never leave an extracted product as an orphan node: link it to the
+        // owning company when one is known.
+        if (companyName && companyName !== 'Unknown') {
+          const rel = await this.relationshipResolver.ensureRelationship({
+            fromType: 'Company',
+            fromName: companyName,
+            toType: 'Product',
+            toName: source.value,
+            relType: 'OWNS',
+            reason: `Company ${companyName} owns product ${source.value}`,
+            sources: [source.subType || 'evidence'],
+            chatId: request?.chatId,
+          });
+          if (rel.success) stats.relationshipsCreated++;
+        }
       }
+    }
+  }
+
+  async _updateFeatures(memory, knowledge, request, stats) {
+    const productData = memory?.product?.data || {};
+    const productAnalysis = productData.productAnalysis || {};
+    const productName = knowledge?.product?.name || productData.productName || request?.productName || '';
+    if (!productName || productName === 'Unknown') return;
+
+    const featureItems = Array.isArray(productAnalysis.features)
+      ? productAnalysis.features
+      : Array.isArray(productAnalysis.keyFeatures)
+        ? productAnalysis.keyFeatures
+        : [];
+    const benefitItems = Array.isArray(productAnalysis.benefits) ? productAnalysis.benefits : [];
+
+    const seen = new Set();
+    for (const item of [...featureItems, ...benefitItems]) {
+      const name = (typeof item === 'string' ? item : (item.name || item.title || item.value || '')).trim();
+      if (!name || seen.has(name.toLowerCase())) continue;
+      seen.add(name.toLowerCase());
+
+      const result = await this.resolver.resolveOrCreate('Feature', name, {
+        source: 'productIntelligence',
+        confidence: 0.7,
+      });
+      if (!result.resolved) stats.newEntities++;
+
+      const rel = await this.relationshipResolver.ensureRelationship({
+        fromType: 'Product',
+        fromName: productName,
+        toType: 'Feature',
+        toName: name,
+        relType: 'HAS_FEATURE',
+        reason: `Product ${productName} has feature ${name}`,
+        sources: ['productIntelligence'],
+        chatId: request?.chatId,
+      });
+      if (rel.success) stats.relationshipsCreated++;
+    }
+  }
+
+  async _updateKeywords(knowledge, request, stats) {
+    const productName = knowledge?.product?.name || request?.productName || '';
+    const keywords = knowledge?.keywords?.entities || [];
+
+    const seen = new Set();
+    for (const kw of keywords) {
+      const text = (kw.value || kw.name || '').trim();
+      if (!text || text === 'Unknown' || seen.has(text.toLowerCase())) continue;
+      seen.add(text.toLowerCase());
+
+      const result = await this.resolver.resolveOrCreate('Keyword', text, {
+        source: kw.source || 'seoIntelligence',
+        confidence: 0.6,
+      });
+      if (!result.resolved) stats.newEntities++;
+
+      if (productName && productName !== 'Unknown') {
+        const rel = await this.relationshipResolver.ensureRelationship({
+          fromType: 'Product',
+          fromName: productName,
+          toType: 'Keyword',
+          toName: text,
+          relType: 'CONNECTS_TO',
+          reason: `Product ${productName} connects to keyword ${text}`,
+          sources: [kw.source || 'seoIntelligence'],
+          chatId: request?.chatId,
+        });
+        if (rel.success) stats.relationshipsCreated++;
+      }
+    }
+  }
+
+  async _updatePainPoints(memory, request, stats) {
+    const productData = memory?.product?.data || {};
+    const audience = productData.audienceIntelligence || {};
+    const productAnalysis = productData.productAnalysis || {};
+    const productName = productData.productName || request?.productName || '';
+    if (!productName || productName === 'Unknown') return;
+
+    const items = Array.isArray(audience.painPoints)
+      ? audience.painPoints
+      : Array.isArray(productAnalysis.painPoints)
+        ? productAnalysis.painPoints
+        : [];
+
+    const seen = new Set();
+    for (const item of items) {
+      const text = (typeof item === 'string' ? item : (item.painPoint || item.name || item.title || '')).trim();
+      if (!text || seen.has(text.toLowerCase())) continue;
+      seen.add(text.toLowerCase());
+
+      const result = await this.resolver.resolveOrCreate('PainPoint', text, {
+        source: 'productIntelligence',
+        confidence: 0.6,
+      });
+      if (!result.resolved) stats.newEntities++;
+
+      const rel = await this.relationshipResolver.ensureRelationship({
+        fromType: 'PainPoint',
+        fromName: text,
+        toType: 'Product',
+        toName: productName,
+        relType: 'SOLVED_BY',
+        reason: `Pain point ${text} is solved by product ${productName}`,
+        sources: ['productIntelligence'],
+        chatId: request?.chatId,
+      });
+      if (rel.success) stats.relationshipsCreated++;
+    }
+  }
+
+  async _updateAudience(memory, request, stats) {
+    const productData = memory?.product?.data || {};
+    const audience = productData.audienceIntelligence || {};
+    const productName = productData.productName || request?.productName || '';
+    if (!productName || productName === 'Unknown') return;
+
+    const names = [
+      audience.primaryAudience,
+      ...(Array.isArray(audience.buyerPersonas) ? audience.buyerPersonas.map(p => p.name || p.title) : []),
+    ].filter(Boolean).map(n => String(n).trim()).filter(n => n && n !== 'Unknown');
+
+    const seen = new Set();
+    for (const name of names) {
+      if (seen.has(name.toLowerCase())) continue;
+      seen.add(name.toLowerCase());
+
+      const result = await this.resolver.resolveOrCreate('Audience', name, {
+        source: 'productIntelligence',
+        confidence: 0.6,
+      });
+      if (!result.resolved) stats.newEntities++;
+
+      const rel = await this.relationshipResolver.ensureRelationship({
+        fromType: 'Product',
+        fromName: productName,
+        toType: 'Audience',
+        toName: name,
+        relType: 'TARGETS',
+        reason: `Product ${productName} targets audience ${name}`,
+        sources: ['productIntelligence'],
+        chatId: request?.chatId,
+      });
+      if (rel.success) stats.relationshipsCreated++;
     }
   }
 
   async getHealthReport() {
     return this.graphHealth.report();
+  }
+
+  // GraphEngine.health() calls service.health() — keep both names working.
+  async health() {
+    return this.getHealthReport();
   }
 
   getEntityStore() { return this.store; }

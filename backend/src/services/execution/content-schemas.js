@@ -1,4 +1,4 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 import { SCHEMA_REGISTRY } from "../../shared/schemas/content-types.schema.js";
 
 const evidenceUsed = z.array(z.string()).default([]);
@@ -10,52 +10,7 @@ function fillCommon(repaired) {
   return repaired;
 }
 
-function generateHeadline(productName, painPoint) {
-  if (!productName && !painPoint) return 'How to Transform Your Business Operations';
-  if (productName && painPoint) return `${productName}: Solving ${painPoint}`;
-  if (productName) return `Introducing ${productName}`;
-  return 'A Comprehensive Guide to Better Outcomes';
-}
 
-function generateCaption(productName, hook) {
-  const base = hook || 'Check out what we have to share!';
-  if (productName) return `${base}\n\nDiscover how ${productName} can help you achieve more.\n\n#Productivity #Innovation #Growth`;
-  return `${base}\n\n#Innovation #Growth`;
-}
-
-function generateVisualConcept(productName, headline) {
-  if (productName) return `Modern, clean interface of ${productName} showing key features in a professional setting. Bright color scheme with brand accents.`;
-  return `Clean, professional design with modern aesthetics. Data visualization elements with brand-colored accents.`;
-}
-
-function generateImagePrompt(productName, topic) {
-  if (productName) return `Professional product showcase of ${productName} interface, clean modern design, soft lighting, technology context, 4k quality`;
-  return `Abstract technology concept with glowing network connections, professional color scheme, modern minimalist design`;
-}
-
-function generateCallToAction(action) {
-  const actions = ['Get Started', 'Learn More', 'Try It Now', 'Discover How', 'See It In Action'];
-  if (action && actions.includes(action)) return action;
-  return actions[0];
-}
-
-function generateHashtags(productName, count = 5) {
-  const tags = ['#Innovation', '#Productivity', '#Growth', '#Technology', '#DigitalTransformation', '#FutureOfWork', '#Efficiency', '#Business'];
-  if (productName) {
-    const brandTag = '#' + productName.replace(/[^a-zA-Z0-9]/g, '');
-    return [brandTag, ...tags].slice(0, count);
-  }
-  return tags.slice(0, count);
-}
-
-function generateSummary(content, maxLength = 200) {
-  if (!content) return 'Learn how our solution can help your team achieve better outcomes.';
-  const str = typeof content === 'string' ? content : JSON.stringify(content);
-  if (str.length <= maxLength) return str;
-  return str.substring(0, maxLength - 3) + '...';
-}
-
-const EMAIL_CTA_DEFAULTS = { label: 'Learn More', url: '#' };
 
 function extractString(val, fallback = '') {
   if (val === null || val === undefined) return fallback;
@@ -65,11 +20,13 @@ function extractString(val, fallback = '') {
 
 function extractCtaObject(candidate, ctaUrlFallback) {
   if (!candidate) return null;
-  if (typeof candidate === 'string') return { label: candidate, url: ctaUrlFallback || '#' };
+  if (typeof candidate === 'string') return candidate.trim() ? { label: candidate, url: ctaUrlFallback || null } : null;
   if (typeof candidate === 'object') {
+    const label = extractString(candidate.label || candidate.text || candidate.title, null);
+    if (!label) return null;
     return {
-      label: extractString(candidate.label || candidate.text || candidate.title, 'Learn More'),
-      url: extractString(candidate.url || candidate.destination || ctaUrlFallback, '#'),
+      label,
+      url: extractString(candidate.url || candidate.destination || ctaUrlFallback, null),
     };
   }
   return null;
@@ -86,17 +43,16 @@ export function normalizeEmailContent(data) {
   if (!data || typeof data !== 'object') return data || {};
   const n = { ...data };
   const now = new Date().getFullYear();
-  const pn = n._productName || n.productIdentity?.displayName || 'this solution';
 
   // === CANONICAL: featureHighlights (NOT features) ===
   if (Array.isArray(n.features) && !Array.isArray(n.featureHighlights)) {
     n.featureHighlights = n.features;
   }
-  n.featureHighlights = Array.isArray(n.featureHighlights) && n.featureHighlights.length >= 2 ? n.featureHighlights : ['Advanced capabilities platform', 'Intelligent workflow tools', 'Seamless integration support'];
+  n.featureHighlights = Array.isArray(n.featureHighlights) ? n.featureHighlights : [];
   delete n.features;
 
   // === CANONICAL: callToAction (NOT primaryCta, cta, ctaText+ctaUrl) ===
-  const ctaUrlFallback = n.ctaUrl || '#';
+  const ctaUrlFallback = n.ctaUrl || null;
   const ctaSources = [
     extractCtaObject(n.callToAction, ctaUrlFallback),
     extractCtaObject(n.primaryCta, ctaUrlFallback),
@@ -104,7 +60,7 @@ export function normalizeEmailContent(data) {
     n.ctaText ? { label: n.ctaText, url: ctaUrlFallback } : null,
   ].filter(Boolean);
 
-  n.callToAction = ctaSources[0] || { label: 'Get Started', url: '#' };
+  n.callToAction = ctaSources[0] || null;
   delete n.primaryCta;
   delete n.cta;
   delete n.ctaText;
@@ -115,18 +71,18 @@ export function normalizeEmailContent(data) {
     n.secondaryCta = n.secondaryCallToAction;
   }
   delete n.secondaryCallToAction;
-  n.secondaryCta = extractCtaObject(n.secondaryCta, '#');
+  n.secondaryCta = extractCtaObject(n.secondaryCta, null);
 
   // === CANONICAL: painPoint (NOT problem) ===
   if (n.problem && !n.painPoint) n.painPoint = n.problem;
-  n.painPoint = extractString(n.painPoint, 'common challenges in daily operations');
+  n.painPoint = extractString(n.painPoint);
   delete n.problem;
 
   // === CANONICAL: variables (NOT personalizationVariables) ===
   if (Array.isArray(n.personalizationVariables) && !Array.isArray(n.variables)) {
     n.variables = n.personalizationVariables;
   }
-  n.variables = Array.isArray(n.variables) && n.variables.length > 0 ? n.variables : ['firstName', 'lastName', 'companyName'];
+  n.variables = Array.isArray(n.variables) && n.variables.length > 0 ? n.variables : [];
   delete n.personalizationVariables;
 
   // === CANONICAL: bodyParagraphs (NOT body) ===
@@ -138,31 +94,27 @@ export function normalizeEmailContent(data) {
     } else if (n.opening || n.painPoint || n.solution) {
       n.bodyParagraphs = [n.opening || '', n.painPoint || '', n.solution || ''].filter(Boolean);
     } else {
-      n.bodyParagraphs = [
-        `Teams today face ${n.painPoint || 'common challenges in daily operations'} that impact productivity and outcomes.`,
-        `${pn} provides the capabilities your team needs to overcome these obstacles and achieve better results.`,
-        `With powerful tools and intelligent workflows, ${pn} helps teams work more efficiently and effectively every day.`
-      ];
+      n.bodyParagraphs = [];
     }
   }
   delete n.body;
 
-  // === Strings: never null, always with valid defaults ===
-  n.subject = extractString(n.subject || n.subjectLine, `Discover ${pn}`);
+  // === Strings: never null; no fabricated copy, only template placeholders ===
+  n.subject = extractString(n.subject || n.subjectLine);
   if (n.subject.length > 70) n.subject = n.subject.substring(0, 67) + '...';
-  n.previewText = extractString(n.previewText || n.preheader, `Learn how ${pn} can help your team achieve better results.`);
+  n.previewText = extractString(n.previewText || n.preheader);
   if (n.previewText.length > 150) n.previewText = n.previewText.substring(0, 147) + '...';
   n.greeting = extractString(n.greeting || n.greetingText, 'Hi {{firstName}},');
-  n.headline = extractString(n.headline, `Introducing ${pn}`);
-  n.opening = extractString(n.opening || n.introduction, `We wanted to share how ${pn} can help your team overcome ${n.painPoint || 'common challenges'}.`);
-  n.solution = extractString(n.solution, `${pn} provides the tools and capabilities your team needs to succeed.`);
+  n.headline = extractString(n.headline);
+  n.opening = extractString(n.opening || n.introduction);
+  n.solution = extractString(n.solution);
   n.closing = extractString(n.closing, 'Best regards');
   n.signature = extractString(n.signature, 'The Team');
   n.postscript = extractString(n.postscript);
   n.compliance = extractString(n.compliance);
   n.socialProof = extractString(n.socialProof);
-  n.emailType = extractString(n.emailType, 'Product Announcement');
-  n.footer = extractString(n.footer || n.complianceFooter, `© ${now}. All rights reserved.`);
+  n.emailType = extractString(n.emailType);
+  n.footer = extractString(n.footer || n.complianceFooter, `Â© ${now}. All rights reserved.`);
   n.complianceFooter = extractString(n.complianceFooter);
   n.unsubscribeText = extractString(n.unsubscribeText, 'To unsubscribe, reply with UNSUBSCRIBE');
   delete n.subjectLine;
@@ -170,17 +122,9 @@ export function normalizeEmailContent(data) {
   delete n.greetingText;
   delete n.introduction;
 
-  // === Arrays with minimum sizes (validators require >=2) ===
-  n.benefits = Array.isArray(n.benefits) && n.benefits.length >= 2 ? n.benefits : [
-    'Streamlined workflows and improved efficiency',
-    'Data-driven insights for better decision-making',
-    'Seamless integration with existing tools'
-  ];
-  n.bodyParagraphs = Array.isArray(n.bodyParagraphs) && n.bodyParagraphs.length >= 2 ? n.bodyParagraphs : [
-    `Teams today face ${n.painPoint || 'common challenges in daily operations'} that impact productivity and outcomes.`,
-    `${pn} provides the capabilities your team needs to overcome these obstacles and achieve better results.`,
-    `With powerful tools and intelligent workflows, ${pn} helps teams work more efficiently and effectively every day.`
-  ];
+  // === Arrays with minimum sizes (validators require >=2) â€” no canned content ===
+  n.benefits = Array.isArray(n.benefits) ? n.benefits : [];
+  n.bodyParagraphs = Array.isArray(n.bodyParagraphs) && n.bodyParagraphs.length >= 2 ? n.bodyParagraphs : [];
   n.subjectAlternatives = Array.isArray(n.subjectAlternatives) ? n.subjectAlternatives : [];
 
   // === Evidence ===
@@ -191,9 +135,9 @@ export function normalizeEmailContent(data) {
   const bodyHtml = n.bodyParagraphs.map(p =>
     `<p style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 16px 0;">${extractString(p)}</p>`
   ).join('\n    ');
-  const ctaLabel = n.callToAction?.label || 'Learn More';
+  const ctaLabel = n.callToAction?.label || '';
   const ctaUrl = n.callToAction?.url || '#';
-  const footerText = n.footer || n.complianceFooter || `© ${now}. All rights reserved.`;
+  const footerText = n.footer || n.complianceFooter || `Â© ${now}. All rights reserved.`;
   n.html = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -205,7 +149,7 @@ export function normalizeEmailContent(data) {
         ${n.headline ? `<tr><td style="padding:28px 32px 0 32px;text-align:center;"><h1 style="font-size:24px;color:#1e293b;margin:0;">${extractString(n.headline)}</h1></td></tr>` : ''}
         ${n.greeting ? `<tr><td style="padding:20px 32px 0 32px;"><p style="font-size:16px;color:#333;margin:0;">${extractString(n.greeting)}</p></td></tr>` : ''}
         <tr><td style="padding:20px 32px 24px 32px;">${bodyHtml}
-        <div style="text-align:center;margin:24px 0;"><a href="${ctaUrl}" style="background-color:#2563eb;color:#ffffff;padding:12px 32px;text-decoration:none;border-radius:6px;display:inline-block;font-size:16px;font-weight:600;">${ctaLabel}</a></div>
+        ${ctaLabel ? `<div style="text-align:center;margin:24px 0;"><a href="${ctaUrl}" style="background-color:#2563eb;color:#ffffff;padding:12px 32px;text-decoration:none;border-radius:6px;display:inline-block;font-size:16px;font-weight:600;">${ctaLabel}</a></div>` : ''}
         </td></tr>
         <tr><td style="background-color:#f8fafc;padding:24px 32px;text-align:center;border-top:1px solid #e2e8f0;">
           <p style="font-size:12px;color:#888;margin:0;">${footerText}</p>
@@ -320,7 +264,9 @@ export function validateContentOutput(raw, assetType) {
   return { valid: false, errors: issues, missingFields, issues, raw: normalized };
 }
 
-/** Attempt repair of common AI output issues — auto-fills ALL missing required fields before validation */
+/** Attempt repair of common AI output issues â€” STRUCTURAL renames/repackaging only. No fabricated content.
+ *  Missing content fields remain missing so validation reports them honestly (schema_rejected + retry).
+ */
 export function repairAIOutput(raw, assetType) {
   if (!raw || typeof raw !== 'object') return raw;
   const repaired = { ...raw };
@@ -342,12 +288,6 @@ export function repairAIOutput(raw, assetType) {
       if (!repaired.conclusion) repaired.conclusion = repaired.body.substring(0, 150);
       delete repaired.body;
     }
-    repaired.headline = repaired.headline || repaired.metaTitle || generateHeadline(repaired._productName, repaired._painPoint);
-    repaired.introduction = repaired.introduction || (repaired.headline ? `An overview of ${repaired.headline.toLowerCase()}.` : 'Introduction to this topic.');
-    if (!repaired.sections || repaired.sections.length === 0) {
-      repaired.sections = [{ heading: 'Overview', body: generateSummary(repaired.headline), keyTakeaways: [] }];
-    }
-    repaired.conclusion = repaired.conclusion || `${repaired.headline || 'This solution'} helps teams achieve better outcomes. Reach out to learn more.`;
     fillCommon(repaired);
   }
 
@@ -358,195 +298,96 @@ export function repairAIOutput(raw, assetType) {
       repaired.faqs = repaired.questions.map(q => typeof q === 'string' ? { question: q, answer: '' } : q);
       delete repaired.questions;
     }
-    repaired.headline = repaired.headline || 'Frequently Asked Questions';
-    repaired.introduction = repaired.introduction || 'Find answers to common questions about how our solution can help you.';
-    if (!repaired.faqs || repaired.faqs.length === 0) {
-      repaired.faqs = [
-        { question: 'What is this solution?', answer: 'Our platform helps teams achieve better outcomes through innovative technology and proven methodologies.' },
-        { question: 'How does it work?', answer: 'The platform integrates seamlessly with your existing workflow, providing powerful tools and insights.' },
-        { question: 'What are the key benefits?', answer: 'Users report increased efficiency, better decision-making, and improved team collaboration.' },
-        { question: 'How do I get started?', answer: 'Contact our team for a personalized demo and onboarding session tailored to your needs.' },
-      ];
-    }
     fillCommon(repaired);
   }
 
   if (assetType === 'linkedin_post') {
-    repaired.hook = repaired.hook || repaired.headline || repaired.title || generateHeadline(repaired._productName, repaired._painPoint);
     repaired.body = repaired.body || repaired.content || repaired.text || '';
     if (repaired.content && !repaired.body) { repaired.body = repaired.content; delete repaired.content; }
     if (repaired.text && !repaired.body) { repaired.body = repaired.text; delete repaired.text; }
-    repaired.body = repaired.body || (repaired.hook ? `Learn more about ${repaired.hook.toLowerCase()}.` : 'Read on for insights on how leading teams are transforming their approach.');
-    repaired.cta = repaired.cta || repaired.callToAction || generateCallToAction();
-    repaired.audience = repaired.audience || 'Professionals in the industry';
-    repaired.angle = repaired.angle || 'informational';
-    repaired.hashtags = Array.isArray(repaired.hashtags) ? repaired.hashtags : generateHashtags(repaired._productName, 3);
+    if (repaired.title && !repaired.headline) { repaired.headline = repaired.title; delete repaired.title; }
+    if (repaired.callToAction && !repaired.cta) { repaired.cta = repaired.callToAction; delete repaired.callToAction; }
     fillCommon(repaired);
   }
 
   if (assetType === 'instagram_post') {
-    repaired.hook = repaired.hook || repaired.headline || generateHeadline(repaired._productName, repaired._painPoint);
-    repaired.caption = repaired.caption || repaired.body || repaired.content || generateCaption(repaired._productName, repaired.hook);
-    repaired.visualConcept = repaired.visualConcept || generateVisualConcept(repaired._productName, repaired.headline || repaired.hook);
-    repaired.imagePrompt = repaired.imagePrompt || generateImagePrompt(repaired._productName, repaired.caption);
-    repaired.callToAction = repaired.callToAction || repaired.cta || generateCallToAction();
-    repaired.hashtags = Array.isArray(repaired.hashtags) ? repaired.hashtags : generateHashtags(repaired._productName, 10);
-    repaired.audience = repaired.audience || 'General audience';
-    repaired.angle = repaired.angle || 'informational';
-    if (!repaired.carouselSlides || !Array.isArray(repaired.carouselSlides) || repaired.carouselSlides.length === 0) {
-      repaired.carouselSlides = [
-        { headline: repaired.hook || 'Key Insight', body: 'Discover what makes this approach different.', visualHint: 'Brand visual with headline overlay' },
-        { headline: 'How It Works', body: 'Simple, effective solution design.', visualHint: 'Process flow diagram' },
-        { headline: 'Results', body: 'See the difference for yourself.', visualHint: 'Before/after comparison graphic' },
-      ];
-    }
+    repaired.caption = repaired.caption || repaired.body || repaired.content || '';
+    if (repaired.body && !repaired.caption) { repaired.caption = repaired.body; delete repaired.body; }
+    if (repaired.content && !repaired.caption) { repaired.caption = repaired.content; delete repaired.content; }
+    if (repaired.headline && !repaired.hook) { repaired.hook = repaired.headline; }
+    if (repaired.callToAction && !repaired.cta) { repaired.cta = repaired.callToAction; delete repaired.callToAction; }
     fillCommon(repaired);
   }
 
   if (assetType === 'twitter_post' || assetType === 'x_post') {
-    // already handled above
     repaired.post = repaired.post || repaired.content || repaired.text || repaired.body || '';
     if (repaired.content && !repaired.post) { repaired.post = repaired.content; delete repaired.content; }
     if (repaired.body && !repaired.post) { repaired.post = repaired.body; delete repaired.body; }
-    repaired.post = repaired.post || `${generateHeadline(repaired._productName, repaired._painPoint)} — learn more today.`;
+    if (repaired.text && !repaired.post) { repaired.post = repaired.text; delete repaired.text; }
     if (repaired.post.length > 280) repaired.post = repaired.post.substring(0, 277) + '...';
-    repaired.cta = repaired.cta || generateCallToAction();
-    repaired.hashtags = Array.isArray(repaired.hashtags) ? repaired.hashtags : generateHashtags(repaired._productName, 2);
-    repaired.audience = repaired.audience || 'General audience';
-    repaired.angle = repaired.angle || 'informational';
+    if (repaired.callToAction && !repaired.cta) { repaired.cta = repaired.callToAction; delete repaired.callToAction; }
     fillCommon(repaired);
   }
 
   if (assetType === 'facebook_post') {
-    repaired.headline = repaired.headline || repaired.title || generateHeadline(repaired._productName, repaired._painPoint);
     repaired.body = repaired.body || repaired.content || repaired.text || '';
     if (repaired.content && !repaired.body) { repaired.body = repaired.content; delete repaired.content; }
     if (repaired.text && !repaired.body) { repaired.body = repaired.text; delete repaired.text; }
-    repaired.body = repaired.body || `${generateSummary(repaired.headline)} Learn how teams are achieving better outcomes with this approach.`;
-    repaired.cta = repaired.cta || generateCallToAction('Share your thoughts');
-    repaired.audience = repaired.audience || 'General audience';
-    repaired.angle = repaired.angle || 'informational';
+    if (repaired.title && !repaired.headline) { repaired.headline = repaired.title; delete repaired.title; }
+    if (repaired.callToAction && !repaired.cta) { repaired.cta = repaired.callToAction; delete repaired.callToAction; }
     fillCommon(repaired);
   }
 
   if (assetType === 'youtube_description') {
-    repaired.title = repaired.title || repaired.headline || generateHeadline(repaired._productName, repaired._painPoint);
-    repaired.openingHook = repaired.openingHook || repaired.introduction || `${repaired._painPoint || 'Common challenges'} are costing teams time and resources — here is the solution.`;
-    repaired.description = repaired.description || repaired.body || repaired.content || `In this video, we explore how to overcome ${repaired._painPoint || 'key industry challenges'} with practical, effective solutions.`;
-    repaired.chapters = Array.isArray(repaired.chapters) ? repaired.chapters : [
-      { timestamp: '0:00', title: 'Introduction' },
-      { timestamp: '1:00', title: 'The Challenge' },
-      { timestamp: '3:00', title: 'The Solution' },
-      { timestamp: '5:00', title: 'Key Takeaways' },
-    ];
-    repaired.cta = repaired.cta || 'Subscribe for more insights';
-    repaired.hashtags = Array.isArray(repaired.hashtags) ? repaired.hashtags : generateHashtags(repaired._productName, 4);
-    repaired.keywords = Array.isArray(repaired.keywords) ? repaired.keywords : [repaired.title || 'video', repaired._productName || 'solution'].filter(Boolean);
+    repaired.title = repaired.title || repaired.headline || '';
+    if (repaired.headline && !repaired.title) delete repaired.headline;
+    repaired.openingHook = repaired.openingHook || repaired.introduction || '';
+    repaired.description = repaired.description || repaired.body || repaired.content || '';
+    if (repaired.body && !repaired.description) { repaired.description = repaired.body; delete repaired.body; }
+    if (repaired.content && !repaired.description) { repaired.description = repaired.content; delete repaired.content; }
+    if (repaired.callToAction && !repaired.cta) { repaired.cta = repaired.callToAction; delete repaired.callToAction; }
     fillCommon(repaired);
   }
 
   if (assetType === 'landing_page') {
-    repaired.headline = repaired.headline || repaired.title || generateHeadline(repaired._productName, repaired._painPoint);
-    repaired.subheadline = repaired.subheadline || `Learn how ${repaired._productName || 'our solution'} helps teams achieve better outcomes.`;
-    repaired.heroCTA = repaired.heroCTA || repaired.cta || generateCallToAction();
-    repaired.painPoints = Array.isArray(repaired.painPoints) && repaired.painPoints.length > 0 ? repaired.painPoints :
-      [repaired._painPoint || 'Inefficient workflows', 'Limited visibility into key metrics', 'Manual processes that slow growth'];
-    repaired.solution = repaired.solution || `${repaired._productName || 'Our solution'} directly addresses these challenges by providing powerful tools and intelligent workflows.`;
-    if (!repaired.features || repaired.features.length === 0) {
-      repaired.features = [
-        { icon: 'star', title: 'Core Platform', description: 'Powerful capabilities designed for real-world use cases.' },
-        { icon: 'chart', title: 'Advanced Analytics', description: 'Data-driven insights to make informed decisions.' },
-        { icon: 'link', title: 'Seamless Integration', description: 'Connect with existing tools and workflows.' },
-      ];
-    }
-    repaired.socialProof = Array.isArray(repaired.socialProof) ? repaired.socialProof : [];
-    repaired.finalCTA = repaired.finalCTA || repaired.heroCTA || generateCallToAction('Get Started');
-    repaired.seoKeywords = Array.isArray(repaired.seoKeywords) ? repaired.seoKeywords : [repaired._productName || 'solution', 'digital transformation'].filter(Boolean);
+    repaired.headline = repaired.headline || repaired.title || '';
+    if (repaired.title && !repaired.headline) delete repaired.title;
+    if (repaired.callToAction && !repaired.heroCTA) { repaired.heroCTA = repaired.callToAction; delete repaired.callToAction; }
+    if (repaired.cta && !repaired.heroCTA) { repaired.heroCTA = repaired.cta; delete repaired.cta; }
+    if (repaired.finalCta && !repaired.finalCTA) { repaired.finalCTA = repaired.finalCta; delete repaired.finalCta; }
     fillCommon(repaired);
   }
 
   if (assetType === 'email_copy' || assetType.startsWith('email_')) {
-    const normalized = normalizeEmailContent(repaired);
-    const now = new Date().getFullYear();
-    const pn = normalized._productName || normalized.productIdentity?.displayName || 'this solution';
-    const pp = normalized._painPoint || 'common challenges';
-
-    // Merge normalized fields back, preserving _ prefixed meta
-    Object.assign(repaired, normalized, {
-      subject: normalized.subject || generateHeadline(pn, pp),
-      previewText: normalized.previewText || `Discover how ${pn} can help your team.`,
-      greeting: normalized.greeting || 'Hi there,',
-      opening: normalized.opening || `We wanted to share how ${pn} can help you overcome ${pp}.`,
-      bodyParagraphs: normalized.bodyParagraphs.length > 0 ? normalized.bodyParagraphs : [`${pn} provides the tools and capabilities your team needs to succeed.`],
-      closing: normalized.closing || 'Best regards,',
-      signature: normalized.signature || 'The Team',
-      footer: normalized.footer || `© ${now} All rights reserved.`,
-      html: normalized.html || '',
-      plainText: normalized.plainText || '',
-      benefits: normalized.benefits.length >= 3 ? normalized.benefits : [
-        ...normalized.benefits,
-        'Key benefit of the platform',
-        'Key benefit of the platform',
-        'Key benefit of the platform',
-      ].slice(0, 5),
-    });
-
+    Object.assign(repaired, normalizeEmailContent(repaired));
     fillCommon(repaired);
   }
 
   if (assetType === 'comparison_page') {
-    repaired.headline = repaired.headline || repaired.title || `${repaired._productName || 'Solution'} vs. Alternatives: A Comprehensive Comparison`;
-    repaired.introduction = repaired.introduction || `Choosing the right solution requires careful evaluation. This comparison examines how ${repaired._productName || 'our solution'} stacks up.`;
-    repaired.competitorWeaknesses = Array.isArray(repaired.competitorWeaknesses) ? repaired.competitorWeaknesses : [];
-    if (!repaired.comparisonTable || !repaired.comparisonTable.rows || repaired.comparisonTable.rows.length === 0) {
-      repaired.comparisonTable = {
-        headers: ['Feature', repaired._productName || 'Our Solution', 'Alternative'],
-        rows: [
-          { feature: 'Core Capabilities', [repaired._productName || 'Our Solution']: '✓', 'Alternative': 'Limited' },
-          { feature: 'Ease of Use', [repaired._productName || 'Our Solution']: '✓', 'Alternative': 'Moderate' },
-          { feature: 'Integration', [repaired._productName || 'Our Solution']: 'Seamless', 'Alternative': 'Complex' },
-        ],
-      };
-    }
+    repaired.headline = repaired.headline || repaired.title || '';
+    if (repaired.title && !repaired.headline) delete repaired.title;
     fillCommon(repaired);
   }
 
   if (assetType === 'feature_announcement') {
-    repaired.headline = repaired.headline || repaired.title || `Introducing New Capabilities in ${repaired._productName || 'Our Platform'}`;
-    repaired.subheadline = repaired.subheadline || `Designed to help teams achieve more.`;
-    repaired.body = repaired.body || repaired.content || `${repaired._productName || 'Our platform'} continuously evolves to meet your needs with new features and capabilities.`;
-    repaired.benefits = Array.isArray(repaired.benefits) ? repaired.benefits : ['Increased efficiency', 'Better outcomes', 'Simplified workflows'];
-    repaired.cta = repaired.cta || generateCallToAction('Learn More');
-    repaired.availability = repaired.availability || 'Available now';
+    repaired.headline = repaired.headline || repaired.title || '';
+    if (repaired.title && !repaired.headline) delete repaired.title;
+    repaired.body = repaired.body || repaired.content || '';
+    if (repaired.content && !repaired.body) { repaired.body = repaired.content; delete repaired.content; }
+    if (repaired.callToAction && !repaired.cta) { repaired.cta = repaired.callToAction; delete repaired.callToAction; }
     fillCommon(repaired);
   }
 
   if (assetType === 'whitepaper') {
-    repaired.title = repaired.title || repaired.headline || `${repaired._productName || 'Solution'} Whitepaper: A Comprehensive Guide`;
-    repaired.subtitle = repaired.subtitle || `Strategies and insights for ${repaired._productName || 'transforming your approach'}.`;
-    repaired.executiveSummary = repaired.executiveSummary || `This whitepaper explores how ${repaired._productName || 'our solution'} helps teams overcome key challenges and achieve better outcomes.`;
-    if (!repaired.sections || repaired.sections.length === 0) {
-      repaired.sections = [
-        { heading: 'Understanding the Challenge', body: 'Teams today face significant obstacles in achieving their goals efficiently.', keyFindings: ['Challenge affects productivity', 'Traditional approaches fall short', 'New strategies needed'] },
-        { heading: 'How Our Solution Addresses This', body: `${repaired._productName || 'Our platform'} provides targeted solutions for these challenges.`, keyFindings: ['Direct solution for key pain points', 'Proven methodologies', 'Measurable results'] },
-        { heading: 'Implementation Guide', body: 'Follow these steps to get started and maximize value.', keyFindings: ['Quick setup process', 'Best practices for adoption', 'Continuous improvement cycle'] },
-      ];
-    }
-    repaired.conclusion = repaired.conclusion || `${repaired._productName || 'Our solution'} provides a comprehensive approach to overcoming key challenges. Reach out to learn more.`;
-    repaired.references = Array.isArray(repaired.references) ? repaired.references : [];
-    repaired.cta = repaired.cta || `Download the full ${repaired._productName || 'whitepaper'}`;
+    repaired.title = repaired.title || repaired.headline || '';
+    if (repaired.headline && !repaired.title) delete repaired.headline;
     fillCommon(repaired);
   }
 
   if (assetType === 'creative_brief') {
-    repaired.objective = repaired.objective || repaired.objective || `Drive awareness and adoption of ${repaired._productName || 'our solution'} by demonstrating how it solves ${repaired._painPoint || 'key challenges'}.`;
-    repaired.audience = repaired.audience || 'Target audience';
-    repaired.message = repaired.message || `${repaired._productName || 'Our solution'} helps teams overcome challenges with targeted solutions.`;
-    repaired.visualDirection = repaired.visualDirection || 'Clean, modern aesthetic with brand colors. Professional imagery showing success and innovation.';
-    repaired.brandSignals = Array.isArray(repaired.brandSignals) ? repaired.brandSignals : ['Brand typography', 'Clean design', 'Professional imagery', 'Data-driven visuals', 'Consistent iconography'];
-    repaired.requiredText = repaired.requiredText || `${repaired._productName || 'Smarter solutions'} for better outcomes`;
-    repaired.cta = repaired.cta || generateCallToAction('Discover More');
-    repaired.format = repaired.format || 'Multi-channel campaign';
+    repaired.objective = repaired.objective || '';
+    repaired.visualDirection = repaired.visualDirection || '';
+    repaired.requiredText = repaired.requiredText || '';
     repaired.supportingMessages = Array.isArray(repaired.supportingMessages) ? repaired.supportingMessages : [];
     repaired.deliverables = Array.isArray(repaired.deliverables) ? repaired.deliverables : [];
     repaired.mandatoryElements = Array.isArray(repaired.mandatoryElements) ? repaired.mandatoryElements : [];
@@ -556,43 +397,16 @@ export function repairAIOutput(raw, assetType) {
   }
 
   if (assetType === 'video_script') {
-    repaired.title = repaired.title || `${repaired._productName || 'Solution'}: ${repaired._painPoint || 'A Comprehensive Overview'}`;
-    repaired.format = repaired.format || 'Explainer';
-    repaired.duration = repaired.duration || '60-90 seconds';
-    if (!repaired.scenes || repaired.scenes.length === 0) {
-      repaired.scenes = [
-        { scene: 1, narration: `Meet your team. Every day they face "${repaired._painPoint || 'key challenges'}" — obstacles that slow them down.`, onScreenText: `${repaired._painPoint || 'The Challenge'}`, visual: 'Team working, looking frustrated', evidencePoint: repaired._painPoint || null, cta: null },
-        { scene: 2, narration: `But what if there was a better way? ${repaired._productName || 'Our solution'} was built for this.`, onScreenText: `Introducing ${repaired._productName || 'The Solution'}`, visual: 'Product interface mockup', evidencePoint: null, cta: null },
-        { scene: 3, narration: `With powerful features, teams achieve better outcomes faster.`, onScreenText: 'Key Features', visual: 'Feature demonstration', evidencePoint: null, cta: null },
-        { scene: 4, narration: `Better efficiency and results — that is what our users experience every day.`, onScreenText: 'Results', visual: 'Success metrics visualization', evidencePoint: null, cta: null },
-        { scene: 5, narration: `Ready to transform your approach? Start today and see the difference.`, onScreenText: `Get Started with ${repaired._productName || 'Our Solution'}`, visual: 'CTA screen', evidencePoint: null, cta: `Learn more about ${repaired._productName || 'our solution'}` },
-      ];
-    }
+    repaired.title = repaired.title || '';
     fillCommon(repaired);
   }
 
   if (assetType === 'product_page') {
-    repaired.productName = repaired.productName || repaired._productName || 'Our Solution';
-    repaired.tagline = repaired.tagline || `The solution teams need to overcome ${repaired._painPoint || 'key challenges'}.`;
-    repaired.overview = repaired.overview || `${repaired.productName} is designed to help teams overcome challenges and achieve better outcomes through innovative capabilities.`;
-    if (!repaired.keyFeatures || repaired.keyFeatures.length === 0) {
-      repaired.keyFeatures = [
-        { name: 'Core Platform', description: 'Powerful capabilities for real-world use.', benefit: 'Achieve better results faster' },
-        { name: 'Advanced Analytics', description: 'Data-driven insights for informed decisions.', benefit: 'Make confident decisions' },
-        { name: 'Seamless Integration', description: 'Connect with existing tools.', benefit: 'Smooth adoption and maximum impact' },
-      ];
-    }
-    if (!repaired.useCases || repaired.useCases.length === 0) {
-      repaired.useCases = [{ scenario: `${repaired._painPoint || 'Key challenge'}`, solution: `${repaired.productName} provides targeted tools to address this directly.`, outcome: 'Improved outcomes and enhanced efficiency.' }];
-    }
-    repaired.cta = repaired.cta || generateCallToAction('Get Started');
-    repaired.pricing = null;
-    if (!repaired.faqs || repaired.faqs.length === 0) {
-      repaired.faqs = [
-        { question: `What is ${repaired.productName}?`, answer: `A platform designed to help teams address key challenges through innovative capabilities.` },
-        { question: `How does it benefit teams?`, answer: `It delivers measurable improvements in efficiency, visibility, and outcomes.` },
-      ];
-    }
+    repaired.productName = repaired.productName || repaired._productName || '';
+    repaired.tagline = repaired.tagline || '';
+    repaired.overview = repaired.overview || '';
+    repaired.pricing = repaired.pricing ?? null;
+    if (repaired.callToAction && !repaired.cta) { repaired.cta = repaired.callToAction; delete repaired.callToAction; }
     fillCommon(repaired);
   }
 

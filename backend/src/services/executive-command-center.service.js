@@ -44,7 +44,7 @@ function scoreToGrade(score) {
 }
 
 function trendFromScore(score) {
-  if (score >= 75) return { direction: 'up', trendLabel: '+8% vs benchmark', confidence: 'high' };
+  if (score >= 75) return { direction: 'up', trendLabel: 'Strong growth', confidence: 'high' };
   if (score >= 55) return { direction: 'stable', trendLabel: 'Stable trajectory', confidence: 'medium' };
   return { direction: 'down', trendLabel: 'Needs attention', confidence: 'low' };
 }
@@ -255,14 +255,14 @@ function buildOpportunities(chat) {
     items.push({
       id: `mkt-${i}`,
       title: asText(o.opportunity || o, 'Market opportunity'),
-      impact: o.impact || 'high',
-      difficulty: o.effort || 'medium',
-      roi: o.roi || 'high',
-      time: o.timeframe || '30-60 days',
-      priority: o.priority || 'high',
+      impact: o.impact || null,
+      difficulty: o.effort || null,
+      roi: o.roi || null,
+      time: o.timeframe || null,
+      priority: o.priority || null,
       category: 'market',
-      recommendation: asText(o.action, 'Pursue this market segment'),
-      confidence: 'medium',
+      recommendation: o.action || null,
+      confidence: o.confidence || null,
     });
   });
 
@@ -270,14 +270,14 @@ function buildOpportunities(chat) {
     items.push({
       id: `kw-${i}`,
       title: asText(o.pageSuggestion || o.keyword, 'Keyword opportunity'),
-      impact: o.impact || 'medium',
-      difficulty: o.difficulty || 'medium',
-      roi: 'high',
-      time: '14-30 days',
-      priority: o.impact === 'high' ? 'high' : 'medium',
+      impact: o.impact || null,
+      difficulty: o.difficulty || null,
+      roi: o.roi || null,
+      time: o.timeframe || null,
+      priority: o.priority || null,
       category: 'seo',
-      recommendation: asText(o.reason, 'Create targeted content'),
-      confidence: 'high',
+      recommendation: o.reason || null,
+      confidence: o.confidence || null,
     });
   });
 
@@ -285,14 +285,14 @@ function buildOpportunities(chat) {
     items.push({
       id: `cg-${i}`,
       title: asText(g.title, 'Content gap'),
-      impact: 'high',
-      difficulty: g.estimatedImpact?.effort || 'medium',
-      roi: 'high',
-      time: '7-21 days',
-      priority: g.priority || 'high',
+      impact: g.estimatedImpact?.impact || null,
+      difficulty: g.estimatedImpact?.effort || null,
+      roi: null,
+      time: g.timeframe || null,
+      priority: g.priority || null,
       category: 'content',
-      recommendation: asText(g.suggestedAction, 'Fill this content gap'),
-      confidence: 'high',
+      recommendation: g.suggestedAction || null,
+      confidence: g.confidence || null,
     });
   });
 
@@ -311,10 +311,10 @@ function buildRisks(chat) {
     items.push({
       id: `risk-mkt-${i}`,
       title: asText(r.risk || r, 'Market risk'),
-      severity: r.severity || 'medium',
-      impact: r.impact || 'Revenue and growth trajectory',
-      mitigation: asText(r.mitigation, 'Monitor and develop counter-strategy'),
-      confidence: 'medium',
+      severity: r.severity || null,
+      impact: r.impact || null,
+      mitigation: r.mitigation || null,
+      confidence: r.confidence || null,
     });
   });
 
@@ -322,10 +322,10 @@ function buildRisks(chat) {
     items.push({
       id: `risk-comp-${i}`,
       title: asText(t.threat || t, 'Competitive threat'),
-      severity: 'high',
-      impact: 'Market share and positioning',
-      mitigation: asText(t.response, 'Differentiate on unique value'),
-      confidence: 'high',
+      severity: t.severity || null,
+      impact: t.impact || null,
+      mitigation: t.response || null,
+      confidence: t.confidence || null,
     });
   });
 
@@ -347,11 +347,11 @@ function buildCopilotInsights(chat, scores) {
   const insights = [];
   const camp = chat.campaignIntelligence || {};
   const seo = chat.seoIntelligence || {};
-  const channel = asText(camp.channelRecommendation?.primaryChannel, 'LinkedIn');
+  const channel = camp.channelRecommendation?.primaryChannel || null;
 
-  if (scores.growthScore >= 70) {
+  if (scores.growthScore >= 70 && channel) {
     insights.push({ type: 'insight', text: `Your strongest growth opportunity is ${channel}.`, confidence: 'high', impact: 'high' });
-  } else {
+  } else if (channel) {
     insights.push({ type: 'recommendation', text: `Focus on ${channel} while completing remaining growth modules.`, confidence: 'medium', impact: 'medium' });
   }
 
@@ -361,8 +361,7 @@ function buildCopilotInsights(chat, scores) {
 
   const gapCount = asArray(seo.contentGapRecord?.contentGaps).length;
   if (gapCount > 3) {
-    const pct = Math.min(40, gapCount * 5);
-    insights.push({ type: 'insight', text: `Your content gap is costing approximately ${pct}% potential traffic.`, confidence: 'medium', impact: 'high' });
+    insights.push({ type: 'insight', text: 'Content gaps were identified that may limit organic visibility.', confidence: 'medium', impact: 'high' });
   }
 
   if (scores.aiVisibility < 60) {
@@ -371,8 +370,8 @@ function buildCopilotInsights(chat, scores) {
 
   insights.push({
     type: 'recommendation',
-    text: 'Prioritize high-impact, low-difficulty opportunities in the Action Center.',
-    confidence: 'high',
+    text: 'Complete remaining growth modules to improve analysis coverage.',
+    confidence: 'medium',
     impact: 'medium',
   });
 
@@ -403,9 +402,9 @@ function buildRoadmap(chat, opportunities) {
   asArray(seo.contentGapRecord?.contentCalendar?.day30).slice(0, 3).forEach(item => {
     phases.day30.push({
       task: `Create: ${asText(item.contentTitle, 'Content piece')}`,
-      expectedResult: 'Improved keyword coverage',
-      estimatedImpact: 'medium',
-      difficulty: 'medium',
+      expectedResult: item.contentTitle ? 'Track search visibility for this topic' : null,
+      estimatedImpact: null,
+      difficulty: null,
     });
   });
 
@@ -428,22 +427,22 @@ function buildRoadmap(chat, opportunities) {
 
   phases.day60.push({
     task: 'Launch content cluster for primary keyword theme',
-    expectedResult: '+15-25% organic visibility',
-    estimatedImpact: 'high',
+    expectedResult: 'Track organic visibility over 60 days',
+    estimatedImpact: 'medium',
     difficulty: 'medium',
   });
 
   phases.day90.push({
     task: 'Expand into secondary market segment',
-    expectedResult: 'New audience pipeline',
-    estimatedImpact: 'high',
-    difficulty: 'high',
+    expectedResult: 'Monitor engagement and pipeline from new segment',
+    estimatedImpact: 'medium',
+    difficulty: 'medium',
   });
 
   phases.day180.push({
     task: 'Full competitive repositioning review',
-    expectedResult: 'Updated market leadership strategy',
-    estimatedImpact: 'high',
+    expectedResult: 'Competitive positioning review document',
+    estimatedImpact: 'medium',
     difficulty: 'high',
   });
 
@@ -490,29 +489,19 @@ function buildGrowthV2(chat, scores) {
 
   return {
     customerJourney: [
-      { stage: 'Awareness', score: Math.round(scores.demandScore * 0.9), actions: ['Content marketing', 'Social ads'] },
-      { stage: 'Consideration', score: Math.round(scores.growthScore * 0.85), actions: ['Case studies', 'Webinars'] },
-      { stage: 'Decision', score: scores.conversionPotential, actions: ['Free trial', 'Demo calls'] },
-      { stage: 'Retention', score: Math.round(scores.growthScore * 0.8), actions: ['Email nurture', 'Upsell'] },
+      { stage: 'Awareness', score: Math.round(scores.demandScore * 0.9), actions: [] },
+      { stage: 'Consideration', score: Math.round(scores.growthScore * 0.85), actions: [] },
+      { stage: 'Decision', score: scores.conversionPotential, actions: [] },
+      { stage: 'Retention', score: Math.round(scores.growthScore * 0.8), actions: [] },
     ],
-    acquisitionFunnel: hasRealGrowthData ? [
-      { stage: 'Visitors', value: 10000, conversion: 100 },
-      { stage: 'Leads', value: 2500, conversion: 25 },
-      { stage: 'MQLs', value: 750, conversion: 30 },
-      { stage: 'SQLs', value: 225, conversion: 30 },
-      { stage: 'Customers', value: 68, conversion: 30 },
-    ] : [],
+    acquisitionFunnel: [],
     revenueOpportunity: {
-      estimate: `$${Math.round(scores.conversionPotential * 1200)}`,
-      confidence: scores.conversionPotential >= 70 ? 'high' : 'medium',
+      estimate: null,
+      confidence: null,
     },
     marketPenetrationScore: Math.min(100, Math.round(scores.demandScore * 0.7)),
     audienceExpansion: asArray(pi.marketDiscovery?.expansionMarkets).slice(0, 4),
-    growthForecast: {
-      day30: `+${Math.round(scores.growthScore * 0.08)}%`,
-      day60: `+${Math.round(scores.growthScore * 0.15)}%`,
-      day90: `+${Math.round(scores.growthScore * 0.22)}%`,
-    },
+    growthForecast: null,
     predictiveAnalytics: {
       churnRisk: scores.demandScore < 60 ? 'medium' : 'low',
       expansionLikelihood: scores.growthScore >= 70 ? 'high' : 'medium',
@@ -534,11 +523,11 @@ function buildActionCenter(chat, opportunities, risks) {
   asArray(camp.campaignGenerator?.nextActions).slice(0, 2).forEach(a => {
     actions.push({
       task: asText(a.action || a, 'Campaign action'),
-      priority: 'high',
-      impact: 'high',
-      difficulty: 'medium',
+      priority: a.priority || null,
+      impact: a.impact || null,
+      difficulty: a.effort || null,
       category: 'campaign',
-      confidence: 'high',
+      confidence: a.confidence || null,
     });
   });
 

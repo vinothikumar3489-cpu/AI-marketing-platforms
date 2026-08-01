@@ -1,8 +1,15 @@
 ﻿import { sanitizeText } from "../utils/text.util.js";
+import { memoize } from "../utils/research-cache.util.js";
 
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const TAVILY_API_URL = process.env.TAVILY_API_URL || "https://api.tavily.com/search";
 const TAVILY_TIMEOUT_MS = 20000;
+const TAVILY_RETRIES = 2;
+const TAVILY_RETRY_BASE_MS = 500;
+// 30-min TTL: dedupes the ~30 Tavily searches a growth run issues across
+// phases (orchestrator, market intelligence, competitor intelligence) while
+// still allowing fresh results within a working session.
+const TAVILY_CACHE_TTL_MS = 30 * 60 * 1000;
 
 function cleanText(value = "") {
   if (!value || typeof value !== "string") return "";
@@ -14,17 +21,22 @@ function cleanText(value = "") {
     .trim();
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function tavilySearch(query, maxResults = 5) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TAVILY_TIMEOUT_MS);
   try {
-    const headers = { "Content-Type": "application/json" };
-    if (TAVILY_API_KEY) headers["Authorization"] = `Bearer ${TAVILY_API_KEY}`;
     const response = await fetch(TAVILY_API_URL, {
       method: "POST",
       signal: controller.signal,
-      headers,
-      body: JSON.stringify({ api_key: TAVILY_API_KEY, query, max_results: maxResults, include_answer: true }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${TAVILY_API_KEY}`,
+      },
+      body: JSON.stringify({ query, max_results: maxResults, include_answer: true }),
     });
 
     if (!response.ok) {
@@ -36,46 +48,120 @@ async function tavilySearch(query, maxResults = 5) {
   }
 }
 
+/** Bounded retry with exponential backoff for transient failures. */
+async function tavilySearchWithRetry(query, maxResults = 5) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= TAVILY_RETRIES; attempt++) {
+    try {
+      const data = await tavilySearch(query, maxResults);
+      if (data?.error) throw new Error(data.error);
+      return data;
+    } catch (error) {
+      lastError = error;
+      if (attempt < TAVILY_RETRIES) {
+        await sleep(TAVILY_RETRY_BASE_MS * Math.pow(2, attempt - 1));
+      }
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * LLM-oriented web search used as citation evidence for AI visibility scoring.
+ * Returns the raw Tavily payload (results + generated `answer`) so callers can
+ * inspect exactly which sources mention the brand. Memoized like the other
+ * research queries to dedupe the multi-platform visibility checks.
+ */
+export async function searchLlmWeb(query, maxResults = 5) {
+  if (!TAVILY_API_KEY) {
+    return { success: false, error: 'Tavily key not configured', code: 'missing_key' };
+  }
+  return memoize(
+    `tavily:llm-web:${(query || '').toLowerCase().trim()}`,
+    TAVILY_CACHE_TTL_MS,
+    async () => {
+      try {
+        const data = await tavilySearchWithRetry(query, maxResults);
+        return {
+          success: true,
+          answer: data.answer || null,
+          results: (data.results || []).map(r => ({
+            title: r.title || '',
+            url: r.url || '',
+            domain: r.domain || '',
+            score: typeof r.score === 'number' ? r.score : null,
+            content: (r.content || '').slice(0, 600),
+            source: 'Tavily',
+            status: 'measured'
+          })),
+          query,
+          retrievedAt: new Date().toISOString()
+        };
+      } catch (error) {
+        return { success: false, error: error.message, code: 'search_failed' };
+      }
+    }
+  );
+}
+
+/**
+ * Run a batch of Tavily queries in PARALLEL (allSettled) so one slow/failed
+ * query neither serializes the batch nor drops the results of the others.
+ */
+async function tavilySearchBatch(queries, maxResults) {
+  const settled = await Promise.allSettled(queries.map(q => tavilySearchWithRetry(q, maxResults)));
+  const results = [];
+  const failures = [];
+  settled.forEach((r, i) => {
+    if (r.status === "fulfilled") {
+      const data = r.value;
+      if (Array.isArray(data.results)) results.push(...data.results);
+      if (!data.results?.length) failures.push(queries[i]);
+    } else {
+      failures.push(queries[i]);
+    }
+  });
+  return { results, failures };
+}
+
 export const researchCompetitors = async (productName, industry, category) => {
   if (!TAVILY_API_KEY) {
     return { success: false, error: "Tavily key not configured", code: "missing_key" };
   }
 
-  const queries = [
-    `${productName} competitors`,
-    `${productName} market category`,
-    `${industry} market trends`,
-    `${productName} pricing competitors`,
-    `${industry} buyer pain points`,
-    `${industry} SEO keywords`,
-    `best products in ${industry}`,
-  ];
+  return memoize(
+    `tavily:competitors:${(productName || "").toLowerCase()}|${(industry || "").toLowerCase()}|${(category || "").toLowerCase()}`,
+    TAVILY_CACHE_TTL_MS,
+    async () => {
+      const queries = [
+        `${productName} competitors`,
+        `${productName} market category`,
+        `${industry} market trends`,
+        `${productName} pricing competitors`,
+        `${industry} buyer pain points`,
+        `${industry} SEO keywords`,
+        `best products in ${industry}`,
+      ];
 
-  const allResults = [];
+      const { results: allResults, failures } = await tavilySearchBatch(queries, 5);
 
-  for (const query of queries) {
-    try {
-      const data = await tavilySearch(query, 5);
-      if (data.results) allResults.push(...data.results);
-    } catch (error) {
-      console.warn(`[Tavily] Search failed for query "${query}":`, error.message);
+      const competitors = extractCompetitorsFromResults(allResults);
+      const marketSignals = extractMarketSignals(allResults);
+      const seoOpportunities = extractSeoOpportunities(allResults);
+      const buyerIntent = extractBuyerIntent(allResults);
+
+      return {
+        success: true,
+        competitors,
+        marketSignals,
+        seoOpportunities,
+        buyerIntent,
+        queries,
+        failedQueries: failures,
+        source: "tavily",
+      };
     }
-  }
-
-  const competitors = extractCompetitorsFromResults(allResults);
-  const marketSignals = extractMarketSignals(allResults);
-  const seoOpportunities = extractSeoOpportunities(allResults);
-  const buyerIntent = extractBuyerIntent(allResults);
-
-  return {
-    success: true,
-    competitors,
-    marketSignals,
-    seoOpportunities,
-    buyerIntent,
-    queries,
-    source: "tavily",
-  };
+  );
 };
 
 export const researchCompany = async (companyName) => {
@@ -86,24 +172,20 @@ export const researchCompany = async (companyName) => {
     return { success: false, error: "Company name required" };
   }
 
-  const queries = [
-    `${companyName} company mission`,
-    `${companyName} funding raised`,
-    `${companyName} founders`,
-    `${companyName} number of employees`,
-  ];
+  return memoize(
+    `tavily:company:${companyName.toLowerCase()}`,
+    TAVILY_CACHE_TTL_MS,
+    async () => {
+      const queries = [
+        `${companyName} company mission`,
+        `${companyName} funding raised`,
+        `${companyName} founders`,
+        `${companyName} number of employees`,
+      ];
 
-  const allResults = [];
-  for (const query of queries) {
-    try {
-      const data = await tavilySearch(query, 4);
-      if (data.results) allResults.push(...data.results);
-    } catch (error) {
-      console.warn(`[Tavily] Company search failed for query "${query}":`, error.message);
-    }
-  }
+      const { results: allResults, failures } = await tavilySearchBatch(queries, 4);
 
-  const text = cleanText(allResults.map((r) => `${r.title || ""} ${r.content || ""}`).join(" \n"));
+      const text = cleanText(allResults.map((r) => `${r.title || ""} ${r.content || ""}`).join(" \n"));
 
   const missionMatch = text.match(/(?:mission|mission statement|purpose|who we are)[:\s]*["']?([^"'.\n]{20,300})/i);
   const fundingMatches = text.matchAll(/(?:raised|secured|closed)\s+\$?\s*(\d+(?:\.\d+)?)\s*(million|m|billion|b)?\s*(?:in|of)?\s*(?:funding|series\s+[a-z]|seed|round)/gi);
@@ -155,7 +237,10 @@ export const researchCompany = async (companyName) => {
     employees,
     source: "tavily",
     queries,
+    failedQueries: failures,
   };
+    }
+  );
 };
 
 const extractCompetitorsFromResults = (results) => {

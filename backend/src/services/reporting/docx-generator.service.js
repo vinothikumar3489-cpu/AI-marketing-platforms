@@ -84,7 +84,7 @@ export async function generateDocx(data) {
         ['Competitive Defensibility', safeScore(scores?.competitiveDefensibilityScore)],
         ['Campaign Readiness', safeScore(scores?.campaignReadinessScore)]
       ]),
-      createInfoBox(name, `${safeStr(company?.industry, 'Verified')} | ${safeStr(company?.businessModel, 'Defined')} | Target: ${safeStr(company?.targetMarket, 'Verified')}`),
+      createInfoBox(name, `${safeStr(company?.industry, 'Data unavailable')} | ${safeStr(company?.businessModel, 'Data unavailable')} | Target: ${safeStr(company?.targetMarket, 'Data unavailable')}`),
       new Paragraph({ children: [new PageBreak()] })
     );
 
@@ -158,7 +158,7 @@ export async function generateDocx(data) {
         ...(keywords.length > 0
           ? [createDataTable([
               ['Keyword', 'Volume', 'Difficulty', 'Intent'],
-              ...keywords.slice(0, 30).map(k => [safeStr(k.keyword || k), k.volume || k.searchVolume ? `${k.volume || k.searchVolume}` : 'N/A', k.keywordDifficulty || k.difficulty ? `${k.keywordDifficulty || k.difficulty}/100` : 'N/A', safeStr(k.intent, 'Informational')])
+              ...keywords.slice(0, 30).map(k => [safeStr(k.keyword || k), k.volume || k.searchVolume ? `${k.volume || k.searchVolume}` : 'N/A', k.keywordDifficulty || k.difficulty ? `${k.keywordDifficulty || k.difficulty}/100` : 'N/A', safeStr(k.intent, 'N/A')])
             ])]
           : [createInfoBox('Note', 'Keyword data unavailable. Configure DataForSEO API for verified keyword intelligence.')]),
         new Paragraph({ children: [new PageBreak()] }),
@@ -176,7 +176,7 @@ export async function generateDocx(data) {
         ...(gaps.length > 0
           ? [createDataTable([
               ['Topic', 'Priority', 'Volume', 'Difficulty'],
-              ...gaps.slice(0, 15).map(g => [safeStr(g.value || g.topic || g.title || g), safeStr(g.priority || g.severity || 'Medium'), g.searchVolume || g.volume ? `${g.searchVolume || g.volume}` : 'N/A', g.keywordDifficulty || g.difficulty ? `${g.keywordDifficulty || g.difficulty}/100` : 'N/A'])
+              ...gaps.slice(0, 15).map(g => [safeStr(g.value || g.topic || g.title || g), safeStr(g.priority || g.severity, 'N/A'), g.searchVolume || g.volume ? `${g.searchVolume || g.volume}` : 'N/A', g.keywordDifficulty || g.difficulty ? `${g.keywordDifficulty || g.difficulty}/100` : 'N/A'])
             ])]
           : [createInfoBox('Note', 'Content gap data unavailable. Run competitor keyword analysis.')]),
         new Paragraph({ children: [new PageBreak()] }),
@@ -261,7 +261,7 @@ export async function generateDocx(data) {
               createHeading(p.label, HeadingLevel.HEADING_2),
               createDataTable([
                 ['Action', 'Priority', 'Impact', 'Evidence'],
-                ...p.items.slice(0, 8).map(a => [safeStr(a.title || a.action || a.task || a.recommendation || a), safeStr(a.priority || a.severity || 'Medium'), safeStr(a.impact || a.area || a.reason, 'N/A'), safeStr(a.evidence || a.source || a.recommendation, 'N/A')])
+                ...p.items.slice(0, 8).map(a => [safeStr(a.title || a.action || a.task || a.recommendation || a), safeStr(a.priority || a.severity, 'N/A'), safeStr(a.impact || a.area || a.reason, 'N/A'), safeStr(a.evidence || a.source || a.recommendation, 'N/A')])
               ])
             ])
           : [createInfoBox('Note', 'SEO action plan unavailable. Run full audit to generate prioritized recommendations.')]),
@@ -282,7 +282,7 @@ export async function generateDocx(data) {
         ...(risks.length > 0
           ? [createDataTable([
               ['Risk', 'Severity', 'Mitigation'],
-              ...risks.slice(0, 6).map(r => [safeStr(typeof r === 'string' ? r : r.value || r.name || r.risk || r.description || r), safeStr(r.severity || r.priority || 'Medium', 'Medium'), safeStr(r.mitigation || r.recommendation || r.evidence, 'Monitor and reassess')])
+              ...risks.slice(0, 6).map(r => [safeStr(typeof r === 'string' ? r : r.value || r.name || r.risk || r.description || r), safeStr(r.severity || r.priority, 'N/A'), safeStr(r.mitigation || r.recommendation || r.evidence, 'Monitor and reassess')])
             ])]
           : [createInfoBox('Note', 'No risk factors recorded from verified sources.', 'info')]),
         new Paragraph({ children: [new PageBreak()] })
@@ -496,10 +496,12 @@ function createTocItem(num, text) {
 function createSwotTable(market) {
   const opportunities = arr(market?.opportunities);
   const risks = arr(market?.risks);
+  const strengths = arr(market?.strengths || market?.growthSignals);
+  const weaknesses = arr(market?.weaknesses || market?.dataGaps);
   const oppItems = opportunities.slice(0, 4).map(o => typeof o === 'string' ? o : o.value || o.name || o.opportunity || o);
   const riskItems = risks.slice(0, 4).map(r => typeof r === 'string' ? r : r.value || r.name || r.risk || r);
-  const strengths = ['Technology infrastructure with verified stack', 'Clear market positioning'];
-  const weaknesses = ['Additional API integrations needed for full coverage', 'Performance metrics require analytics connectivity'];
+  const strengthItems = strengths.slice(0, 4).map(s => typeof s === 'string' ? s : s.value || s.name || s);
+  const weaknessItems = weaknesses.slice(0, 4).map(w => typeof w === 'string' ? w : w.value || w.name || w);
 
   const quadrantStyle = (color) => ({ type: ShadingType.SOLID, color });
 
@@ -516,8 +518,8 @@ function createSwotTable(market) {
     rows: [
       new TableRow({
         children: [
-          makeCell(quadrantStyle('166534'), 'Strengths', strengths),
-          makeCell(quadrantStyle('991B1B'), 'Weaknesses', weaknesses)
+          makeCell(quadrantStyle('166534'), 'Strengths', strengthItems.length > 0 ? strengthItems : ['Data pending — run full product analysis']),
+          makeCell(quadrantStyle('991B1B'), 'Weaknesses', weaknessItems.length > 0 ? weaknessItems : ['Data pending — run full competitive analysis'])
         ]
       }),
       new TableRow({

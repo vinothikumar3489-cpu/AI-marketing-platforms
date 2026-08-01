@@ -13,6 +13,11 @@ const VIDEO_TYPES = {
 
 export { VIDEO_TYPES };
 
+function unwrapSourced(v) {
+  if (v && typeof v === 'object' && 'value' in v && 'source' in v) return v.value;
+  return v;
+}
+
 export async function generateVideoScript(videoType, context) {
   const typeConfig = VIDEO_TYPES[videoType];
   if (!typeConfig) throw new Error(`Unknown video type: ${videoType}`);
@@ -21,11 +26,16 @@ export async function generateVideoScript(videoType, context) {
 
   const evidenceLines = [];
   if (productUsp) evidenceLines.push(`Product USP: ${productUsp}`);
-  if (evidence?.website?.heroText) evidenceLines.push(`Website Hero: ${evidence.website.heroText}`);
-  if (evidence?.website?.featuresText?.length) evidenceLines.push(`Product Features from Website: ${evidence.website.featuresText.slice(0, 5).join('; ')}`);
-  if (evidence?.website?.ctaTexts?.length) evidenceLines.push(`Product CTAs: ${evidence.website.ctaTexts.join('; ')}`);
-  if (evidence?.audience?.painPoints?.length) evidenceLines.push(`Audience Pain Points: ${evidence.audience.painPoints.slice(0, 3).join('; ')}`);
-  if (evidence?.competitors?.weaknesses?.length) evidenceLines.push(`Competitor Weaknesses: ${evidence.competitors.weaknesses.slice(0, 3).join('; ')}`);
+  const websiteHero = unwrapSourced(evidence?.website?.heroText);
+  if (websiteHero) evidenceLines.push(`Website Hero: ${websiteHero}`);
+  const featuresText = Array.isArray(unwrapSourced(evidence?.website?.featuresText)) ? unwrapSourced(evidence?.website?.featuresText) : [];
+  if (featuresText.length) evidenceLines.push(`Product Features from Website: ${featuresText.slice(0, 5).join('; ')}`);
+  const ctaTexts = Array.isArray(unwrapSourced(evidence?.website?.ctaTexts)) ? unwrapSourced(evidence?.website?.ctaTexts) : [];
+  if (ctaTexts.length) evidenceLines.push(`Product CTAs: ${ctaTexts.join('; ')}`);
+  const painPoints = Array.isArray(unwrapSourced(evidence?.audience?.painPoints)) ? unwrapSourced(evidence?.audience?.painPoints) : [];
+  if (painPoints.length) evidenceLines.push(`Audience Pain Points: ${painPoints.slice(0, 3).join('; ')}`);
+  const weaknesses = Array.isArray(unwrapSourced(evidence?.competitors?.weaknesses)) ? unwrapSourced(evidence?.competitors?.weaknesses) : [];
+  if (weaknesses.length) evidenceLines.push(`Competitor Weaknesses: ${weaknesses.slice(0, 3).join('; ')}`);
   if (evidence?.sourceSummary?.sourcesCollected?.length) evidenceLines.push(`Evidence Sources: ${evidence.sourceSummary.sourcesCollected.join(', ')}`);
 
   const providerVideoConfigured = !!(process.env.SHOTSTACK_API_KEY || process.env.CREATOMATE_API_KEY);

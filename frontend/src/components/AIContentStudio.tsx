@@ -55,6 +55,9 @@ const CONTENT_TYPES = [
   { value: 'comparison_page', label: 'Comparison Page', icon: BarChart2, group: 'long-form' },
   { value: 'feature_announcement', label: 'Feature Announcement', icon: Megaphone, group: 'long-form' },
   { value: 'whitepaper', label: 'Whitepaper', icon: BookOpen, group: 'long-form' },
+  { value: 'press_release', label: 'Press Release', icon: FileText, group: 'long-form' },
+  { value: 'case_study', label: 'Case Study', icon: FileText, group: 'long-form' },
+  { value: 'sales_page', label: 'Sales Page', icon: Globe, group: 'long-form' },
   { value: 'linkedin_post', label: 'LinkedIn Post', icon: Linkedin, group: 'social' },
   { value: 'instagram_post', label: 'Instagram Post', icon: Instagram, group: 'social' },
   { value: 'twitter_post', label: 'X (Twitter) Post', icon: Twitter, group: 'social' },
@@ -715,6 +718,162 @@ function VideoScriptRenderer({ content, onCopy }: { content: any; onCopy: (text:
   );
 }
 
+function PressReleaseRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
+  const safe = (v: any) => typeof v === 'string' ? v : toText(v);
+  const fullText = [
+    `${safe(content.headline)}`,
+    `${safe(content.subheadline)}`,
+    `${safe(content.dateline)}`,
+    '',
+    safe(content.body),
+    '',
+    content.quote ? `\u2014 ${safe(content.quote.name)}, ${safe(content.quote.title)}` : '',
+    content.quote ? `"${safe(content.quote.text)}"` : '',
+    '',
+    safe(content.cta),
+  ].filter(Boolean).join('\n');
+
+  return (
+    <div style={S.card}>
+      <div style={{ ...S.cardHeader, marginBottom: '4px' }}><FileText size={18} style={{ color: C.cyan }} /><span style={S.cardTitle}>Press Release</span></div>
+      <div style={{ fontSize: '11px', color: C.dim, marginBottom: '8px' }}>{safe(content.dateline)}</div>
+      <div style={S.previewBox}>
+        <div style={{ fontSize: '16px', fontWeight: 700, color: C.text, marginBottom: '8px' }}>{safe(content.headline)}</div>
+        {content.subheadline && <div style={{ fontSize: '13px', color: C.muted, marginBottom: '12px', fontStyle: 'italic' }}>{safe(content.subheadline)}</div>}
+        <div style={{ whiteSpace: 'pre-wrap', color: C.muted, lineHeight: 1.7 }}>{safe(content.body)}</div>
+        {content.quote && (
+          <div style={{ marginTop: '12px', padding: '10px', background: C.bg, borderRadius: '6px', borderLeft: `3px solid ${C.cyan}`, fontSize: '12px' }}>
+            <div style={{ color: C.text, fontWeight: 600 }}>{safe(content.quote.name)}</div>
+            <div style={{ color: C.dim, fontSize: '10px', marginBottom: '4px' }}>{safe(content.quote.role)}</div>
+            <div style={{ color: C.muted, fontStyle: 'italic' }}>"{safe(content.quote.text)}"</div>
+          </div>
+        )}
+        {content.cta && <div style={{ color: C.cyan, fontWeight: 600, marginTop: '12px' }}>{safe(content.cta)}</div>}
+      </div>
+      <CopyButton text={fullText} onCopy={onCopy} />
+    </div>
+  );
+}
+
+function CaseStudyRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
+  const safe = (v: any) => typeof v === 'string' ? v : toText(v);
+  const fullText = [
+    `${safe(content.title)}`,
+    content.subtitle ? `\n${safe(content.subtitle)}` : '',
+    '',
+    `Customer: ${safe(content.customerName || 'N/A')}`,
+    `Industry: ${safe(content.customerIndustry || 'N/A')}`,
+    '',
+    `Challenge: ${safe(content.challenge)}`,
+    '',
+    `Situation: ${safe(content.situation)}`,
+    '',
+    `Solution: ${safe(content.solution)}`,
+    '',
+    `Implementation: ${safe(content.implementation || '')}`,
+    '',
+    ...(content.results || []).map((r: any) => `Result: ${safe(r.metric)} \u2014 ${safe(r.value)}${r.context ? ` (${safe(r.context)})` : ''}`),
+    '',
+    content.quote ? `\nQuote: ${safe(content.quote.name)} (${safe(content.quote.role)}): "${safe(content.quote.text)}"` : '',
+    '',
+    ...(content.lessonsLearned || []).map((l: any, i: number) => `Lesson ${i + 1}: ${safe(l)}`),
+    '',
+    safe(content.cta || ''),
+  ].filter(Boolean).join('\n');
+
+  return (
+    <div style={S.card}>
+      <div style={{ ...S.cardHeader, marginBottom: '4px' }}><FileText size={18} style={{ color: C.excellent }} /><span style={S.cardTitle}>Case Study</span></div>
+      {content.customerName && (
+        <div style={{ fontSize: '11px', color: C.dim, marginBottom: '8px' }}>Customer: {safe(content.customerName)} {content.customerIndustry ? `\u2014 ${safe(content.customerIndustry)}` : ''}</div>
+      )}
+      <div style={S.previewBox}>
+        <div style={{ fontSize: '16px', fontWeight: 700, color: C.text, marginBottom: '8px' }}>{safe(content.title)}</div>
+        {content.subtitle && <div style={{ fontSize: '12px', color: C.muted, marginBottom: '12px' }}>{safe(content.subtitle)}</div>}
+        <div style={{ fontSize: '12px', fontWeight: 600, color: C.critical, marginBottom: '4px' }}>Challenge</div>
+        <div style={{ color: C.muted, marginBottom: '12px', lineHeight: 1.6 }}>{safe(content.challenge)}</div>
+        <div style={{ fontSize: '12px', fontWeight: 600, color: C.accent, marginBottom: '4px' }}>Solution</div>
+        <div style={{ color: C.muted, marginBottom: '12px', lineHeight: 1.6 }}>{safe(content.solution)}</div>
+        {(content.results || []).length > 0 && (
+          <>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: C.excellent, marginBottom: '4px' }}>Results</div>
+            {content.results.map((r: any, i: number) => (
+              <div key={i} style={{ color: C.muted, marginBottom: '4px', fontSize: '11px' }}>
+                <strong style={{ color: C.text }}>{safe(r.metric)}:</strong> {safe(r.value)}
+                {r.context && <span style={{ color: C.dim }}> \u2014 {safe(r.context)}</span>}
+              </div>
+            ))}
+          </>
+        )}
+        {content.quote && (
+          <div style={{ marginTop: '12px', padding: '10px', background: C.bg, borderRadius: '6px', borderLeft: `3px solid ${C.excellent}`, fontSize: '12px' }}>
+            <div style={{ color: C.text, fontWeight: 600 }}>{safe(content.quote.name)}</div>
+            <div style={{ color: C.dim, fontSize: '10px', marginBottom: '4px' }}>{safe(content.quote.role)}</div>
+            <div style={{ color: C.muted, fontStyle: 'italic' }}>"{safe(content.quote.text)}"</div>
+          </div>
+        )}
+      </div>
+      <CopyButton text={fullText} onCopy={onCopy} />
+    </div>
+  );
+}
+
+function SalesPageRenderer({ content, onCopy }: { content: any; onCopy: (text: string) => void }) {
+  const safe = (v: any) => typeof v === 'string' ? v : toText(v);
+  const fullText = [
+    `${safe(content.headline)}`,
+    content.subheadline ? `\n${safe(content.subheadline)}` : '',
+    '',
+    `Pain Points: ${(content.painPoints || []).map(safe).join(', ')}`,
+    '',
+    safe(content.solutionOverview || ''),
+    '',
+    ...(content.features || []).map((f: any) => `${safe(f.name)}: ${safe(f.description)} \u2192 ${safe(f.benefit)}`),
+    '',
+    safe(content.finalCta || ''),
+  ].filter(Boolean).join('\n');
+
+  return (
+    <div style={S.card}>
+      <div style={{ ...S.cardHeader, marginBottom: '4px' }}><Globe size={18} style={{ color: C.orange }} /><span style={S.cardTitle}>Sales Page</span></div>
+      <div style={S.previewBox}>
+        <div style={{ fontSize: '20px', fontWeight: 700, color: C.text, marginBottom: '8px', textAlign: 'center' }}>{safe(content.headline)}</div>
+        {content.subheadline && <div style={{ fontSize: '14px', color: C.muted, marginBottom: '16px', textAlign: 'center' }}>{safe(content.subheadline)}</div>}
+        {(content.painPoints || []).length > 0 && (
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: C.critical, marginBottom: '6px' }}>The Challenge</div>
+            {content.painPoints.map((p: any, i: number) => (
+              <div key={i} style={{ fontSize: '11px', color: C.muted, marginBottom: '4px' }}>\u2022 {safe(p)}</div>
+            ))}
+          </div>
+        )}
+        {content.solutionOverview && (
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: C.accent, marginBottom: '6px' }}>Our Solution</div>
+            <div style={{ fontSize: '11px', color: C.muted, lineHeight: 1.6 }}>{safe(content.solutionOverview)}</div>
+          </div>
+        )}
+        {(content.features || []).length > 0 && (
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: C.excellent, marginBottom: '6px' }}>Key Features</div>
+            {content.features.map((f: any, i: number) => (
+              <div key={i} style={{ fontSize: '11px', color: C.muted, marginBottom: '4px', paddingLeft: '8px', borderLeft: `2px solid ${C.border}` }}>
+                <strong style={{ color: C.text }}>{safe(f.name)}</strong>: {safe(f.description)} \u2192 {safe(f.benefit)}
+              </div>
+            ))}
+          </div>
+        )}
+        {content.finalCta && (
+          <div style={{ textAlign: 'center', padding: '12px', background: 'rgba(37,99,235,0.1)', borderRadius: '8px', border: `1px solid rgba(37,99,235,0.2)` }}>
+            <span style={{ color: C.brand, fontWeight: 700, fontSize: '14px' }}>{safe(content.finalCta)}</span>
+          </div>
+        )}
+      </div>
+      <CopyButton text={fullText} onCopy={onCopy} />
+    </div>
+  );
+}
+
 function CopyButton({ text, onCopy }: { text: string; onCopy: (text: string) => void }) {
   return (
     <div style={{ marginTop: '8px', display: 'flex', gap: '4px' }}>
@@ -759,6 +918,12 @@ function ContentPreview({ content, selectedChatId, onAddToCampaign }: { content:
     renderer = <CreativeBriefRenderer content={content} onCopy={handleCopy} />;
   } else if (contentType === 'video_script' || (content.duration && content.scenes)) {
     renderer = <VideoScriptRenderer content={content} onCopy={handleCopy} />;
+  } else if (contentType === 'press_release' || (content.headline && content.body && content.dateline)) {
+    renderer = <PressReleaseRenderer content={content} onCopy={handleCopy} />;
+  } else if (contentType === 'case_study' || (content.title && content.challenge && content.results)) {
+    renderer = <CaseStudyRenderer content={content} onCopy={handleCopy} />;
+  } else if (contentType === 'sales_page' || (content.headline && content.painPoints && content.features)) {
+    renderer = <SalesPageRenderer content={content} onCopy={handleCopy} />;
   }
 
   if (renderer) {
@@ -812,7 +977,8 @@ function AssetRow({ asset, onOpen, onRegenerate }: { asset: any; onOpen: (a: any
   const typeColors: Record<string, string> = {
     content_blog_article: C.brand, content_faq_page: C.accent, content_landing_page: C.excellent,
     content_product_page: C.good, content_comparison_page: C.purple, content_feature_announcement: C.orange,
-    content_whitepaper: C.pink, content_linkedin_post: C.brand, content_instagram_post: C.pink,
+    content_whitepaper: C.pink, content_press_release: C.cyan, content_case_study: C.excellent,
+    content_sales_page: C.orange, content_linkedin_post: C.brand, content_instagram_post: C.pink,
     content_twitter_post: C.cyan, content_facebook_post: C.good, content_youtube_description: C.critical,
     content_email_copy: C.purple, content_creative_brief: C.needsImprovement, content_video_script: C.critical,
   };

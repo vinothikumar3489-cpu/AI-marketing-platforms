@@ -50,34 +50,43 @@ export async function collectBusinessIntelligence({ chatId, websiteUrl, productN
         const evidenceReq = await getLatestEvidenceSnapshot(chatId);
         if (evidenceReq.success && evidenceReq.snapshot) {
           const snap = evidenceReq.snapshot;
-          const txt = snap.contentEvidence?.cleanedText || snap.rawEvidence?.rawMarkdown || '';
-          
+          const raw = snap.rawEvidence || {};
+          const html = snap.websiteEvidence?.html || raw.html || raw.rawHtml || '';
+          const txt = raw.text || snap.contentEvidence?.cleanedText || raw.rawMarkdown || '';
+
           scrapedData = {
-            html: snap.rawEvidence?.rawHtml || '',
+            html,
             text: txt,
             metadata: {
               title: snap.websiteEvidence?.title || '',
               description: snap.websiteEvidence?.metaDescription || ''
             },
-            title: snap.websiteEvidence?.title || ''
+            title: snap.websiteEvidence?.title || '',
+            headings: snap.websiteEvidence?.headings || [],
+            features: snap.websiteEvidence?.features || [],
+            benefits: snap.websiteEvidence?.benefits || [],
+            heroText: snap.websiteEvidence?.heroText || ''
           };
-          
+
           scrapedWithExtraction = {
-            rawMarkdown: snap.rawEvidence?.rawMarkdown || '',
+            rawMarkdown: raw.rawMarkdown || '',
             cleanedText: txt,
             pricingText: snap.websiteEvidence?.pricingText || '',
             scrapeQuality: snap.sourceSummary
           };
-          
+
+          evidence.snapshotCollectedAt = snap.createdAt || null;
           evidence.sources.push({ type: 'evidence_snapshot', source: snap.source || 'canonical', success: true });
         }
       }
-      
+
       if (!scrapedData) {
-         throw new Error("No EvidenceSnapshot found. Scraping must run first.");
+        console.warn('[Business Intelligence] No EvidenceSnapshot found — returning null (no evidence to analyze, nothing fabricated)');
+        return null;
       }
     } catch (e) {
-      evidence.warnings.push(`Evidence load failed: ${e.message}`);
+      console.warn('[Business Intelligence] Evidence load failed — returning null (no evidence to analyze):', e.message);
+      return null;
     }
 
     // Phase 2: Company Intelligence
@@ -126,6 +135,7 @@ export async function collectBusinessIntelligence({ chatId, websiteUrl, productN
       marketData: marketIntel,
       category: category || companyIntel.category,
       domain: domain || extractDomainSimple(websiteUrl),
+      html: scrapedData?.html || null,
     });
     evidence.competitors = competitorIntel;
     logCompetitorsCollected(competitorIntel);
@@ -487,6 +497,50 @@ export function extractVerifiedPricing(scrapedData, scrapedWithExtraction) {
   return pricing;
 }
 
+const SOURCE_AUTHORITY = {
+  evidence_snapshot: 100,
+  canonical: 100,
+  firecrawl: 95,
+  playwright: 95,
+  dataforseo: 95,
+  cheerio: 90,
+  jina: 90,
+  tavily: 60,
+  ai_estimated: 30,
+  industry_evidence_pattern: 50,
+};
+
+function clampConfidence(value) {
+  return Math.max(0, Math.min(95, Math.round(value)));
+}
+
+/**
+ * Computes confidence from real evidence signals instead of hardcoded values:
+ * - coverage: how complete the actual collected data is (0..1)
+ * - corroboration: number of distinct evidence sources (up to +15)
+ * - source authority: best source type, e.g. evidence_snapshot/firecrawl (up to +15)
+ * - recency: snapshot age <= 7 days (+10), <= 30 days (+5), else 0
+ * Returns 0 when no real evidence exists — never fabricates a score.
+ */
+function computeSectionConfidence(evidence, coverage) {
+  if (!coverage || coverage <= 0) return 0;
+  const now = Date.now();
+  const snapshotAt = evidence.snapshotCollectedAt ? new Date(evidence.snapshotCollectedAt).getTime() : null;
+  const recencyPoints = !snapshotAt ? 0 : (now - snapshotAt) <= 7 * 86400000 ? 10 : (now - snapshotAt) <= 30 * 86400000 ? 5 : 0;
+
+  const sources = evidence.sources || [];
+  const distinctTypes = new Set(sources.map(s => s.type || s.source)).size;
+  const corroborationPoints = distinctTypes >= 3 ? 15 : distinctTypes >= 2 ? 10 : distinctTypes >= 1 ? 5 : 0;
+
+  const bestAuthority = sources.reduce((best, s) => {
+    const authority = SOURCE_AUTHORITY[(s.source || '').toLowerCase()] ?? SOURCE_AUTHORITY[(s.type || '').toLowerCase()] ?? 50;
+    return Math.max(best, authority);
+  }, 0);
+  const authorityPoints = Math.round((bestAuthority / 100) * 15);
+
+  return clampConfidence(50 + Math.min(20, Math.round(coverage * 20)) + corroborationPoints + authorityPoints + recencyPoints);
+}
+
 export function synthesizeWithAI(evidence) {
   const company = evidence.company || {};
   const technology = evidence.technology || [];
@@ -496,6 +550,17 @@ export function synthesizeWithAI(evidence) {
   const audience = evidence.audience || {};
 
   const now = new Date().toISOString();
+
+  const companyConfidence = computeSectionConfidence(evidence, company.name && company.name !== 'Unknown' ? 1 : 0);
+  const technologyConfidence = computeSectionConfidence(evidence, technology.length > 0 ? Math.min(1, technology.length / 5) : 0);
+  const pricingConfidence = computeSectionConfidence(evidence, pricing.tiers?.length > 0 ? 1 : 0);
+  const competitorsConfidence = computeSectionConfidence(evidence, competitors.all?.length > 0 ? 1 : 0);
+  const marketConfidence = computeSectionConfidence(evidence, market.tam && market.tam !== 'Unknown' ? 1 : 0);
+  const audiencePersonas = audience.personas || [];
+  const audienceCoverage = audiencePersonas.length > 0
+    ? Math.max(0.25, (audiencePersonas.reduce((acc, p) => acc + (p.evidence?.confidence ?? 0), 0) / audiencePersonas.length) / 100)
+    : 0;
+  const audienceConfidence = computeSectionConfidence(evidence, audienceCoverage);
 
   const evidenceSources = (evidence.sources || []).map(s => ({
     type: s.type || 'unknown',
@@ -533,7 +598,7 @@ export function synthesizeWithAI(evidence) {
       languages: company.languages || ['Unknown'],
       evidence: {
         source: evidence.sources?.length > 0 ? evidence.sources.map(s => s.source).join(', ') : 'Unknown',
-        confidence: evidence.sources?.length > 0 ? 85 : 0,
+        confidence: companyConfidence,
         collectedAt: now
       }
     },
@@ -555,7 +620,7 @@ export function synthesizeWithAI(evidence) {
       infrastructure: technology.filter(t => t.category === 'infrastructure').map(t => ({ name: t.name, confidence: t.confidence, evidence: t.evidence })),
       evidence: {
         source: technology.length > 0 ? 'Technology fingerprinting from page source' : 'Unknown',
-        confidence: technology.length > 0 ? 90 : 0,
+        confidence: technologyConfidence,
         collectedAt: now
       }
     },
@@ -571,7 +636,7 @@ export function synthesizeWithAI(evidence) {
       source: pricing.source || 'Unknown',
       evidence: {
         source: pricing.tiers?.length > 0 ? 'Website pricing page analysis' : 'Not found on website',
-        confidence: pricing.tiers?.length > 0 ? 85 : 0,
+        confidence: pricingConfidence,
         collectedAt: now
       }
     },
@@ -620,7 +685,7 @@ export function synthesizeWithAI(evidence) {
       warnings: competitors.warnings || [],
       evidence: {
         source: competitors.sources?.length > 0 ? competitors.sources.map(s => s.source).join(', ') : 'Unknown',
-        confidence: competitors.all?.length > 0 ? 80 : 0,
+        confidence: competitorsConfidence,
         collectedAt: now
       }
     },
@@ -640,7 +705,7 @@ export function synthesizeWithAI(evidence) {
       sources: market.sources || [],
       evidence: {
         source: market.sources?.length > 0 ? 'DataForSEO & Tavily market analysis' : 'Unknown',
-        confidence: market.tam !== 'Unknown' ? 75 : 0,
+        confidence: marketConfidence,
         collectedAt: now
       }
     },
@@ -662,7 +727,7 @@ export function synthesizeWithAI(evidence) {
       sources: audience.sources || [],
       evidence: {
         source: audience.personas?.length > 0 ? 'Industry evidence patterns & website analysis' : 'Unknown',
-        confidence: audience.personas?.length > 0 ? 80 : 0,
+        confidence: audienceConfidence,
         collectedAt: now
       }
     },

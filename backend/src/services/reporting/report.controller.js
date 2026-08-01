@@ -216,11 +216,11 @@ function generateCsv(data) {
   csv += `Market,SOM,${csvEscape(data.market?.som)}\n`;
   csv += `Market,Growth Rate,${csvEscape(data.market?.growthRate)}\n`;
 
-  csv += `Scores,Overall Growth,${data.scores?.overallGrowthScore ?? 0}\n`;
-  csv += `Scores,Market Opportunity,${data.scores?.marketOpportunityScore ?? 0}\n`;
-  csv += `Scores,Audience Clarity,${data.scores?.audienceClarityScore ?? 0}\n`;
-  csv += `Scores,Competitive Defensibility,${data.scores?.competitiveDefensibilityScore ?? 0}\n`;
-  csv += `Scores,Campaign Readiness,${data.scores?.campaignReadinessScore ?? 0}\n`;
+  csv += `Scores,Overall Growth,${data.scores?.overallGrowthScore ?? ''}\n`;
+  csv += `Scores,Market Opportunity,${data.scores?.marketOpportunityScore ?? ''}\n`;
+  csv += `Scores,Audience Clarity,${data.scores?.audienceClarityScore ?? ''}\n`;
+  csv += `Scores,Competitive Defensibility,${data.scores?.competitiveDefensibilityScore ?? ''}\n`;
+  csv += `Scores,Campaign Readiness,${data.scores?.campaignReadinessScore ?? ''}\n`;
 
   if (data.competitor?.direct?.length > 0) {
     data.competitor.direct.forEach(c => {
@@ -265,7 +265,7 @@ function generateCsv(data) {
 
   if (data.seo?.keywords?.length > 0) {
     data.seo.keywords.slice(0, 30).forEach(k => {
-      csv += `SEO Keyword,${csvEscape(k.keyword || k)},Volume:${k.volume || k.searchVolume || 'N/A'} | Difficulty:${k.keywordDifficulty || k.difficulty || 'N/A'} | Intent:${csvEscape(k.intent || 'Informational')}\n`;
+      csv += `SEO Keyword,${csvEscape(k.keyword || k)},Volume:${k.volume || k.searchVolume || 'N/A'} | Difficulty:${k.keywordDifficulty || k.difficulty || 'N/A'} | Intent:${csvEscape(k.intent || 'N/A')}\n`;
     });
   }
   if (data.seo?.competitors?.length > 0) {
@@ -275,7 +275,7 @@ function generateCsv(data) {
   }
   if (data.seo?.gaps?.length > 0) {
     data.seo.gaps.slice(0, 15).forEach(g => {
-      csv += `Content Gap,${csvEscape(g.value || g.topic || g.title || g)},Priority:${g.priority || g.severity || 'medium'}\n`;
+      csv += `Content Gap,${csvEscape(g.value || g.topic || g.title || g)},Priority:${g.priority || g.severity || 'N/A'}\n`;
     });
   }
 
@@ -314,11 +314,11 @@ function generateMarkdown(data) {
 
   md += `## 2. Performance Scores\n\n`;
   md += `| Score | Value |\n| --- | --- |\n`;
-  md += `| Overall Growth | ${scores?.overallGrowthScore ?? 0}/100 |\n`;
-  md += `| Market Opportunity | ${scores?.marketOpportunityScore ?? 0}/100 |\n`;
-  md += `| Audience Clarity | ${scores?.audienceClarityScore ?? 0}/100 |\n`;
-  md += `| Competitive Defensibility | ${scores?.competitiveDefensibilityScore ?? 0}/100 |\n`;
-  md += `| Campaign Readiness | ${scores?.campaignReadinessScore ?? 0}/100 |\n\n`;
+  md += `| Overall Growth | ${scores?.overallGrowthScore ?? 'N/A'}/100 |\n`;
+  md += `| Market Opportunity | ${scores?.marketOpportunityScore ?? 'N/A'}/100 |\n`;
+  md += `| Audience Clarity | ${scores?.audienceClarityScore ?? 'N/A'}/100 |\n`;
+  md += `| Competitive Defensibility | ${scores?.competitiveDefensibilityScore ?? 'N/A'}/100 |\n`;
+  md += `| Campaign Readiness | ${scores?.campaignReadinessScore ?? 'N/A'}/100 |\n\n`;
 
   md += `## 3. Market Intelligence\n\n`;
   md += `- **TAM:** ${market?.tam || 'Unknown'}\n`;
@@ -355,7 +355,7 @@ function generateMarkdown(data) {
   if (directComps.length > 0) {
     md += `| Competitor | Domain | Type | Similarity |\n| --- | --- | --- | --- |\n`;
     directComps.forEach(c => {
-      md += `| ${c.name || 'Unknown'} | ${c.domain || 'N/A'} | ${c.type || 'N/A'} | ${c.similarityScore ?? 'N/A'}/100 |\n`;
+      md += `| ${c.name || 'Unknown'} | ${c.domain || 'N/A'} | ${c.type || 'N/A'} | ${c.similarityScore != null ? `${c.similarityScore}/100` : 'N/A'} |\n`;
     });
     md += '\n';
   } else {
@@ -397,7 +397,7 @@ function generateMarkdown(data) {
     md += `## 8. SEO Keywords (${seo.keywords.length})\n\n`;
     md += `| Keyword | Volume | Difficulty | Intent |\n| --- | --- | --- | --- |\n`;
     seo.keywords.slice(0, 20).forEach(k => {
-      md += `| ${k.keyword || k} | ${k.volume || k.searchVolume || 'N/A'} | ${k.keywordDifficulty || k.difficulty || 'N/A'} | ${k.intent || 'Informational'} |\n`;
+      md += `| ${k.keyword || k} | ${k.volume || k.searchVolume || 'N/A'} | ${k.keywordDifficulty || k.difficulty || 'N/A'} | ${k.intent || 'N/A'} |\n`;
     });
     md += '\n';
   }
@@ -420,7 +420,7 @@ function generateMarkdown(data) {
         if (tasks.length > 0) {
           md += `### ${period.replace('day', 'Day ')}\n\n`;
           tasks.slice(0, 5).forEach(t => {
-            md += `- **${t.title || t.task || 'Task'}** (Priority: ${t.priority || 'Medium'}) — ${t.owner || 'Unassigned'}\n`;
+            md += `- **${t.title || t.task || 'Task'}** (Priority: ${t.priority || 'N/A'}) — ${t.owner || 'Unassigned'}\n`;
           });
           md += '\n';
         }

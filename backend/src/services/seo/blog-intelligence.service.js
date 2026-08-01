@@ -155,6 +155,7 @@ async function generateBlogIdeas({ keywordIntelligence, competitorIntelligence, 
     ...(keywordIntelligence.longTailKeywords || [])
   ].filter(kw => {
     const key = (kw.keyword || kw || '').toLowerCase().trim();
+    if (kw.validationStatus === 'UNVALIDATED') return false;
     return isValidBlogKeyword(key);
   });
   
@@ -166,6 +167,8 @@ async function generateBlogIdeas({ keywordIntelligence, competitorIntelligence, 
   console.log(`[Blog Ideas] Using ${allKeywords.length} keywords for blog generation`);
 
   const validatedKeywords = allKeywords.filter(kw => {
+    if (kw.validationStatus === 'VERIFIED' || kw.validationStatus === 'VALIDATED') return true;
+    if (kw.validationStatus === 'UNVALIDATED') return false;
     const confidence = kw.confidence || 0;
     const source = kw.source || '';
 
@@ -191,6 +194,7 @@ async function generateBlogIdeas({ keywordIntelligence, competitorIntelligence, 
     if (allKeywords.length > 0) {
       console.log(`[Blog Ideas] Falling back to ${allKeywords.length} unvalidated keywords`);
       allKeywords.slice(0, 10).forEach(kw => {
+        if (kw.validationStatus === 'UNVALIDATED') return;
         const keyword = (kw.keyword || kw || '').toLowerCase().trim();
         if (!isValidBlogKeyword(keyword)) return;
         ideas.push({

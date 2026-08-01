@@ -1294,7 +1294,7 @@ export function EnterpriseActionWorkspace({ workspaceRef }: { workspaceRef?: { c
 
 export function generateWorkspaceData(actions: Partial<StoredAction>[]): StoredAction[] {
   return actions.map(a => ({
-    id: generateId(), title: a.title || '', description: a.description || '', priority: a.priority || 'Medium',
+    id: generateId(), title: a.title || '', description: a.description || '', priority: (a.priority || '') as 'Low' | 'Medium' | 'High' | 'Critical',
     owner: a.owner || '', dueDate: a.dueDate || '', status: a.status || 'pending', progress: a.progress || 0,
     comments: a.comments || [], approvalStatus: a.approvalStatus || 'pending', approvedBy: a.approvedBy || '',
     approvedDate: a.approvedDate || '', approverNotes: a.approverNotes || '', sourceModule: a.sourceModule || '',

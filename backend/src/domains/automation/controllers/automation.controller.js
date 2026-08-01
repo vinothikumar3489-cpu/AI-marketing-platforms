@@ -562,12 +562,13 @@ export const executeAllModules = async (req, res) => {
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId } });
     if (!chat) return res.status(404).json({ success: false, error: "Chat not found" });
 
-    const [productIntelligence, competitorIntelligence, campaignIntelligence, seoIntelligence, plan] = await Promise.all([
+    const [productIntelligence, competitorIntelligence, campaignIntelligence, seoIntelligence, plan, evidenceContext] = await Promise.all([
       prisma.productIntelligence.findFirst({ where: { chatId, userId } }),
       prisma.competitorIntelligence.findFirst({ where: { chatId, userId } }),
       prisma.campaignIntelligence.findFirst({ where: { chatId, userId } }),
       prisma.seoIntelligence.findFirst({ where: { chatId, userId } }),
       prisma.automationPlan.findFirst({ where: { chatId, userId } }),
+      buildEvidenceContext(prisma, userId, chatId),
     ]);
 
     const context = {
@@ -582,6 +583,7 @@ export const executeAllModules = async (req, res) => {
       brandColors: plan?.designStyles?.colors?.join(', '),
       campaignGoal: plan?.campaignObjective,
       platforms: plan?.channels?.map(c => c.channel || c.name).filter(Boolean),
+      evidenceContext,
     };
 
     const executionData = await generateAllExecutionModules(context);

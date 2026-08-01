@@ -143,8 +143,8 @@ function generateFallbackStoryboard(videoContent) {
 export async function renderVideo({ script, scenes, duration, platform, aspectRatio, prompt }) {
   const videoContent = buildVideoContent({ script, scenes, prompt: prompt || '' });
 
-  if (!videoContent.scenes || videoContent.scenes.length === 0) {
-    return { success: false, error: 'At least one scene is required' };
+  if (!videoContent || !videoContent.scenes || videoContent.scenes.length === 0) {
+    return { success: false, error: 'At least one evidence-derived scene is required to render a video' };
   }
 
   const warnings = [];

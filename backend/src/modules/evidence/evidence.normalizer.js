@@ -114,6 +114,7 @@ export function normalizeEvidenceResponse(raw) {
       inp: raw.pageSpeed.inp,
       ttfb: raw.pageSpeed.ttfb,
       topOpportunities: raw.pageSpeed.topOpportunities?.slice(0, 5) || [],
+      source: raw.pageSpeed.source || 'Google PageSpeed Insights API',
     };
     sourcesCollected.push("pageSpeedInsights");
   } else {

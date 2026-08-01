@@ -713,7 +713,17 @@ function calculatePlatformScores(data) {
     source: 'geo_intelligence_aggregation'
   };
 
-  const overall = platformApisAvailable ? Math.round(
+  // Never propagate NaN: components come from estimation/APIs that may degrade.
+  const componentScores = [
+    data.entities.score,
+    data.knowledgeGraphReadiness.score,
+    data.answerability.score,
+    data.citationReadiness.score,
+    data.topicalAuthority.score
+  ];
+  const allComponentsFinite = componentScores.every(v => Number.isFinite(v));
+
+  const overall = platformApisAvailable && allComponentsFinite ? Math.round(
     (data.entities.score * 0.25) +
     (data.knowledgeGraphReadiness.score * 0.20) +
     (data.answerability.score * 0.25) +
@@ -721,7 +731,7 @@ function calculatePlatformScores(data) {
     (data.topicalAuthority.score * 0.15)
   ) : null;
 
-  const googleAiOverview = platformApisAvailable ? Math.round(
+  const googleAiOverview = platformApisAvailable && allComponentsFinite ? Math.round(
     (data.knowledgeGraphReadiness.score * 0.35) +
     (data.entities.score * 0.25) +
     (data.answerability.score * 0.25) +

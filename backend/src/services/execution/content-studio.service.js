@@ -1,4 +1,4 @@
-
+﻿
 import { generateLinkedInPost, generateInstagramPost, generateTwitterPost, generateFacebookPost, generateYouTubeDescription } from '../../domains/content/agents/social.agent.js';
 import { generateBlogArticle, generateFAQ } from '../../domains/content/agents/blog.agent.js';
 import { generateLandingPage, generateProductPage, generateComparisonPage } from '../../domains/content/agents/page.agent.js';
@@ -16,6 +16,462 @@ import { saveContentMemory, buildEvidenceGraphHash, buildPromptHash } from "./co
 import { enrichContentBrief, checkBriefRequirements } from "./brief-enrichment.service.js";
 
 export { CONTENT_TYPES, CONTENT_TYPES_LIST } from "../../constants/content-types.js";
+export { generatePressRelease, generateCaseStudy, generateSalesPage, FRAMEWORKS, checkRepetitiveLanguage, sanitizeRepetitiveLanguage, applyFramework };
+
+// ============================================
+// ENTERPRISE COPYWRITING FRAMEWORKS
+// ============================================
+
+const FRAMEWORKS = {
+  AIDA: {
+    name: 'AIDA',
+    stages: ['Attention', 'Interest', 'Desire', 'Action'],
+    description: 'Classic attention-interest-desire-action framework for persuasive copy',
+  },
+  PAS: {
+    name: 'PAS',
+    stages: ['Problem', 'Agitate', 'Solution'],
+    description: 'Problem-Agitate-Solution framework for highlighting pain points',
+  },
+  BAB: {
+    name: 'BAB',
+    stages: ['Before', 'After', 'Bridge'],
+    description: 'Before-After-Bridge framework for transformation storytelling',
+  },
+  '4Ps': {
+    name: '4Ps',
+    stages: ['Picture', 'Promise', 'Proof', 'Push'],
+    description: 'Picture-Promise-Proof-Push framework for sales-driven copy',
+  },
+};
+
+const ANTI_REPETITION_PATTERNS = [
+  /\b(revolutionary|game-changing|cutting-edge|state-of-the-art|thought leader|paradigm shift|disruptive|world-class|unmatched|unbeatable|empower|synergy|leverage|holistic|robust|streamline|scalable)\b/gi,
+  /\b(best|ultimate|leading|top|premier|exclusive|revolution|breakthrough|next level|game changer)\b/gi,
+  /\b(in today'\s?world|in the modern era|as we all know|it goes without saying|let me be clear)\b/gi,
+  /\b(studies show|research indicates|data shows|experts agree|according to research)\b/gi,
+];
+
+function checkRepetitiveLanguage(text) {
+  const issues = [];
+  for (const pattern of ANTI_REPETITION_PATTERNS) {
+    const matches = text.match(pattern);
+    if (matches) {
+      issues.push(...matches.map(m => ({ word: m, pattern: pattern.source })));
+    }
+  }
+  return {
+    hasIssues: issues.length > 0,
+    issues,
+    score: Math.max(0, 100 - issues.length * 15),
+  };
+}
+
+function sanitizeRepetitiveLanguage(text, replacementMap = {}) {
+  const defaults = {
+    'revolutionary': 'modern',
+    'game-changing': 'effective',
+    'cutting-edge': 'advanced',
+    'state-of-the-art': 'proven',
+    'thought leader': 'trusted authority',
+    'paradigm shift': 'meaningful change',
+    'disruptive': 'innovative',
+    'world-class': 'high-quality',
+    'unmatched': 'distinctive',
+    'unbeatable': 'compelling',
+    'empower': 'enable',
+    'synergy': 'collaboration',
+    'leverage': 'use',
+    'holistic': 'complete',
+    'robust': 'reliable',
+    'streamline': 'improve',
+    'scalable': 'flexible',
+    'best': 'strongest',
+    'ultimate': 'comprehensive',
+    'leading': 'established',
+    'premier': 'primary',
+    'exclusive': 'specialized',
+    'revolution': 'advancement',
+    'breakthrough': 'advance',
+    'next level': 'better results',
+    'game changer': 'effective solution',
+  };
+  const map = { ...defaults, ...replacementMap };
+  let result = text;
+  for (const [banned, replacement] of Object.entries(map)) {
+    const re = new RegExp('\\b' + banned.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
+    result = result.replace(re, replacement);
+  }
+  return result;
+}
+
+function applyFramework(structure, framework, brief, productName, painPoint, persona) {
+  const fw = FRAMEWORKS[framework] || FRAMEWORKS.AIDA;
+  const stages = fw.stages;
+
+  switch (framework) {
+    case 'AIDA':
+      return {
+        attention: structure.headline || `How ${productName} Helps ${persona} With ${painPoint}`,
+        interest: structure.introduction || `For ${persona}, ${painPoint} is more than an inconvenience \u2014 it is a barrier to achieving real outcomes.`,
+        desire: structure.body || `${productName} is designed to address ${painPoint} directly, giving ${persona} the tools they need to succeed.`,
+        action: structure.cta || `Discover how ${productName} can transform your workflow today.`,
+      };
+    case 'PAS':
+      return {
+        problem: structure.headline || `The Hidden Cost of ${painPoint}`,
+        agitate: structure.introduction || `${persona} know the frustration all too well. Every day, ${painPoint} drains time, energy, and results.`,
+        solution: structure.body || `${productName} was built to solve this exact problem. With ${productName}, ${persona} can finally move forward with confidence.`,
+      };
+    case 'BAB':
+      return {
+        before: structure.headline || `Life Before ${productName}`,
+        after: structure.introduction || `Imagine a world where ${painPoint} is no longer a barrier. ${persona} achieve more, faster, with less effort.`,
+        bridge: structure.body || `${productName} is the bridge between where you are now and where you want to be.`,
+      };
+    case '4Ps':
+      return {
+        picture: structure.headline || `Picture ${persona} struggling with ${painPoint} every single day.`,
+        promise: structure.introduction || `${productName} delivers a clear promise: measurable improvement in how ${persona} handle ${painPoint}.`,
+        proof: structure.body || `Built on verified product capabilities and real evidence, ${productName} provides the features and benefits that matter most.`,
+        push: structure.cta || `Take the next step \u2014 explore ${productName} and see the difference for yourself.`,
+      };
+    default:
+      return structure;
+  }
+}
+
+// ============================================
+// PRESS RELEASE GENERATOR
+// ============================================
+
+async function generatePressRelease(brief, aiFunction = callAI, normalizedEvidence) {
+  const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
+  const evidenceCheck = checkEvidenceSufficiency(brief, normalizedEvidence);
+  if (evidenceCheck) {
+    console.warn(`[PressRelease Agent] Insufficient evidence: ${evidenceCheck}`);
+    return { _insufficientEvidence: true, _message: evidenceCheck, _provider: 'evidence_gate' };
+  }
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const painPoint = getFirstPainPoint(brief);
+  const companyName = brief.company?.name || '';
+  const brandVoice = brief.campaign?.brandVoice?.value || brief.campaign?.brandVoice || brief.brandVoice?.value || brief.brandVoice || 'professional';
+  const tone = brief.tone || 'professional';
+  const audience = brief.audience || persona;
+  const competitors = brief.validatedCompetitors || [];
+  const seoKeywords = brief.verifiedKeywords || [];
+
+  const prompt = `You are a senior PR copywriter for ${companyName || productName}.
+
+Write a professional press release for ${audience}.
+
+${productContext}
+
+COMPANY RESEARCH:
+- Company: ${companyName || productName}
+- Industry: ${brief.company?.industry || 'Technology'}
+- Website: ${brief.company?.websiteUrl || ''}
+- Key Differentiators: ${(brief.product?.features || []).slice(0, 5).map(f => typeof f === 'string' ? f : f.name || f.feature || '').filter(Boolean).join(', ')}
+
+AUDIENCE:
+- Primary Persona: ${persona}
+- Pain Point: ${painPoint}
+- Target Audience: ${audience}
+
+COMPETITOR CONTEXT:
+${competitors.length ? `Competitors in the market: ${competitors.map(c => c.name || c.url || '').filter(Boolean).join(', ')}` : 'No competitor data available.'}
+
+SEO KEYWORDS:
+${seoKeywords.slice(0, 5).map(k => typeof k === 'string' ? k : k.keyword || k).filter(Boolean).join(', ') || 'N/A'}
+
+BRAND VOICE & TONE:
+- Brand Voice: ${brandVoice}
+- Tone: ${tone}
+
+FORMAT: Enterprise Press Release
+Framework: Use the AIDA (Attention, Interest, Desire, Action) structure.
+
+ANTI-REPETITION RULES:
+- Never use: revolutionary, game-changing, cutting-edge, state-of-the-art, thought leader, paradigm shift, disruptive, world-class, unmatched, unbeatable, empower, synergy, leverage, holistic, robust, streamline, scalable, best, ultimate, leading, premier, exclusive, breakthrough, next level.
+- Use specific, verifiable language only.
+- Every claim must trace to evidence.
+
+STRUCTURE REQUIREMENTS:
+- Headline: News-style headline including company name and key announcement. Max 100 chars.
+- Subheadline: One sentence summarizing the announcement. Max 150 chars.
+- Dateline: City, State \u2014 Date
+- Body: 3-5 paragraphs following AIDA structure.
+  - Attention: Lead with the most newsworthy angle. What is the announcement?
+  - Interest: Why does this matter to ${persona}? Reference specific pain point "${painPoint}".
+  - Desire: How does ${productName} address this? Reference specific features and benefits from evidence.
+  - Action: What should the reader do next?
+- Quote: Include a quote from a company executive. Format: {name}, {title}, said: "..."
+- About the Company: 2-3 sentence boilerplate about ${companyName || productName}.
+- Contact: Media contact information placeholder.
+- CTA: Specific next step for readers.
+
+EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
+Do NOT: invent statistics, fake quotes, superlatives, or generic PR fluff.
+
+Return valid JSON:
+{
+  "headline": "string \u2014 news-style, max 100 chars",
+  "subheadline": "string \u2014 max 150 chars",
+  "dateline": "string \u2014 City, State",
+  "body": "string \u2014 3-5 paragraphs, AIDA structure",
+  "quote": {"name": "string", "title": "string", "text": "string"},
+  "companyInfo": {"name": "string", "description": "string", "website": "string or null"},
+  "mediaContact": {"name": "string or null", "email": "string or null"},
+  "cta": "string \u2014 specific next step",
+  "evidenceUsed": ["list evidence fields referenced"],
+  "claimsRequiringReview": []
+}`;
+
+  try {
+    const result = await aiFunction(prompt);
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[PressRelease Agent] AI success', { hasHeadline: !!result.data.headline, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[PressRelease Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[PressRelease Agent] AI generation error:', e.message);
+  }
+  console.warn('[PressRelease Agent] AI generation failed \u2014 returning null (no fabricated fallback content)');
+  return null;
+}
+
+// ============================================
+// CASE STUDY GENERATOR
+// ============================================
+
+async function generateCaseStudy(brief, aiFunction = callAI, normalizedEvidence) {
+  const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
+  const evidenceCheck = checkEvidenceSufficiency(brief, normalizedEvidence);
+  if (evidenceCheck) {
+    console.warn(`[CaseStudy Agent] Insufficient evidence: ${evidenceCheck}`);
+    return { _insufficientEvidence: true, _message: evidenceCheck, _provider: 'evidence_gate' };
+  }
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const painPoint = getFirstPainPoint(brief);
+  const companyName = brief.company?.name || '';
+  const brandVoice = brief.campaign?.brandVoice?.value || brief.campaign?.brandVoice || brief.brandVoice?.value || brief.brandVoice || 'professional';
+  const tone = brief.tone || 'professional';
+  const audience = brief.audience || persona;
+  const competitors = brief.validatedCompetitors || [];
+  const seoKeywords = brief.verifiedKeywords || [];
+
+  const prompt = `You are a senior case study writer for ${companyName || productName}.
+
+Write a compelling case study for ${audience}.
+
+${productContext}
+
+COMPANY RESEARCH:
+- Company: ${companyName || productName}
+- Industry: ${brief.company?.industry || 'Technology'}
+- Website: ${brief.company?.websiteUrl || ''}
+- Key Differentiators: ${(brief.product?.features || []).slice(0, 5).map(f => typeof f === 'string' ? f : f.name || f.feature || '').filter(Boolean).join(', ')}
+
+AUDIENCE:
+- Primary Persona: ${persona}
+- Pain Point: ${painPoint}
+- Target Audience: ${audience}
+
+COMPETITOR CONTEXT:
+${competitors.length ? `Competitors in the market: ${competitors.map(c => c.name || c.url || '').filter(Boolean).join(', ')}` : 'No competitor data available.'}
+
+SEO KEYWORDS:
+${seoKeywords.slice(0, 5).map(k => typeof k === 'string' ? k : k.keyword || k).filter(Boolean).join(', ') || 'N/A'}
+
+BRAND VOICE & TONE:
+- Brand Voice: ${brandVoice}
+- Tone: ${tone}
+
+FORMAT: Enterprise Case Study
+Framework: Use the PAS (Problem-Agitate-Solution) structure for the challenge section and BAB (Before-After-Bridge) for the transformation section.
+
+ANTI-REPETITION RULES:
+- Never use: revolutionary, game-changing, cutting-edge, state-of-the-art, thought leader, paradigm shift, disruptive, world-class, unmatched, unbeatable, empower, synergy, leverage, holistic, robust, streamline, scalable, best, ultimate, leading, premier, exclusive, breakthrough, next level.
+- Use specific, verifiable language only.
+- Every claim must trace to evidence.
+
+STRUCTURE REQUIREMENTS:
+- Title: "[Persona] at [Company] Achieves [Outcome] with [Product Name]". Max 120 chars.
+- Subtitle: One sentence summarizing the case study value.
+- Customer Profile: Name, industry, size, and role of the featured customer (use placeholder if no evidence).
+- Challenge: Describe the problem ${persona} faced with ${painPoint}. Use PAS framework.
+- Situation: What was the context before ${productName}? What were the constraints?
+- Solution: How ${productName} was implemented. Reference specific features from evidence.
+- Implementation: Key steps in the deployment. Timeline if evidence supports it.
+- Results: 3-5 measurable outcomes. Use the format: "Metric: Value \u2014 Context". Only include if evidence supports.
+- Quote: Testimonial from the customer. Format: {name}, {role}, said: "..."
+- Lessons Learned: 2-3 key takeaways for other ${persona}.
+- CTA: Specific next step for the reader.
+
+EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
+Do NOT: invent statistics, fake testimonials, fake customer names, superlatives, or generic case study fluff.
+
+Return valid JSON:
+{
+  "title": "string \u2014 max 120 chars",
+  "subtitle": "string \u2014 one sentence value summary",
+  "customerName": "string or null \u2014 placeholder if no evidence",
+  "customerIndustry": "string or null",
+  "customerSize": "string or null",
+  "challenge": "string \u2014 PAS structure, problem-agitate-solution",
+  "situation": "string \u2014 context before the solution",
+  "solution": "string \u2014 how the product was implemented",
+  "implementation": "string \u2014 key deployment steps",
+  "results": [{"metric": "string", "value": "string", "context": "string or null"}],
+  "quote": {"name": "string", "role": "string or null", "text": "string"},
+  "lessonsLearned": ["2-3", "key", "takeaways"],
+  "cta": "string \u2014 specific next step",
+  "evidenceUsed": ["list evidence fields referenced"],
+  "claimsRequiringReview": []
+}`;
+
+  try {
+    const result = await aiFunction(prompt);
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[CaseStudy Agent] AI success', { hasTitle: !!result.data.title, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[CaseStudy Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[CaseStudy Agent] AI generation error:', e.message);
+  }
+  console.warn('[CaseStudy Agent] AI generation failed \u2014 returning null (no fabricated fallback content)');
+  return null;
+}
+
+// ============================================
+// SALES PAGE GENERATOR
+// ============================================
+
+async function generateSalesPage(brief, aiFunction = callAI, normalizedEvidence) {
+  const productContext = buildProductEvidenceContext(brief, normalizedEvidence);
+  const evidenceCheck = checkEvidenceSufficiency(brief, normalizedEvidence);
+  if (evidenceCheck) {
+    console.warn(`[SalesPage Agent] Insufficient evidence: ${evidenceCheck}`);
+    return { _insufficientEvidence: true, _message: evidenceCheck, _provider: 'evidence_gate' };
+  }
+  const productName = getProductName(brief);
+  const persona = getPersonaName(brief);
+  const painPoint = getFirstPainPoint(brief);
+  const companyName = brief.company?.name || '';
+  const brandVoice = brief.campaign?.brandVoice?.value || brief.campaign?.brandVoice || brief.brandVoice?.value || brief.brandVoice || 'professional';
+  const tone = brief.tone || 'professional';
+  const audience = brief.audience || persona;
+  const competitors = brief.validatedCompetitors || [];
+  const seoKeywords = brief.verifiedKeywords || [];
+  const campaignGoal = brief.campaign?.goal?.value || brief.campaign?.goal || '';
+  const cta = brief.CTA?.[0] || brief.campaign?.primaryCTA || '';
+
+  const prompt = `You are a senior conversion copywriter for ${companyName || productName}.
+
+Write a high-converting sales page for ${audience}.
+
+${productContext}
+
+COMPANY RESEARCH:
+- Company: ${companyName || productName}
+- Industry: ${brief.company?.industry || 'Technology'}
+- Website: ${brief.company?.websiteUrl || ''}
+- Key Differentiators: ${(brief.product?.features || []).slice(0, 5).map(f => typeof f === 'string' ? f : f.name || f.feature || '').filter(Boolean).join(', ')}
+
+AUDIENCE:
+- Primary Persona: ${persona}
+- Pain Point: ${painPoint}
+- Target Audience: ${audience}
+
+COMPETITOR CONTEXT:
+${competitors.length ? `Competitors in the market: ${competitors.map(c => c.name || c.url || '').filter(Boolean).join(', ')}` : 'No competitor data available.'}
+
+SEO KEYWORDS:
+${seoKeywords.slice(0, 5).map(k => typeof k === 'string' ? k : k.keyword || k).filter(Boolean).join(', ') || 'N/A'}
+
+BRAND VOICE & TONE:
+- Brand Voice: ${brandVoice}
+- Tone: ${tone}
+
+Campaign Goal: ${campaignGoal || 'Conversion'}
+Primary CTA: ${cta || 'Learn More'}
+
+FORMAT: High-Converting Sales Page
+Framework: Use the 4Ps (Picture, Promise, Proof, Push) framework for the hero section and BAB (Before-After-Bridge) for the transformation narrative.
+
+ANTI-REPETITION RULES:
+- Never use: revolutionary, game-changing, cutting-edge, state-of-the-art, thought leader, paradigm shift, disruptive, world-class, unmatched, unbeatable, empower, synergy, leverage, holistic, robust, streamline, scalable, best, ultimate, leading, premier, exclusive, breakthrough, next level.
+- Use specific, verifiable language only.
+- Every claim must trace to evidence.
+
+STRUCTURE REQUIREMENTS:
+- Hero Section:
+  - Headline: Benefit-driven, include product name. Max 80 chars. Use 4Ps framework.
+  - Subheadline: One-line value prop. Max 150 chars.
+  - CTA: Primary action button. Use "${cta || 'Learn More'}" only if evidence supports it; otherwise use a specific, evidence-backed CTA.
+  - Sub-CTA: Secondary action (e.g., "Watch Demo", "Read Case Study").
+- Problem Section:
+  - Headline: "The Challenge ${persona} Face"
+  - Body: 2-3 paragraphs describing ${painPoint} using PAS framework.
+- Solution Section:
+  - Headline: "How ${productName} Delivers"
+  - Body: Reference specific features from evidence. Use BAB framework.
+- Features Section:
+  - 4-5 features with name, description, and benefit. Use "Feature \u2192 Mechanism \u2192 Benefit" structure.
+- Social Proof Section:
+  - Only include if evidence has testimonials, logos, or stats. Empty array otherwise.
+- FAQ Section:
+  - 3-4 FAQs addressing real concerns from evidence. Not generic.
+- Final CTA:
+  - Strong, confident, specific. Action + value.
+- Urgency:
+  - Only if evidence supports time-limited offers. Null otherwise.
+
+EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
+Do NOT: invent pricing, testimonials, fake data, superlatives, competitor bashing, or fake urgency.
+
+Return valid JSON:
+{
+  "headline": "string \u2014 max 80 chars, benefit-driven, 4Ps framework",
+  "subheadline": "string \u2014 max 150 chars, one-line value prop",
+  "heroSection": {"headline": "string", "subtext": "string or null", "cta": "string", "ctaSecondary": "string or null"},
+  "painPoints": ["3", "specific", "pain", "points", "from", "evidence"],
+  "solutionOverview": "string \u2014 PAS framework, problem-agitate-solution",
+  "features": [{"name": "string", "description": "string", "benefit": "string"}],
+  "socialProof": [] \u2014 only if evidence supports, otherwise empty,
+  "faqs": [{"question": "string", "answer": "string"}],
+  "finalCta": "string \u2014 strong, confident, specific",
+  "urgency": "string or null \u2014 only if evidence supports",
+  "pricing": null \u2014 do not invent,
+  "evidenceUsed": ["list evidence fields referenced"],
+  "claimsRequiringReview": []
+}`;
+
+  try {
+    const result = await aiFunction(prompt);
+    if (result.success && result.data && typeof result.data === 'object') {
+      console.info('[SalesPage Agent] AI success', { hasHeadline: !!result.data.headline, features: result.data.features?.length, provider: result.provider });
+      return { ...result.data, _provider: result.provider, _traceId: result.traceId };
+    }
+    console.warn('[SalesPage Agent] AI returned invalid data, using fallback', {
+      success: result.success, dataType: typeof result.data, provider: result.provider, traceId: result.traceId
+    });
+  } catch (e) {
+    console.error('[SalesPage Agent] AI generation error:', e.message);
+  }
+  console.warn('[SalesPage Agent] AI generation failed \u2014 returning null (no fabricated fallback content)');
+  return null;
+}
+
+export { generatePressRelease, generateCaseStudy, generateSalesPage, FRAMEWORKS, checkRepetitiveLanguage, sanitizeRepetitiveLanguage, applyFramework };
 
 const INVALID_PRODUCT_LABELS = new Set([
   'unknown product', 'new analysis', 'new & featured', 'untitled',
@@ -157,12 +613,12 @@ async function generateEmailCopy(brief, aiFunction = callAI, normalizedEvidence)
 
   const sender = {
     name: brief?.senderName || brandName || displayName,
-    email: brief?.senderEmail || `noreply@${domain || 'example.com'}`,
-    replyTo: brief?.replyToEmail || brief?.senderEmail || `noreply@${domain || 'example.com'}`
+    email: brief?.senderEmail || (domain ? `noreply@${domain}` : null),
+    replyTo: brief?.replyToEmail || brief?.senderEmail || (domain ? `noreply@${domain}` : null)
   };
 
   const recipient = brief?.recipient || { email: '', firstName: '', lastName: '', companyName: '' };
-  const ctaUrl = brief?.ctaUrl || brief?.websiteUrl || `https://${domain || 'example.com'}`;
+  const ctaUrl = brief?.ctaUrl || brief?.websiteUrl || (domain ? `https://${domain}` : null);
   const wc = EMAIL_WORD_COUNT_LIMITS[emailType] || EMAIL_WORD_COUNT_LIMITS['Product Announcement'];
 
   const features = Array.isArray(brief?.product?.features) ? brief.product.features.slice(0, 5) : [];
@@ -173,8 +629,6 @@ async function generateEmailCopy(brief, aiFunction = callAI, normalizedEvidence)
   const campaignObjective = brief.campaign?.objective?.value || brief.campaign?.objective || '';
   const brandVoice = brief.campaign?.brandVoice?.value || brief.campaign?.brandVoice || brief.brandVoice?.value || brief.brandVoice || '';
 
-  const fallbackCtaLabel = emailType === 'Welcome' ? 'Start Your Free Trial' : emailType === 'Event Invitation' ? 'Reserve Your Spot' : emailType === 'Newsletter' ? 'Explore More' : emailType === 'Re-engagement' ? 'Come Back & Save' : 'Claim Your Access';
-  const fallbackCtaUrl = ctaUrl;
   const prompt = `You are an enterprise email copywriter for ${displayName}. Write a ${emailType} email comparable to HubSpot, Brevo, and Mailchimp quality standards.
 
 ${productContext}
@@ -210,7 +664,7 @@ REQUIREMENTS:
 - featureHighlights: Array of 3-5 feature highlights (MANDATORY, min 3)
 - benefits: Array of 3-5 key benefits (MANDATORY, min 3)
 - socialProof: Evidence or empty string (MANDATORY)
-- callToAction: Object {"label": "Specific Action CTA", "url": "${ctaUrl}"} (MANDATORY) — CTA label must be specific action-oriented, 15+ chars, use "?" or "!" for urgency
+- callToAction: Object {"label": "Specific Action CTA", "url": "${ctaUrl}"} (MANDATORY) â€” CTA label must be specific action-oriented, 15+ chars, use "?" or "!" for urgency
 - secondaryCta: Object or null
 - closing: Closing paragraph (MANDATORY)
 - signature: Sender signature (MANDATORY)
@@ -225,13 +679,13 @@ REQUIREMENTS:
 - evidenceUsed: Array of evidence sources (MANDATORY - use [] if none)
 - claimsRequiringReview: Array (MANDATORY - use [] if none)
 
-QUALITY SCORING — CRITICAL: Your content will be scored on these dimensions. Follow EXACTLY:
+QUALITY SCORING â€” CRITICAL: Your content will be scored on these dimensions. Follow EXACTLY:
 1. productAccuracy (weight 12%): Mention "${displayName}" at least 3 times. Include specific features from brief.
 2. audienceRelevance (weight 10%): Use "you", "your", "team", "business", "challenge" naturally.
-3. storytelling (weight 10%): Open with a hook. Use phrases like "Imagine...", "What if...", "Picture this..." to start. Follow: hook → problem → solution → outcome.
+3. storytelling (weight 10%): Open with a hook. Use phrases like "Imagine...", "What if...", "Picture this..." to start. Follow: hook â†’ problem â†’ solution â†’ outcome.
 4. persuasiveness (weight 8%): Include benefit words (benefit, value, improve, grow, accelerate), value props (because, enables, helps), pain acknowledgment (we understand, you know).
-5. ctaStrength (weight 8%): CRITICAL — DO NOT use "Get Started" or "Learn More" as CTA label. Use specific CTAs like "Reserve Your Free Consultation Today!" or "Build Your Custom Dashboard Now!" — 15+ characters, use "!" for urgency.
-6. originality (weight 6%): CRITICAL — ABSOLUTELY FORBIDDEN WORDS: revolutionary, game-changing, cutting-edge, state-of-the-art, thought leader, paradigm shift, disruptive, world-class, unmatched, unbeatable, empower, synergy, leverage, holistic, robust, streamline, scalable. NEVER use any of these.
+5. ctaStrength (weight 8%): CRITICAL â€” DO NOT use "Get Started" or "Learn More" as CTA label. Use specific CTAs like "Reserve Your Free Consultation Today!" or "Build Your Custom Dashboard Now!" â€” 15+ characters, use "!" for urgency.
+6. originality (weight 6%): CRITICAL â€” ABSOLUTELY FORBIDDEN WORDS: revolutionary, game-changing, cutting-edge, state-of-the-art, thought leader, paradigm shift, disruptive, world-class, unmatched, unbeatable, empower, synergy, leverage, holistic, robust, streamline, scalable. NEVER use any of these.
 7. evidenceCoverage (weight 8%): Populate evidenceUsed with the evidence sources listed above. Minimum 1 entry.
 8. marketingImpact (weight 6%): Strong headline + specific CTA + benefits.
 
@@ -258,7 +712,7 @@ Return valid JSON with ALL fields populated:
   "postscript": "P.S. line with urgency or empty string",
   "complianceFooter": "Legal text or empty string",
   "unsubscribeText": "To unsubscribe, reply with UNSUBSCRIBE",
-  "footer": "© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.",
+  "footer": "Â© ${new Date().getFullYear()} ${brandName || displayName}. All rights reserved.",
   "compliance": "Additional info or empty string",
   "variables": ["firstName", "companyName"],
   "plainText": "Full plain text version of the email",
@@ -316,174 +770,14 @@ Return valid JSON with ALL fields populated:
     console.error('[Email Agent] AI generation error, using fallback:', e.message);
   }
 
-  // PART 5: Deterministic complete fallback when AI parsing fails
-  return generateEmailCopyFallback(displayName, internalName, brandName, domain, emailType, persona, painPoint, goal, tone, audience, sender, ctaUrl);
-}
-
-/**
- * PART 5: Deterministic fallback for email_copy generation
- * Returns complete, valid email structure with metadata marking
- */
-function generateEmailCopyFallback(displayName, internalName, brandName, domain, emailType, persona, painPoint, goal, tone, audience, sender, ctaUrl) {
+  // PART 5: No fabricated fallback â€” return null so the pipeline marks generation_failed honestly
   if (!displayName || displayName === 'this solution' || displayName === 'N/A') {
     return { _insufficientEvidence: true, _message: 'Additional verified product information is required. No product name identified.', _provider: 'evidence_gate' };
   }
-  const now = new Date().getFullYear();
-  const fallbackSubject = `${displayName}: A Solution for ${persona}`;
-  const fallbackPreview = `Learn how ${displayName} can help ${persona} overcome ${painPoint}`;
-  const fallbackOpening = `As a ${persona}, you understand the challenge of ${painPoint}.`;
-  const fallbackSolution = `${displayName} provides a comprehensive solution that addresses these challenges directly.`;
-  const fallbackBody = [
-    `As a ${persona}, you understand the challenge of ${painPoint}.`,
-    painPoint || 'Many professionals struggle with inefficient workflows and limited visibility.',
-    `${displayName} provides a comprehensive solution that addresses these challenges directly.`,
-    `With ${goal} at the core, ${displayName} helps teams achieve better results through intuitive ${tone.toLowerCase()} interfaces and seamless integrations.`
-  ];
-  const fallbackHook = `Imagine if ${painPoint || 'inefficient processes'} no longer stood between your team and its goals.`;
-  const fallbackCtaLabel = emailType === 'Welcome' ? 'Start Your Free Trial Now!' : emailType === 'Event Invitation' ? 'Reserve Your Spot Today!' : emailType === 'Newsletter' ? 'Discover Your Next Advantage!' : emailType === 'Re-engagement' ? 'Come Back & Save Big!' : 'Claim Your Free Access Now!';
-  const fallbackHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${fallbackSubject}</title></head><body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,sans-serif;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td align="center" style="padding:20px 10px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="background-color:#ffffff;border-radius:8px;"><tr><td style="padding:20px 32px;"><p style="font-size:16px;color:#333;margin:0 0 16px 0;">Hi {{firstName}},</p><p style="font-family:Arial,sans-serif;font-size:16px;line-height:1.6;color:#333;margin:0 0 16px 0;">${fallbackHook}</p>${fallbackBody.map(p => `<p style="font-family:Arial,sans-serif;font-size:16px;line-height:1.6;color:#333;margin:0 0 16px 0;">${p}</p>`).join('')}<div style="text-align:center;margin:24px 0;"><a href="${ctaUrl || '#'}" style="background-color:#2563eb;color:#fff;padding:12px 32px;text-decoration:none;border-radius:6px;display:inline-block;font-size:16px;font-weight:600;">${fallbackCtaLabel}</a></div></td></tr><tr><td style="background-color:#f8fafc;padding:24px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="font-size:12px;color:#888;margin:0;">© ${now} ${brandName || displayName}. All rights reserved.<br>To unsubscribe, reply with UNSUBSCRIBE</p></td></tr></table></td></tr></table></body></html>`;
-  const fallbackPlain = fallbackHtml.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
-
-  const fallbackData = {
-    id: `email_fallback_${Date.now()}`,
-    contentType: 'email_copy',
-    emailType, goal, tone, audience, language: 'en',
-    sender,
-    recipient: { email: '', firstName: '', lastName: '', companyName: '' },
-    productIdentity: { internalName, displayName, brandName, domain },
-    subject: fallbackSubject.length > 70 ? fallbackSubject.substring(0, 67) + '...' : fallbackSubject,
-    subjectAlternatives: [],
-    previewText: fallbackPreview.length > 150 ? fallbackPreview.substring(0, 147) + '...' : fallbackPreview,
-    greeting: 'Hi {{firstName}},',
-    headline: `Achieve More with ${displayName}`,
-    opening: `${fallbackHook} ${fallbackOpening}`,
-    painPoint: painPoint || 'Many professionals struggle with inefficient workflows and limited visibility.',
-    solution: fallbackSolution,
-    bodyParagraphs: [
-      `${fallbackHook}`,
-      fallbackOpening,
-      painPoint || 'Inefficient workflows create bottlenecks that slow your team down and increase operational costs.',
-      `${displayName} provides a comprehensive approach to overcome these hurdles with practical tools designed for your specific needs.`,
-      `${displayName} gives you back time, improves team coordination, and helps you deliver measurable outcomes.`
-    ],
-    featureHighlights: [
-      `${goal}-focused tools to accelerate delivery`,
-      `Customizable workflows for any team size`,
-      `Real-time analytics helping you make informed decisions`
-    ],
-    benefits: [
-      `Faster time-to-value for your organization`,
-      `Better team coordination and visibility`,
-      `Measurable improvement in daily operations`,
-    ],
-    socialProof: '',
-    callToAction: { label: fallbackCtaLabel, url: ctaUrl || '#' },
-    secondaryCta: null,
-    closing: `We're excited to help you achieve your goals with ${displayName}.`,
-    signature: sender.name || 'The Team',
-    postscript: '',
-    complianceFooter: '',
-    unsubscribeText: 'To unsubscribe, reply with UNSUBSCRIBE',
-    footer: `© ${now} ${brandName || displayName}. All rights reserved.`,
-    compliance: '',
-    variables: ['firstName', 'lastName', 'companyName'],
-    html: fallbackHtml,
-    plainText: fallbackPlain,
-    evidenceUsed: [],
-    claimsRequiringReview: [],
-    quality: {
-      score: 0.5,
-      checks: ['fallback_used'],
-      warnings: ['Using deterministic fallback due to AI generation failure'],
-    },
-    approvalStatus: 'DRAFT',
-    deliveryStatus: null,
-    createdAt: new Date().toISOString(),
-    spamScore: calculateSpamScore(fallbackData),
-    readabilityScore: calculateReadabilityScore(fallbackData),
-    _fallbackUsed: true,
-    _provider: 'fallback',
-  };
-
-  return fallbackData;
+  console.warn('[Email Agent] AI generation failed â€” returning null (no fabricated fallback content)');
+  return null;
 }
 
-/**
- * Generate fallback HTML for email
- */
-function generateFallbackHtml(displayName, sender, ctaUrl) {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${displayName}</title>
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
-    <h1 style="color: #0066cc; margin-top: 0;">Transform Your Experience with ${displayName}</h1>
-    <p>Hi {{firstName}},</p>
-    <p>As a professional, you understand the challenge of inefficient workflows and limited visibility.</p>
-    <p><strong>${displayName}</strong> provides a comprehensive solution that addresses these challenges directly.</p>
-    <ul>
-      <li>Streamlined workflows</li>
-      <li>Enhanced visibility and control</li>
-      <li>Improved productivity and efficiency</li>
-      <li>Cost-effective solution</li>
-      <li>Easy implementation and adoption</li>
-    </ul>
-    <p>${displayName} is designed specifically for professionals who need to overcome these challenges. Our platform combines advanced features with intuitive design to deliver measurable results.</p>
-    <p>With ${displayName}, you gain access to powerful tools that help you achieve your goals. Our solution has been tested and refined based on feedback from professionals like you.</p>
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${ctaUrl}" style="background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Get Started</a>
-    </div>
-    <p>We're excited to help you achieve your goals with ${displayName}.</p>
-    <p style="margin-top: 30px;">Best regards,<br>${sender.name}</p>
-    <p style="font-size: 12px; color: #666; margin-top: 30px;">P.S. Start your journey with ${displayName} today and see immediate results.</p>
-    <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
-    <p style="font-size: 12px; color: #666;">© ${new Date().getFullYear()} ${sender.name}. All rights reserved.</p>
-    <p style="font-size: 12px; color: #666;"><a href="#" style="color: #666;">Unsubscribe</a></p>
-  </div>
-</body>
-</html>`;
-}
-
-/**
- * Generate fallback plain text for email
- */
-function generateFallbackPlainText(displayName, sender, ctaUrl) {
-  return `Transform Your Experience with ${displayName}
-
-Hi {{firstName}},
-
-As a professional, you understand the challenge of inefficient workflows and limited visibility.
-
-${displayName} provides a comprehensive solution that addresses these challenges directly.
-
-Key Benefits:
-- Streamlined workflows
-- Enhanced visibility and control
-- Improved productivity and efficiency
-- Cost-effective solution
-- Easy implementation and adoption
-
-${displayName} is designed specifically for professionals who need to overcome these challenges. Our platform combines advanced features with intuitive design to deliver measurable results.
-
-With ${displayName}, you gain access to powerful tools that help you achieve your goals. Our solution has been tested and refined based on feedback from professionals like you.
-
-Get Started: ${ctaUrl}
-
-We're excited to help you achieve your goals with ${displayName}.
-
-Best regards,
-${sender.name}
-
-P.S. Start your journey with ${displayName} today and see immediate results.
-
----
-© ${new Date().getFullYear()} ${sender.name}. All rights reserved.
-Unsubscribe: [unsubscribe link]`;
-}
 
 
 
@@ -598,6 +892,9 @@ const GENERATORS = {
   comparison_page: generateComparisonPage,
   feature_announcement: generateFeatureAnnouncement,
   whitepaper: generateWhitepaper,
+  press_release: generatePressRelease,
+  case_study: generateCaseStudy,
+  sales_page: generateSalesPage,
   creative_brief: generateCreativeBrief,
   video_script: generateVideoScript,
 };
@@ -607,10 +904,26 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
   if (!typeConfig) throw new Error(`Unknown content type: ${assetType}`);
 
   const schemaEntry = SCHEMA_REGISTRY[assetType];
-  if (!schemaEntry) throw new Error(`No schema registered for: ${assetType}`);
+  if (!schemaEntry) {
+    return {
+      _type: assetType,
+      _label: typeConfig.label,
+      _status: 'unavailable',
+      _reason: `No schema registered for: ${assetType}`,
+      _generatedAt: new Date().toISOString(),
+    };
+  }
 
   const generator = GENERATORS[assetType];
-  if (!generator) throw new Error(`No generator for: ${assetType}`);
+  if (!generator) {
+    return {
+      _type: assetType,
+      _label: typeConfig.label,
+      _status: 'unavailable',
+      _reason: `No generator implemented for: ${assetType}`,
+      _generatedAt: new Date().toISOString(),
+    };
+  }
 
   const briefValidation = validateBriefContent(brief);
   if (briefValidation.status === 'blocked') {
@@ -618,7 +931,7 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
       _type: assetType,
       _label: typeConfig.label,
       _status: 'blocked',
-      _reason: briefValidation.issues.join('; '),
+      _reason: briefValidation.issues?.length ? briefValidation.issues.join('; ') : (briefValidation.reason || briefValidation.code || 'Brief blocked'),
       _generatedAt: new Date().toISOString(),
     };
   }
@@ -630,7 +943,7 @@ export async function generateContent(assetType, brief, evidenceContext, callAiF
       _type: assetType,
       _label: typeConfig.label,
       _status: 'blocked',
-      _reason: `Invalid product identity: "${identity?.productName || brief?.product?.name || 'none'}" — content generation requires a verified product`,
+      _reason: `Invalid product identity: "${identity?.productName || brief?.product?.name || 'none'}" â€” content generation requires a verified product`,
       _generatedAt: new Date().toISOString(),
     };
   }
@@ -915,7 +1228,7 @@ function localPolishContent(content, assetType, qualityResult, brief) {
     threshold: QUALITY_THRESHOLD,
   });
 
-  // Local deterministic polish — always applied, no AI required, never blocks
+  // Local deterministic polish â€” always applied, no AI required, never blocks
   if (qualityResult.needsRewrite) {
     const polished = localPolishContent(validatedContent, assetType, qualityResult, briefWithMeta);
     const polishedQuality = scoreContentQuality(polished, evidenceContext?.product ? evidenceContext : null, assetType);
@@ -985,12 +1298,50 @@ function localPolishContent(content, assetType, qualityResult, brief) {
 export async function generateContentStudioPlan(typesOrCtx, brief, evidenceContext, callAiFn, userId, chatId, prisma) {
   if (typesOrCtx && typeof typesOrCtx === 'object' && !Array.isArray(typesOrCtx)) {
     const execCtx = typesOrCtx;
+    const ev = execCtx.evidence || {};
+    const unwrap = (v) => v && typeof v === 'object' && 'value' in v && 'source' in v ? v.value : v;
+    const seoEvidence = ev.seo || {};
+    const seoScore = unwrap(seoEvidence.score);
+    const seoPrimary = Array.isArray(unwrap(seoEvidence.primary)) ? unwrap(seoEvidence.primary) : Array.isArray(unwrap(seoEvidence.primaryKeywords)) ? unwrap(seoEvidence.primaryKeywords) : [];
+    const seoGaps = Array.isArray(unwrap(seoEvidence.contentGaps)) ? unwrap(seoEvidence.contentGaps) : [];
+    const competitorsObj = unwrap(ev.competitors);
+    const competitorsList = Array.isArray(competitorsObj?.list) ? competitorsObj.list : Array.isArray(competitorsObj) ? competitorsObj : [];
+    const audienceObj = unwrap(ev.audience);
+    const audience = Array.isArray(audienceObj?.personas) ? audienceObj.personas : Array.isArray(unwrap(audienceObj?.primary)) ? unwrap(audienceObj?.primary) : [];
+    const painPoints = Array.isArray(unwrap(audienceObj?.painPoints)) ? unwrap(audienceObj?.painPoints) : [];
+    const features = Array.isArray(ev.features) ? ev.features.map(f => typeof f === 'string' ? f : f.title || f.name) : [];
+    const benefits = Array.isArray(ev.benefits) ? ev.benefits.map(b => typeof b === 'string' ? b : b.title || b.name) : [];
+    const websiteObj = unwrap(ev.website) || {};
+    const keywords = Array.isArray(execCtx.seoKeywords) ? execCtx.seoKeywords
+      : Array.isArray(seoPrimary) ? seoPrimary : [];
+    const channels = Array.isArray(ev.channels) ? ev.channels : [];
+    const growth = ev.growth || execCtx.growth || null;
+    const campaignGoal = execCtx.campaignGoal || unwrap(ev.campaign?.goal) || null;
     const minimalBrief = {
-      product: { name: execCtx.productName || 'N/A', summary: null, features: [], benefits: [], usp: execCtx.productUsp || null },
-      company: { name: execCtx.companyName || null, websiteUrl: null, industry: execCtx.industry || null },
-      targetPersonas: execCtx.targetAudience ? [{ name: execCtx.targetAudience, role: null, painPoints: [], goals: [] }] : [],
-      painPoints: [], objections: [], validatedCompetitors: [], verifiedKeywords: [], topicIdeas: [],
-      contentGaps: [], tone: execCtx.tone || 'professional', CTA: [], evidenceSources: {}, limitations: [],
+      product: { name: execCtx.productName || 'N/A', summary: null, features, benefits, usp: execCtx.productUsp || ev.usp || null },
+      company: { name: execCtx.companyName || null, websiteUrl: unwrap(websiteObj.url) || null, industry: execCtx.industry || unwrap(websiteObj.industry) || null },
+      targetPersonas: audience.map(a => ({ name: unwrap(a.name) || unwrap(a.personaName) || null, role: unwrap(a.role) || null, painPoints: Array.isArray(a.painPoints) ? a.painPoints : [], goals: Array.isArray(a.goals) ? a.goals : [] })),
+      painPoints,
+      objections: Array.isArray(ev.objections) ? ev.objections : [],
+      validatedCompetitors: competitorsList.map(c => ({ name: c.name || c.website || c.url || null, domain: c.website || c.url || null, strengths: c.strengths || [], weaknesses: c.weaknesses || [] })),
+      verifiedKeywords: keywords.map(k => ({ keyword: typeof k === 'string' ? k : k.keyword || k.term || null, searchVolume: typeof k === 'object' ? k.searchVolume ?? k.volume ?? null : null, difficulty: typeof k === 'object' ? k.difficulty ?? k.kd ?? null : null })),
+      topicIdeas: seoGaps.map(g => typeof g === 'string' ? g : g.opportunity || g.title || null),
+      contentGaps: seoGaps.slice(0, 10),
+      seo: {
+        score: seoScore ?? null,
+        primary: keywords.slice(0, 10),
+        primaryKeywords: keywords.slice(0, 10),
+        contentGaps: seoGaps.slice(0, 10),
+      },
+      campaign: { goal: campaignGoal || null, channels },
+      growthWorkspace: growth,
+      tone: execCtx.tone || 'professional',
+      CTA: [],
+      evidenceSources: {
+        hasEvidenceSnapshot: Boolean(ev.sourceSummary || websiteObj || competitorsList.length),
+        websiteScrape: Boolean(websiteObj),
+      },
+      limitations: [],
       _briefId: `legacy_${Date.now()}`, _chatId: null, _userId: null, _builtAt: new Date().toISOString(),
     };
     const allTypes = Object.keys(CONTENT_TYPES);
@@ -1148,7 +1499,7 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
       <tr><td style="padding: 16px 16px 8px 16px; font-family: Arial, sans-serif; font-size: 15px; font-weight: 600; color: #1e293b;">Key Features</td></tr>
       ${features.map(f => `
       <tr>
-        <td style="font-family: Arial, sans-serif; font-size: 15px; line-height: 1.5; color: #333333; padding: 0 16px 8px 16px; vertical-align: top; padding-left: 32px;">✦ ${sanitizeText(f)}</td>
+        <td style="font-family: Arial, sans-serif; font-size: 15px; line-height: 1.5; color: #333333; padding: 0 16px 8px 16px; vertical-align: top; padding-left: 32px;">âœ¦ ${sanitizeText(f)}</td>
       </tr>`).join('\n      ')}
     </table>` : ''}
     ${benefits.length > 0 ? `
@@ -1156,14 +1507,14 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
       <tr><td style="padding: 16px 16px 8px 16px; font-family: Arial, sans-serif; font-size: 15px; font-weight: 600; color: #166534;">Benefits</td></tr>
       ${benefits.map(b => `
       <tr>
-        <td style="font-family: Arial, sans-serif; font-size: 15px; line-height: 1.5; color: #333333; padding: 0 16px 8px 16px; vertical-align: top; padding-left: 32px;">✓ ${sanitizeText(b)}</td>
+        <td style="font-family: Arial, sans-serif; font-size: 15px; line-height: 1.5; color: #333333; padding: 0 16px 8px 16px; vertical-align: top; padding-left: 32px;">âœ“ ${sanitizeText(b)}</td>
       </tr>`).join('\n      ')}
     </table>` : ''}
     ${bulletPoints.length > 0 ? `
     <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 16px 0;">
       ${bulletPoints.map(b => `
       <tr>
-        <td style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; padding: 0 0 8px 0; vertical-align: top; width: 20px;">•</td>
+        <td style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; padding: 0 0 8px 0; vertical-align: top; width: 20px;">â€¢</td>
         <td style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333333; padding: 0 0 8px 0;">${sanitizeText(b)}</td>
       </tr>`).join('\n      ')}
     </table>` : ''}
@@ -1180,7 +1531,7 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
     <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px 0;">
       <tr>
         <td align="center">
-          <a href="${sanitizeText(secondaryCta.url || '#')}" target="_blank" style="font-family: Arial, sans-serif; font-size: 14px; font-weight: 500; color: #2563eb; text-decoration: none; border-bottom: 1px solid #2563eb;">${sanitizeText(secondaryCta.label || 'Learn More')}</a>
+          <a href="${sanitizeText(secondaryCta.url || '#')}" target="_blank" style="font-family: Arial, sans-serif; font-size: 14px; font-weight: 500; color: #2563eb; text-decoration: none; border-bottom: 1px solid #2563eb;">${sanitizeText(secondaryCta.label || '')}</a>
         </td>
       </tr>
     </table>` : ''}
@@ -1236,7 +1587,7 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
     ${previewText}
   </div>
   <div style="display: none; max-height: 0; overflow: hidden; mso-hide: all; line-height: 1px;">
-    &nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;‌&nbsp;
+    &nbsp;â€Œ&nbsp;â€Œ&nbsp;â€Œ&nbsp;â€Œ&nbsp;â€Œ&nbsp;â€Œ&nbsp;â€Œ&nbsp;â€Œ&nbsp;â€Œ&nbsp;â€Œ&nbsp;â€Œ&nbsp;â€Œ&nbsp;â€Œ&nbsp;â€Œ&nbsp;â€Œ&nbsp;â€Œ&nbsp;â€Œ&nbsp;
   </div>
 
   <!-- SUBJECT BAR -->
@@ -1276,7 +1627,7 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                 <tr>
                   <td style="font-family: Arial, sans-serif; font-size: 12px; line-height: 1.5; color: #888888; text-align: center;">
-                    <p style="margin: 0 0 8px 0;">© ${new Date().getFullYear()} ${company}. All rights reserved.</p>
+                    <p style="margin: 0 0 8px 0;">Â© ${new Date().getFullYear()} ${company}. All rights reserved.</p>
                     <p style="margin: 0 0 8px 0;">
                       <a href="${sanitizeText(baseUrl)}" target="_blank" style="color: #888888; text-decoration: underline; font-size: 12px;">Visit our website</a>
                     </p>
@@ -1330,7 +1681,7 @@ function renderEmailHtmlTemplate(emailData, companyName = '', companyWebsite = '
       greeting,
       opening,
       body: bodyHtml,
-      footer: `© ${new Date().getFullYear()} ${company}. All rights reserved.`,
+      footer: `Â© ${new Date().getFullYear()} ${company}. All rights reserved.`,
       unsubscribe: unsubscribeHtml,
     },
     subjectOptions: Array.isArray(emailData.subjectOptions) ? emailData.subjectOptions : (emailData._rawSubjectOptions ? JSON.parse(emailData._rawSubjectOptions) : []),

@@ -100,6 +100,23 @@ const safeJsonParse = (value) => {
   }
 };
 
+const buildAssistantMessage = (structured, productName) => {
+  const summary = typeof structured?.productSummary === 'string' && structured.productSummary
+    ? structured.productSummary
+    : '';
+  if (summary) return summary;
+  const featureCount = Array.isArray(structured?.features) ? structured.features.length : 0;
+  const personaCount = Array.isArray(structured?.buyerPersonas) ? structured.buyerPersonas.length : 0;
+  const competitorCount = Array.isArray(structured?.competitors) ? structured.competitors.length : 0;
+  const parts = [];
+  if (featureCount > 0) parts.push(`${featureCount} feature(s) identified`);
+  if (personaCount > 0) parts.push(`${personaCount} buyer persona(s) identified`);
+  if (competitorCount > 0) parts.push(`${competitorCount} competitor(s) identified`);
+  return parts.length > 0
+    ? `Analysis completed for ${productName || 'your product'}: ${parts.join(', ')}.`
+    : `Analysis completed for ${productName || 'your product'}. Limited data available — connect a website URL or run Growth Workspace for full intelligence.`;
+};
+
 export const generateAnalysis = async ({ manualData = {}, scrapedData = {}, evidenceContext = "" } = {}) => {
   const tavilyKey = process.env.TAVILY_API_KEY;
 
@@ -110,7 +127,7 @@ export const generateAnalysis = async ({ manualData = {}, scrapedData = {}, evid
 
   if (tavilyKey) {
     try {
-      // Placeholder Tavily API call - expected to return short research summary
+      // Tavily research call - expected to return short research summary
       const tavilyResp = await fetch(process.env.TAVILY_API_URL || "https://api.tavily.com/v1/research", {
         method: "POST",
         headers: { Authorization: `Bearer ${tavilyKey}`, "Content-Type": "application/json" },
@@ -213,7 +230,7 @@ export const generateAnalysis = async ({ manualData = {}, scrapedData = {}, evid
     });
 
     return { 
-      message: aiResponse.provider, 
+      message: buildAssistantMessage(aiResponse.data, manualData.productName), 
       structured: aiResponse.data, 
       providerStatus: { [aiResponse.provider]: "success" }, 
       warnings 
@@ -261,5 +278,5 @@ export const generateAnalysis = async ({ manualData = {}, scrapedData = {}, evid
     actionPlan: null,
   };
 
-  return { message: "fallback", structured: fallbackStructured, providerStatus, warnings };
+  return { message: `Analysis could not be completed. ${warnings[0] || 'AI providers unavailable.'}`, structured: fallbackStructured, providerStatus, warnings };
 };

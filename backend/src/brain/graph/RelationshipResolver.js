@@ -1,12 +1,25 @@
 export class RelationshipResolver {
-  constructor(entityStore, relationshipStore) {
+  constructor(entityStore, relationshipStore, entityResolver = null) {
     this._entityStore = entityStore;
     this._relStore = relationshipStore;
+    this._resolver = entityResolver;
   }
 
   async ensureRelationship({ fromType, fromName, toType, toName, relType, reason, sources, chatId, confidence, metadata }) {
-    const from = await this._entityStore.findByTypeAndName(fromType, fromName);
-    const to = await this._entityStore.findByTypeAndName(toType, toName);
+    let from = await this._entityStore.findByTypeAndName(fromType, fromName);
+    let to = await this._entityStore.findByTypeAndName(toType, toName);
+
+    // Exact canonical lookup misses variant spellings ("Acme Inc" vs stored
+    // "Acme"). Fall back to fuzzy resolution so relationships are not silently
+    // dropped when names differ in case/format.
+    if (!from && this._resolver) {
+      const resolved = await this._resolver.resolve(fromType, fromName, { chatId });
+      from = resolved?.entity || null;
+    }
+    if (!to && this._resolver) {
+      const resolved = await this._resolver.resolve(toType, toName, { chatId });
+      to = resolved?.entity || null;
+    }
 
     if (!from || !to) {
       return { success: false, error: `Entities not found: ${!from ? fromName : ''} ${!to ? toName : ''}` };
@@ -45,10 +58,12 @@ export class RelationshipResolver {
 
   async resolveConflicts(entityId) {
     const { outgoing, incoming } = await this._relStore.findByEntity(entityId);
+    const total = outgoing.length + incoming.length;
+    const allRels = [...outgoing, ...incoming];
     const conflicts = [];
 
     const typeGroups = {};
-    for (const rel of [...outgoing, ...incoming]) {
+    for (const rel of allRels) {
       const key = `${rel.type}`;
       if (!typeGroups[key]) typeGroups[key] = [];
       typeGroups[key].push(rel);
@@ -70,7 +85,7 @@ export class RelationshipResolver {
       }
     }
 
-    return { total: rels.length, conflicts };
+    return { total, conflicts };
   }
 
   async getGraph(entityId, depth = 1) {

@@ -6,20 +6,35 @@ import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
 const getPageSpeedKey = () => process.env.PAGESPEED_API_KEY || "";
 const PAGESPEED_API_URL = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
 
-function getRuleBasedFallback(inputData, pageSpeedScore = 0) {
+function getRuleBasedFallback(inputData, pageSpeedScore = 0, scrapedData = null) {
   const productName = inputData?.productName || 'Product';
+  const content = scrapedData?.scrapedData || scrapedData || {};
+  const hasTitleEvidence = content.title || content.metaDescription;
+  const keywordEvidence = content.features || [];
   return {
     seoScore: null,
     pageSpeedScore: pageSpeedScore,
-    metaTitleAnalysis: "Check if title is 50-60 characters, includes main keyword, and is unique.",
-    metaDescriptionAnalysis: "Check if description is 150-160 characters, includes main keyword, and is compelling.",
-    headingStructure: ["Ensure one H1 per page", "Use H2-H3 for content hierarchy", "Include keywords in headings"],
-    keywordSuggestions: [`${productName} features`, `${productName} pricing`, `${productName} vs alternatives`, `${productName} for teams`],
-    technicalSeoIssues: ["Check mobile-friendliness", "Ensure fast page speed", "Verify SSL certificate"],
-    contentImprovementIdeas: ["Create product-specific landing pages", "Add use-case documentation", "Build comparison content"],
+    // Analysis of the actual page is only provided when scraped evidence
+    // exists; otherwise it would be fabricated. Generic guidance is kept
+    // in clearly-labeled guidance fields, not presented as page analysis.
+    metaTitleAnalysis: hasTitleEvidence ? `Title tag present on page: "${content.title}" (${(content.title || '').length} chars).` : null,
+    metaDescriptionAnalysis: hasTitleEvidence ? `Meta description present on page (${(content.metaDescription || '').length} chars).` : null,
+    headingStructure: [],
+    keywordSuggestions: keywordEvidence.slice(0, 10),
+    technicalSeoIssues: [],
+    contentImprovementIdeas: [],
     backlinkAuthorityNotes: "Backlink data not available — focus on content quality and internal linking.",
-    priorityFixes: ["Verify meta tags across key pages", "Improve page speed", "Fix heading hierarchy"],
-    finalRecommendation: "Build topical authority through product-specific content."
+    priorityFixes: [],
+    finalRecommendation: "No verified SEO evidence was available to analyze. Connect SEO data sources (PageSpeed, scraping) and retry for a full analysis.",
+    fallbackNote: "SEO AI analysis unavailable. Only verified page evidence (title, meta description, PageSpeed scores, extracted keywords) is included; unverifiable fields are null/empty.",
+    guidance: {
+      metaTitleGuidance: "Check if title is 50-60 characters, includes main keyword, and is unique.",
+      metaDescriptionGuidance: "Check if description is 150-160 characters, includes main keyword, and is compelling.",
+      headingGuidance: ["Ensure one H1 per page", "Use H2-H3 for content hierarchy", "Include keywords in headings"],
+      technicalGuidance: ["Check mobile-friendliness", "Ensure fast page speed", "Verify SSL certificate"],
+      contentGuidance: ["Create product-specific landing pages", "Add use-case documentation", "Build comparison content"],
+      priorityGuidance: ["Verify meta tags across key pages", "Improve page speed", "Fix heading hierarchy"],
+    },
   };
 }
 
@@ -99,7 +114,7 @@ export async function generateSeoIntelligence(inputData) {
 
   if (websiteUrl) {
     try {
-      scrapedData = await scrapeWebsite(websiteUrl);
+      scrapedData = await scrapeWebsite({ websiteUrl });
     } catch (e) { /* continue */ }
 
     try {
@@ -125,7 +140,7 @@ export async function generateSeoIntelligence(inputData) {
   return {
     success: true,
     data: {
-      ...getRuleBasedFallback(inputData, pageSpeedData?.mobile?.seo ?? 0),
+      ...getRuleBasedFallback(inputData, pageSpeedData?.mobile?.seo ?? 0, scrapedData),
       pageSpeedData
     },
     provider: 'rule-based',

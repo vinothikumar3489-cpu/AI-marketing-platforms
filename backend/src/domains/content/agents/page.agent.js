@@ -1,4 +1,4 @@
-import { callAI } from "../../../domains/ai/services/aiOrchestrator.service.js";
+﻿import { callAI } from "../../../domains/ai/services/aiOrchestrator.service.js";
 import { buildProductEvidenceContext, getProductName, getPersonaName, getFirstPainPoint, getKeyword, getEvidenceForTrend, buildFallbackFeatures, buildFallbackBenefits, buildFallbackEvidenceFields, checkEvidenceSufficiency } from "./agent.utils.js";
 
 export async function generateLandingPage(brief, aiFunction = callAI, normalizedEvidence) {
@@ -26,14 +26,14 @@ Tone: Persuasive, benefit-driven, urgent without being pushy
 STRATEGIC REQUIREMENTS:
 - Headline: Single, powerful benefit-driven headline. Include primary value prop. Max 80 chars. Use the "So that" framework: [Feature] so that [Benefit].
 - Subheadline: Expand on the headline with a specific promise. Max 150 chars.
-- HeroCTA: Primary CTA button text. Must be a specific action verb + value. NOT generic like "Get Started" — use "Start Your Free Trial" or "Book Your Demo" instead. ${primaryCTA ? `Recommended: "${primaryCTA}"` : ''}
-- HeroSubtext: Short line below CTA (e.g. "No credit card required. Free 14-day trial."). Use evidence if available.
+- HeroCTA: Primary CTA button text. Must be a specific action verb + value. NOT generic like "Get Started" â€” use "Start Your Free Trial" or "Book Your Demo" only if the offer actually exists and is in evidence; otherwise use "Learn More" or a factual action. ${primaryCTA ? `Recommended: "${primaryCTA}"` : ''}
+- HeroSubtext: Short line below CTA, only if supported by evidence (e.g. actual trial terms from evidence). Omit fabricated offers ("No credit card required. Free 14-day trial.") unless the brief verifies them. Null otherwise.
 - TrustSignals: Array of evidence-backed trust indicators (e.g., "Used by [number] teams", "SOC 2 compliant"). Empty if not in evidence.
 - UrgencyMechanism: A single string with a time-limited offer or scarcity angle IF evidence supports it. Null otherwise.
 - PainPoints: 3 specific pain points from evidence that ${persona} experiences.
 - Solution: One compelling paragraph describing the solution. Specific features, not generic claims.
-- Features: 3 features with icon (emoji), title, and benefit-driven description. Use the "Feature → Benefit → Outcome" structure.
-- SocialProof: Empty array — do NOT invent testimonials, logos, or stats.
+- Features: 3 features with icon (emoji), title, and benefit-driven description. Use the "Feature â†’ Benefit â†’ Outcome" structure.
+- SocialProof: Empty array â€” do NOT invent testimonials, logos, or stats.
 - FinalCTA: Closing CTA. Strong, confident, specific.
 - SEO Keywords: 3 keywords from evidence to optimize for.
 
@@ -44,17 +44,17 @@ Do NOT: invent testimonials, fake stats, ROI claims, pricing, superlatives, gene
 
 Return valid JSON:
 {
-  "headline": "string — max 80 chars, benefit-driven, USP-focused",
-  "subheadline": "string — max 150 chars, specific promise",
-  "heroCTA": "string — specific action verb + value (e.g. 'Start Your Free Trial')",
-  "heroSubtext": "string — short line below CTA (e.g. 'No credit card required. Free 14-day trial.')",
+  "headline": "string â€” max 80 chars, benefit-driven, USP-focused",
+  "subheadline": "string â€” max 150 chars, specific promise",
+  "heroCTA": "string â€” specific action verb + value; trial/demo offers only if verified in evidence",
+  "heroSubtext": "string or null â€” short line below CTA, only if verified in evidence",
   "trustSignals": ["array of evidence-backed trust indicators, or empty"],
-  "urgencyMechanism": "string or null — time-limited offer or scarcity angle if in evidence",
+  "urgencyMechanism": "string or null â€” time-limited offer or scarcity angle if in evidence",
   "painPoints": ["3", "specific", "pain", "points"],
-  "solution": "string — one paragraph, specific, evidence-backed",
-  "features": [{"icon": "emoji", "title": "string", "description": "string — Feature → Benefit → Outcome"}],
+  "solution": "string â€” one paragraph, specific, evidence-backed",
+  "features": [{"icon": "emoji", "title": "string", "description": "string â€” Feature â†’ Benefit â†’ Outcome"}],
   "socialProof": [],
-  "finalCTA": "string — strong, confident closing CTA",
+  "finalCTA": "string â€” strong, confident closing CTA",
   "seoKeywords": ["3", "seo", "keywords"],
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
@@ -72,7 +72,8 @@ Return valid JSON:
   } catch (e) {
     console.error('[LandingPage Agent] AI generation error:', e.message);
   }
-  return generateLandingPageFallback(brief, productName, persona, painPoint);
+  console.warn('[*Agent] AI generation failed — returning null (no fabricated fallback content)');
+  return null;
 }
 
 function generateLandingPageFallback(brief, productName, persona, painPoint) {
@@ -83,21 +84,21 @@ function generateLandingPageFallback(brief, productName, persona, painPoint) {
   const features = buildFallbackFeatures(brief);
   const benefits = buildFallbackBenefits(brief);
   return {
-    headline: `Solve ${painPoint} with ${productName}`.slice(0, 80),
-    subheadline: `${productName} helps ${persona} achieve ${benefits[0] || 'better outcomes'} through ${features[0] || 'innovative capabilities'}.`.slice(0, 150),
-    heroCTA: `Start Your Free Trial`,
-    heroSubtext: 'No credit card required. Free 14-day trial.',
+    headline: `Address ${painPoint} with ${productName}`.slice(0, 80),
+    subheadline: `${productName} is designed to help ${persona} work through ${painPoint} with ${features[0] || 'practical capabilities'} and ${features[1] || 'clear workflows'}.`.slice(0, 150),
+    heroCTA: `Learn More`,
+    heroSubtext: `See ${productName} in action and decide for yourself.`,
     trustSignals: [],
     urgencyMechanism: null,
     painPoints: [
       painPoint,
       ...(brief.painPoints || []).slice(0, 2),
     ].filter((v, i, a) => a.indexOf(v) === i).slice(0, 3),
-    solution: `${productName} directly addresses ${painPoint} by providing ${persona} with ${features[0] || 'powerful tools'} and ${features[1] || 'intelligent workflows'}. The platform delivers ${benefits[0] || 'measurable improvements'} through an approach designed for real-world use.`,
+    solution: `${productName} is designed to address ${painPoint} by giving ${persona} ${features[0] || 'practical tools'} and ${features[1] || 'structured workflows'}. The intended outcomes are ${benefits[0] || 'practical results'} and ${benefits[1] || 'clear improvements'}.`,
     features: [
-      { icon: '⚡', title: features[0] || 'Core Platform', description: `${features[0] || 'Core capabilities'} that help ${persona} achieve ${benefits[0] || 'better results'} faster.` },
-      { icon: '🎯', title: features[1] || 'Advanced Analytics', description: `${features[1] || 'Data-driven insights'} to make informed decisions and track ${benefits[1] || 'key metrics'}.` },
-      { icon: '🔗', title: features[2] || 'Seamless Integration', description: `Connect with existing tools and workflows for ${benefits[2] || 'smooth adoption and maximum impact'}.` },
+      { icon: '\u26A1', title: features[0] || 'Core Platform', description: `${features[0] || 'Core capabilities'} designed to help ${persona} make progress on ${benefits[0] || 'practical outcomes'}.` },
+      { icon: '\uD83C\uDFAF', title: features[1] || 'Reporting', description: `${features[1] || 'Dashboards and reporting'} to track progress on ${benefits[1] || 'key metrics'}.` },
+      { icon: '\uD83D\uDD17', title: features[2] || 'Integrations', description: `Integrate with existing tools and workflows for ${benefits[2] || 'smoother adoption'}.` },
     ].filter(f => f.description),
     socialProof: [],
     finalCTA: `Start with ${productName} today`,
@@ -130,16 +131,16 @@ Format: Product page
 Tone: Confident, specific, value-oriented
 
 STRATEGIC REQUIREMENTS:
-- productName: "${productName}" — use exactly.
+- productName: "${productName}" â€” use exactly.
 - tagline: One-line value proposition. Reference USP from evidence. "The [category] for [persona] that [key benefit]."
-- overview: One paragraph. Problem (pain point) → Solution (product) → Outcome (benefits). Reference evidence.
+- overview: One paragraph. Problem (pain point) â†’ Solution (product) â†’ Outcome (benefits). Reference evidence.
 - heroImage: A detailed Midjourney/DALL-E image prompt describing the product hero image. Include visual style, perspective, and mood.
-- keyFeatures: 4-5 features. Each description must use "Feature → Mechanism → Benefit" triple structure (what it is → how it works → what it means for them). Map directly to evidence.
+- keyFeatures: 4-5 features. Each description must use "Feature â†’ Mechanism â†’ Benefit" triple structure (what it is â†’ how it works â†’ what it means for them). Map directly to evidence.
 - integrationHighlights: Array of 2-3 integration names from evidence. Null if none found.
 - roiMetrics: Array of {metric, value, description} objects. ONLY include if evidence has ROI data. Empty otherwise.
 - useCases: 2-3 use cases. Each: scenario (when), solution (how), outcome (result). Relevant to ${persona}.
 - cta: Specific, confident CTA. Action + value.
-- pricing: null — do not invent.
+- pricing: null â€” do not invent.
 - faqs: 3-4 FAQs addressing real customer concerns from evidence. Not generic.
 
 EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
@@ -148,16 +149,16 @@ Do NOT: invent pricing, testimonials, fake data, superlatives, competitor bashin
 Return valid JSON:
 {
   "productName": "${productName}",
-  "tagline": "string — one-line value proposition with USP",
-  "overview": "string — Problem → Solution → Outcome paragraph",
-  "heroImage": "string — detailed Midjourney/DALL-E prompt for product hero image",
-  "keyFeatures": [{"name": "string", "description": "string — Feature → Mechanism → Benefit", "benefit": "string — what it means"}],
+  "tagline": "string â€” one-line value proposition with USP",
+  "overview": "string â€” Problem â†’ Solution â†’ Outcome paragraph",
+  "heroImage": "string â€” detailed Midjourney/DALL-E prompt for product hero image",
+  "keyFeatures": [{"name": "string", "description": "string â€” Feature â†’ Mechanism â†’ Benefit", "benefit": "string â€” what it means"}],
   "integrationHighlights": ["array of 2-3 integration names from evidence, or null"],
   "roiMetrics": [{"metric": "string", "value": "string", "description": "string"}],
-  "useCases": [{"scenario": "string — when", "solution": "string — how", "outcome": "string — result"}],
-  "cta": "string — specific, confident CTA",
+  "useCases": [{"scenario": "string â€” when", "solution": "string â€” how", "outcome": "string â€” result"}],
+  "cta": "string â€” specific, confident CTA",
   "pricing": null,
-  "faqs": [{"question": "string — real concern", "answer": "string — evidence-backed"}],
+  "faqs": [{"question": "string â€” real concern", "answer": "string â€” evidence-backed"}],
   "evidenceUsed": ["list evidence fields referenced"],
   "claimsRequiringReview": []
 }`;
@@ -174,7 +175,8 @@ Return valid JSON:
   } catch (e) {
     console.error('[ProductPage Agent] AI generation error:', e.message);
   }
-  return generateProductPageFallback(brief, productName, persona, painPoint);
+  console.warn('[*Agent] AI generation failed — returning null (no fabricated fallback content)');
+  return null;
 }
 
 function generateProductPageFallback(brief, productName, persona, painPoint) {
@@ -186,13 +188,13 @@ function generateProductPageFallback(brief, productName, persona, painPoint) {
   const benefits = buildFallbackBenefits(brief);
   return {
     productName,
-    tagline: `The solution ${persona} need to overcome ${painPoint}`,
-    overview: `${productName} is designed specifically for ${persona} dealing with "${painPoint}". The platform combines ${features[0] || 'powerful capabilities'} with ${features[1] || 'intuitive design'} to deliver ${benefits[0] || 'measurable results'}. Whether you are looking to ${benefits[1] || 'improve outcomes'} or ${benefits[2] || 'streamline operations'}, ${productName} provides the tools you need.`,
-    heroImage: `Product hero showcasing ${productName}'s interface with ${persona} using the platform — clean, modern SaaS dashboard style, warm lighting, focused professional environment`,
+    tagline: `A platform designed for ${persona} addressing ${painPoint}`,
+    overview: `${productName} is designed for ${persona} dealing with "${painPoint}". The platform combines ${features[0] || 'practical capabilities'} with ${features[1] || 'structured workflows'} to aim for ${benefits[0] || 'practical outcomes'}. Whether you are looking to ${benefits[1] || 'improve workflows'} or ${benefits[2] || 'reduce overhead'}, ${productName} is built around those goals.`,
+    heroImage: `Product hero showcasing ${productName}'s interface with ${persona} using the platform \u2014 clean, modern SaaS dashboard style, warm lighting, focused professional environment`,
     keyFeatures: [
-      { name: features[0] || 'Core Capabilities', description: `${features[0] || 'Core platform features'} purpose-built for ${persona}.`, benefit: benefits[0] || 'Achieve better results faster' },
-      { name: features[1] || 'Intelligent Workflows', description: `${features[1] || 'Smart automation'} that reduces manual effort.`, benefit: benefits[1] || 'Save time and reduce errors' },
-      { name: features[2] || 'Analytics Dashboard', description: `${features[2] || 'Comprehensive analytics'} for data-driven decisions.`, benefit: benefits[2] || 'Make informed decisions with confidence' },
+      { name: features[0] || 'Core Capabilities', description: `${features[0] || 'Core platform features'} built for ${persona}.`, benefit: benefits[0] || 'Practical outcomes as the goal' },
+      { name: features[1] || 'Workflow Tools', description: `${features[1] || 'Tooling for repetitive tasks'} to reduce manual effort.`, benefit: benefits[1] || 'Less manual work' },
+      { name: features[2] || 'Reporting', description: `${features[2] || 'Dashboards and reporting'} for evidence-based decisions.`, benefit: benefits[2] || 'Track progress over time' },
     ],
     integrationHighlights: null,
     roiMetrics: [],
@@ -200,14 +202,14 @@ function generateProductPageFallback(brief, productName, persona, painPoint) {
       {
         scenario: `${persona} facing ${painPoint}`,
         solution: `${productName} provides targeted tools and workflows to address this challenge directly.`,
-        outcome: `${benefits[0] || 'Improved outcomes'} and ${benefits[1] || 'enhanced efficiency'} for your team.`,
+        outcome: `Intended outcomes are ${benefits[0] || 'practical results'} and ${benefits[1] || 'clear improvements'}.`,
       },
     ],
     cta: `Get started with ${productName}`,
     pricing: null,
     faqs: [
-      { question: `What is ${productName}?`, answer: `${productName} is a platform designed to help ${persona} address ${painPoint} through ${features[0] || 'innovative capabilities'} and ${benefits[0] || 'proven methodologies'}.` },
-      { question: `How does ${productName} benefit ${persona}?`, answer: `${productName} delivers ${benefits.join(', ') || 'multiple benefits'} through an integrated platform built specifically for your needs.` },
+      { question: `What is ${productName}?`, answer: `${productName} is a platform designed to help ${persona} address ${painPoint} through ${features[0] || 'practical capabilities'} and ${benefits[0] || 'intended outcomes'}.` },
+      { question: `How does ${productName} benefit ${persona}?`, answer: `${productName} is designed around ${benefits.join(', ') || 'practical outcomes'} for ${persona}.` },
     ],
     evidenceUsed: buildFallbackEvidenceFields(brief),
     claimsRequiringReview: [],
@@ -246,7 +248,7 @@ STRATEGIC REQUIREMENTS:
 - competitorWeaknesses: ONLY if evidence supports. Empty array otherwise.
 - cta: Specific, helpful CTA.
 
-${competitors.length ? `Competitors from evidence: ${competitors.join(', ')}` : 'No competitor evidence — use generic categories.'}
+${competitors.length ? `Competitors from evidence: ${competitors.join(', ')}` : 'No competitor evidence â€” use generic categories.'}
 
 EVIDENCE INTEGRITY: If evidence does not contain information about a specific feature or claim, do NOT invent it. Return {missingEvidence: true, message: 'Additional verified product information is required for [specific area]'}.
 Do NOT: bash competitors without evidence, make superlative claims, use fake data, invent competitor weaknesses.
@@ -256,9 +258,9 @@ Return valid JSON:
   "headline": "string",
   "introduction": "string",
   "comparisonTable": {"headers": ["string"], "rows": [{"feature": "string", "winner": "productName or competitor or tie"}]},
-  "verdict": "string — one-sentence who should choose this product",
-  "idealCustomerProfile": "string — brief description of who benefits most",
-  "whyChooseUs": "string — evidence-based differentiators",
+  "verdict": "string â€” one-sentence who should choose this product",
+  "idealCustomerProfile": "string â€” brief description of who benefits most",
+  "whyChooseUs": "string â€” evidence-based differentiators",
   "cta": "string",
   "competitorWeaknesses": [{"competitor": "string", "weakness": "string"}],
   "evidenceUsed": ["list evidence fields referenced"],
@@ -277,7 +279,8 @@ Return valid JSON:
   } catch (e) {
     console.error('[ComparisonPage Agent] AI generation error:', e.message);
   }
-  return generateComparisonPageFallback(brief, productName, persona);
+  console.warn('[*Agent] AI generation failed — returning null (no fabricated fallback content)');
+  return null;
 }
 
 function generateComparisonPageFallback(brief, productName, persona) {
@@ -287,32 +290,32 @@ function generateComparisonPageFallback(brief, productName, persona) {
   }
   const features = buildFallbackFeatures(brief);
   const benefits = buildFallbackBenefits(brief);
-  const competitors = brief.validatedCompetitors?.slice(0, 3).map(c => c.name) || ['Alternative solutions'];
+  const competitors = brief.validatedCompetitors?.slice(0, 3).map(c => c.name) || [];
+  const compA = competitors[0] || 'Competitor A';
+  const compB = competitors[1] || 'Competitor B';
   return {
-    headline: `${productName} vs. ${competitors[0] || 'Alternatives'}: A Comprehensive Comparison`,
-    introduction: `Choosing the right solution for ${persona} requires careful evaluation. This comparison examines how ${productName} stacks up against ${competitors.join(' and ') || 'alternative approaches'} across key criteria important to ${persona}.`,
+    headline: `${productName} vs. ${competitors[0] || 'Alternatives'}: A Feature Comparison`,
+    introduction: `Choosing the right solution for ${persona} requires careful evaluation. This comparison lists what ${productName} offers; data on the alternatives was not verified and is marked as requiring review.`,
     comparisonTable: {
-      headers: ['Feature', productName, ...competitors.slice(0, 2)],
+      headers: ['Feature', productName, compA, compB],
       rows: [
-        { feature: features[0] || 'Core capabilities', [productName]: '✓', [competitors[0] || 'Competitor A']: 'Limited', [competitors[1] || 'Competitor B']: 'Partial', winner: productName },
-        { feature: features[1] || 'Ease of use', [productName]: '✓', [competitors[0] || 'Competitor A']: 'Moderate', [competitors[1] || 'Competitor B']: 'Complex', winner: productName },
-        { feature: benefits[0] || 'Time to value', [productName]: 'Fast', [competitors[0] || 'Competitor A']: 'Slow', [competitors[1] || 'Competitor B']: 'Medium', winner: productName },
-        { feature: benefits[1] || 'Integration', [productName]: 'Seamless', [competitors[0] || 'Competitor A']: 'Limited', [competitors[1] || 'Competitor B']: 'Requires custom work', winner: productName },
-        { feature: 'Scalability', [productName]: 'High', [competitors[0] || 'Competitor A']: 'Medium', [competitors[1] || 'Competitor B']: 'Low', winner: productName },
-        { feature: 'Support', [productName]: 'Dedicated', [competitors[0] || 'Competitor A']: 'Standard', [competitors[1] || 'Competitor B']: 'Limited', winner: productName },
-        { feature: 'Pricing', [productName]: 'Competitive', [competitors[0] || 'Competitor A']: 'Varies', [competitors[1] || 'Competitor B']: 'Premium', winner: 'tie' },
+        { feature: features[0] || 'Core capabilities', [productName]: 'Available', [compA]: 'Requires review', [compB]: 'Requires review', winner: 'tie' },
+        { feature: features[1] || 'Workflow support', [productName]: 'Available', [compA]: 'Requires review', [compB]: 'Requires review', winner: 'tie' },
+        { feature: benefits[0] || 'Intended outcome', [productName]: 'Designed for this', [compA]: 'Requires review', [compB]: 'Requires review', winner: 'tie' },
+        { feature: benefits[1] || 'Intended outcome', [productName]: 'Designed for this', [compA]: 'Requires review', [compB]: 'Requires review', winner: 'tie' },
+        { feature: 'Pricing', [productName]: 'See product page', [compA]: 'Requires review', [compB]: 'Requires review', winner: 'tie' },
+        { feature: 'Support', [productName]: 'See product page', [compA]: 'Requires review', [compB]: 'Requires review', winner: 'tie' },
       ],
     },
-    verdict: `${productName} is the best choice for ${persona} who need ${features[0] || 'specialized capabilities'} with fast time to value and seamless integration.`,
-    idealCustomerProfile: `${persona} teams looking to address ${benefits[0] || 'key challenges'} with a purpose-built solution that combines ${features.join(' and ') || 'power and simplicity'}.`,
-    whyChooseUs: `${productName} is purpose-built for ${persona} who need to address their specific challenges. Unlike generic alternatives, ${productName} delivers ${features.join(', ') || 'targeted capabilities'} with a focus on ${benefits[0] || 'practical outcomes'} and ${benefits[1] || 'measurable results'}. The platform's intuitive design and seamless integration capabilities make it the preferred choice for teams looking to make an immediate impact.`,
-    cta: `Compare ${productName} for yourself`,
-    competitorWeaknesses: competitors.slice(0, 2).map(c => ({
-      competitor: c,
-      weakness: `Limited specialization for ${persona}'s specific needs compared to ${productName}.`,
-    })),
+    verdict: `Confirm each option against your own requirements \u2014 this page only verifies what ${productName} offers.`,
+    idealCustomerProfile: `${persona} teams looking to address ${benefits[0] || 'their specific challenges'} with a platform built around ${features.join(' and ') || 'their needs'}.`,
+    whyChooseUs: `${productName} is purpose-built for ${persona} and offers ${features.join(', ') || 'its core capabilities'} with a focus on ${benefits[0] || 'practical outcomes'} and ${benefits[1] || 'clear workflows'}. Ratings for alternative products require verified data.`,
+    cta: `Try ${productName} for yourself`,
+    competitorWeaknesses: [],
     evidenceUsed: buildFallbackEvidenceFields(brief),
-    claimsRequiringReview: [],
+    claimsRequiringReview: competitors.length
+      ? [`Ratings for ${competitors.join(' and ')} were not verified and require evidence before publication.`]
+      : [],
     _provider: 'fallback',
     _fallbackUsed: true,
   };

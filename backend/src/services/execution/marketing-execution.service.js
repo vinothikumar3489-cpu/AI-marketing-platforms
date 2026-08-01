@@ -5,20 +5,38 @@ import { generateVideoStudioPlan } from "./video-studio.service.js";
 import { generateCampaignPlannerPlan } from "./campaign-planner.service.js";
 import { generateSocialCalendarPlan } from "./social-calendar.service.js";
 
+function unwrapSourced(v) {
+  if (v && typeof v === 'object' && 'value' in v && 'source' in v) return v.value;
+  return v;
+}
+
 function buildExecutionContext(context) {
   const ec = context.evidenceContext || {};
+  const seoFromContext = ec.seo || null;
+  const seoScore = unwrapSourced(seoFromContext?.score);
+  const seoPrimary = Array.isArray(unwrapSourced(seoFromContext?.primary)) ? unwrapSourced(seoFromContext?.primary) : Array.isArray(unwrapSourced(seoFromContext?.primaryKeywords)) ? unwrapSourced(seoFromContext?.primaryKeywords) : [];
+  const seoContentGaps = Array.isArray(unwrapSourced(seoFromContext?.contentGaps)) ? unwrapSourced(seoFromContext?.contentGaps) : [];
+  const seoDataString = seoFromContext ? (() => {
+    const parts = [];
+    if (seoScore != null) parts.push(`Score: ${seoScore}`);
+    const kws = seoPrimary.slice(0, 5)
+      .map(k => typeof k === 'string' ? k : (k.keyword || k)).filter(Boolean);
+    if (kws.length) parts.push(`Keywords: ${kws.join(', ')}`);
+    return parts.length ? parts.join(' | ') : null;
+  })() : null;
+  const growthFromContext = unwrapSourced(ec.growthWorkspace) || null;
   return {
     evidenceSnapshotId: context.evidenceContext?.evidenceSnapshotId || null,
-    productName: context.productName || ec.product?.name || 'N/A',
-    companyName: context.companyName || ec.company?.name || null,
-    targetAudience: context.targetAudience || ec.product?.targetAudience || ec.audience?.primary || null,
-    industry: context.industry || ec.product?.industry || null,
-    productUsp: context.productUsp || ec.product?.usp || null,
-    seoData: context.seoData || (ec.seo ? JSON.stringify({ issues: ec.seo.issues?.length || 0, opportunities: ec.seo.contentOpportunities?.length || 0 }) : null),
-    growthData: context.growthData || (ec.growth ? JSON.stringify({ score: ec.growth.overallScore }) : null),
-    campaignGoal: context.campaignGoal || null,
+    productName: context.productName || unwrapSourced(ec.product?.name) || 'N/A',
+    companyName: context.companyName || unwrapSourced(ec.company?.name) || null,
+    targetAudience: context.targetAudience || unwrapSourced(ec.product?.targetAudience) || unwrapSourced(ec.audience?.primary) || null,
+    industry: context.industry || unwrapSourced(ec.product?.industry) || unwrapSourced(ec.website?.industry) || null,
+    productUsp: context.productUsp || unwrapSourced(ec.product?.usp) || unwrapSourced(ec.usp) || null,
+    seoData: context.seoData || seoDataString,
+    growthData: context.growthData || (growthFromContext ? JSON.stringify({ score: growthFromContext.overallScore ?? growthFromContext.summary?.overallScore ?? null }) : null),
+    campaignGoal: context.campaignGoal || unwrapSourced(ec.campaign?.goal) || unwrapSourced(ec.campaign?.objective) || null,
     tone: context.tone || 'professional',
-    seoKeywords: context.seoKeywords || (ec.seo?.contentOpportunities?.slice(0, 5).map(o => o.opportunity) || []),
+    seoKeywords: context.seoKeywords || seoContentGaps.slice(0, 5).map(o => o.opportunity || o.title || (typeof o === 'string' ? o : '')),
     platforms: context.platforms || [],
     brandColors: context.brandColors || null,
     senderName: context.senderName || null,
@@ -27,10 +45,15 @@ function buildExecutionContext(context) {
       website: ec.website || null,
       audience: ec.audience || null,
       competitors: ec.competitors || null,
-      seo: ec.seo || null,
-      channels: ec.channels || [],
-      growth: ec.growth || null,
+      seo: seoFromContext,
+      channels: Array.isArray(ec.channels) ? ec.channels : [],
+      growth: unwrapSourced(ec.growthWorkspace) || null,
       sourceSummary: ec.sourceSummary || null,
+      features: unwrapSourced(ec.features) || null,
+      benefits: unwrapSourced(ec.benefits) || null,
+      usp: unwrapSourced(ec.usp) || null,
+      pricing: unwrapSourced(ec.pricing) || null,
+      useCases: unwrapSourced(ec.useCases) || null,
     },
   };
 }

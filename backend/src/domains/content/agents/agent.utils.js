@@ -82,7 +82,7 @@ export function buildProductEvidenceContext(brief, normalizedEvidence) {
   const execStory = brief.executive?.story?.value || brief.executive?.story || '';
   const execRecommendations = extractArray(brief.executive?.recommendations?.value || brief.executive?.recommendations || []);
 
-  const growthWs = brief.growthWorkspace || '';
+  const growthWs = brief.growthWorkspace || brief._growthWs || '';
 
   return `PRODUCT & COMPANY:
 Identity: ${company.name || product.name || 'Unknown'}

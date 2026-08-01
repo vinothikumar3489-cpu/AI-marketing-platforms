@@ -1,6 +1,7 @@
 import fetch from 'node-fetch';
 import { getSerpCompetitors, normalizeSerpCompetitors, separateCompetitorsByType, isDataForSEOConfigured, getDomainData } from '../../providers/dataforseo.service.js';
 import { researchCompetitors } from '../../providers/tavily.service.js';
+import { discoverCompetitors as cascadeDiscoverCompetitors } from '../../providers/competitor-discovery.service.js';
 import { asArray } from '../../utils/text.util.js';
 import { prisma } from '../../config/prisma.js';
 
@@ -198,6 +199,41 @@ export async function generateCompetitorSeoIntelligence({
 // COMPETITOR DISCOVERY
 // ============================================
 
+async function cascadeCompetitorFallback(productName, industry, websiteUrl, identity, keywordIntelligence) {
+  console.log('🔄 [Discovery] Trying cascading discovery (free + AI sources)...');
+  try {
+    const result = await cascadeDiscoverCompetitors({
+      websiteUrl,
+      productName: productName || identity?.productName || '',
+      companyName: identity?.companyName || '',
+      industry: industry || identity?.industry || 'technology',
+      html: null,
+      max: 8,
+      enrich: true,
+    });
+    if (result.success && result.competitors.length > 0) {
+      console.log(`✅ [Discovery] Cascade returned ${result.competitors.length} competitors (${result.sourcesUsed.join(', ')})`);
+      return filterSelfLinks(result.competitors.map(comp => ({
+        name: comp.name || '',
+        website: comp.url || '',
+        domain: comp.domain || extractDomain(comp.url || ''),
+        type: 'direct',
+        positioning: comp.positioning || 'Direct competitor',
+        source: comp.source || 'Cascade',
+        isFallback: true,
+        description: comp.description || '',
+        strengths: Array.isArray(comp.strengths) ? comp.strengths : null,
+        weaknesses: Array.isArray(comp.weaknesses) ? comp.weaknesses : null,
+        pricing: comp.pricing || null,
+        trafficEstimate: comp.trafficEstimate || null,
+      })), websiteUrl);
+    }
+  } catch (e) {
+    console.log('⚠️ [Discovery] Cascading discovery failed:', e.message);
+  }
+  return [];
+}
+
 async function discoverCompetitors({ productName, industry, websiteUrl, keywordIntelligence, identity = {} }) {
   console.log('🔍 [Discovery] Searching for competitors...');
 
@@ -368,17 +404,15 @@ async function discoverCompetitors({ productName, industry, websiteUrl, keywordI
         return [];
       } else {
         console.log('⚠️ [Discovery] DataForSEO SERP returned no results or failed');
-        // DataForSEO failure is not fatal - return empty array to use Growth competitors
-        return [];
+        return await cascadeCompetitorFallback(productName, industry, websiteUrl, identity, keywordIntelligence);
       }
     } catch (error) {
       console.warn('⚠️ [Discovery] DataForSEO SERP failed:', error.message);
-      // DataForSEO failure is not fatal - return empty array to use Growth competitors
-      return [];
+      return await cascadeCompetitorFallback(productName, industry, websiteUrl, identity, keywordIntelligence);
     }
   } else {
     console.log('⚠️ [Discovery] DataForSEO not configured - skipping SERP competitor discovery');
-    return [];
+    return await cascadeCompetitorFallback(productName, industry, websiteUrl, identity, keywordIntelligence);
   }
   
   // Fallback chain: Tavily → SerpAPI → Exa → AI-estimated (only if DataForSEO not configured)
@@ -392,15 +426,19 @@ async function discoverCompetitors({ productName, industry, websiteUrl, keywordI
       const tavilyResult = await researchCompetitors(productName, industry, 'software');
       if (tavilyResult && tavilyResult.success && tavilyResult.competitors && tavilyResult.competitors.length > 0) {
         console.log(`✅ [Discovery] Tavily returned ${tavilyResult.competitors.length} competitors`);
-        fallbackResult = filterSelfLinks(tavilyResult.competitors.map(comp => ({
-          name: comp.name,
-          website: comp.website || comp.url,
-          domain: extractDomain(comp.website || comp.url),
-          type: 'direct',
-          positioning: 'Direct competitor',
-          source: 'Tavily',
-          isFallback: true
-        })), websiteUrl);
+        fallbackResult = filterSelfLinks(tavilyResult.competitors.map(comp => {
+          const name = typeof comp === 'string' ? comp : (comp.name || '');
+          const website = typeof comp === 'string' ? '' : (comp.website || comp.url || '');
+          return {
+            name,
+            website,
+            domain: extractDomain(website) || (name ? extractDomain(name) : ''),
+            type: 'direct',
+            positioning: 'Direct competitor',
+            source: 'Tavily',
+            isFallback: true
+          };
+        }), websiteUrl);
         fallbackSource = 'Tavily';
       }
     } catch (tavilyError) {

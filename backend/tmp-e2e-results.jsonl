@@ -1,0 +1,8 @@
+{"phase":4,"site":"virlo.ai","ok":true,"competitors":11,"techStack":[],"pricing":null,"keywords":12,"durationMs":40580,"scraped":false}
+{"phase":4,"site":"stripe.com","ok":true,"competitors":12,"techStack":[],"pricing":null,"keywords":12,"durationMs":49956,"scraped":false}
+{"phase":5,"site":"virlo.ai","ok":true,"overall":76,"missingScores":[],"channels":0,"competitors":0,"status":null,"techStack":0,"leaks":[],"durationSec":62}
+{"phase":5,"site":"stripe.com","ok":true,"overall":73,"missingScores":[],"channels":0,"competitors":0,"status":null,"techStack":0,"leaks":[],"durationSec":53}
+{"phase":6,"site":"virlo.ai","ok":true,"overall":50,"tech":98,"authority":56,"keywords":11,"kwMissingMetrics":0,"backlinks":{"measured":false,"count":null},"warnings":[{"code":"EVIDENCE_AUTO_CREATED","message":"No evidence snapshot existed — auto-scraped website directly"}],"leaks":[],"durationSec":3}
+{"phase":4,"site":"vercel.com","ok":true,"competitors":12,"techStack":[],"pricing":null,"keywords":13,"durationMs":59218,"scraped":false}
+{"phase":5,"site":"vercel.com","ok":true,"overall":76,"missingScores":[],"channels":0,"competitors":0,"status":null,"techStack":0,"leaks":[],"durationSec":50}
+{"phase":6,"site":"vercel.com","ok":true,"overall":49,"tech":57,"authority":76,"keywords":19,"kwMissingMetrics":0,"backlinks":{"measured":false,"count":null},"warnings":[{"code":"EVIDENCE_AUTO_CREATED","message":"No evidence snapshot existed — auto-scraped website directly"}],"leaks":[],"durationSec":4}

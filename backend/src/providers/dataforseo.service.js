@@ -1,8 +1,16 @@
 ﻿import fetch from 'node-fetch';
+import { memoize } from '../utils/research-cache.util.js';
 
 const DATAFORSEO_LOGIN = process.env.DATAFORSEO_LOGIN?.trim();
 const DATAFORSEO_PASSWORD = process.env.DATAFORSEO_PASSWORD?.trim();
 const DATAFORSEO_API_URL = 'https://api.dataforseo.com/v3';
+
+// Hard request timeout so a hung connection can never leak a socket or stall
+// the orchestrator phase (the router's Promise.race abandons but never aborts).
+const REQUEST_TIMEOUT_MS = 30000;
+const RETRYABLE_ATTEMPTS = 2;
+const RETRY_BASE_DELAY_MS = 500;
+const KEYWORD_CACHE_TTL_MS = 60 * 60 * 1000;
 
 
 let _dataforseoVerified = false;
@@ -142,107 +150,131 @@ async function dataforseoRequest(endpoint, method = 'POST', body = null) {
     taskCount: Array.isArray(body) ? body.length : 1,
   });
 
-  try {
-    const url = `${DATAFORSEO_API_URL}${endpoint}`;
-    const options = {
-      method,
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json'
+  for (let attempt = 1; attempt <= RETRYABLE_ATTEMPTS; attempt++) {
+    try {
+      const url = `${DATAFORSEO_API_URL}${endpoint}`;
+      const options = {
+        method,
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json'
+        },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      };
+
+      if (body) {
+        options.body = JSON.stringify(body);
       }
-    };
 
-    if (body) {
-      options.body = JSON.stringify(body);
-    }
+      const response = await fetch(url, options);
 
-    const response = await fetch(url, options);
+      console.log(`[DataForSEO] Response Status: ${response.status}`);
 
-    console.log(`[DataForSEO] Response Status: ${response.status}`);
+      // Transient server/network-ish failures are retried with backoff.
+      if (response.status === 429 || response.status >= 500) {
+        if (attempt < RETRYABLE_ATTEMPTS) {
+          await sleep(RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1));
+          continue;
+        }
+        const errorText = await response.text();
+        console.error(`Γ¥î [DataForSEO] Server error ${response.status}: ${errorText}`);
+        return { success: false, error: `API error: ${response.status}` };
+      }
 
-    if (response.status === 401) {
-      _dataforseoAuthFailed = true;
-      _dataforseoVerified = false;
-      const errorText = await response.text();
-      console.warn('ΓÜá∩╕Å [DataForSEO] Authentication failed');
+      if (response.status === 401) {
+        _dataforseoAuthFailed = true;
+        _dataforseoVerified = false;
+        const errorText = await response.text();
+        console.warn('ΓÜá∩╕Å [DataForSEO] Authentication failed');
 
-      if (errorText.includes('40104') || errorText.includes('verify your account')) {
+        if (errorText.includes('40104') || errorText.includes('verify your account')) {
+          return {
+            success: false,
+            error: 'DataForSEO account not verified',
+            unavailable: true,
+            available: false,
+            reason: 'DataForSEO account not verified',
+            source: 'DataForSEO',
+            statusCode: 40104
+          };
+        }
+
         return {
           success: false,
-          error: 'DataForSEO account not verified',
+          error: 'DataForSEO unavailable: authentication failed',
           unavailable: true,
           available: false,
-          reason: 'DataForSEO account not verified',
-          source: 'DataForSEO',
-          statusCode: 40104
+          reason: 'DataForSEO authentication failed',
+          source: 'DataForSEO'
         };
       }
 
-      return {
-        success: false,
-        error: 'DataForSEO unavailable: authentication failed',
-        unavailable: true,
-        available: false,
-        reason: 'DataForSEO authentication failed',
-        source: 'DataForSEO'
-      };
-    }
-
-    if (response.status === 402) {
-      const errorText = await response.text();
-      console.warn(`ΓÜá∩╕Å [DataForSEO] Payment Required (402): ${endpoint}`);
-      _dataforseoBlockedUntil = Date.now() + 300000;
-      _dataforseoPaymentRequired = true;
-      _dataforseoVerified = false;
-      return {
-        success: false,
-        error: 'DataForSEO credits exhausted (HTTP 402)',
-        unavailable: true,
-        available: false,
-        reason: 'DataForSEO account has no credits',
-        source: 'DataForSEO',
-        statusCode: 40200,
-        httpStatus: 402,
-        status: 'PAYMENT_REQUIRED'
-      };
-    }
-
-    if (response.status === 404) {
-      const errorText = await response.text();
-      console.error(`Γ¥î [DataForSEO] 404 Not Found: ${endpoint} - ${errorText}`);
-      return { success: false, error: `DataForSEO endpoint not found: ${endpoint}`, statusCode: 40400, httpStatus: 404 };
-    }
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Γ¥î [DataForSEO] API error: ${response.status} - ${errorText}`);
-      return { success: false, error: `API error: ${response.status}` };
-    }
-
-    const data = await response.json();
-
-    if (data && data.tasks && data.tasks.length > 0) {
-      const failedTask = data.tasks.find(t => t.status_code && t.status_code !== 20000);
-      if (failedTask) {
-        console.error(`Γ¥î [DataForSEO] Task failed: ${failedTask.status_code} - ${failedTask.status_message}`);
+      if (response.status === 402) {
+        const errorText = await response.text();
+        console.warn(`ΓÜá∩╕Å [DataForSEO] Payment Required (402): ${endpoint}`);
+        _dataforseoBlockedUntil = Date.now() + 300000;
+        _dataforseoPaymentRequired = true;
+        _dataforseoVerified = false;
         return {
           success: false,
-          error: failedTask.status_message || `DataForSEO task error: ${failedTask.status_code}`,
-          statusCode: failedTask.status_code,
-          statusMessage: failedTask.status_message,
-          results: [],
+          error: 'DataForSEO credits exhausted (HTTP 402)',
+          unavailable: true,
+          available: false,
+          reason: 'DataForSEO account has no credits',
+          source: 'DataForSEO',
+          statusCode: 40200,
+          httpStatus: 402,
+          status: 'PAYMENT_REQUIRED'
         };
       }
-    }
 
-    _dataforseoVerified = true;
-    _dataforseoAuthFailed = false;
-    _dataforseoPaymentRequired = false;
-    return { success: true, data };
-  } catch (error) {
-    console.error(`Γ¥î [DataForSEO] Request failed:`, error.message);
-    return { success: false, error: error.message };
+      if (response.status === 404) {
+        const errorText = await response.text();
+        console.error(`Γ¥î [DataForSEO] 404 Not Found: ${endpoint} - ${errorText}`);
+        return { success: false, error: `DataForSEO endpoint not found: ${endpoint}`, statusCode: 40400, httpStatus: 404 };
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Γ¥î [DataForSEO] API error: ${response.status} - ${errorText}`);
+        return { success: false, error: `API error: ${response.status}` };
+      }
+
+      const data = await response.json();
+
+      if (data && data.tasks && data.tasks.length > 0) {
+        const failedTask = data.tasks.find(t => t.status_code && t.status_code !== 20000);
+        if (failedTask) {
+          console.error(`Γ¥î [DataForSEO] Task failed: ${failedTask.status_code} - ${failedTask.status_message}`);
+          return {
+            success: false,
+            error: failedTask.status_message || `DataForSEO task error: ${failedTask.status_code}`,
+            statusCode: failedTask.status_code,
+            statusMessage: failedTask.status_message,
+            results: [],
+          };
+        }
+      }
+
+      _dataforseoVerified = true;
+      _dataforseoAuthFailed = false;
+      _dataforseoPaymentRequired = false;
+      return { success: true, data };
+    } catch (error) {
+      if (attempt < RETRYABLE_ATTEMPTS) {
+        await sleep(RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1));
+        continue;
+      }
+      console.error(`Γ¥î [DataForSEO] Request failed:`, error.message);
+      return { success: false, error: error.message };
+    }
   }
+
+  return { success: false, error: 'Max retries exceeded' };
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function normalizeKeywordMetrics(response) {
@@ -285,64 +317,68 @@ export async function getKeywordMetrics(keywords, location = 'United States', la
 
   const loc = resolveLocation(location);
 
-  const body = [{
-    keywords: filteredKeywords,
-    location_code: loc.location_code,
-    language_code: loc.language_code,
-  }];
+  const cacheKey = `dfs:kw:${loc.location_code}:${[...filteredKeywords].sort().join('|')}`;
 
-  const endpoint = '/keywords_data/google_ads/search_volume/live';
+  return memoize(cacheKey, KEYWORD_CACHE_TTL_MS, async () => {
+    const body = [{
+      keywords: filteredKeywords,
+      location_code: loc.location_code,
+      language_code: loc.language_code,
+    }];
 
-  console.log('[DataForSEO] Keywords sent to API:', {
-    endpoint,
-    count: filteredKeywords.length,
-    keywords: filteredKeywords,
-    location,
-    resolvedCode: loc.location_code,
-    resolvedName: loc.location_name,
-    fallbackApplied: loc.fallbackApplied,
+    const endpoint = '/keywords_data/google_ads/search_volume/live';
+
+    console.log('[DataForSEO] Keywords sent to API:', {
+      endpoint,
+      count: filteredKeywords.length,
+      keywords: filteredKeywords,
+      location,
+      resolvedCode: loc.location_code,
+      resolvedName: loc.location_name,
+      fallbackApplied: loc.fallbackApplied,
+    });
+
+    const response = await dataforseoRequest(endpoint, 'POST', body);
+
+    if (!response.success) {
+      return response;
+    }
+
+    const normalized = (response.data.tasks || [])
+      .filter(task => task.status_code === 20000)
+      .flatMap(task => {
+        if (!task.result) return [];
+        const taskResults = Array.isArray(task.result) ? task.result : [task.result];
+        return taskResults.flatMap(result => {
+          const items = Array.isArray(result) ? result : [result];
+          return items.map(item => ({
+            keyword: item.keyword || '',
+            volume: item.search_volume ?? null,
+            keywordDifficulty: null,
+            cpc: item.cpc ?? null,
+            competition: item.competition ?? null,
+            competitionIndex: item.competition_index ?? null,
+            monthlySearches: item.monthly_searches ?? null,
+            intent: item.keyword_info?.intent || null,
+            source: 'DataForSEO',
+            confidence: 100,
+            evidence: 'Retrieved from DataForSEO Keyword Data API'
+          }));
+        });
+      })
+      .filter(item => item !== null && item.keyword && item.keyword.length > 0);
+
+    if (normalized.length === 0) {
+      return {
+        success: false,
+        error: 'No valid metrics returned',
+        message: 'Metrics unavailable from DataForSEO',
+        data: []
+      };
+    }
+
+    return { success: true, data: normalized };
   });
-
-  const response = await dataforseoRequest(endpoint, 'POST', body);
-
-  if (!response.success) {
-    return response;
-  }
-
-  const normalized = (response.data.tasks || [])
-    .filter(task => task.status_code === 20000)
-    .flatMap(task => {
-      if (!task.result) return [];
-      const taskResults = Array.isArray(task.result) ? task.result : [task.result];
-      return taskResults.flatMap(result => {
-        const items = Array.isArray(result) ? result : [result];
-        return items.map(item => ({
-          keyword: item.keyword || '',
-          volume: item.search_volume ?? null,
-          keywordDifficulty: null,
-          cpc: item.cpc ?? null,
-          competition: item.competition ?? null,
-          competitionIndex: item.competition_index ?? null,
-          monthlySearches: item.monthly_searches ?? null,
-          intent: item.keyword_info?.intent || null,
-          source: 'DataForSEO',
-          confidence: 100,
-          evidence: 'Retrieved from DataForSEO Keyword Data API'
-        }));
-      });
-    })
-    .filter(item => item !== null && item.keyword && item.keyword.length > 0);
-
-  if (normalized.length === 0) {
-    return {
-      success: false,
-      error: 'No valid metrics returned',
-      message: 'Metrics unavailable from DataForSEO',
-      data: []
-    };
-  }
-
-  return { success: true, data: normalized };
 }
 
 /**
@@ -542,6 +578,223 @@ export async function getSerpResults(keyword, location = 'United States', langua
     });
 
   return { success: true, data: results };
+}
+
+/**
+ * Full SERP analysis for a keyword — preserves every feature item the live
+ * endpoint returns (ai_overview, featured_snippet, people_also_ask, knowledge
+ * graph, related searches, local pack, top stories) instead of dropping
+ * everything except `organic`. Each feature carries its real source evidence.
+ */
+export async function getSerpAnalysis(keyword, location = 'United States', language = 'English') {
+  if (!keyword || typeof keyword !== 'string') {
+    return { success: false, error: 'Invalid keyword' };
+  }
+
+  const loc = resolveLocation(location);
+
+  const body = [{
+    keyword,
+    location_code: loc.location_code,
+    language_code: loc.language_code,
+    depth: 10,
+    device: 'desktop'
+  }];
+
+  const response = await dataforseoRequest('/serp/google/organic/live/regular', 'POST', body);
+
+  if (!response.success) {
+    return response;
+  }
+
+  const task = (response.data.tasks || []).find(t => t.status_code === 20000);
+  const items = task?.result?.[0]?.items || [];
+
+  return {
+    success: true,
+    data: normalizeSerpAnalysis(items, keyword, 'DataForSEO')
+  };
+}
+
+/**
+ * Pure mapper from raw DataForSEO SERP items to the canonical evidence shape.
+ * Exported for deterministic unit testing without network access.
+ */
+export function normalizeSerpAnalysis(items, keyword, provider = 'DataForSEO') {
+  const organic = [];
+  let aiOverview = null;
+  let featuredSnippet = null;
+  const peopleAlsoAsk = [];
+  let knowledgeGraph = null;
+  const relatedSearches = [];
+  let localPack = null;
+  const topStories = [];
+  const detectedFeatures = [];
+  const seenDomains = new Set();
+
+  const extractDomain = (url) => {
+    if (!url) return '';
+    try {
+      return new URL(url).hostname.replace(/^www\./, '');
+    } catch {
+      return '';
+    }
+  };
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const type = item.type || '';
+    const url = item.url || item.link || '';
+    const domain = extractDomain(url);
+
+    if (type === 'organic') {
+      if (!seenDomains.has(domain)) {
+        seenDomains.add(domain);
+        organic.push({
+          domain,
+          url,
+          title: item.title || '',
+          snippet: item.description || item.snippet || '',
+          rank: item.rank_absolute || item.rank_group || 0,
+          source: provider,
+          status: 'measured'
+        });
+      }
+      continue;
+    }
+
+    if (type === 'ai_overview') {
+      const overviewText = item.description || item.text || item.answer || '';
+      const citedDomains = [];
+      for (const ref of item.references || []) {
+        const refUrl = ref?.url || ref?.link || '';
+        const refDomain = extractDomain(refUrl);
+        if (refDomain) citedDomains.push({ domain: refDomain, url: refUrl });
+      }
+      if (citedDomains.length === 0 && overviewText) {
+        const found = overviewText.match(/https?:\/\/[^\s)"']+/g) || [];
+        for (const u of found) {
+          const d = extractDomain(u);
+          if (d) citedDomains.push({ domain: d, url: u });
+        }
+      }
+      aiOverview = {
+        keyword,
+        present: true,
+        text: overviewText,
+        citedDomains,
+        citedDomainCount: citedDomains.length,
+        source: provider,
+        status: 'measured'
+      };
+      detectedFeatures.push({ type: 'ai_overview', available: true, keyword });
+      continue;
+    }
+
+    if (type === 'featured_snippet') {
+      featuredSnippet = {
+        keyword,
+        domain,
+        url,
+        title: item.title || '',
+        snippet: item.description || item.snippet || '',
+        source: provider,
+        status: 'measured'
+      };
+      detectedFeatures.push({ type: 'featured_snippet', available: true, keyword });
+      continue;
+    }
+
+    if (type === 'people_also_ask') {
+      const itemsList = item.items || [item];
+      for (const q of itemsList) {
+        const question = q.title || q.question || q.text || '';
+        if (question) {
+          peopleAlsoAsk.push({
+            question,
+            answer: q.snippet || q.answer || '',
+            url: q.url || q.link || '',
+            source: provider,
+            status: 'measured'
+          });
+        }
+      }
+      detectedFeatures.push({ type: 'people_also_ask', available: true, keyword });
+      continue;
+    }
+
+    if (type === 'knowledge_graph') {
+      knowledgeGraph = {
+        keyword,
+        title: item.title || '',
+        type: item.data_type || item.type_label || '',
+        description: item.description || item.text || '',
+        source: provider,
+        status: 'measured'
+      };
+      detectedFeatures.push({ type: 'knowledge_graph', available: true, keyword });
+      continue;
+    }
+
+    if (type === 'related_searches') {
+      const itemsList = item.items || [item];
+      for (const r of itemsList) {
+        const text = r.title || r.text || '';
+        if (text) relatedSearches.push({ search: text, source: provider, status: 'measured' });
+      }
+      detectedFeatures.push({ type: 'related_searches', available: true, keyword });
+      continue;
+    }
+
+    if (type === 'local_pack') {
+      const itemsList = item.items || [];
+      localPack = {
+        keyword,
+        places: itemsList.map(p => ({
+          title: p.title || '',
+          domain: extractDomain(p.url || p.link || ''),
+          rating: p.rating?.value ?? p.rating ?? null,
+          reviews: p.rating?.votes_count ?? null,
+          source: provider,
+          status: 'measured'
+        })),
+        source: provider,
+        status: 'measured'
+      };
+      detectedFeatures.push({ type: 'local_pack', available: true, keyword });
+      continue;
+    }
+
+    if (type === 'top_stories') {
+      const itemsList = item.items || [item];
+      for (const s of itemsList) {
+        topStories.push({
+          domain: extractDomain(s.url || s.link || ''),
+          url: s.url || s.link || '',
+          title: s.title || '',
+          source: provider,
+          status: 'measured'
+        });
+      }
+      detectedFeatures.push({ type: 'top_stories', available: true, keyword });
+    }
+  }
+
+  return {
+    keyword,
+    organic,
+    aiOverview,
+    featuredSnippet,
+    peopleAlsoAsk,
+    knowledgeGraph,
+    relatedSearches,
+    localPack,
+    topStories,
+    detectedFeatures,
+    totalOrganicResults: organic.length,
+    provider,
+    status: detectedFeatures.length > 0 || organic.length > 0 ? 'measured' : 'unavailable',
+    retrievedAt: new Date().toISOString()
+  };
 }
 
 export async function getSerpCompetitors(keywords, location = 'United States', language = 'English') {
@@ -998,6 +1251,11 @@ function extractDomain(url) {
 export async function verifyDataForSEO() {
   if (!DATAFORSEO_LOGIN || !DATAFORSEO_PASSWORD) {
     return { success: false, reason: 'NOT_CONFIGURED', error: 'Credentials not configured' };
+  }
+  // Never fire a reconnect probe while the 402 circuit is open — the probe
+  // would burn a paid call only to re-block the provider for another 5 minutes.
+  if (Date.now() < _dataforseoBlockedUntil) {
+    return { success: false, reason: 'RATE_LIMITED', error: 'DataForSEO payment required (circuit open)', status: 'RATE_LIMITED' };
   }
   try {
     const response = await fetch(`${DATAFORSEO_API_URL}/keywords_data/google_ads/search_volume/live`, {

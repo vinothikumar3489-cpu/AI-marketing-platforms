@@ -180,32 +180,15 @@ function deriveCleanContent(prompt, headline, cta, audience) {
       .replace(/^(a|an|the)\s+/i, '')
       .split(/\s+/).slice(0, 6).join(' ');
     if (derivedHeadline.length < 5 || containsPlaceholder(derivedHeadline)) {
-      if (p.includes('figma')) derivedHeadline = 'Design a Movie Poster in Figma';
-      else if (p.includes('skincare') || p.includes('organic')) derivedHeadline = 'Organic Skincare Launch';
-      else if (p.includes('hospital') || p.includes('chatbot')) derivedHeadline = 'AI Hospital Chatbot';
-      else if (p.includes('bike') || p.includes('electric')) derivedHeadline = 'Electric Bike Launch';
-      else if (p.includes('course') || p.includes('coding')) derivedHeadline = 'Online Coding Course';
-      else derivedHeadline = p.split(/\s+/).slice(0, 4).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Creative Design';
+      derivedHeadline = p.split(/\s+/).slice(0, 4).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || null;
     }
   }
 
-  let derivedSubheadline = '';
-  if (p.includes('figma')) derivedSubheadline = 'Create a bold cinematic poster that grabs attention and looks professional.';
-  else if (p.includes('skincare') || p.includes('organic')) derivedSubheadline = 'Natural ingredients. Real results. Perfect for modern wellness routines.';
-  else if (p.includes('hospital') || p.includes('chatbot')) derivedSubheadline = 'Automate patient scheduling with intelligent AI conversation flows.';
-  else if (p.includes('bike') || p.includes('electric')) derivedSubheadline = 'Eco-friendly commuting with cutting-edge electric vehicle technology.';
-  else if (p.includes('course') || p.includes('coding')) derivedSubheadline = 'Learn from industry experts with hands-on projects and real-world skills.';
-  else if (a) derivedSubheadline = `Designed specifically for ${a} to achieve real results.`;
-  else derivedSubheadline = 'Professional design crafted for maximum impact and engagement.';
+  let derivedSubheadline = null;
 
   let derivedCta = cta || '';
   if (!derivedCta || containsPlaceholder(derivedCta)) {
-    if (p.includes('figma')) derivedCta = 'Start Designing';
-    else if (p.includes('skincare')) derivedCta = 'Shop Now';
-    else if (p.includes('hospital') || p.includes('chatbot')) derivedCta = 'Book Demo';
-    else if (p.includes('bike') || p.includes('electric')) derivedCta = 'Test Ride';
-    else if (p.includes('course') || p.includes('coding')) derivedCta = 'Enroll Today';
-    else derivedCta = 'Learn More';
+    derivedCta = null;
   }
 
   const visualDirection = p.includes('figma') ? 'Cinematic poster design with dramatic lighting, bold title area, character silhouette, layered gradients, and Figma-style design elements.' :

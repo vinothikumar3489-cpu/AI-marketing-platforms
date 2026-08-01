@@ -9,6 +9,11 @@ const PLAN_TYPES = {
 
 export { PLAN_TYPES };
 
+function unwrapSourced(v) {
+  if (v && typeof v === 'object' && 'value' in v && 'source' in v) return v.value;
+  return v;
+}
+
 export async function generateCampaignPlan(planType, context) {
   const typeConfig = PLAN_TYPES[planType];
   if (!typeConfig) throw new Error(`Unknown plan type: ${planType}`);
@@ -17,11 +22,48 @@ export async function generateCampaignPlan(planType, context) {
 
   const evidenceLines = [];
   if (productUsp) evidenceLines.push(`Product USP: ${productUsp}`);
-  if (evidence?.website?.featuresText?.value?.length) evidenceLines.push(`Product Features: ${evidence.website.featuresText.value.slice(0, 5).join('; ')}`);
-  if (evidence?.audience?.painPoints?.value?.length) evidenceLines.push(`Audience Pain Points: ${evidence.audience.painPoints.value.slice(0, 3).join('; ')}`);
-  if (evidence?.audience?.personas?.value?.length) evidenceLines.push(`Buyer Personas: ${evidence.audience.personas.value.slice(0, 3).map(p => p.name || p.title).filter(Boolean).join('; ')}`);
-  if (evidence?.competitors?.list?.value?.length) evidenceLines.push(`Competitors: ${evidence.competitors.list.value.slice(0, 3).map(c => c.name || c.url).filter(Boolean).join(', ')}`);
-  if (evidence?.channels?.length) evidenceLines.push(`Channels: ${evidence.channels.map(c => c.channel).join(', ')}`);
+
+  const features = evidence?.features?.length ? evidence.features : (evidence?.website?.features || []);
+  const featureNames = features.map(f => typeof f === 'string' ? f : (f.name || f.feature || f.value || '')).filter(Boolean).slice(0, 5);
+  if (featureNames.length) evidenceLines.push(`Product Features: ${featureNames.join('; ')}`);
+
+  const benefits = evidence?.benefits || [];
+  const benefitNames = benefits.map(b => typeof b === 'string' ? b : (b.name || b.benefit || b.value || '')).filter(Boolean).slice(0, 5);
+  if (benefitNames.length) evidenceLines.push(`Product Benefits: ${benefitNames.join('; ')}`);
+
+  const painPoints = Array.isArray(unwrapSourced(evidence?.audience?.painPoints)) ? unwrapSourced(evidence?.audience?.painPoints) : [];
+  const painText = painPoints.map(p => typeof p === 'string' ? p : (p.value || p.painPoint || p.title || '')).filter(Boolean).slice(0, 3);
+  if (painText.length) evidenceLines.push(`Audience Pain Points: ${painText.join('; ')}`);
+
+  const personas = Array.isArray(unwrapSourced(evidence?.audience?.personas)) ? unwrapSourced(evidence?.audience?.personas) : [];
+  const personaNames = personas.map(p => typeof p === 'string' ? p : (p.name || p.title || p.persona || '')).filter(Boolean).slice(0, 3);
+  if (personaNames.length) evidenceLines.push(`Buyer Personas: ${personaNames.join('; ')}`);
+
+  const comps = Array.isArray(unwrapSourced(evidence?.competitors?.list)) ? unwrapSourced(evidence?.competitors?.list) : [];
+  const compNames = comps.map(c => typeof c === 'string' ? c : (c.name || c.url || '')).filter(Boolean).slice(0, 3);
+  if (compNames.length) evidenceLines.push(`Competitors: ${compNames.join(', ')}`);
+
+  const channels = Array.isArray(evidence?.channels) ? evidence.channels : [];
+  const channelNames = channels.map(c => (c && (c.channel || c.name)) || c).filter(Boolean).slice(0, 5);
+  if (channelNames.length) evidenceLines.push(`Channels: ${channelNames.join(', ')}`);
+
+  const seo = evidence?.seo || null;
+  if (seo) {
+    const seoParts = [];
+    const seoScore = unwrapSourced(seo.score);
+    if (seoScore != null) seoParts.push(`Score: ${seoScore}`);
+    const primaryKws = (Array.isArray(unwrapSourced(seo.primary)) ? unwrapSourced(seo.primary) : Array.isArray(unwrapSourced(seo.primaryKeywords)) ? unwrapSourced(seo.primaryKeywords) : []).slice(0, 8).map(k => typeof k === 'string' ? k : (k.keyword || k)).filter(Boolean);
+    if (primaryKws.length) seoParts.push(`Primary Keywords: ${primaryKws.join(', ')}`);
+    const gaps = (Array.isArray(unwrapSourced(seo.contentGaps)) ? unwrapSourced(seo.contentGaps) : []).slice(0, 5).map(g => typeof g === 'string' ? g : (g.title || g.opportunity || '')).filter(Boolean);
+    if (gaps.length) seoParts.push(`Content Gaps: ${gaps.join('; ')}`);
+    if (seoParts.length) evidenceLines.push(`SEO Evidence: ${seoParts.join(' | ')}`);
+  }
+
+  const website = evidence?.website || null;
+  const websiteTitle = unwrapSourced(website?.title);
+  const ctaTexts = Array.isArray(unwrapSourced(website?.ctaTexts)) ? unwrapSourced(website?.ctaTexts) : [];
+  if (websiteTitle) evidenceLines.push(`Website Title: ${websiteTitle}`);
+  if (ctaTexts.length) evidenceLines.push(`Existing CTAs: ${ctaTexts.slice(0, 3).join('; ')}`);
   if (evidence?.sourceSummary?.sourcesCollected?.length) evidenceLines.push(`Evidence Sources: ${evidence.sourceSummary.sourcesCollected.join(', ')}`);
 
   const prompt = `Generate a ${typeConfig.label} (exactly ${typeConfig.days} days) campaign plan. Use ONLY verified data below.
@@ -82,7 +124,7 @@ RULES:
   try {
     const result = await callAI(prompt);
     if (result.success && result.data) {
-      let items = Array.isArray(result.data) ? result.data : (result.data.items || result.data.campaignItems || []);
+      let items = Array.isArray(result.data) ? result.data : (result.data.items || result.data.campaignItems || result.data.campaignPlan || []);
       items = items.filter(item => {
         const tacticOk = isTacticSupportedByContext(item, context);
         const featureOk = context.productUsp || !itemRequiresProductFeatures(item);

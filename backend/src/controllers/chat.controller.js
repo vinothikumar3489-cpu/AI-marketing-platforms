@@ -646,6 +646,7 @@ export const getFullResults = async (req, res) => {
       positioning: competitorIntelligence?.positioningEngine ?? null,
       campaign: campaignIntelligence?.campaignGenerator ?? null,
       channel: campaignIntelligence?.channelRecommendation ?? null,
+      evidence: campaignIntelligence?.campaignGenerator?.evidence || campaignIntelligence?.evidence || null,
       executiveStory: campaignIntelligence?.executiveStory || campaignIntelligence?.campaignGenerator?.executiveStory || campaignIntelligence?.campaignGenerator?.metadata?.executiveStory || null,
       actionPlan: campaignIntelligence?.actionPlan || campaignIntelligence?.campaignGenerator?.actionPlan || campaignIntelligence?.campaignGenerator?.metadata?.actionPlan || null,
       summary: campaignIntelligence?.campaignGenerator?.growthSummary || campaignIntelligence?.campaignGenerator?.metadata?.growthSummary || null

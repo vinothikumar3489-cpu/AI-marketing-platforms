@@ -56,6 +56,14 @@ export default function GrowthWorkspacePage() {
     return obj && typeof obj === 'object' && Object.keys(obj).length > 0;
   }
 
+  // Derived from the fullResults cache: 'ready' when growth data is present,
+  // 'restoring' while the cache is being hydrated, 'empty' otherwise.
+  const viewStatus = fullResults?.hasGrowthWorkspace === true || hasRealContent(fullResults?.growth)
+    ? 'ready'
+    : restoreStatus === 'restoring' || restoreStatus === 'idle'
+      ? 'restoring'
+      : 'empty';
+
   // On mount, trigger loading if needed
   useEffect(() => {
     if (!selectedChatId) return;
@@ -502,19 +510,19 @@ function ExecutiveSnapshot({ results }: { results: any }) {
     const findings = (keyFindings || []).slice(0, 5).map((f: any, i: number) => ({
       text: f.finding || f.value || f.description || f || '',
       confidence: f.confidence ?? null,
-      impact: f.impact || 'Medium'
+      impact: f.impact || ''
     }));
 
     const risks = (swot?.weaknesses || swot?.threats || []).slice(0, 5).map((r: any) => ({
       text: r.value || r.finding || r || '',
-      severity: 'warning',
+      severity: r.severity || r.impact || '',
       probability: typeof r.confidence === 'number' ? r.confidence : null
     }));
 
     const opportunities = (swot?.opportunities || []).slice(0, 5).map((o: any) => ({
       text: o.value || o.finding || o || '',
       roi: null,
-      effort: 'Medium'
+      effort: o.effort || ''
     }));
 
     const gs = sum?.overallGrowthScore != null ? asNumber(sum?.overallGrowthScore) : null;
@@ -537,7 +545,7 @@ function ExecutiveSnapshot({ results }: { results: any }) {
       executiveRecommendation: execRecommendation ? {
         text: execRecommendation.recommendation || '',
         reasoning: execRecommendation.basedOn || execRecommendation.nextSteps?.join('. ') || '',
-        confidence: typeof execRecommendation.confidenceLevel === 'number' ? execRecommendation.confidenceLevel : 85
+        confidence: typeof execRecommendation.confidenceLevel === 'number' ? execRecommendation.confidenceLevel : null
       } : undefined
     };
   }, [keyFindings, swot, sum, execRecommendation]);
@@ -575,8 +583,7 @@ function ExecutiveSnapshot({ results }: { results: any }) {
       if (competition < 50) items.push({ label: 'Should Pivot?', question: 'Should the strategy pivot?', answer: 'Likely' as const, reasoning: `Competitive defensibility of ${competition}% suggests considering a pivot.`, confidence: competition });
       else items.push({ label: 'Should Pivot?', question: 'Should the strategy pivot?', answer: 'No' as const, reasoning: `Competitive defensibility of ${competition}% is adequate.`, confidence: competition });
     }
-    items.push({ label: 'Should Improve SEO?', question: 'Should SEO be prioritized?', answer: 'Yes' as const, reasoning: 'SEO is a high-ROI channel with compounding returns over time.', confidence: 85 });
-    if (campaignReadiness != null) items.push({ label: 'Should Launch Campaign?', question: 'Should a campaign be launched?', answer: 'Yes' as const, reasoning: `Campaign readiness of ${campaignReadiness}% supports launching immediately.`, confidence: campaignReadiness });
+      items.push({ label: 'Should Launch Campaign?', question: 'Should a campaign be launched?', answer: 'Yes' as const, reasoning: `Campaign readiness of ${campaignReadiness}% supports launching immediately.`, confidence: campaignReadiness });
     return items;
   }, [sum]);
 
@@ -603,10 +610,10 @@ function ExecutiveSnapshot({ results }: { results: any }) {
       description: p.rationale || p.reason || '',
       group: i < 2 ? 'Critical' as const : i < 4 ? 'High ROI' as const : i < 6 ? 'Quick Wins' as const : 'Long-Term' as const,
       priority: i < 2 ? 'Critical' as const : i < 4 ? 'High' as const : i < 6 ? 'Medium' as const : 'Low' as const,
-      difficulty: Math.round(30 + Math.random() * 40),
-      roi: p.roi || '150%',
-      timeline: p.timeline || '30 days',
-      owner: p.owner || 'Marketing Team',
+      difficulty: typeof p.difficulty === 'number' ? p.difficulty : null,
+      roi: p.roi ?? null,
+      timeline: p.timeline || 'N/A',
+      owner: p.owner || 'N/A',
       confidence: p.confidence ?? null
     }));
   }, [topPriorities]);
@@ -615,21 +622,32 @@ function ExecutiveSnapshot({ results }: { results: any }) {
   const riskItems = useMemo(() => {
     const items: any[] = [];
     (swot?.weaknesses || []).slice(0, 3).forEach((w: any) => {
-      items.push({ title: w.value || w.finding || w || '', category: 'Business' as const, probability: w.confidence ?? null, impact: 'high' as const, mitigation: 'Address through strategic planning and resource allocation.', owner: 'Executive Team' });
+      items.push({ title: w.value || w.finding || w || '', category: 'Business' as const, probability: w.confidence ?? null, impact: (w.impact || w.severity || 'unknown') as any, mitigation: w.mitigation || 'No mitigation strategy recorded', owner: 'Executive Team' });
     });
     (swot?.threats || []).slice(0, 3).forEach((t: any) => {
-      items.push({ title: t.value || t.finding || t || '', category: 'Competition' as const, probability: t.confidence ?? null, impact: 'medium' as const, mitigation: 'Monitor and develop counter-strategies.', owner: 'Competitive Intelligence' });
+      items.push({ title: t.value || t.finding || t || '', category: 'Competition' as const, probability: t.confidence ?? null, impact: (t.impact || t.severity || 'unknown') as any, mitigation: t.mitigation || 'No mitigation strategy recorded', owner: 'Competitive Intelligence' });
     });
     return items;
   }, [swot]);
 
   // Phase 6C: Confidence data
   const confidenceData = useMemo(() => [
-    sum?.overallGrowthScore != null ? { section: 'Growth Analysis', confidence: asNumber(sum?.overallGrowthScore), evidenceStrength: null, sourceCount: results.evidence?.sources?.length || 0, dataFreshness: 'Today' } : null,
-    sum?.marketOpportunityScore != null ? { section: 'Market Intelligence', confidence: asNumber(sum?.marketOpportunityScore), evidenceStrength: null, sourceCount: results.market?.sources?.length || 0, dataFreshness: 'Today' } : null,
-    sum?.audienceClarityScore != null ? { section: 'Audience Intelligence', confidence: asNumber(sum?.audienceClarityScore), evidenceStrength: null, sourceCount: results.audience?.sources?.length || 0, dataFreshness: 'Today' } : null,
-    sum?.competitiveDefensibilityScore != null ? { section: 'Competitor Intelligence', confidence: asNumber(sum?.competitiveDefensibilityScore), evidenceStrength: null, sourceCount: results.competitor?.sources?.length || 0, dataFreshness: 'Today' } : null,
+    sum?.overallGrowthScore != null ? { section: 'Growth Analysis', confidence: asNumber(sum?.overallGrowthScore), evidenceStrength: null, sourceCount: results.evidence?.sources?.length || 0, dataFreshness: 'N/A' } : null,
+    sum?.marketOpportunityScore != null ? { section: 'Market Intelligence', confidence: asNumber(sum?.marketOpportunityScore), evidenceStrength: null, sourceCount: results.market?.sources?.length || 0, dataFreshness: 'N/A' } : null,
+    sum?.audienceClarityScore != null ? { section: 'Audience Intelligence', confidence: asNumber(sum?.audienceClarityScore), evidenceStrength: null, sourceCount: results.audience?.sources?.length || 0, dataFreshness: 'N/A' } : null,
+    sum?.competitiveDefensibilityScore != null ? { section: 'Competitor Intelligence', confidence: asNumber(sum?.competitiveDefensibilityScore), evidenceStrength: null, sourceCount: results.competitor?.sources?.length || 0, dataFreshness: 'N/A' } : null,
   ].filter(Boolean), [sum, results]);
+
+  // Phase 6C: Opportunity matrix items — only when impact scores are quantified
+  const opportunityMatrixItems = useMemo(() => {
+    const quantified = (swot?.opportunities || []).filter((o: any) => typeof o.impact === 'number');
+    if (quantified.length < 2) return [];
+    return quantified.slice(0, 8).map((o: any) => ({
+      title: o.value || o.name || o.opportunity || String(o),
+      impact: o.impact,
+      effort: typeof o.effort === 'number' ? o.effort : 50
+    }));
+  }, [swot]);
 
   const filterOptions = [
     { key: 'confidence', label: 'Confidence', values: ['High (70%+)', 'Medium (40-70%)', 'Low (<40%)'] },
@@ -794,13 +812,18 @@ function ExecutiveSnapshot({ results }: { results: any }) {
 
       {/* Phase 6C: Opportunity Matrix + Risk Matrix */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        <OpportunityMatrix items={[
-          { title: 'Expand to new markets', impact: 85, effort: 60 },
-          { title: 'Improve conversion rate', impact: 70, effort: 30 },
-          { title: 'Content marketing program', impact: 65, effort: 40 },
-          { title: 'Enterprise sales team', impact: 50, effort: 80 },
-          { title: 'Basic SEO fixes', impact: 40, effort: 20 },
-        ]} />
+        {opportunityMatrixItems.length >= 2 ? (
+          <OpportunityMatrix items={opportunityMatrixItems} />
+        ) : (
+          <Card>
+            <div style={{ padding: '16px', color: '#9aa7bd', fontSize: '13px' }}>
+              <h3 style={{ margin: '0 0 10px 0', color: '#fff' }}>Opportunity Matrix</h3>
+              {(swot?.opportunities || []).length > 0
+                ? 'Opportunity impact was not quantified in this analysis. Opportunities are listed in the SWOT section.'
+                : 'No opportunities identified from verified sources.'}
+            </div>
+          </Card>
+        )}
         <RiskMatrix items={riskItems} />
       </div>
 
@@ -810,11 +833,11 @@ function ExecutiveSnapshot({ results }: { results: any }) {
       {/* Phase 6C: Recommendation Priorities */}
       {recommendations.length > 0 && <RecommendationPriorities items={recommendations} />}
 
-      {/* Phase 6C: Compare Results (placeholder) */}
+      {/* Phase 6C: Compare Results (only when a previous baseline exists) */}
       <CompareResults metrics={[
-        sum?.overallGrowthScore != null ? { label: 'Growth Score', current: asNumber(sum?.overallGrowthScore), previous: asNumber(sum?.previousGrowthScore || 0) } : null,
-        sum?.marketOpportunityScore != null ? { label: 'Market Opportunity', current: asNumber(sum?.marketOpportunityScore), previous: asNumber(sum?.previousMarketScore || 0) } : null,
-        sum?.audienceClarityScore != null ? { label: 'Audience Clarity', current: asNumber(sum?.audienceClarityScore), previous: asNumber(sum?.previousAudienceScore || 0) } : null,
+        sum?.overallGrowthScore != null && sum?.previousGrowthScore != null ? { label: 'Growth Score', current: asNumber(sum.overallGrowthScore), previous: asNumber(sum.previousGrowthScore) } : null,
+        sum?.marketOpportunityScore != null && sum?.previousMarketScore != null ? { label: 'Market Opportunity', current: asNumber(sum.marketOpportunityScore), previous: asNumber(sum.previousMarketScore) } : null,
+        sum?.audienceClarityScore != null && sum?.previousAudienceScore != null ? { label: 'Audience Clarity', current: asNumber(sum.audienceClarityScore), previous: asNumber(sum.previousAudienceScore) } : null,
       ].filter(Boolean)} />
 
       {/* Phase 6C: Confidence Visualization */}
@@ -933,7 +956,7 @@ function ExecutiveStory({ data }: { data: any }) {
                 <div style={{ fontSize: '11px', color: '#6b7280' }}>Evidence: {renderSafeValue(f.evidence) || ''}</div>
               </div>
               <div style={{ display: 'flex', gap: '8px', marginLeft: '12px', flexShrink: 0 }}>
-                {f.confidence && <EvidenceBadge evidence={{ source: f.evidence || 'AI', confidence: f.confidence }} size="sm" />}
+                {f.confidence && <EvidenceBadge evidence={{ source: f.evidence || '', confidence: f.confidence }} size="sm" />}
                 {f.impact && <Badge tone={f.impact === 'High' ? 'pink' : f.impact === 'Medium' ? 'blue' : 'dark'}>{f.impact}</Badge>}
               </div>
             </div>
@@ -953,7 +976,7 @@ function ExecutiveStory({ data }: { data: any }) {
                   <strong style={{ fontSize: '15px', color: '#e5e7eb' }}>{renderSafeValue(p.action || p.title) || ''}</strong>
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {p.confidence && <EvidenceBadge evidence={{ source: p.evidence || 'AI', confidence: p.confidence }} size="sm" />}
+                  {p.confidence && <EvidenceBadge evidence={{ source: p.evidence || '', confidence: p.confidence }} size="sm" />}
                 </div>
               </div>
               <p style={{ margin: '0 0 8px 38px', fontSize: '13px', color: '#9aa7bd' }}>{renderSafeValue(p.rationale || p.reason) || ''}</p>
@@ -1191,7 +1214,7 @@ function AudienceIntelligence({ data }: { data: any }) {
                 buyingTriggers: asArray(p.buyingTriggers || p.triggers || []),
                 decisionAuthority: p.authority || p.decisionAuthority || 'Unknown',
                 budget: p.budget || '',
-                intentScore: p.intent || p.intentLevel || 'Medium',
+                intentScore: typeof p.intent === 'number' ? p.intent : typeof p.intentLevel === 'number' ? p.intentLevel : null,
                 buyingStage: p.buyingStage || ''
               }} />
             ))}
@@ -1214,7 +1237,7 @@ function AudienceIntelligence({ data }: { data: any }) {
                 buyingTriggers: asArray(p.buyingTriggers || p.triggers || []),
                 decisionAuthority: p.authority || p.decisionAuthority || 'Unknown',
                 budget: p.budget || '',
-                intentScore: p.intent || p.intentLevel || 'Medium',
+                intentScore: typeof p.intent === 'number' ? p.intent : typeof p.intentLevel === 'number' ? p.intentLevel : null,
                 buyingStage: p.buyingStage || ''
               }} />
             ))}
@@ -1231,7 +1254,7 @@ function AudienceIntelligence({ data }: { data: any }) {
               {audience.decisionMakers.map((d: any, i: number) => (
                 <div key={i} style={{ padding: '8px 10px', background: '#151d2b', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '13px', color: '#e5e7eb' }}>{renderSafeValue(d.title || d)}</span>
-                  {d.confidence && <EvidenceBadge evidence={{ source: d.evidence?.source || 'AI', confidence: d.confidence }} size="sm" />}
+                  {d.confidence && <EvidenceBadge evidence={{ source: d.evidence?.source || '', confidence: d.confidence }} size="sm" />}
                 </div>
               ))}
             </div>
@@ -1493,7 +1516,7 @@ function RecommendationCard({ item, index, type, compact }: { item: any, index: 
         <h4 style={{ margin: 0, fontSize: '15px' }}>{safeVal || item.title || `${type} ${index + 1}`}</h4>
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {item.priority && <Badge tone={item.priority === 'Critical' ? 'pink' : item.priority === 'High' ? 'blue' : item.priority === 'Medium' ? 'yellow' : 'dark'}>{item.priority}</Badge>}
-          {item.confidence && <EvidenceBadge evidence={{ source: item.evidence || 'AI', confidence: item.confidence }} size="sm" />}
+          {item.confidence && <EvidenceBadge evidence={{ source: item.evidence || '', confidence: item.confidence }} size="sm" />}
           {item.difficulty && <Badge tone={item.difficulty === 'High' ? 'pink' : item.difficulty === 'Medium' ? 'yellow' : 'green'}>{item.difficulty}</Badge>}
         </div>
       </div>
@@ -1586,7 +1609,7 @@ function ActionPlan({ data }: { data: any }) {
         owner: item.owner || '',
         expectedKpi: item.expectedKPI || (Array.isArray(item.kpis) ? item.kpis.join(', ') : item.kpis) || '',
         dependencies: Array.isArray(item.dependencies) ? item.dependencies.join(', ') : item.dependencies || '',
-        priority: item.priority as string || 'Medium'
+        priority: item.priority as string || ''
       }))
     };
   }).filter(p => p.tasks.length > 0);

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AI Response Validator
  * Ensures all AI responses conform to expected schemas and never return undefined/null
  */
@@ -8,7 +8,7 @@
  */
 export function validateProductAnalysis(data, input) {
   if (!data || typeof data !== 'object') {
-    return generateProductFallback(input);
+    return null;
   }
 
   return {
@@ -33,7 +33,7 @@ export function validateProductAnalysis(data, input) {
  */
 export function validateMarketDiscovery(data, input) {
   if (!data || typeof data !== 'object') {
-    return generateMarketFallback(input);
+    return null;
   }
 
   return {
@@ -60,7 +60,7 @@ export function validateMarketDiscovery(data, input) {
  */
 export function validateAudienceIntelligence(data, input) {
   if (!data || typeof data !== 'object') {
-    return generateAudienceFallback(input);
+    return null;
   }
 
   return {
@@ -80,7 +80,7 @@ export function validateAudienceIntelligence(data, input) {
  */
 export function validateCompetitorAnalysis(data, input) {
   if (!data || typeof data !== 'object') {
-    return generateCompetitorFallback(input);
+    return null;
   }
 
   return {
@@ -99,7 +99,7 @@ export function validateCompetitorAnalysis(data, input) {
  */
 export function validateIntentPrediction(data, input) {
   if (!data || typeof data !== 'object') {
-    return generateIntentFallback(input);
+    return null;
   }
 
   return {
@@ -120,7 +120,7 @@ export function validateIntentPrediction(data, input) {
  */
 export function validatePositioningEngine(data, input) {
   if (!data || typeof data !== 'object') {
-    return generatePositioningFallback(input);
+    return null;
   }
 
   return {
@@ -141,7 +141,7 @@ export function validatePositioningEngine(data, input) {
  */
 export function validateCampaignGenerator(data, input) {
   if (!data || typeof data !== 'object') {
-    return generateCampaignFallback(input);
+    return null;
   }
 
   return {
@@ -185,7 +185,7 @@ export function validateActionPlan(actionPlan) {
  */
 export function validateChannelRecommendation(data, input) {
   if (!data || typeof data !== 'object') {
-    return generateChannelFallback(input);
+    return null;
   }
 
   return {
@@ -450,245 +450,13 @@ function ensureActionArray(value) {
         researchSource: ensureString(action.researchSource || action.source),
         businessImpact: ensureString(action.businessImpact || action.impact),
         expectedGain: ensureString(action.expectedGain || action.gain),
-        difficulty: ensureString(action.difficulty, 'Low'),
-        priority: ensureString(action.priority, 'low'),
-        estimatedTimeline: ensureString(action.estimatedTimeline || action.timeline, '1-2 weeks'),
-        owner: ensureString(action.owner, 'Team')
+        difficulty: ensureString(action.difficulty, null),
+        priority: ensureString(action.priority, null),
+        estimatedTimeline: ensureString(action.estimatedTimeline || action.timeline, null),
+        owner: ensureString(action.owner, null)
       };
     }
     
     return null;
   }).filter(a => a !== null);
-}
-
-// ============================================
-// SIMPLE FALLBACK GENERATORS
-// ============================================
-
-function generateProductFallback(input) {
-  const productName = input?.productName || input?.brandName || 'Product';
-  return {
-    usp: `Innovative solution for ${input?.industry || 'market'}`,
-    summary: `${productName} provides value to customers`,
-    productSummary: `${productName} provides value to customers`,
-    keyFeatures: [
-      { value: 'Core functionality', confidence: null, impact: null }
-    ],
-    features: [
-      { value: 'Core functionality', confidence: null, impact: null }
-    ],
-    coreBenefits: [
-      { value: 'Saves time', confidence: null, impact: null }
-    ],
-    painPointsSolved: [
-      { value: 'Inefficiency', confidence: null, impact: null }
-    ],
-    painPoints: [
-      { value: 'Inefficiency', confidence: null, impact: null }
-    ],
-    targetUsers: [
-      { value: input?.targetAudience || 'Business users', confidence: null, impact: null }
-    ],
-    differentiators: [
-      { value: 'Unique approach', confidence: null, impact: null }
-    ],
-    jobsToBeDone: [
-      { value: 'Solve core problem', confidence: null, impact: null }
-    ],
-    confidenceScore: null,
-    provider: 'fallback'
-  };
-}
-
-function generateMarketFallback(input) {
-  return {
-    demandScore: null,
-    confidence: null,
-    confidenceScore: null,
-    tam: 'Insufficient Data',
-    sam: 'Insufficient Data',
-    som: 'Insufficient Data',
-    cagr: 'Insufficient Data',
-    marketTrends: [
-      { value: 'Market trend data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    opportunities: [
-      { value: 'Market opportunity data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    growthOpportunities: [
-      { value: 'Growth opportunity data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    risks: [
-      { value: 'Market risk data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    marketRisks: [
-      { value: 'Market risk data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    growthSignals: [],
-    entryStrategy: 'Market entry strategy unavailable. No verified source found.',
-    provider: 'fallback'
-  };
-}
-
-function generateAudienceFallback(input) {
-  return {
-    buyerPersonas: [
-      {
-        name: input?.targetAudience || 'Target User',
-        demographics: 'Audience data unavailable. No verified source found.',
-        intentScore: 0,
-        goals: [],
-        painPoints: [],
-        buyingMotivations: []
-      }
-    ],
-    personas: [
-      {
-        name: input?.targetAudience || 'Target User',
-        demographics: 'Audience data unavailable. No verified source found.',
-        intentScore: 0,
-        goals: [],
-        painPoints: [],
-        buyingMotivations: []
-      }
-    ],
-    buyingTriggers: [
-      { value: 'Buying trigger data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    commonObjections: [
-      { value: 'Objection data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    bestChannels: [
-      { value: 'Channel data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    decisionMakers: [
-      { value: 'Decision maker data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    confidenceScore: null,
-    provider: 'fallback'
-  };
-}
-
-function generateCompetitorFallback(input) {
-  return {
-    directCompetitors: [],
-    competitorMatrix: 'Competitive landscape analysis unavailable - SERP API required',
-    differentiationOpportunities: [
-      { value: 'Competitor data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    marketGaps: [
-      { value: 'Market gap analysis unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    competitorWeaknesses: [
-      { value: 'Competitor analysis unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    confidenceScore: null,
-    provider: 'fallback'
-  };
-}
-
-function generateIntentFallback(input) {
-  return {
-    hotSegments: [
-      { value: 'Intent data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    highIntentSegments: [
-      { value: 'Intent data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    warmSegments: [
-      { value: 'Intent data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    coldSegments: [
-      { value: 'Intent data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    buyingSignals: [
-      { value: 'Buying signal data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    triggerEvents: [
-      { value: 'Trigger event data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    leadScoringRules: [
-      { value: 'Lead scoring data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    confidenceScore: null,
-    provider: 'fallback'
-  };
-}
-
-function generatePositioningFallback(input) {
-  const productName = input?.productName || input?.brandName || 'Product';
-  return {
-    positioningStatement: `${productName} positioning unavailable. No verified source found.`,
-    statement: `${productName} positioning unavailable. No verified source found.`,
-    valueProposition: 'Value proposition unavailable. No verified source found.',
-    brandPromise: 'Brand promise unavailable. No verified source found.',
-    messagingPillars: [
-      { value: 'Messaging pillar data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    pillars: [
-      { value: 'Messaging pillar data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    competitorWeaknessesToAttack: [
-      { value: 'Competitor weakness data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    confidenceScore: null,
-    provider: 'fallback'
-  };
-}
-
-function generateCampaignFallback(input) {
-  return {
-    creativeAngles: [
-      { value: 'Creative angle data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    copyHooks: [
-      { value: 'Copy hook data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    ctaSuggestions: [
-      { value: 'CTA data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    emailSequence: [
-      { value: 'Email sequence data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    socialPostIdeas: [
-      { value: 'Social post data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    videoIdeas: [
-      { value: 'Video idea data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    actionPlan: {
-      sevenDay: [],
-      thirtyDay: [],
-      sixtyDay: [],
-      ninetyDay: []
-    },
-    nextActions: ['Campaign data unavailable. No verified source found.'],
-    campaignIdeas: [
-      { value: 'Campaign idea data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    confidenceScore: null,
-    provider: 'fallback'
-  };
-}
-
-function generateChannelFallback(input) {
-  return {
-    recommendedChannels: [],
-    channels: [],
-    primaryChannel: 'Channel data unavailable. No verified source found.',
-    budgetSplit: [
-      { value: 'Budget split data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    channelFitScores: [
-      { value: 'Channel fit data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    postingFrequency: [
-      { value: 'Posting frequency data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    contentTypes: [
-      { value: 'Content type data unavailable. No verified source found.', confidence: null, impact: null }
-    ],
-    confidenceScore: null,
-    provider: 'fallback'
-  };
 }

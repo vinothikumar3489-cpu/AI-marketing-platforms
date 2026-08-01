@@ -1,4 +1,4 @@
-import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
+﻿import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
 import { resolveProductIdentity } from "../resolvers/product-identity.resolver.js";
 import { createStableHash } from "../../utils/stable-hash.js";
 
@@ -63,6 +63,10 @@ export async function generateCampaignIntelligence({ userId, chatId, evidenceCon
   const channels = ec.channels || [];
   const growth = ec.growth || {};
   const sources = ec.sourceSummary || {};
+  const market = ec.market || null;
+  const technology = ec.technology || null;
+  const positioning = ec.positioning || null;
+  const pricing = ec.pricing || null;
 
   // PART 13: Use canonical product identity resolver for product-specific campaigns
   const productIdentity = resolveProductIdentity({
@@ -94,14 +98,14 @@ export async function generateCampaignIntelligence({ userId, chatId, evidenceCon
     });
     return {
       _noData: true,
-      reason: `Invalid product identity: "${productIdentity.productName || 'none'}" — campaign generation requires verified product`,
+      reason: `Invalid product identity: "${productIdentity.productName || 'none'}" â€” campaign generation requires verified product`,
       code: 'INVALID_PRODUCT_IDENTITY'
     };
   }
 
   // PART 12: Reconcile evidence before generation
   const evidenceReconciliation = reconcileEvidence({
-    product, company, website, audience, competitors, seo, channels, growth, sources
+    product, company, website, audience, competitors, seo, channels, growth, sources, market, technology, positioning
   });
   
   console.info("[CampaignIntelligence] Evidence reconciliation", {
@@ -120,7 +124,7 @@ export async function generateCampaignIntelligence({ userId, chatId, evidenceCon
     attempt++;
     try {
       const prompt = buildCampaignPrompt({
-        product, company, website, audience, competitors, seo, channels, growth, sources, productIdentity
+        product, company, website, audience, competitors, seo, channels, growth, sources, productIdentity, market, technology, positioning
       });
 
       const aiResult = await callAI(prompt);
@@ -152,7 +156,7 @@ export async function generateCampaignIntelligence({ userId, chatId, evidenceCon
   console.warn("[CampaignIntelligence] Using fallback after AI failures", { userId, chatId, attempts: maxAttempts, lastError });
   
   const fallbackResult = generateEvidenceBasedCampaign({
-    product, company, website, audience, competitors, seo, channels, growth, sources, productIdentity
+    product, company, website, audience, competitors, seo, channels, growth, sources, productIdentity, market, technology, positioning
   });
 
   // Mark as partially generated with fallback
@@ -176,7 +180,7 @@ export async function generateCampaignIntelligence({ userId, chatId, evidenceCon
 }
 
 function buildCampaignPrompt(context) {
-  const { product, company, website, audience, competitors, seo, channels, growth, sources, productIdentity } = context;
+  const { product, company, website, audience, competitors, seo, channels, growth, sources, productIdentity, market, technology, positioning } = context;
 
   const evidenceLines = [];
 
@@ -199,7 +203,7 @@ function buildCampaignPrompt(context) {
     if (audience.primary?.value) evidenceLines.push(`Primary Audience: ${audience.primary.value}`);
     if (audience.personas?.value?.length) {
       audience.personas.value.slice(0, 3).forEach(p => {
-        evidenceLines.push(`Persona: ${p.name || p.title || p.role || "Unnamed"} — ${(p.painPoints || []).slice(0, 2).join(", ")}`);
+        evidenceLines.push(`Persona: ${p.name || p.title || p.role || "Unnamed"} â€” ${(p.painPoints || []).slice(0, 2).join(", ")}`);
       });
     }
     if (audience.painPoints?.value?.length) evidenceLines.push(`Pain Points: ${audience.painPoints.value.slice(0, 5).join(", ")}`);
@@ -221,6 +225,39 @@ function buildCampaignPrompt(context) {
 
   if (growth?.overallScore?.value != null) {
     evidenceLines.push(`Growth Score: ${growth.overallScore.value}/100`);
+  }
+
+  // ==== MARKET RESEARCH ====
+  if (market && market.status === 'measured') {
+    if (market.overview) evidenceLines.push(`Market Overview: ${market.overview}`);
+    if (market.size != null) evidenceLines.push(`Market Size: ${market.size}`);
+    if (market.growthRate != null) evidenceLines.push(`Market Growth Rate: ${market.growthRate}`);
+    if (market.segments?.length) evidenceLines.push(`Market Segments: ${market.segments.slice(0, 5).map(s => typeof s === 'string' ? s : (s.name || s.segment || JSON.stringify(s))).join(", ")}`);
+    if (market.trends?.length) evidenceLines.push(`Market Trends: ${market.trends.slice(0, 5).map(t => typeof t === 'string' ? t : (t.trend || t.name || JSON.stringify(t))).join(", ")}`);
+    if (market.drivers?.length) evidenceLines.push(`Market Drivers: ${market.drivers.slice(0, 5).map(d => typeof d === 'string' ? d : (d.driver || d.name || JSON.stringify(d))).join(", ")}`);
+    if (market.opportunities?.length) evidenceLines.push(`Market Opportunities: ${market.opportunities.slice(0, 5).map(o => typeof o === 'string' ? o : (o.opportunity || o.title || JSON.stringify(o))).join(", ")}`);
+  }
+
+  // ==== TECHNOLOGY RESEARCH ====
+  if (technology && technology.status === 'measured') {
+    if (technology.stack?.length) evidenceLines.push(`Technology Stack: ${technology.stack.slice(0, 8).join(", ")}`);
+    if (technology.integrations?.length) evidenceLines.push(`Integrations: ${technology.integrations.slice(0, 6).join(", ")}`);
+    if (technology.platforms?.length) evidenceLines.push(`Platforms: ${technology.platforms.slice(0, 5).join(", ")}`);
+  }
+
+  // ==== POSITIONING RESEARCH ====
+  if (positioning) {
+    const posText = typeof positioning === 'string' ? positioning : JSON.stringify(positioning);
+    evidenceLines.push(`Competitive Positioning: ${posText.substring(0, 300)}`);
+  }
+  if (competitors?.positioning?.value) {
+    evidenceLines.push(`Competitor Positioning: ${String(competitors.positioning.value).substring(0, 300)}`);
+  }
+
+  // ==== PRICING RESEARCH ====
+  const pricingValue = product.pricing?.value ?? product.pricing;
+  if (pricingValue) {
+    evidenceLines.push(`Pricing: ${typeof pricingValue === 'string' ? pricingValue : (pricingValue.model || pricingValue.type || pricingValue.plan || JSON.stringify(pricingValue))}`);
   }
 
   evidenceLines.push(`Evidence Sources: ${sources.sourcesCollected?.join(", ") || "none"}`);
@@ -246,6 +283,11 @@ RULES (ABSOLUTE):
 9. For kpiFramework, each KPI must include: name, businessDefinition, formula, eventSource, analyticsTool, baselineStatus (one of BASELINE_REQUIRED/TRACKABLE_NOT_CONNECTED/CONNECTED/UNAVAILABLE), targetStatus, reportingFrequency, owner, attributionWindow. Do NOT invent baseline or target values.
 10. For channelRecommendations, each channel must include: channel, role, targetSegment, buyingStage, objective, targeting, message, contentFormats, landingDestination, cta, budgetLogic, kpis, testIdeas, evidence, confidence. Do NOT default to Google Ads + LinkedIn.
 11. The campaign may be for an early-stage product with limited evidence. In that case, focus on validation and learning, not a full-funnel rollout.
+12. For marketingStrategy: derive the strategy narrative, pillars, positioning and differentiation ONLY from the evidence provided (market research, audience, competitors, SEO, pricing, technology, product). Do NOT write generic strategy statements. Every pillar must name the evidence that supports it. If market/technology/positioning evidence is missing, say so explicitly in the researchCoverage list.
+13. For budget: NEVER fabricate a total budget or absolute spend numbers. Provide percentage allocation across channels with "basis" (the evidence/logic behind the split) and mark budget.status as "proposed" with an inputSummary requiring the user's actual budget to be set.
+14. For forecast: NEVER fabricate numeric outcomes (conversion rates, revenue, leads). Provide qualitative scenarios (conservative/moderate/aggressive) with assumptions derived from evidence and explicitly state "no numeric forecast" when metrics are absent.
+15. For roi: define the ROI framework with formula and inputs. Every input must have a "source" naming the evidence (or "not yet measured"). No invented numbers.
+16. For emailCampaigns, ads, landingPages, socialPosts: every piece of copy must reference evidence (pain points, competitors, SEO keywords, pricing, positioning). Include the specific subject lines, headlines, hooks and CTAs. Do not repeat the same angle across campaigns — vary by audience/segment.
 
 Return valid JSON with this exact structure (no markdown, no code fences):
 
@@ -317,7 +359,48 @@ Return valid JSON with this exact structure (no markdown, no code fences):
   ],
   "opportunityAssessment": [
     { "opportunity": "opportunity description", "reason": "why", "evidence": "evidence", "effort": "high/medium/low", "priority": "high/medium/low", "expectedBusinessImpact": "impact description (no revenue numbers)" }
-  ]
+  ],
+  "marketingStrategy": {
+    "narrative": "strategy narrative derived from evidence (not generic)",
+    "pillars": [{ "name": "pillar name", "description": "what it covers", "evidence": "supporting evidence" }],
+    "positioning": { "statement": "positioning statement", "basis": "evidence for it", "differentiators": [{ "differentiator": "x", "evidence": "evidence" }] },
+    "researchCoverage": [{ "area": "research/audience/competitors/seo/pricing/technology/market/product/positioning", "status": "measured/unavailable", "note": "what data was used" }]
+  },
+  "emailCampaigns": [
+    { "name": "campaign name", "objective": "objective", "audience": "segment", "sequence": ["Email 1 subject", "Email 2 subject", "Email 3 subject"], "angles": ["angle per email"], "cta": "call to action", "evidence": "supporting evidence" }
+  ],
+  "ads": [
+    { "platform": "ad platform", "objective": "objective", "headline": "ad headline", "primaryText": "ad copy", "audience": "targeting description", "cta": "call to action", "angle": "angle used", "evidence": "supporting evidence" }
+  ],
+  "landingPages": [
+    { "name": "page name", "purpose": "conversion goal", "headline": "hero headline", "sections": ["section outline"], "seoKeywords": ["keywords"], "cta": "call to action", "evidence": "supporting evidence" }
+  ],
+  "socialPosts": [
+    { "platform": "LinkedIn/Instagram/X/Facebook", "hook": "opening hook", "body": "post body", "cta": "call to action", "angle": "angle used", "audience": "segment", "evidence": "supporting evidence" }
+  ],
+  "creativeAngles": [
+    { "angle": "angle name", "source": "where it comes from (pain point, competitor gap, USP, trend)", "evidence": "supporting evidence", "bestFor": "channel or format it fits" }
+  ],
+  "budget": {
+    "status": "proposed",
+    "total": null,
+    "currency": null,
+    "allocation": [{ "category": "channel/area", "percentage": 0, "basis": "logic and evidence for the split" }],
+    "notes": ["assumptions and dependencies"],
+    "inputSummary": "what the user must provide to finalize the budget"
+  },
+  "forecast": {
+    "status": "qualitative",
+    "disclaimer": "explicit statement that no numeric outcomes are fabricated",
+    "scenarios": [{ "scenario": "conservative/moderate/aggressive", "description": "what could happen", "assumptions": ["assumptions from evidence"], "evidence": "supporting evidence" }],
+    "metricsToTrack": ["metrics that must be tracked to build a numeric forecast later"]
+  },
+  "roi": {
+    "formula": "ROI formula",
+    "inputs": [{ "name": "input name", "description": "what it measures", "source": "evidence source or 'not yet measured'" }],
+    "limitations": ["what cannot be estimated yet"],
+    "measurementPlan": ["steps to measure ROI"]
+  }
 }
 
 Return ONLY valid JSON. No markdown. No code fences. No explanations.`;
@@ -367,6 +450,15 @@ function validateCampaignOutput(data, evidenceReconciliation) {
     kpiFramework: data.kpiFramework || null,
     riskAssessment: data.riskAssessment || null,
     opportunityAssessment: data.opportunityAssessment || null,
+    marketingStrategy: data.marketingStrategy || null,
+    emailCampaigns: data.emailCampaigns || null,
+    ads: data.ads || null,
+    landingPages: data.landingPages || null,
+    socialPosts: data.socialPosts || null,
+    creativeAngles: data.creativeAngles || null,
+    budget: data.budget || null,
+    forecast: data.forecast || null,
+    roi: data.roi || null,
     nextActions: data.executiveSummary?.nextActions || null,
     _metadata: {
       generatedAt: new Date().toISOString(),
@@ -510,6 +602,10 @@ function generateEvidenceHash(evidenceReconciliation) {
     hasChannelData: evidenceReconciliation.evidenceStatus?.hasChannelData,
     hasWebsiteData: evidenceReconciliation.evidenceStatus?.hasWebsiteData,
     hasGrowthData: evidenceReconciliation.evidenceStatus?.hasGrowthData,
+    hasMarketData: evidenceReconciliation.evidenceStatus?.hasMarketData,
+    hasTechnologyData: evidenceReconciliation.evidenceStatus?.hasTechnologyData,
+    hasPositioningData: evidenceReconciliation.evidenceStatus?.hasPositioningData,
+    hasPricingData: evidenceReconciliation.evidenceStatus?.hasPricingData,
   });
   
   let hash = 0;
@@ -552,7 +648,7 @@ function detectCampaignSimilarity(fingerprint1, fingerprint2) {
  * Returns evidence status and warnings about data quality
  */
 function reconcileEvidence(context) {
-  const { product, company, website, audience, competitors, seo, channels, growth, sources } = context;
+  const { product, company, website, audience, competitors, seo, channels, growth, sources, market, technology, positioning } = context;
   
   const contradictions = [];
   const warnings = [];
@@ -564,6 +660,10 @@ function reconcileEvidence(context) {
     hasChannelData: !!(channels?.length),
     hasWebsiteData: !!(website.title?.value || website.heroText?.value),
     hasGrowthData: growth?.overallScore?.value != null,
+    hasMarketData: !!(market && (market.overview || market.trends?.length || market.segments?.length)),
+    hasTechnologyData: !!(technology && technology.stack?.length),
+    hasPositioningData: !!(positioning || competitors?.positioning?.value),
+    hasPricingData: !!(product.pricing?.value ?? product.pricing),
   };
   
   // Check for contradictions between product name sources
@@ -797,7 +897,7 @@ function applyCampaignSafety(campaignResult, evidenceStatus) {
 }
 
 function generateEvidenceBasedCampaign(context) {
-  const { product, company, website, audience, competitors, seo, channels, growth, sources, productIdentity } = context;
+  const { product, company, website, audience, competitors, seo, channels, growth, sources, productIdentity, market, technology, positioning } = context;
 
   // PART 13: Use canonical product identity for product-specific campaigns
   const companyName = productIdentity?.companyName || company.name?.value || product.name?.value || "Project";
@@ -822,10 +922,10 @@ function generateEvidenceBasedCampaign(context) {
       campaignName: `${productName} Evidence-Based Campaign`,
       campaignTheme: `Growth through ${goal.goal || "strategic marketing"}`,
       campaignGoal: goal.goal || "Brand Awareness",
-      recommendedDuration: "Proposed planning horizon — to be confirmed by user",
+      recommendedDuration: "Proposed planning horizon â€” to be confirmed by user",
       primaryAudience: {
         value: audience?.primary?.value || "Not yet determined from available evidence",
-        reason: hasAudienceData ? "Derived from audience intelligence analysis" : "Audience intelligence not yet available — run audience analysis first",
+        reason: hasAudienceData ? "Derived from audience intelligence analysis" : "Audience intelligence not yet available â€” run audience analysis first",
         evidence: hasAudienceData ? "audience_intelligence" : "insufficient_evidence",
         _evidenceStatus: hasAudienceData ? "EVIDENCE_BACKED" : "NOT_MEASURED"
       },
@@ -879,6 +979,15 @@ function generateEvidenceBasedCampaign(context) {
       ...o,
       _evidenceStatus: o.evidence !== "best_practice" ? "EVIDENCE_BACKED" : "BEST_PRACTICE"
     })),
+    marketingStrategy: buildMarketingStrategy(context),
+    emailCampaigns: buildEmailCampaigns(context),
+    ads: buildAds(context),
+    landingPages: buildLandingPages(context),
+    socialPosts: buildSocialPosts(context),
+    creativeAngles: buildCreativeAngles(context),
+    budget: buildBudget(context),
+    forecast: buildForecast(context),
+    roi: buildROI(context),
     _metadata: {
       generatedAt: new Date().toISOString(),
       provider: "evidence-based",
@@ -929,6 +1038,402 @@ function generateEvidenceBasedCampaign(context) {
   const safeResult = applyCampaignSafety(labelledResult, evidenceStatus);
   
   return safeResult;
+}
+
+// ============================================================
+// RESEARCH-DRIVEN EXECUTION SECTIONS (fallback builders)
+// Every field references evidence; no fabricated numbers.
+// ============================================================
+
+function firstText(values, fallback = null) {
+  if (!Array.isArray(values)) return fallback;
+  for (const v of values) {
+    if (!v) continue;
+    if (typeof v === 'string' && v.trim()) return v.trim();
+    if (typeof v === 'object' && v.value && typeof v.value === 'string' && v.value.trim()) return v.value.trim();
+    if (typeof v === 'object') {
+      const text = v.name || v.trend || v.segment || v.driver || v.opportunity || v.barrier || v.topic || v.title || null;
+      if (text && typeof text === 'string' && text.trim()) return text.trim();
+    }
+  }
+  return fallback;
+}
+
+function buildMarketingStrategy(context) {
+  const { product, company, audience, competitors, seo, market, technology, positioning, productIdentity } = context;
+  const productName = productIdentity?.productName || product.name?.value || company.name?.value || 'this product';
+  const brandName = productIdentity?.brandName || productName;
+  const painPoint = audience?.painPoints?.value?.[0] || audience?.personas?.value?.[0]?.painPoints?.[0] || null;
+  const competitorNames = (competitors?.list?.value || []).slice(0, 3).map(c => c.name || c.domain).filter(Boolean);
+  const marketTrends = market?.trends?.length ? market.trends.slice(0, 3) : [];
+  const marketOverview = market?.overview || null;
+  const techStack = technology?.stack?.length ? technology.stack.slice(0, 4) : [];
+
+  const researchCoverage = [
+    { area: 'product', status: product?.usp?.value || product?.features?.value?.length ? 'measured' : 'unavailable', note: product?.usp?.value ? `USP: ${product.usp.value}` : 'No USP evidence' },
+    { area: 'audience', status: audience?.primary?.value || audience?.personas?.value?.length ? 'measured' : 'unavailable', note: audience?.primary?.value || 'No audience evidence' },
+    { area: 'competitors', status: competitorNames.length ? 'measured' : 'unavailable', note: competitorNames.join(', ') || 'No competitor evidence' },
+    { area: 'seo', status: seo?.keywords?.value?.length ? 'measured' : 'unavailable', note: seo?.keywords?.value?.slice(0, 3).map(k => k.keyword || k).join(', ') || 'No SEO keyword evidence' },
+    { area: 'market', status: market?.status === 'measured' ? 'measured' : 'unavailable', note: marketOverview || (marketTrends.length ? firstText(marketTrends) : null) || 'No market research' },
+    { area: 'technology', status: techStack.length ? 'measured' : 'unavailable', note: techStack.join(', ') || 'No technology evidence' },
+    { area: 'positioning', status: positioning || competitors?.positioning?.value ? 'measured' : 'unavailable', note: typeof positioning === 'string' ? positioning : null },
+    { area: 'pricing', status: product.pricing?.value ?? product.pricing ? 'measured' : 'unavailable', note: String(product.pricing?.value ?? product.pricing ?? '').substring(0, 120) || null },
+  ];
+
+  const pillars = [];
+  if (painPoint) pillars.push({ name: `Solve ${String(painPoint).substring(0, 60)}`, description: `Lead with the audience's most documented pain point and show how ${brandName} addresses it.`, evidence: 'audience_intelligence' });
+  if (product?.usp?.value) pillars.push({ name: 'Own the differentiator', description: `Anchor messaging on the verified USP: ${product.usp.value}`, evidence: 'product_intelligence' });
+  if (seo?.keywords?.value?.length) pillars.push({ name: 'Search-led organic growth', description: `Build content and landing experiences around the verified keyword set.`, evidence: 'seo_intelligence' });
+  if (marketTrends.length) pillars.push({ name: 'Ride the documented market trend', description: firstText(marketTrends) || 'Position against an identified market trend', evidence: 'market_research' });
+  if (competitorNames.length) pillars.push({ name: 'Differentiate against named competitors', description: `Target gaps versus ${competitorNames.join(', ')} in messaging and product story.`, evidence: 'competitor_intelligence' });
+  if (techStack.length) pillars.push({ name: 'Technical credibility', description: `Signal the documented technology stack (${techStack.join(', ')}) to technical buyers.`, evidence: 'technology_research' });
+  if (pillars.length === 0) pillars.push({ name: 'Evidence-based validation phase', description: 'With limited research, run a focused validation campaign before scaling spend.', evidence: 'insufficient_evidence' });
+
+  return {
+    narrative: `The strategy for ${brandName} is derived from the available research: audience evidence defines who to target, competitor evidence defines where to differentiate, SEO evidence defines the entry keywords, and ${market?.status === 'measured' ? 'market research defines the opportunity context' : 'market research is not yet available (run market discovery to strengthen this strategy)'}.`,
+    pillars,
+    positioning: {
+      statement: positioning ? (typeof positioning === 'string' ? positioning : (positioning.statement || positioning.positioningStatement || null)) : `${brandName} positions against ${competitorNames.join(', ') || 'the incumbent players'} by leading with ${product?.usp?.value || 'its verified strengths'}.`,
+      basis: positioning ? 'competitor_intelligence' : product?.usp?.value ? 'product_intelligence' : 'insufficient_evidence',
+      differentiators: (product?.benefits?.value || []).slice(0, 3).map(b => ({ differentiator: typeof b === 'string' ? b : (b.value || b.benefit || b.text || ''), evidence: 'product_intelligence' })),
+    },
+    researchCoverage,
+  };
+}
+
+function buildEmailCampaigns(context) {
+  const { product, audience, competitors, seo, productIdentity, company } = context;
+  const productName = productIdentity?.productName || product.name?.value || company.name?.value || 'this solution';
+  const painPoint = audience?.painPoints?.value?.[0] || audience?.personas?.value?.[0]?.painPoints?.[0] || null;
+  const persona = audience?.personas?.value?.[0]?.name || audience?.primary?.value || 'target audience';
+  const keyword = seo?.keywords?.value?.[0]?.keyword || seo?.keywords?.value?.[0] || null;
+  const campaigns = [];
+
+  if (painPoint) {
+    campaigns.push({
+      name: `${productName} pain-point onboarding`,
+      objective: `Introduce ${productName} as the answer to "${painPoint}"`,
+      audience: persona,
+      sequence: [
+        `Why "${painPoint}" keeps costing your team`,
+        `How ${productName} addresses this directly`,
+        `A concrete walkthrough of the fix`,
+        `The offer: start with a focused pilot`,
+      ],
+      angles: ['problem-first', 'education', 'capability proof', 'low-risk trial'],
+      cta: 'Request a guided walkthrough',
+      evidence: 'audience_intelligence',
+    });
+  }
+  if (keyword || seo?.contentOpportunities?.value?.length) {
+    campaigns.push({
+      name: `${productName} search-intent nurture`,
+      objective: 'Convert organic search visitors into leads with content-aligned email',
+      audience: 'Organic search audience (awareness stage)',
+      sequence: [
+        `The ${keyword ? `${keyword} ` : ''}guide your team needs`,
+        `What most teams miss about ${keyword ? keyword.split(' ').slice(0, 2).join(' ') : 'this topic'}`,
+        `How ${productName} fits the workflow`,
+      ],
+      angles: ['educational', 'gap-based', 'product-fit'],
+      cta: 'Read the guide and get a demo',
+      evidence: 'seo_intelligence',
+    });
+  }
+  if (competitors?.list?.value?.length) {
+    campaigns.push({
+      name: `${productName} competitor-switch campaign`,
+      objective: 'Target teams evaluating alternatives by naming the switch criteria',
+      audience: persona,
+      sequence: [
+        `What to compare before renewing with ${competitors.list.value[0]?.name || 'your current vendor'}`,
+        `${productName} on the criteria that matter most`,
+        'Migration made simple: the practical path',
+      ],
+      angles: ['comparison', 'objective-criteria', 'risk-reduction'],
+      cta: 'See the comparison',
+      evidence: 'competitor_intelligence',
+    });
+  }
+  if (campaigns.length === 0) {
+    campaigns.push({
+      name: `${productName} evidence-based launch email`,
+      objective: 'Introduce the product to a defined audience once research is complete',
+      audience: persona,
+      sequence: ['Introducing what we learned', 'How it changes your workflow', 'Let us show you'],
+      angles: ['story-led'],
+      cta: 'Book an introduction',
+      evidence: 'product_intelligence',
+    });
+  }
+  return campaigns;
+}
+
+function buildAds(context) {
+  const { product, audience, competitors, productIdentity, company } = context;
+  const productName = productIdentity?.productName || product.name?.value || company.name?.value || 'this solution';
+  const painPoint = audience?.painPoints?.value?.[0] || null;
+  const persona = audience?.primary?.value || audience?.personas?.value?.[0]?.name || null;
+  const ads = [];
+
+  if (product?.usp?.value) {
+    ads.push({
+      platform: 'Google Search',
+      objective: 'Capture high-intent searches',
+      headline: productName,
+      primaryText: product.usp.value,
+      audience: persona || 'High-intent searchers',
+      cta: 'Learn more',
+      angle: 'USP-led',
+      evidence: 'product_intelligence',
+    });
+  }
+  if (painPoint && persona) {
+    ads.push({
+      platform: 'LinkedIn',
+      objective: 'Reach decision-makers with a problem-first angle',
+      headline: `Still dealing with ${String(painPoint).substring(0, 60)}?`,
+      primaryText: `Teams like yours use ${productName} to change that.`,
+      audience: persona,
+      cta: 'See how',
+      angle: 'pain-point-led',
+      evidence: 'audience_intelligence',
+    });
+  }
+  if (competitors?.list?.value?.length) {
+    const rival = competitors.list.value[0];
+    ads.push({
+      platform: 'Google Search',
+      objective: 'Capture competitor-intent searches',
+      headline: `${rival.name || 'The leading tool'} vs ${productName}`,
+      primaryText: `Compare honestly before you buy. ${productName} was built for ${persona || 'your team'}.`,
+      audience: `Searchers comparing ${rival.name || 'alternatives'}`,
+      cta: 'Read the comparison',
+      angle: 'comparison-led',
+      evidence: 'competitor_intelligence',
+    });
+  }
+  if (ads.length === 0) {
+    ads.push({
+      platform: 'Google Search',
+      objective: 'Establish a presence on verified keywords once SEO research is complete',
+      headline: productName,
+      primaryText: `Discover what ${productName} can do for your team.`,
+      audience: 'High-intent searchers',
+      cta: 'Learn more',
+      angle: 'brand-led',
+      evidence: 'product_intelligence',
+    });
+  }
+  return ads;
+}
+
+function buildLandingPages(context) {
+  const { product, seo, audience, productIdentity, company } = context;
+  const productName = productIdentity?.productName || product.name?.value || company.name?.value || 'this solution';
+  const painPoint = audience?.painPoints?.value?.[0] || null;
+  const keyword = seo?.keywords?.value?.[0]?.keyword || seo?.keywords?.value?.[0] || null;
+  const pages = [];
+
+  pages.push({
+    name: `${productName} product overview`,
+    purpose: 'Educate and capture leads from general research traffic',
+    headline: product?.usp?.value ? `${productName}: ${product.usp.value}` : `${productName} — overview`,
+    sections: ['Hero with verified value proposition', 'How it works', 'Key capabilities from product evidence', 'Outcome stories (once available)', 'CTA'],
+    seoKeywords: keyword ? [String(keyword)] : [],
+    cta: 'Book a walkthrough',
+    evidence: 'product_intelligence',
+  });
+  if (keyword) {
+    pages.push({
+      name: `${keyword} guide page`,
+      purpose: 'Rank for a verified primary keyword and convert research traffic',
+      headline: `${String(keyword).replace(/^\w/, c => c.toUpperCase())} — a practical guide`,
+      sections: ['Answer the core question first', 'Common pitfalls', 'How teams approach it today', 'Where tools like ' + productName + ' fit', 'CTA'],
+      seoKeywords: [String(keyword)],
+      cta: 'Get the full guide',
+      evidence: 'seo_intelligence',
+    });
+  }
+  if (painPoint) {
+    pages.push({
+      name: `${productName} pain-point landing`,
+      purpose: 'Convert problem-focused traffic from ads and social',
+      headline: `Fix ${String(painPoint).substring(0, 70)}`,
+      sections: ['Acknowledge the problem', 'Show the mechanism', 'Proof points from product evidence', 'Objection handling', 'CTA'],
+      seoKeywords: [],
+      cta: 'See how it works',
+      evidence: 'audience_intelligence',
+    });
+  }
+  return pages;
+}
+
+function buildSocialPosts(context) {
+  const { product, audience, competitors, seo, productIdentity, company } = context;
+  const productName = productIdentity?.productName || product.name?.value || company.name?.value || 'this solution';
+  const painPoint = audience?.painPoints?.value?.[0] || null;
+  const persona = audience?.primary?.value || audience?.personas?.value?.[0]?.name || null;
+  const keyword = seo?.keywords?.value?.[0]?.keyword || seo?.keywords?.value?.[0] || null;
+  const posts = [];
+
+  if (product?.usp?.value) {
+    posts.push({
+      platform: 'LinkedIn',
+      hook: `Most teams don't have a ${String(painPoint || 'core challenge').substring(0, 50)} problem. They have an approach problem.`,
+      body: `${productName} was built around a different assumption: ${product.usp.value}`,
+      cta: 'Reply "curious" and we will share how.',
+      angle: 'contrarian/thought-leadership',
+      audience: persona || 'Founders and team leads',
+      evidence: 'product_intelligence',
+    });
+  }
+  if (painPoint) {
+    posts.push({
+      platform: 'LinkedIn',
+      hook: `"${String(painPoint).substring(0, 80)}" is the #1 blocker our research found.`,
+      body: `We analyzed the problem space before building. Here is the pattern: the fix is usually upstream, not in the tooling. ${productName} targets the root cause.`,
+      cta: 'Follow for the full breakdown.',
+      angle: 'research-led',
+      audience: persona || 'Operations and product teams',
+      evidence: 'audience_intelligence',
+    });
+  }
+  if (keyword) {
+    posts.push({
+      platform: 'X',
+      hook: `${String(keyword).substring(0, 70)} — a thread.`,
+      body: `1. Most guides skip the setup reality\n2. The workflow gap nobody talks about\n3. Where tools like ${productName} actually help`,
+      cta: 'Save this thread.',
+      angle: 'educational-thread',
+      audience: 'Search-driven professionals',
+      evidence: 'seo_intelligence',
+    });
+  }
+  if (competitors?.list?.value?.length) {
+    posts.push({
+      platform: 'X',
+      hook: `Choosing between ${competitors.list.value.slice(0, 2).map(c => c.name || c.domain).filter(Boolean).join(' and ') || 'vendors'}?`,
+      body: `Add these 3 criteria to your comparison — most teams skip them, and they decide the outcome. ${productName} scores well because of them.`,
+      cta: 'Grab the criteria list.',
+      angle: 'comparison-led',
+      audience: 'Evaluation-stage buyers',
+      evidence: 'competitor_intelligence',
+    });
+  }
+  if (posts.length === 0) {
+    posts.push({
+      platform: 'LinkedIn',
+      hook: `What we learned building ${productName}`,
+      body: 'Sharing our research-driven approach to the problem we are solving — and inviting your perspective.',
+      cta: 'Share your experience in the comments.',
+      angle: 'story-led',
+      audience: null,
+      evidence: 'product_intelligence',
+    });
+  }
+  return posts;
+}
+
+function buildCreativeAngles(context) {
+  const { product, audience, competitors, market, productIdentity, company } = context;
+  const productName = productIdentity?.productName || product.name?.value || company.name?.value || 'this solution';
+  const angles = [];
+  const painPoint = audience?.painPoints?.value?.[0] || null;
+
+  if (painPoint) angles.push({ angle: `Problem-first: name the pain and make it visible`, source: 'audience pain points', evidence: 'audience_intelligence', bestFor: 'Ads, email subject lines, social hooks' });
+  if (product?.usp?.value) angles.push({ angle: `Differentiator-led: own "${product.usp.value}"`, source: 'product USP', evidence: 'product_intelligence', bestFor: 'Landing pages, product page, LinkedIn' });
+  if (competitors?.list?.value?.length) angles.push({ angle: 'Comparison honesty: give buyers objective criteria', source: 'competitor research', evidence: 'competitor_intelligence', bestFor: 'Search ads, X threads, comparison page' });
+  if (market?.trends?.length) angles.push({ angle: `Trend-aligned: connect to "${firstText(market.trends) || 'the documented trend'}"`, source: 'market research', evidence: 'market_research', bestFor: 'Whitepapers, thought leadership, PR' });
+  if (product?.features?.value?.length) angles.push({ angle: 'Capability proof: show the mechanism, not just the outcome', source: 'product features', evidence: 'product_intelligence', bestFor: 'Video scripts, demo-led emails' });
+  if (angles.length === 0) angles.push({ angle: `Origin story: why ${productName} exists`, source: 'company identity', evidence: 'product_intelligence', bestFor: 'Social launch posts' });
+  return angles;
+}
+
+function buildBudget(context) {
+  const { channels, seo, audience, competitors } = context;
+  const allocation = [];
+  const hasSeo = seo?.keywords?.value?.length || seo?.issues?.value?.length;
+  const hasAudience = audience?.primary?.value || audience?.personas?.value?.length;
+  const hasCompetitors = competitors?.list?.value?.length;
+
+  if (hasSeo) allocation.push({ category: 'Organic SEO & Content', percentage: 40, basis: 'Verified keyword and issue evidence exists — organic compounding is the highest-confidence channel' });
+  if (hasAudience) allocation.push({ category: 'Email & Lifecycle', percentage: 20, basis: 'Audience evidence enables targeted nurture sequences' });
+  if (hasCompetitors) allocation.push({ category: 'Search Ads', percentage: 15, basis: 'Competitor evidence supports comparison-led paid capture' });
+  allocation.push({ category: 'Social & Community', percentage: 15, basis: 'Social posts are low-cost and reuse research angles' });
+  allocation.push({ category: 'Measurement & Tools', percentage: 10, basis: 'KPIs require tracking infrastructure before spend scales' });
+
+  return {
+    status: 'proposed',
+    total: null,
+    currency: null,
+    allocation,
+    notes: [
+      'No total budget or absolute spend is fabricated — percentages are a starting split, not a commitment.',
+      'Re-allocate once real channel data (CPA, conversion) is measured.',
+      'Prioritize channels with the strongest evidence; add channels only when research supports them.',
+    ],
+    inputSummary: 'Provide the total campaign budget and currency to finalize the allocation.',
+  };
+}
+
+function buildForecast(context) {
+  const { market, seo, audience } = context;
+  const scenarios = [];
+  const marketTrend = market?.growthRate != null ? `the documented market growth (${market.growthRate})` : null;
+
+  scenarios.push({
+    scenario: 'Conservative',
+    description: `Validation-first: spend only on measured channels and iterate. ${marketTrend ? `Outcome is bounded by ${marketTrend}, with spend limited to high-confidence activities.` : 'Market size data is unavailable — outcomes stay qualitative until baseline metrics exist.'}`,
+    assumptions: ['Start with organic and email, no paid scale', 'Spend is capped at what the team can measure'],
+    evidence: market?.status === 'measured' ? 'market_research' : 'insufficient_evidence',
+  });
+  scenarios.push({
+    scenario: 'Moderate',
+    description: seo?.keywords?.value?.length
+      ? 'Add paid search on verified keywords once organic foundations are in place and baseline conversion data exists.'
+      : 'Add paid channels only after SEO research provides verified keywords to target.',
+    assumptions: ['Baseline conversion metrics are tracked for 30 days before scaling', 'Landing pages from research drive all paid traffic'],
+    evidence: 'seo_intelligence',
+  });
+  scenarios.push({
+    scenario: 'Aggressive',
+    description: audience?.primary?.value
+      ? 'Full multi-channel rollout across the defined audience once the first measurement cycle proves unit economics.'
+      : 'Full rollout is deferred until audience evidence defines targeting.',
+    assumptions: ['KPIs are connected to measurement tools', 'Channel-level ROAS is verified before further spend'],
+    evidence: 'audience_intelligence',
+  });
+
+  return {
+    status: 'qualitative',
+    disclaimer: 'No numeric outcomes (leads, revenue, conversion rates) are fabricated. Forecasts are scenario-based and must be replaced by real measured data.',
+    scenarios,
+    metricsToTrack: ['Sessions and ranking positions per keyword', 'Email open and reply rates', 'Conversion rate per landing page', 'Cost per lead per paid channel', 'Product activation rate'],
+  };
+}
+
+function buildROI(context) {
+  const { seo, audience } = context;
+  return {
+    formula: 'ROI = (Attributed Revenue − Campaign Cost) / Campaign Cost',
+    inputs: [
+      { name: 'Campaign Cost', description: 'Actual spend across all channels', source: 'not yet measured — track in the measurement tool' },
+      { name: 'Attributed Revenue', description: 'Revenue attributed to the campaign via tracked conversions', source: 'not yet measured — connect analytics and CRM' },
+      { name: 'Leads Generated', description: 'Qualified leads from campaign sources', source: 'not yet measured — requires lead tracking' },
+      { name: 'Conversion Rate', description: 'Visitors to leads to customers at each stage', source: seo?.keywords?.value?.length ? 'partially measurable — SEO baseline exists' : 'not yet measured — requires analytics' },
+      { name: 'Customer Value', description: 'Value per converted customer over the measurement window', source: audience?.primary?.value ? 'product context available, value not yet measured' : 'not yet measured' },
+    ],
+    limitations: [
+      'No ROI figure is produced until real cost and revenue data exist.',
+      'Attribution across organic, email, ads, and social requires a connected measurement stack.',
+    ],
+    measurementPlan: [
+      'Connect analytics and conversion tracking before launch',
+      'Define the attribution window per channel',
+      'Report ROI monthly with measured inputs only',
+    ],
+  };
 }
 
 function determineBusinessGoal(context) {
@@ -993,7 +1498,7 @@ function determineBusinessGoal(context) {
   } else if (hasProductData && hasCompetitorData) {
     goal = "Increase Leads";
     confidence = "medium";
-    reason = "Product and competitor data available — lead generation is recommended starting point";
+    reason = "Product and competitor data available â€” lead generation is recommended starting point";
     evidence = "product_and_competitor_analysis";
   }
 
@@ -1106,8 +1611,8 @@ function makeChannelPlan(channel, role, fit, priority, reason, evidence, targetS
   return {
     channel,
     role,
-    targetSegment: targetSegment || primaryAudience || 'target audience',
-    buyingStage: buyingStage || 'awareness',
+    targetSegment: targetSegment || primaryAudience || null,
+    buyingStage: buyingStage || null,
     objective: '',
     targeting: '',
     message: '',
@@ -1142,8 +1647,8 @@ function determineChannels(context) {
   const hasSeoKeywords = !!(seo?.keywords?.value?.length);
   const hasCompetitorData = !!(competitors?.list?.value?.length);
   const hasAudienceData = !!(audience?.personas?.value?.length || audience?.primary?.value);
-  const primaryAudience = audience?.primary?.value || 'target audience';
-  const productName = product.name?.value || company.name?.value || 'product';
+  const primaryAudience = audience?.primary?.value || null;
+  const productName = product.name?.value || company.name?.value || null;
 
   if (hasSeoKeywords || seo?.issues?.value?.length) {
     const plan = makeChannelPlan(
@@ -1156,10 +1661,6 @@ function determineChannels(context) {
     plan.message = 'Educational and solution-oriented content';
     plan.contentFormats = ['Blog posts', 'Landing pages', 'How-to guides'];
     plan.landingDestination = '/blog/ /resources/';
-    plan.cta = 'Learn More';
-    plan.budgetLogic = 'Content production hours + SEO tool costs';
-    plan.kpis = ['Organic traffic', 'Keyword rankings', 'Organic CTR'];
-    plan.testIdeas = ['Content format A/B testing', 'Long-tail vs short-tail targeting'];
     plan.organicOrPaid = 'organic';
     recs.push(plan);
   }
@@ -1175,10 +1676,6 @@ function determineChannels(context) {
     plan.message = 'Product benefits, comparisons, and thought leadership';
     plan.contentFormats = ['Case studies', 'Comparison guides', 'Feature highlights', 'Whitepapers'];
     plan.landingDestination = '/resources/ /product/';
-    plan.cta = 'Get Started / Learn More';
-    plan.budgetLogic = 'Content calendar-driven production';
-    plan.kpis = ['Content engagement', 'Lead generation from content', 'Time on page'];
-    plan.testIdeas = ['Content types (video vs text vs infographic)', 'CTA placement testing'];
     plan.organicOrPaid = 'organic';
     recs.push(plan);
 
@@ -1192,10 +1689,6 @@ function determineChannels(context) {
     emailPlan.message = 'Relevant product education and social proof';
     emailPlan.contentFormats = ['Drip sequences', 'Newsletter', 'Product updates'];
     emailPlan.landingDestination = '/product/ /demo/';
-    emailPlan.cta = 'Try Now / Schedule Demo';
-    emailPlan.budgetLogic = 'Email platform subscription + content production';
-    emailPlan.kpis = ['Open rate', 'CTR', 'Conversion from email'];
-    emailPlan.testIdeas = ['Subject line A/B testing', 'Send time optimization', 'Segmentation strategy'];
     emailPlan.organicOrPaid = 'organic';
     recs.push(emailPlan);
   }
@@ -1211,10 +1704,6 @@ function determineChannels(context) {
     plan.message = 'Comparison messaging and unique value proposition';
     plan.contentFormats = ['Search ads', 'Comparison landing pages'];
     plan.landingDestination = '/vs-competitor/ /product/';
-    plan.cta = 'Compare / See Why Better';
-    plan.budgetLogic = 'Cost-per-click based; start with competitor conquest budget';
-    plan.kpis = ['Click-through rate', 'CPA', 'Conversion rate'];
-    plan.testIdeas = ['Ad copy variants (feature vs benefit)', 'Landing page messaging'];
     plan.organicOrPaid = 'paid';
     recs.push(plan);
   }
@@ -1230,10 +1719,6 @@ function determineChannels(context) {
     linkedinPlan.message = 'Thought leadership and industry insights';
     linkedinPlan.contentFormats = ['Sponsored content', 'InMail', 'Thought leadership posts'];
     linkedinPlan.landingDestination = '/product/ /resources/';
-    linkedinPlan.cta = 'Learn More / Connect';
-    linkedinPlan.budgetLogic = 'CPC or CPM based; LinkedIn premium pricing';
-    linkedinPlan.kpis = ['Impressions', 'Engagement rate', 'Lead form submissions'];
-    linkedinPlan.testIdeas = ['Audience narrowing vs broad', 'Message type (educational vs promotional)'];
     linkedinPlan.organicOrPaid = 'both';
     recs.push(linkedinPlan);
   }
@@ -1249,10 +1734,6 @@ function determineChannels(context) {
     xPlan.message = 'Quick insights, industry news, community engagement';
     xPlan.contentFormats = ['Short posts', 'Threads', 'Visual content'];
     xPlan.landingDestination = '/product/ /blog/';
-    xPlan.cta = 'Follow / Share / Learn More';
-    xPlan.budgetLogic = 'Minimal organic; paid promotions optional';
-    xPlan.kpis = ['Follower growth', 'Engagement rate', 'Share of voice'];
-    xPlan.testIdeas = ['Post frequency testing', 'Content mix (educational vs promotional)'];
     xPlan.organicOrPaid = 'organic';
     recs.push(xPlan);
   }
@@ -1260,7 +1741,7 @@ function determineChannels(context) {
   if (lower.includes("enterprise") || lower.includes("business") || lower.includes("team")) {
     const plan = makeChannelPlan(
       'Webinars / Events', 'Deep engagement with qualified prospects', 'high', 'medium',
-      'Enterprise positioning detected — webinars effective for B2B', 'content_language_analysis',
+      'Enterprise positioning detected â€” webinars effective for B2B', 'content_language_analysis',
       'enterprise decision-makers', 'consideration', primaryAudience
     );
     plan.objective = 'Generate qualified leads through educational events';
@@ -1268,10 +1749,6 @@ function determineChannels(context) {
     plan.message = 'Solve specific industry challenges with product';
     plan.contentFormats = ['Live demos', 'Industry panels', 'Educational sessions'];
     plan.landingDestination = '/webinars/ /events/';
-    plan.cta = 'Register / Watch On-Demand';
-    plan.budgetLogic = 'Event platform costs + promotion budget';
-    plan.kpis = ['Registrations', 'Attendance rate', 'Post-event conversion'];
-    plan.testIdeas = ['Format (live vs on-demand)', 'Topic selection A/B'];
     plan.organicOrPaid = 'both';
     recs.push(plan);
   }
@@ -1279,7 +1756,7 @@ function determineChannels(context) {
   if (lower.includes("youtube") || lower.includes("video") || lower.includes("demo") || lower.includes("visual")) {
     const plan = makeChannelPlan(
       'YouTube', 'Visual product demonstration', 'high', 'medium',
-      'Video content referenced on website — YouTube showcases product visually', 'website_content_analysis',
+      'Video content referenced on website â€” YouTube showcases product visually', 'website_content_analysis',
       'visual learners and researchers', 'awareness', primaryAudience
     );
     plan.objective = 'Build product understanding through visual content';
@@ -1287,10 +1764,6 @@ function determineChannels(context) {
     plan.message = 'Visual demonstration of value and ease of use';
     plan.contentFormats = ['Product demos', 'Tutorials', 'Customer testimonials'];
     plan.landingDestination = '/product/ /demo/';
-    plan.cta = 'Subscribe / Watch Full Demo';
-    plan.budgetLogic = 'Production costs + YouTube Ads (optional)';
-    plan.kpis = ['Views', 'Watch time', 'Subscription conversions'];
-    plan.testIdeas = ['Video length optimization', 'Thumbnail A/B testing'];
     plan.organicOrPaid = 'both';
     recs.push(plan);
   }
@@ -1312,40 +1785,42 @@ function determineChannels(context) {
 }
 
 function buildTimeline(context, channels) {
-  const { product, company, audience } = context;
+  const { product, company, audience, seo } = context;
   const companyName = company.name?.value || product.name?.value || "Project";
   const hasAudienceData = !!(audience?.primary?.value || audience?.personas?.value?.length);
+  const hasSeoData = !!(seo?.keywords?.value?.length || seo?.issues?.value?.length);
+  const hasProductData = !!(product.usp?.value || product.features?.value?.length);
 
   return {
     week1: [
-      { title: "Set up measurement infrastructure", description: "Configure analytics tools and KPI tracking for all channels", dependency: "None", ownerRole: "Marketing Operations", evidence: "Required for all subsequent measurement" },
+      { title: "Set up measurement infrastructure", description: "Configure analytics tools and KPI tracking for all channels", dependency: "None", ownerRole: "Marketing Operations", evidence: "best_practice" },
       { title: "Finalize audience segments", description: "Review and refine audience intelligence for campaign targeting", dependency: "Complete audience intelligence", ownerRole: "Marketing Strategist", evidence: hasAudienceData ? "audience_intelligence" : "needs_audience_analysis" },
       { title: "Create content calendar", description: "Plan first 30 days of content across priority channels", dependency: "Channel selection complete", ownerRole: "Content Manager", evidence: "channel_recommendations" },
     ],
     week2: [
-      { title: "Launch organic SEO content", description: "Publish first batch of SEO-optimized content targeting identified keywords", dependency: "Content calendar created", ownerRole: "SEO Specialist", evidence: "seo_keyword_analysis" },
+      { title: "Launch organic SEO content", description: "Publish first batch of SEO-optimized content targeting identified keywords", dependency: "Content calendar created", ownerRole: "SEO Specialist", evidence: hasSeoData ? "seo_keyword_analysis" : "best_practice" },
       { title: "Set up LinkedIn company page", description: "Optimize LinkedIn presence and begin organic posting", dependency: "None", ownerRole: "Social Media Manager", evidence: "channel_recommendation" },
       { title: "Build email nurture sequence", description: "Create initial email workflow for lead nurturing", dependency: "Measurement infrastructure ready", ownerRole: "Email Marketer", evidence: "channel_recommendation" },
     ],
     week3: [
-      { title: "Publish content marketing assets", description: "Release product-focused content and feature highlights", dependency: "Content production complete", ownerRole: "Content Manager", evidence: "product_intelligence" },
+      { title: "Publish content marketing assets", description: "Release product-focused content and feature highlights", dependency: "Content production complete", ownerRole: "Content Manager", evidence: hasProductData ? "product_intelligence" : "best_practice" },
       { title: "Begin community engagement", description: "Start participating in relevant industry communities", dependency: "Brand guidelines finalized", ownerRole: "Community Manager", evidence: "channel_recommendation" },
-      { title: "Review week 1-2 analytics", description: "Analyze initial data and adjust strategy", dependency: "Measurement infrastructure live", ownerRole: "Marketing Operations", evidence: "analytics_data_review" },
+      { title: "Review week 1-2 analytics", description: "Analyze initial data and adjust strategy", dependency: "Measurement infrastructure live", ownerRole: "Marketing Operations", evidence: "best_practice" },
     ],
     week4: [
-      { title: "Optimize based on early data", description: "Adjust content strategy and channel mix based on performance", dependency: "Week 1-3 data collected", ownerRole: "Marketing Strategist", evidence: "early_performance_data" },
-      { title: "Scale high-performing channels", description: "Double down on channels showing early traction", dependency: "Performance data collected", ownerRole: "Channel Manager", evidence: "performance_analysis" },
-      { title: "Plan month 2 campaigns", description: "Develop detailed plan for second month based on learnings", dependency: "First month data", ownerRole: "Campaign Manager", evidence: "month_1_results" },
+      { title: "Optimize based on early data", description: "Adjust content strategy and channel mix based on performance", dependency: "Week 1-3 data collected", ownerRole: "Marketing Strategist", evidence: "best_practice" },
+      { title: "Scale high-performing channels", description: "Double down on channels showing early traction", dependency: "Performance data collected", ownerRole: "Channel Manager", evidence: "best_practice" },
+      { title: "Plan month 2 campaigns", description: "Develop detailed plan for second month based on learnings", dependency: "First month data", ownerRole: "Campaign Manager", evidence: "best_practice" },
     ],
     month2: [
-      { title: "Expand content distribution", description: "Extend content reach through partnerships and syndication", dependency: "Content library established", ownerRole: "Content Manager", evidence: "content_strategy" },
-      { title: "Optimize landing pages", description: "Refine landing pages for engaged audience segments", dependency: "Sufficient traffic data", ownerRole: "SEO Specialist", evidence: "audience_engagement_data" },
-      { title: "Deepen community presence", description: "Increase engagement in industry communities", dependency: "Community presence established", ownerRole: "Community Manager", evidence: "community_growth_strategy" },
+      { title: "Expand content distribution", description: "Extend content reach through partnerships and syndication", dependency: "Content library established", ownerRole: "Content Manager", evidence: "best_practice" },
+      { title: "Optimize landing pages", description: "Refine landing pages for engaged audience segments", dependency: "Sufficient traffic data", ownerRole: "SEO Specialist", evidence: "best_practice" },
+      { title: "Deepen community presence", description: "Increase engagement in industry communities", dependency: "Community presence established", ownerRole: "Community Manager", evidence: "best_practice" },
     ],
     month3: [
-      { title: "Full campaign performance review", description: "Comprehensive analysis of all channels and KPIs", dependency: "3 months of data", ownerRole: "Marketing Strategist", evidence: "quarterly_performance_data" },
-      { title: "Develop next quarter strategy", description: "Evidence-based plan for next campaign cycle", dependency: "Performance review complete", ownerRole: "Campaign Manager", evidence: "quarterly_review" },
-      { title: "Document learnings", description: "Create playbook from campaign insights for future campaigns", dependency: "Campaign complete", ownerRole: "Marketing Operations", evidence: "campaign_learnings" },
+      { title: "Full campaign performance review", description: "Comprehensive analysis of all channels and KPIs", dependency: "3 months of data", ownerRole: "Marketing Strategist", evidence: "best_practice" },
+      { title: "Develop next quarter strategy", description: "Evidence-based plan for next campaign cycle", dependency: "Performance review complete", ownerRole: "Campaign Manager", evidence: "best_practice" },
+      { title: "Document learnings", description: "Create playbook from campaign insights for future campaigns", dependency: "Campaign complete", ownerRole: "Marketing Operations", evidence: "best_practice" },
     ]
   };
 }
@@ -1364,14 +1839,14 @@ function buildFunnel(context, channels) {
   if (hasAudienceData || hasCompetitorData || isLaunch) {
     funnel.awareness = {
       objective: isLaunch ? "Introduce the product to the market and build initial awareness" : "Build brand visibility and reach new audience segments",
-      audience: audience?.primary?.value || 'target audience',
+      audience: audience?.primary?.value || null,
       barrier: isLaunch ? "Unknown brand, no market presence" : "Low brand recall",
       message: isLaunch ? "New solution for known problem" : "Thought leadership and industry insights",
       channel: channelNames.filter(c => ['LinkedIn', 'X (Twitter)', 'Organic SEO', 'YouTube'].includes(c)),
       content: "Educational content, thought leadership, SEO-optimized articles",
-      cta: "Learn More",
+      cta: null,
       event: 'first_visit',
-      kpi: 'Impressions, reach, new visitors',
+      kpi: null,
       evidence: hasAudienceData ? 'audience_intelligence' : 'campaign_goal'
     };
   }
@@ -1379,14 +1854,14 @@ function buildFunnel(context, channels) {
   if (hasProductData || hasAudienceData) {
     funnel.consideration = {
       objective: "Educate prospects on product value and differentiation",
-      audience: audience?.personas?.value?.[0]?.name || 'evaluating prospects',
+      audience: audience?.personas?.value?.[0]?.name || null,
       barrier: "Lack of product understanding vs competitors",
       message: "Product benefits, comparisons, and proof points",
       channel: channelNames.filter(c => ['Content Marketing', 'Email Marketing', 'Paid Search', 'Webinars / Events'].includes(c)),
       content: "Case studies, comparison guides, feature highlights, demo content",
-      cta: "Schedule Demo",
+      cta: null,
       event: 'demo_request',
-      kpi: 'Demo requests, content engagement score',
+      kpi: null,
       evidence: hasProductData ? 'product_intelligence' : 'audience_intelligence'
     };
   }
@@ -1394,14 +1869,14 @@ function buildFunnel(context, channels) {
   if (hasProductData) {
     funnel.conversion = {
       objective: "Convert qualified prospects into customers",
-      audience: 'high-intent prospects',
+      audience: null,
       barrier: "Price objection, implementation concerns",
       message: "Social proof, risk reduction, time-limited offers",
       channel: channelNames.filter(c => ['Email Marketing', 'Paid Search'].includes(c)),
       content: "Testimonials, free trial offers, case studies",
-      cta: "Start Free Trial / Get Started",
+      cta: null,
       event: 'signup',
-      kpi: 'Conversion rate, signup rate',
+      kpi: null,
       evidence: 'product_intelligence'
     };
   }
@@ -1409,14 +1884,14 @@ function buildFunnel(context, channels) {
   if (!isLaunch) {
     funnel.retention = {
       objective: "Drive product adoption and reduce churn",
-      audience: 'existing customers',
+      audience: null,
       barrier: "Low feature adoption, lack of ongoing engagement",
       message: "Value realization and continuous improvement",
       channel: channelNames.filter(c => ['Email Marketing', 'X (Twitter)', 'Webinars / Events'].includes(c)),
       content: "Onboarding sequences, product tips, success stories",
-      cta: "Explore Feature",
+      cta: null,
       event: 'feature_adoption',
-      kpi: 'Activation rate, retention rate',
+      kpi: null,
       evidence: 'best_practice'
     };
   }
@@ -1595,7 +2070,7 @@ function buildOpportunities(context) {
   if (hasCompetitorData && competitors?.list?.value?.length > 0) {
     opportunities.push({
       opportunity: `Competitive differentiation against ${competitors.list.value[0]?.name || "identified competitors"}`,
-      reason: "Competitors identified — opportunity to capture untapped market segments",
+      reason: "Competitors identified â€” opportunity to capture untapped market segments",
       evidence: "competitor_intelligence",
       effort: "medium",
       priority: "medium",

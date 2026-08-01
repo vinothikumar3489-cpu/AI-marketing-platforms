@@ -49,12 +49,16 @@ export class MemoryEngine extends BaseEngine {
   async _loadFromDatabase(chatId, userId, memoryResult, context, rid) {
     const p = this._prisma;
 
+    // Scope every memory query to the requesting user when known, so one
+    // user's context can never bleed into another's brain state.
+    const userScope = userId ? { userId } : {};
+
     const [productIntel, competitorIntel, seoIntel, evidenceSnapshots, productProfile] = await Promise.all([
-      p.productIntelligence.findUnique({ where: { chatId } }).catch(() => null),
-      p.competitorIntelligence.findUnique({ where: { chatId } }).catch(() => null),
-      p.seoIntelligence.findUnique({ where: { chatId } }).catch(() => null),
-      p.evidenceSnapshot.findMany({ where: { chatId }, orderBy: { createdAt: 'desc' }, take: 1 }).catch(() => []),
-      p.productProfile.findUnique({ where: { chatId } }).catch(() => null),
+      p.productIntelligence.findFirst({ where: { chatId, ...userScope } }).catch(() => null),
+      p.competitorIntelligence.findFirst({ where: { chatId, ...userScope } }).catch(() => null),
+      p.seoIntelligence.findFirst({ where: { chatId, ...userScope } }).catch(() => null),
+      p.evidenceSnapshot.findMany({ where: { chatId, ...userScope }, orderBy: { createdAt: 'desc' }, take: 1 }).catch(() => []),
+      p.productProfile.findFirst({ where: { chatId, ...userScope } }).catch(() => null),
     ]);
 
     if (productIntel) {

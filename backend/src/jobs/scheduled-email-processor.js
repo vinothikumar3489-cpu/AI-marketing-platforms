@@ -145,7 +145,7 @@ async function processCampaignSchedule(schedule) {
           subject: item.subjectLine,
           previewText: item.previewText,
           bodyParagraphs: [item.emailBodyText],
-          callToAction: { label: 'Learn More', url: item.primaryCta || '#' }
+          callToAction: { label: item.primaryCta || '', url: item.primaryCta || '#' }
         });
 
         const result = await sendEmail({

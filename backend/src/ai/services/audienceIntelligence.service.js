@@ -33,8 +33,28 @@ Return ONLY a valid JSON object with these exact fields (no markdown, no extra t
   "finalRecommendation": ""
 }
 
-Ensure all arrays have at least 3 items. Return ONLY valid JSON.
+RULES:
+- Derive every persona and insight ONLY from the research data above and the provided audience details.
+- Treat user-provided audience hints as starting points, never echo them verbatim as persona names.
+- When evidence is insufficient, return empty arrays or empty strings. NEVER invent demographics, statistics, or motivations that are not grounded in the data.
+- Return ONLY valid JSON.
 `;
+}
+
+function getRuleBasedFallback(inputData) {
+  const { productName, industry, targetAudience } = inputData;
+  return {
+    customerPersonas: [],
+    demographics: [],
+    psychographics: [],
+    buyingMotivations: [],
+    painPoints: [],
+    preferredChannels: [],
+    messagingStrategy: "",
+    contentIdeas: [],
+    finalRecommendation: "",
+    fallbackNote: `Audience intelligence could not be generated for ${productName || "this product"} (${industry || "industry unknown"}). No AI provider was available and no verified audience research could be retrieved. Provide verified research sources or connect an AI provider to generate a full analysis.`
+  };
 }
 
 export async function generateAudienceIntelligence(inputData) {
@@ -55,8 +75,8 @@ export async function generateAudienceIntelligence(inputData) {
 
   let result = await callAI(prompt);
   if (!result.success) {
-    console.warn("⚠️ Audience Intelligence AI failed, returning partial results");
-    return { success: false, error: "Audience intelligence generation failed", provider: "ai", fallbackUsed: false };
+    console.warn("⚠️ Audience Intelligence AI failed, returning verified-evidence-only fallback");
+    result = { success: true, data: getRuleBasedFallback(inputData), provider: "rule-based", fallbackUsed: true };
   } else {
     result.fallbackUsed = false;
   }

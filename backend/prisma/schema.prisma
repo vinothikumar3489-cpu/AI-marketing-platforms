@@ -347,6 +347,15 @@ model CampaignPlan {
   kpiFramework           Json? // [{ kpi, howToMeasure, tool, frequency, status }]
   riskAssessment         Json? // [{ risk, cause, evidence, severity, mitigation }]
   opportunityAssessment  Json? // [{ opportunity, reason, evidence, effort, priority, expectedBusinessImpact }]
+  marketingStrategy      Json? // { narrative, pillars, positioning, researchCoverage }
+  emailCampaigns         Json? // [{ name, objective, audience, sequence, angles, cta, evidence }]
+  ads                    Json? // [{ platform, objective, headline, primaryText, audience, cta, angle, evidence }]
+  landingPages           Json? // [{ name, purpose, headline, sections, seoKeywords, cta, evidence }]
+  socialPosts            Json? // [{ platform, hook, body, cta, angle, audience, evidence }]
+  creativeAngles         Json? // [{ angle, source, evidence, bestFor }]
+  budget                 Json? // { status, total, currency, allocation, notes, inputSummary }
+  forecast               Json? // { status, disclaimer, scenarios, metricsToTrack }
+  roi                    Json? // { formula, inputs, limitations, measurementPlan }
   nextActions            Json? // [{ action, owner, priority, evidence }]
 
   // Metadata

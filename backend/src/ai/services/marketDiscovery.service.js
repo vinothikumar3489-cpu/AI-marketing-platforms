@@ -32,21 +32,26 @@ Return ONLY a valid JSON object with these exact fields (no markdown, no extra t
   "finalRecommendation": "Actionable final recommendation"
 }
 
-Ensure all arrays have at least 3 items. Return ONLY valid JSON.`;
+RULES:
+- Derive every trend, segment, and figure ONLY from the research data above.
+- Do NOT invent market size numbers (TAM/SAM/SOM), growth rates, or statistics that are not present in the research data.
+- When evidence is insufficient, return empty arrays or empty strings.
+- Return ONLY valid JSON.`;
 }
 
 function getRuleBasedFallback(inputData) {
   const { productName, industry, targetCountry } = inputData;
   return {
-    marketOverview: `${productName} operates in the ${industry} industry in ${targetCountry}. The market is growing with increasing demand for digital solutions.`,
-    marketDemand: "High demand from small businesses and startups looking for affordable tools.",
-    currentTrends: ["AI integration", "Mobile-first design", "Subscription models"],
-    targetCustomerSegments: ["Students", "Freelancers", "Small businesses"],
-    growthOpportunities: ["Partnerships with educational institutions", "Content marketing", "Freemium model"],
-    risks: ["Intense competition", "Rapid tech changes", "Economic uncertainty"],
-    recommendedMarketEntryStrategy: "Start with a freemium model targeting early adopters, then expand to paid tiers.",
-    pricingSuggestions: ["Freemium tier", "$9.99/month basic", "$29.99/month pro"],
-    finalRecommendation: "Focus on content marketing and user referrals to drive initial growth."
+    marketOverview: "",
+    marketDemand: "",
+    currentTrends: [],
+    targetCustomerSegments: [],
+    growthOpportunities: [],
+    risks: [],
+    recommendedMarketEntryStrategy: "",
+    pricingSuggestions: [],
+    finalRecommendation: "",
+    fallbackNote: `Market discovery could not be generated for ${productName || "this product"} (${industry || "industry unknown"}, ${targetCountry || "country unknown"}). No AI provider was available and no verified market research could be retrieved. Connect an AI provider or retry with verified market sources to generate a full analysis.`
   };
 }
 

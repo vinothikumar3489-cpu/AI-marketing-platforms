@@ -94,12 +94,11 @@ function deriveBenefitsFromFeatures(features) {
 }
 
 function deriveFeaturesFromSummary(summary) {
-  if (!summary) return generateGenericFeatures();
+  if (!summary) return [];
   const sentences = summary.split(/[.!?]+/).filter(Boolean);
   const derived = [];
-  const words = summary.split(/\s+/).filter(w => w.length > 4);
 
-  sentences.forEach((s, i) => {
+  sentences.forEach((s) => {
     const trimmed = s.trim();
     if (trimmed.length > 10) {
       derived.push({
@@ -112,58 +111,13 @@ function deriveFeaturesFromSummary(summary) {
     }
   });
 
-  const nameCandidates = words.filter(w => w[0] === w[0].toUpperCase() && w.length > 3).slice(0, 3);
-  nameCandidates.forEach(candidate => {
-    if (!derived.some(d => d.name.toLowerCase().includes(candidate.toLowerCase()))) {
-      derived.push({
-        name: candidate + ' capabilities',
-        description: `Advanced ${candidate.toLowerCase()} features for modern businesses`,
-        benefit: null,
-        evidence: null,
-        inferenceStatus: 'AI_INFERRED',
-      });
-    }
-  });
-
-  return derived.length >= 5 ? derived.slice(0, 8) : [...derived, ...generateGenericFeatures()].slice(0, 8);
-}
-
-function generateGenericFeatures() {
-  return [
-    { name: 'Advanced Analytics & Reporting', description: 'Comprehensive analytics with real-time dashboards and customizable reports', benefit: 'Data-driven decision making with actionable insights', evidence: null, inferenceStatus: 'AI_INFERRED' },
-    { name: 'Intelligent Automation Engine', description: 'Automate repetitive tasks and streamline complex workflows', benefit: 'Reduce manual effort and accelerate time-to-value', evidence: null, inferenceStatus: 'AI_INFERRED' },
-    { name: 'Seamless Integration Platform', description: 'Connect with existing tools and systems through robust APIs', benefit: 'Unified workflow across your entire technology stack', evidence: null, inferenceStatus: 'AI_INFERRED' },
-    { name: 'Enterprise-Grade Security', description: 'SOC 2 compliant with role-based access control and encryption', benefit: 'Protect sensitive data and maintain regulatory compliance', evidence: null, inferenceStatus: 'AI_INFERRED' },
-    { name: 'Real-Time Collaboration', description: 'Work together seamlessly with shared workspaces and instant updates', benefit: 'Faster decision making with improved team alignment', evidence: null, inferenceStatus: 'AI_INFERRED' },
-    { name: 'Scalable Cloud Infrastructure', description: 'Enterprise-grade infrastructure that grows with your business', benefit: 'Handle increased demand without performance degradation', evidence: null, inferenceStatus: 'AI_INFERRED' },
-    { name: 'Smart Personalization', description: 'AI-driven personalization engine for tailored user experiences', benefit: 'Higher engagement and conversion rates', evidence: null, inferenceStatus: 'AI_INFERRED' },
-    { name: 'Mobile-First Experience', description: 'Fully responsive design with dedicated mobile applications', benefit: 'Access critical features anytime, anywhere', evidence: null, inferenceStatus: 'AI_INFERRED' },
-  ];
-}
-
-function generateGenericBenefits(summary) {
-  if (summary) {
-    return [
-      { text: summary.length > 100 ? summary.substring(0, 100) + '...' : summary, evidence: null, inferenceStatus: 'AI_INFERRED' },
-      { text: 'Streamline operations and reduce manual effort with intelligent automation', evidence: null, inferenceStatus: 'AI_INFERRED' },
-      { text: 'Make data-driven decisions with comprehensive analytics and insights', evidence: null, inferenceStatus: 'AI_INFERRED' },
-      { text: 'Scale your business efficiently with enterprise-grade infrastructure', evidence: null, inferenceStatus: 'AI_INFERRED' },
-      { text: 'Improve team collaboration and alignment with real-time tools', evidence: null, inferenceStatus: 'AI_INFERRED' },
-      { text: 'Enhance customer experience with personalized, AI-driven interactions', evidence: null, inferenceStatus: 'AI_INFERRED' },
-    ];
-  }
-  return [
-    { text: 'Drive measurable business growth with data-driven strategies', evidence: null, inferenceStatus: 'AI_INFERRED' },
-    { text: 'Reduce operational costs through intelligent process automation', evidence: null, inferenceStatus: 'AI_INFERRED' },
-    { text: 'Improve team productivity with streamlined workflows and collaboration tools', evidence: null, inferenceStatus: 'AI_INFERRED' },
-    { text: 'Gain competitive advantage with actionable insights and analytics', evidence: null, inferenceStatus: 'AI_INFERRED' },
-    { text: 'Ensure enterprise-grade security and compliance across all operations', evidence: null, inferenceStatus: 'AI_INFERRED' },
-    { text: 'Scale seamlessly with cloud-native infrastructure that grows with you', evidence: null, inferenceStatus: 'AI_INFERRED' },
-  ];
+  return derived.slice(0, 8);
 }
 
 function deriveBenefitsFromSummary(summary) {
-  return generateGenericBenefits(summary);
+  if (!summary) return [];
+  const trimmed = summary.length > 100 ? summary.substring(0, 100) + '...' : summary;
+  return [{ text: trimmed, evidence: null, inferenceStatus: 'AI_INFERRED' }];
 }
 
 function derivePainPointsFromCompetitors(competitors) {
@@ -179,69 +133,27 @@ function derivePainPointsFromCompetitors(competitors) {
   return takeArray(painPoints, 5);
 }
 
-function generateGenericPainPoints(summary, productName) {
-  const name = productName || 'the solution';
-  if (summary) {
-    const summaryLower = summary.toLowerCase();
-    const matched = [];
-    const painPointIndicators = [
-      { pattern: 'challenge', point: 'Overcoming operational challenges' },
-      { pattern: 'complex', point: 'Managing complex workflows and processes' },
-      { pattern: 'manual', point: 'Reducing manual, repetitive tasks' },
-      { pattern: 'slow', point: 'Eliminating slow, inefficient processes' },
-      { pattern: 'cost', point: 'Controlling rising operational costs' },
-      { pattern: 'inefficient', point: 'Addressing inefficient workflows' },
-      { pattern: 'data', point: 'Making sense of scattered data sources' },
-      { pattern: 'integration', point: 'Integrating disconnected tools and systems' },
-      { pattern: 'scale', point: 'Scaling operations without proportional cost increase' },
-      { pattern: 'visibility', point: 'Lack of visibility into key business metrics' },
-    ];
-    painPointIndicators.forEach(({ pattern, point }) => {
-      if (summaryLower.includes(pattern)) matched.push(point);
-    });
-    if (matched.length >= 5) return matched.slice(0, 8);
-  }
-  return [
-    'Inefficient manual processes consuming valuable team hours',
-    'Lack of visibility into key business metrics and performance',
-    'Difficulty scaling operations without proportional cost increases',
-    'Fragmented tool ecosystem causing data silos and inefficiencies',
-    'High operational costs eating into profit margins',
-    'Inconsistent customer experiences across channels',
-    'Slow decision-making due to lack of real-time data',
-    'Integration challenges between existing systems and new tools',
-  ];
-}
-
 function derivePainPointsFromSummary(summary) {
-  return generateGenericPainPoints(summary);
+  if (!summary) return [];
+  const painPointIndicators = [
+    'challenge', 'complex', 'manual', 'slow', 'cost', 'inefficient',
+    'data', 'integration', 'scale', 'visibility', 'problem', 'difficult',
+  ];
+  const matched = summary.split(/[.!?]+/).filter(Boolean).map(s => s.trim()).filter(s => {
+    if (s.length < 10) return false;
+    const lower = s.toLowerCase();
+    return painPointIndicators.some(w => lower.includes(w));
+  });
+  return takeArray(matched, 8);
 }
 
-function generateGenericUseCases(features, summary, productName) {
-  const name = productName || 'the solution';
+function deriveUseCasesFromFeatures(features) {
   const featureNames = (features || []).map(f => typeof f === 'string' ? f : (f.name || '')).filter(Boolean);
-  const useCases = [];
-
-  if (featureNames.length > 0) {
-    useCases.push({ scenario: `Leveraging ${featureNames[0]} for daily operations`, solution: `${featureNames[0]} enables teams to automate and optimize workflows`, outcome: 'Increased efficiency and reduced manual effort' });
-  }
-  if (featureNames.length > 1) {
-    useCases.push({ scenario: `Using ${featureNames[1]} for strategic decision-making`, solution: `${featureNames[1]} provides actionable insights for ${summary?.substring(0, 50) || 'business growth'}`, outcome: 'Data-driven decisions with measurable results' });
-  } else if (featureNames.length > 0) {
-    useCases.push({ scenario: `Driving strategic growth with ${featureNames[0]}`, solution: `${featureNames[0]} delivers actionable insights for business growth`, outcome: 'Improved strategic outcomes' });
-  }
-
-  useCases.push(
-    { scenario: `Onboarding new team members and streamlining training`, solution: `Intuitive interface and comprehensive documentation reduce ramp-up time`, outcome: `Faster time-to-productivity for new hires` },
-    { scenario: `Cross-departmental collaboration and reporting`, solution: `Shared workspaces and real-time dashboards keep everyone aligned`, outcome: `Improved organizational alignment and faster decision-making` },
-    { scenario: `Customer success and retention initiatives`, solution: `Usage analytics and health scores identify at-risk accounts early`, outcome: `Reduced churn and increased customer lifetime value` },
-  );
-
-  return useCases.slice(0, 5);
-}
-
-function deriveUseCasesFromFeatures(features, summary) {
-  return generateGenericUseCases(features, summary);
+  return featureNames.slice(0, 3).map(name => ({
+    scenario: `Implementing ${name}`,
+    solution: null,
+    outcome: null,
+  }));
 }
 
 function extractSources(brief, campaignData, execDashboard) {
@@ -304,23 +216,23 @@ export async function enrichContentBrief(prisma, userId, chatId, brief) {
   enriched._sources = extractSources(brief, campaignData, execDashboard);
   enriched._growthWs = growthWs;
 
-  const productName = productAnalysis.productName || enriched.product?.name || brief._productIdentity?.productName || '';
   const summary = productAnalysis.summary || productAnalysis.productSummary || enriched.product?.summary || '';
 
   // --- Campaign Goal Mapping (Task 4) ---
   enriched.campaign = {
-    goal: campaignData.campaignGoals?.[0] || campaignData.goals?.[0] || campaignData.objective || campaignData.businessGoal || campaignData.businessObjective || `Drive adoption of ${productName || 'the solution'}`,
-    businessGoal: campaignData.businessGoal || campaignData.businessObjective || null,
-    objective: campaignData.objective || campaignData.campaignGoals?.[0] || null,
-    timeline: campaignData.timeline || campaignData.campaignTimeline || null,
+    ...(enriched.campaign || {}),
+    goal: enriched.campaign?.goal || campaignData.campaignGoals?.[0] || campaignData.goals?.[0] || campaignData.objective || campaignData.businessGoal || campaignData.businessObjective || null,
+    businessGoal: campaignData.businessGoal || campaignData.businessObjective || enriched.campaign?.businessGoal || null,
+    objective: campaignData.objective || campaignData.campaignGoals?.[0] || enriched.campaign?.objective || null,
+    timeline: campaignData.timeline || campaignData.campaignTimeline || enriched.campaign?.timeline || null,
     channels: channelData?.recommendedChannels?.map(ch => ({
       channel: ch.channel || ch.name,
-      priority: ch.priority || 'medium',
+      priority: ch.priority || null,
       reason: ch.reason || null,
-    })) || [],
-    marketingFunnel: campaignData.funnelStage || campaignData.marketingFunnel || null,
-    creativeAngles: takeArray(campaignData.creativeAngles || campaignData.messagingPillars, 5),
-    brandVoice: campaignData.brandVoice || productAnalysis.brandVoice || null,
+    })).filter(ch => ch.channel) || enriched.campaign?.channels || [],
+    marketingFunnel: campaignData.funnelStage || campaignData.marketingFunnel || enriched.campaign?.marketingFunnel || null,
+    creativeAngles: takeArray(campaignData.creativeAngles || campaignData.messagingPillars || enriched.campaign?.creativeAngles, 5),
+    brandVoice: campaignData.brandVoice || productAnalysis.brandVoice || enriched.campaign?.brandVoice || null,
   };
 
   enriched.executive = {
@@ -397,16 +309,16 @@ export async function enrichContentBrief(prisma, userId, chatId, brief) {
       return true;
     });
     if (fromCompetitors.length > 0) diagnostics.enriched.push(`Derived ${fromCompetitors.length} pain points from competitor weaknesses`);
-    diagnostics.enriched.push(`Derived ${allPainPoints.length} pain points from product summary`);
+    if (allPainPoints.length > 0 && fromCompetitors.length === 0) diagnostics.enriched.push(`Derived ${allPainPoints.length} pain points from product summary`);
   }
 
   console.info('[Enrich] After pain point derivation', { count: allPainPoints.length });
 
   // --- Use Cases Derivation (ensure minimum 3) ---
   if (allUseCases.length < MINIMUM_REQUIREMENTS.useCases.count) {
-    const derived = deriveUseCasesFromFeatures(allFeatures, summary, productName);
+    const derived = deriveUseCasesFromFeatures(allFeatures);
     allUseCases = [...allUseCases, ...derived];
-    diagnostics.enriched.push(`Derived ${derived.length} use cases`);
+    if (derived.length > 0) diagnostics.enriched.push(`Derived ${derived.length} use cases from feature names`);
   }
 
   console.info('[Enrich] After use case derivation', { count: allUseCases.length });
@@ -425,10 +337,9 @@ export async function enrichContentBrief(prisma, userId, chatId, brief) {
 
   // --- Campaign Goal (Task 4) ---
   if (!enriched.campaign.goal) {
-    enriched.campaign.goal = `Drive adoption and awareness for ${productName || 'the solution'}`;
-    diagnostics.enriched.push('Derived campaign goal from product name');
+    diagnostics.missing.push('Campaign Goal');
   }
-  console.info('[Enrich] Campaign goal', { goal: enriched.campaign.goal });
+  console.info('[Enrich] Campaign goal', { goal: enriched.campaign.goal || null });
 
   // --- CTA Derivation ---
   const ctaCount = enriched.CTA?.length || 0;
@@ -436,8 +347,8 @@ export async function enrichContentBrief(prisma, userId, chatId, brief) {
     enriched.CTA = website.ctaTexts.slice(0, 3).map(t => ({ text: t, url: null }));
     diagnostics.enriched.push('Derived CTA from website evidence');
   } else if (ctaCount === 0) {
-    enriched.CTA = [{ text: 'Get Started', url: null }];
-    diagnostics.enriched.push('Using default CTA');
+    enriched.CTA = [];
+    diagnostics.missing.push('Primary CTA');
   }
   console.info('[Enrich] CTA', { count: enriched.CTA?.length || 0, cta: enriched.CTA?.[0]?.text });
 
@@ -510,12 +421,7 @@ export async function enrichContentBrief(prisma, userId, chatId, brief) {
     }
   }
   if ((enriched.targetPersonas?.length || 0) < MINIMUM_REQUIREMENTS.personas.count) {
-    enriched.targetPersonas = [
-      { name: 'Business Decision Makers', role: 'Executive', painPoints: ['ROI justification', 'Competitive pressure', 'Growth targets'], goals: ['Revenue growth', 'Market share', 'Operational excellence'] },
-      { name: 'End Users & Team Members', role: 'Team Member', painPoints: ['Inefficient workflows', 'Manual processes', 'Tool fragmentation'], goals: ['Productivity', 'Ease of use', 'Time savings'] },
-      { name: 'Technical Evaluators', role: 'Technical Lead', painPoints: ['Integration complexity', 'Security compliance', 'Scalability concerns'], goals: ['Seamless integration', 'Enterprise security', 'Platform reliability'] },
-    ];
-    diagnostics.enriched.push('Using inferred audience personas');
+    diagnostics.missing.push('Audience Personas');
   }
   console.info('[Enrich] Personas', { count: enriched.targetPersonas?.length || 0 });
 

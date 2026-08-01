@@ -1,4 +1,4 @@
-﻿import { researchCompetitors, generateFallbackCompetitorInsights } from "./tavily.service.js";
+﻿import { researchCompetitors, generateFallbackCompetitorInsights } from "../providers/tavily.service.js";
 import { sanitizeText } from '../utils/text.util.js';
 
 const CEREBRAS_API_KEY = process.env.CEREBRAS_API_KEY;
@@ -18,8 +18,6 @@ const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-business-intel";
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "anthropic/claude-3-haiku";
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-
-const MAX_PROMPT_LENGTH = 3200;
 
 function limitArray(value, max) {
   if (!value) return [];
@@ -54,17 +52,21 @@ function buildPrompt({ productData = {}, scrapedData = {}, researchData = {} }) 
     .filter(Boolean)
     .join("\n");
 
+  // Evidence sections are truncated to control prompt size, but the JSON
+  // schema is never truncated: a cut-off schema forces providers into
+  // freeform output that then fails parsing and degrades to generic
+  // heuristic fallbacks for every request.
   const prompt = `You are a senior SaaS product marketing strategist and competitive intelligence analyst. Use the product profile, website evidence, and market research to produce a clean, professional product intelligence report.
 
-Do not include markdown, tables, code fences, or raw HTML. Return valid JSON only. Use the exact schema fields and do not use “Unknown” for mature brands.
+Do not include markdown, tables, code fences, or raw HTML. Return valid JSON only.
 
 PRODUCT PROFILE:
-Name: ${sanitizeText(productData.productName) || "Product"}
-Company: ${sanitizeText(productData.companyName) || "N/A"}
-Industry: ${sanitizeText(productData.industry) || "General SaaS"}
+Name: ${sanitizeText(productData.productName) || "Not provided"}
+Company: ${sanitizeText(productData.companyName) || "Not provided"}
+Industry: ${sanitizeText(productData.industry) || "Not provided"}
 Description: ${sanitizeText(productData.description) || "Not provided"}
-Target audience: ${sanitizeText(productData.targetAudience) || "Not specified"}
-Pricing: ${sanitizeText(productData.pricing) || "Not specified"}
+Target audience: ${sanitizeText(productData.targetAudience) || "Not provided"}
+Pricing: ${sanitizeText(productData.pricing) || "Not provided"}
 Competitors: ${sanitizeText(productData.competitors) || "Not provided"}
 Business goal: ${sanitizeText(productData.businessGoal) || "Not provided"}
 
@@ -103,7 +105,7 @@ Return valid JSON only with these fields:
     "marketTrends": [],
     "growthOpportunity": "",
     "marketRisks": [],
-    "demandScore": ""
+    "demandScore": null
   },
   "audienceIntelligence": {
     "customerSegments": [],
@@ -119,9 +121,15 @@ Return valid JSON only with these fields:
     "seoConfidence": 0,
     "overallConfidence": 0
   }
-}`;
+}
 
-  return prompt.slice(0, MAX_PROMPT_LENGTH);
+RULES:
+- Derive every value from the product profile, website evidence, or research found above.
+- When a field cannot be derived from the evidence, return an empty string or empty array. For demandScore return null.
+- NEVER invent product features, prices, competitor names, market sizes, statistics, or personas that are not present in the evidence.
+- Do not use "Unknown", "N/A", or placeholder text. Return valid JSON only.`;
+
+  return prompt;
 }
 
 function extractJsonFromText(text) {
@@ -188,31 +196,40 @@ function normalizePersonas(value) {
     .map((persona) => {
       if (!persona) return null;
       if (typeof persona === "string") {
-        return { name: persona, title: "Buyer Persona", goal: "Improve outcomes", challenge: "Needs more clarity", department: "Marketing" };
+        return { name: sanitizeText(persona), title: null, goal: null, challenge: null, department: null };
       }
       return {
-        name: sanitizeText(persona.name) || persona.name || "Buyer Persona",
-        title: sanitizeText(persona.title) || persona.title || "Role",
-        goal: sanitizeText(persona.goal) || persona.goal || "Goal",
-        challenge: sanitizeText(persona.challenge) || persona.challenge || "Challenge",
-        department: sanitizeText(persona.department) || persona.department || "Marketing",
+        name: sanitizeText(persona.name) || null,
+        title: sanitizeText(persona.title) || null,
+        goal: sanitizeText(persona.goal) || null,
+        challenge: sanitizeText(persona.challenge) || null,
+        department: sanitizeText(persona.department) || null,
       };
     })
-    .filter(Boolean)
+    .filter((p) => p && p.name)
     .slice(0, 6);
 }
 
 function normalizeCompetitors(value, type = "direct") {
-  return normalizeArray(value, 6).map((name) => ({ name: sanitizeText(name), type, positioning: type === "direct" ? "Core competitor" : type === "indirect" ? "Adjacent competitor" : "Emerging competitor" }));
+  // Positioning labels are only included when the model provided them;
+  // a hardcoded label would be fabricated evidence about the competitor.
+  return normalizeArray(value, 6).map((name) => ({ name: sanitizeText(name), type, positioning: null }));
 }
 
 function normalizeMarketDiscovery(rawAnalysis = {}, productData = {}, researchData = {}) {
+  const marketSizeEstimate = sanitizeText(rawAnalysis.marketDiscovery?.marketSizeEstimate) || null;
+  const growthOpportunity = sanitizeText(rawAnalysis.marketDiscovery?.growthOpportunity) || null;
+  const demandScoreRaw = rawAnalysis.marketDiscovery?.demandScore;
+  const demandScore = (typeof demandScoreRaw === "number" && Number.isFinite(demandScoreRaw) && demandScoreRaw >= 0 && demandScoreRaw <= 100)
+    ? demandScoreRaw
+    : null;
+
   return {
-    marketSizeEstimate: sanitizeText(rawAnalysis.marketDiscovery?.marketSizeEstimate) || `Estimated market size for ${sanitizeText(productData.industry) || "this category"}`,
+    marketSizeEstimate,
     marketTrends: normalizeArray(rawAnalysis.marketDiscovery?.marketTrends, 5),
-    growthOpportunity: sanitizeText(rawAnalysis.marketDiscovery?.growthOpportunity) || `Strengths in product-market fit for ${sanitizeText(productData.productName) || "this product"}`,
+    growthOpportunity,
     marketRisks: normalizeArray(rawAnalysis.marketDiscovery?.marketRisks, 5),
-    demandScore: Number(rawAnalysis.marketDiscovery?.demandScore) || (researchData?.marketSignals?.length ? 70 : 45),
+    demandScore,
   };
 }
 
@@ -262,7 +279,7 @@ function normalizeAnalysis(rawAnalysis = {}, productData = {}, scrapedData = {},
 
   const confidenceBreakdown = {
     scrapingQuality: Number(rawAnalysis.confidenceBreakdown?.scrapingQuality) || Math.min(100, (scrapedData?.scrapeQuality?.featuresCount || 1) * 6 + (scrapedData?.scrapeQuality?.benefitsCount || 1) * 5),
-    aiAnalysisQuality: Number(rawAnalysis.confidenceBreakdown?.aiAnalysisQuality) || (usedProvider === "cerebras" ? 88 : usedProvider === "deepseek" ? 84 : usedProvider === "openrouter" ? 80 : usedProvider === "groq" ? 78 : usedProvider === "gemini" ? 75 : 60),
+    aiAnalysisQuality: Number(rawAnalysis.confidenceBreakdown?.aiAnalysisQuality) || Math.min(100, 40 + (usp.length > 0 ? 15 : 0) + (features.length > 0 ? 15 : 0) + (benefits.length > 0 ? 10 : 0) + (painPoints.length > 0 ? 10 : 0)),
     competitorConfidence: Number(rawAnalysis.confidenceBreakdown?.competitorConfidence) || (researchData?.competitors?.length ? 72 : 40),
     seoConfidence: Number(rawAnalysis.confidenceBreakdown?.seoConfidence) || (seoOpportunities.length ? 68 : 35),
     overallConfidence: 0,
@@ -270,26 +287,26 @@ function normalizeAnalysis(rawAnalysis = {}, productData = {}, scrapedData = {},
   confidenceBreakdown.overallConfidence = Math.min(100, Math.round((confidenceBreakdown.scrapingQuality + confidenceBreakdown.aiAnalysisQuality + confidenceBreakdown.competitorConfidence + confidenceBreakdown.seoConfidence) / 4));
 
   return {
-    productSummary: sanitizeText(rawAnalysis.productSummary) || `A professional product intelligence summary for ${sanitizeText(productData.productName) || "this product"}.`,
-    category: sanitizeText(rawAnalysis.category) || sanitizeText(productData.industry) || "SEO & Marketing Intelligence Platform",
-    marketSegment: sanitizeText(rawAnalysis.marketSegment) || sanitizeText(productData.industry) || "Digital Marketing",
-    businessModel: sanitizeText(rawAnalysis.businessModel) || "SaaS",
-    revenueModel: sanitizeText(rawAnalysis.revenueModel) || "Subscription",
-    marketMaturity: sanitizeText(rawAnalysis.marketMaturity) || "Growth Stage Leader",
-    usp: usp.length ? usp : [`${sanitizeText(productData.productName) || "The product"} delivers a stronger route to market differentiation.`],
+    productSummary: sanitizeText(rawAnalysis.productSummary) || null,
+    category: sanitizeText(rawAnalysis.category) || sanitizeText(productData.industry) || null,
+    marketSegment: sanitizeText(rawAnalysis.marketSegment) || sanitizeText(productData.industry) || null,
+    businessModel: sanitizeText(rawAnalysis.businessModel) || null,
+    revenueModel: sanitizeText(rawAnalysis.revenueModel) || null,
+    marketMaturity: sanitizeText(rawAnalysis.marketMaturity) || null,
+    usp: usp.length ? usp : [],
     features: features.length ? features : limitArray(scrapedData.features, 10),
     benefits: benefits.length ? benefits : limitArray(scrapedData.benefits, 10),
-    painPoints: painPoints.length ? painPoints : ["Unclear product positioning", "Weak competitor differentiation", "Insufficient market signals", "Low SEO visibility", "Undefined buyer intent"],
-    targetUsers: targetUsers.length ? targetUsers : limitArray(scrapedData.heroText ? [scrapedData.heroText] : [], 6),
-    buyerPersonas: buyerPersonas.length ? buyerPersonas : normalizePersonas(rawAnalysis.targetUsers || rawAnalysis.buyerPersonas),
+    painPoints: painPoints.length ? painPoints : [],
+    targetUsers: targetUsers.length ? targetUsers : [],
+    buyerPersonas: buyerPersonas.length ? buyerPersonas : [],
     directCompetitors: directCompetitors.length ? directCompetitors : normalizeCompetitors(fallbackCompetitors.slice(0, 3), "direct"),
     indirectCompetitors: indirectCompetitors.length ? indirectCompetitors : normalizeCompetitors(fallbackCompetitors.slice(3, 5), "indirect"),
     emergingCompetitors: emergingCompetitors.length ? emergingCompetitors : normalizeCompetitors(fallbackCompetitors.slice(5, 6), "emerging"),
-    pricingPosition: sanitizeText(rawAnalysis.pricingPosition) || "Competitive pricing position",
-    seoOpportunities: seoOpportunities.length ? seoOpportunities : ["Optimize core landing pages for high-intent search", "Create competitor comparison content", "Target long-tail commercial keywords"],
-    marketingAngles: marketingAngles.length ? marketingAngles : ["Position as the AI-first growth engine", "Highlight faster time to value", "Promote superior competitive visibility"],
-    campaignIdeas: campaignIdeas.length ? campaignIdeas : ["SEO growth sprint", "Competitor outrank campaign", "Demand-gen launch promotion"],
-    recommendedChannels: recommendedChannels.length ? recommendedChannels : ["SEO", "LinkedIn", "Webinars", "Email Marketing"],
+    pricingPosition: sanitizeText(rawAnalysis.pricingPosition) || null,
+    seoOpportunities: seoOpportunities.length ? seoOpportunities : [],
+    marketingAngles: marketingAngles.length ? marketingAngles : [],
+    campaignIdeas: campaignIdeas.length ? campaignIdeas : [],
+    recommendedChannels: recommendedChannels.length ? recommendedChannels : [],
     marketDiscovery: normalizeMarketDiscovery(rawAnalysis, productData, researchData),
     audienceIntelligence: normalizeAudienceIntelligence(rawAnalysis),
     researchSources: normalizeResearchSources(rawAnalysis, scrapedData),
@@ -620,62 +637,19 @@ export async function generateProductIntelligence({ productData = {}, scrapedDat
     analysis = normalizeAnalysis(analysisResult.data || {}, productData, scrapedData, researchData, providerStatus.usedProvider);
   } else {
     providerStatus.usedProvider = "heuristic";
-    warnings.push("AI providers did not return valid intelligence. Generated fallback analysis.");
+    warnings.push("AI providers did not return valid intelligence. Returning scraped evidence only.");
     analysis = normalizeAnalysis(
       {
-        productSummary: `Product intelligence summary for ${sanitizeText(productData.productName) || "this product"}.`,
-        category: sanitizeText(productData.industry) || "General SaaS",
-        marketSegment: sanitizeText(productData.industry) || "General",
-        businessModel: "SaaS",
-        revenueModel: "Subscription",
-        marketMaturity: "Growth Stage Leader",
-        usp: [
-          `Clear value messaging that positions ${sanitizeText(productData.productName) || "the product"} as a strong market choice.`,
-        ],
         features: limitArray(scrapedData.features, 10),
         benefits: limitArray(scrapedData.benefits, 10),
-        painPoints: [
-          "Unclear product differentiation",
-          "Weak buyer persona definition",
-          "Lack of competitive positioning",
-          "Low SEO and market visibility",
-          "Unfocused feature messaging",
-        ],
-        targetUsers: normalizeArray(productData.targetAudience, 6),
-        buyerPersonas: normalizePersonas(productData.targetAudience),
-        directCompetitors: normalizeCompetitors(researchData.competitors || [], "direct"),
-        pricingPosition: sanitizeText(productData.pricing) || "Competitive pricing",
-        seoOpportunities: ["Create SEO pillar pages", "Target buyer intent keywords", "Build competitor comparison content"],
-        marketingAngles: ["Promote AI-driven efficiency", "Highlight revenue acceleration", "Position as a modern market leader"],
-        campaignIdeas: ["AI visibility audit", "Competitor outrank sprint", "Demand generation webinar series"],
-        recommendedChannels: ["SEO", "Google Search", "LinkedIn", "Webinars"],
-        marketDiscovery: {
-          marketSizeEstimate: `Estimated audience for ${sanitizeText(productData.industry) || "this category"}.`,
-          marketTrends: ["Growing demand for AI-enabled marketing", "More buyers seeking faster ROI"],
-          growthOpportunity: "Position against legacy tools with faster intelligence.",
-          marketRisks: ["Competitive incumbent platforms", "Shifting SEO algorithm updates"],
-          demandScore: 62,
-        },
-        audienceIntelligence: {
-          customerSegments: normalizeArray(productData.targetAudience || "", 5),
-          buyingTriggers: ["Need for faster insights", "Pressure to improve ROI", "Demand for better automation"],
-          objections: ["Budget uncertainty", "Integration complexity", "Feature overlap"],
-          decisionMakers: ["Marketing Manager", "Growth Lead", "CMO"],
-          customerProfiles: ["Mid-market marketing teams", "SEO agencies", "B2B SaaS growth teams"],
-        },
-        confidenceBreakdown: {
-          scrapingQuality: 45,
-          aiAnalysisQuality: 60,
-          competitorConfidence: 55,
-          seoConfidence: 50,
-          overallConfidence: 53,
-        },
       },
       productData,
       scrapedData,
       researchData,
       "heuristic"
     );
+    analysis.fallbackUsed = true;
+    analysis.fallbackNote = "AI analysis unavailable. Only evidence directly extracted from the website and verified research is included; unverifiable fields are null/empty.";
   }
 
   return {

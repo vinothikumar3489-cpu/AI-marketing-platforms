@@ -334,12 +334,13 @@ export async function generateReportCharts(chatId, userId) {
   }
 
   if (data.market.trends.length > 0) {
-    charts.marketTrend = generateTrendChartSvg(
-      data.market.trends.slice(0, 10).map((t, i) => ({
-        label: typeof t === 'string' ? t.substring(0, 20) : t.keyword?.substring(0, 20) || `Point ${i + 1}`,
-        value: null
-      }))
-    );
+    const trendPoints = data.market.trends.slice(0, 10).map((t, i) => ({
+      label: typeof t === 'string' ? t.substring(0, 20) : t.keyword?.substring(0, 20) || `Point ${i + 1}`,
+      value: t.value ?? t.volume ?? t.growthRate ?? null
+    })).filter(p => p.value != null);
+    if (trendPoints.length > 0) {
+      charts.marketTrend = generateTrendChartSvg(trendPoints);
+    }
   }
 
   return charts;
@@ -420,7 +421,7 @@ function generateMarkdown(data, type = 'executive') {
     if (seo?.keywords?.length > 0) {
       md += `| Keyword | Volume | Difficulty | Intent |\n| --- | --- | --- | --- |\n`;
       seo.keywords.slice(0, 30).forEach(k => {
-        md += `| ${k.keyword || k} | ${k.volume || k.searchVolume || 'N/A'} | ${k.keywordDifficulty || k.difficulty || 'N/A'}/100 | ${k.intent || 'Informational'} |\n`;
+        md += `| ${k.keyword || k} | ${k.volume || k.searchVolume || 'N/A'} | ${k.keywordDifficulty || k.difficulty || 'N/A'}/100 | ${k.intent || 'N/A'} |\n`;
       });
       md += '\n';
     } else {
@@ -440,7 +441,7 @@ function generateMarkdown(data, type = 'executive') {
     if (seo?.gaps?.length > 0) {
       md += `| Topic | Priority | Volume |\n| --- | --- | --- |\n`;
       seo.gaps.slice(0, 15).forEach(g => {
-        md += `| ${g.value || g.topic || g.title || g} | ${g.priority || g.severity || 'Medium'} | ${g.searchVolume || g.volume || 'N/A'} |\n`;
+        md += `| ${g.value || g.topic || g.title || g} | ${g.priority || g.severity || 'N/A'} | ${g.searchVolume || g.volume || 'N/A'} |\n`;
       });
       md += '\n';
     } else {
@@ -472,7 +473,7 @@ function generateMarkdown(data, type = 'executive') {
         md += `### ${p.label}\n\n`;
         md += `| Action | Priority | Impact |\n| --- | --- | --- |\n`;
         p.items.slice(0, 8).forEach(a => {
-          md += `| ${a.title || a.action || a.task || a.recommendation || a} | ${a.priority || a.severity || 'Medium'} | ${a.impact || a.area || a.reason || 'N/A'} |\n`;
+          md += `| ${a.title || a.action || a.task || a.recommendation || a} | ${a.priority || a.severity || 'N/A'} | ${a.impact || a.area || a.reason || 'N/A'} |\n`;
         });
         md += '\n';
       });
@@ -487,11 +488,11 @@ function generateMarkdown(data, type = 'executive') {
 
     md += `## 1. Executive Summary & KPI Dashboard\n\n`;
     md += `| Metric | Value |\n| --- | --- |\n`;
-    md += `| Overall Score | ${scores?.overallGrowthScore ?? null}/100 |\n`;
-    md += `| Market Opportunity | ${scores?.marketOpportunityScore ?? null}/100 |\n`;
-    md += `| Audience Clarity | ${scores?.audienceClarityScore ?? null}/100 |\n`;
-    md += `| Competitive Defensibility | ${scores?.competitiveDefensibilityScore ?? null}/100 |\n`;
-    md += `| Campaign Readiness | ${scores?.campaignReadinessScore ?? null}/100 |\n\n`;
+    md += `| Overall Score | ${scores?.overallGrowthScore ?? 'N/A'}/100 |\n`;
+    md += `| Market Opportunity | ${scores?.marketOpportunityScore ?? 'N/A'}/100 |\n`;
+    md += `| Audience Clarity | ${scores?.audienceClarityScore ?? 'N/A'}/100 |\n`;
+    md += `| Competitive Defensibility | ${scores?.competitiveDefensibilityScore ?? 'N/A'}/100 |\n`;
+    md += `| Campaign Readiness | ${scores?.campaignReadinessScore ?? 'N/A'}/100 |\n\n`;
 
     md += `## 2. Company Overview\n\n`;
     md += `| Attribute | Value |\n| --- | --- |\n`;
@@ -507,13 +508,26 @@ function generateMarkdown(data, type = 'executive') {
     md += `| Funding Stage | ${company?.fundingStage || 'Unknown'} |\n\n`;
 
     md += `## 3. SWOT Analysis\n\n`;
-    md += `### Strengths\n`;
-    md += `- Technology infrastructure with verified stack\n`;
-    md += `- Clear market positioning and business model\n`;
-    md += `- Data-driven intelligence platform coverage\n\n`;
-    md += `### Weaknesses\n`;
-    md += `- Data gaps requiring additional API integrations\n`;
-    md += `- Analytics connectivity needed for performance metrics\n\n`;
+    const strengths = market?.strengths || market?.growthSignals || [];
+    const weaknesses = market?.weaknesses || market?.dataGaps || [];
+    if (strengths.length > 0) {
+      md += `### Strengths\n`;
+      strengths.slice(0, 4).forEach(s => {
+        md += `- ${typeof s === 'string' ? s : s.value || s.name || s}\n`;
+      });
+      md += '\n';
+    } else {
+      md += '> Strength data unavailable from verified sources.\n\n';
+    }
+    if (weaknesses.length > 0) {
+      md += `### Weaknesses\n`;
+      weaknesses.slice(0, 4).forEach(w => {
+        md += `- ${typeof w === 'string' ? w : w.value || w.name || w}\n`;
+      });
+      md += '\n';
+    } else {
+      md += '> Weakness data unavailable from verified sources.\n\n';
+    }
     const opportunities = market?.opportunities || [];
     if (opportunities.length > 0) {
       md += `### Opportunities\n`;
@@ -607,7 +621,7 @@ function generateMarkdown(data, type = 'executive') {
             md += `### ${period.replace('day', 'Day ')}\n\n`;
             md += `| Task | Owner | Priority | Impact |\n| --- | --- | --- | --- |\n`;
             tasks.slice(0, 5).forEach(t => {
-              md += `| ${t.title || t.task || 'Task'} | ${t.owner || 'Unassigned'} | ${t.priority || 'Medium'} | ${t.impact || t.reason || t.evidence || 'N/A'} |\n`;
+              md += `| ${t.title || t.task || 'Task'} | ${t.owner || 'Unassigned'} | ${t.priority || 'N/A'} | ${t.impact || t.reason || t.evidence || 'N/A'} |\n`;
             });
             md += '\n';
           }
@@ -720,7 +734,7 @@ function generateCsv(data) {
 
   if (data.seo?.keywords?.length > 0) {
     data.seo.keywords.slice(0, 30).forEach(k => {
-      csv += `SEO Keyword,${csvEscape(k.keyword || k)},Volume:${k.volume || k.searchVolume || 'N/A'} | Difficulty:${k.keywordDifficulty || k.difficulty || 'N/A'} | Intent:${csvEscape(k.intent || 'Informational')}\n`;
+      csv += `SEO Keyword,${csvEscape(k.keyword || k)},Volume:${k.volume || k.searchVolume || 'N/A'} | Difficulty:${k.keywordDifficulty || k.difficulty || 'N/A'} | Intent:${csvEscape(k.intent || 'N/A')}\n`;
     });
   }
   if (data.seo?.competitors?.length > 0) {
@@ -730,7 +744,7 @@ function generateCsv(data) {
   }
   if (data.seo?.gaps?.length > 0) {
     data.seo.gaps.slice(0, 15).forEach(g => {
-      csv += `Content Gap,${csvEscape(g.value || g.topic || g.title || g)},Priority:${g.priority || g.severity || 'medium'}\n`;
+      csv += `Content Gap,${csvEscape(g.value || g.topic || g.title || g)},Priority:${g.priority || g.severity || 'N/A'}\n`;
     });
   }
 

@@ -69,6 +69,10 @@ export async function buildEvidenceContext(prisma, userId, chatId) {
       positioning: sourcedOpt(graph.competitors.positioning, 'competitorIntelligence', 'positioning'),
     },
 
+    market: sourcedOpt(graph.market, 'productIntelligence', 'marketDiscovery'),
+    technology: sourcedOpt(graph.technology, 'productIntelligence', 'technology'),
+    positioning: sourcedOpt(graph.positioning, 'competitorIntelligence', 'positioning'),
+
     seo: {
       score: sourcedOpt(graph.seo.score, 'seoIntelligence', 'score'),
       visibility: sourcedOpt(graph.seo.visibility, 'seoIntelligence', 'visibility'),

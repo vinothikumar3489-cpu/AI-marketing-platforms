@@ -268,14 +268,6 @@ function extractCompetitors(manualData = {}, scrapedData = {}) {
     competitors.push(...compParts);
   }
   
-  // Add inferred competitor types from scraped content
-  if (scrapedData?.cleanedText || scrapedData?.heroText) {
-    const text = (scrapedData.cleanedText || scrapedData.heroText || "").toLowerCase();
-    if (text.includes("alternative") || text.includes("vs")) competitors.push("Direct competitors");
-    if (text.includes("traditional")) competitors.push("Legacy solution providers");
-    if (text.includes("ai") || text.includes("machine learning")) competitors.push("AI-powered alternatives");
-  }
-  
   return uniq(competitors).slice(0, 5);
 }
 
@@ -290,13 +282,7 @@ function extractPricingPosition(manualData = {}, scrapedData = {}) {
     return scrapedData.pricingText;
   }
   
-  // Default based on industry
-  const industry = (manualData.industry || "").toLowerCase();
-  if (industry.includes("enterprise")) return "Enterprise licensing with custom pricing";
-  if (industry.includes("saas") || industry.includes("software")) return "Monthly/annual subscription";
-  if (industry.includes("consumer")) return "Affordable consumer pricing";
-  
-  return "Competitive market pricing";
+  return null;
 }
 
 function extractMarketingAngles(manualData = {}, scrapedData = {}) {

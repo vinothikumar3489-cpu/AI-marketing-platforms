@@ -36,7 +36,10 @@ Return ONLY a valid JSON object with these exact fields (no markdown, no extra t
   "finalRecommendation": "Your final actionable recommendation"
 }
 
-Ensure all arrays have at least 3 items. Return ONLY valid JSON.`;
+RULES:
+- Derive every competitor, insight, and figure ONLY from the research and scraped data above.
+- When evidence is insufficient, return empty arrays or empty strings. NEVER invent competitor names, pricing, or statistics that are not present in the data.
+- Return ONLY valid JSON.`;
 }
 
 function getRuleBasedFallback(inputData) {
@@ -64,13 +67,14 @@ export async function generateCompetitorAnalysis(inputData) {
     console.log("🔍 Scraping provided competitor URLs...");
     for (let i = 0; i < Math.min(inputData.competitorUrls.length, 3); i++) {
       try {
-        const scraped = await scrapeWebsite(inputData.competitorUrls[i]);
+        const scraped = await scrapeWebsite({ websiteUrl: inputData.competitorUrls[i] });
+        const content = scraped?.scrapedData || scraped || {};
         scrapedData.push({
           url: inputData.competitorUrls[i],
-          title: scraped?.title || "",
-          description: scraped?.metaDescription || "",
-          headings: scraped?.headings || [],
-          cleanedText: (scraped?.cleanedText || "").slice(0, 1000)
+          title: content.title || "",
+          description: content.metaDescription || "",
+          headings: content.headings || [],
+          cleanedText: (content.cleanedText || "").slice(0, 1000)
         });
       } catch (e) {
         console.warn(`⚠️ Failed to scrape ${inputData.competitorUrls[i]}:`, e.message);

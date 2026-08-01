@@ -2,6 +2,7 @@ import FirecrawlApp from "@mendable/firecrawl-js";
 import { load } from "cheerio";
 import fetch from "node-fetch";
 import { createEvidenceSnapshot } from "./evidence.service.js";
+import { memoize, cacheKeyUrl } from "../../../utils/research-cache.util.js";
 
 // Optional API fallback clients are not yet installed; these are placeholders.
 // If the packages are available, you can import them here:
@@ -78,6 +79,16 @@ function truncateString(text = "", maxLength = 500) {
   if (!text || typeof text !== "string") return "";
   text = text.trim();
   return text.length > maxLength ? text.slice(0, maxLength) + "..." : text;
+}
+
+// Maximum HTML length retained from scraped pages. The <head> section (which
+// technology detection and schema.org discovery rely on) is always first, so
+// truncation preserves it while bounding memory usage.
+const MAX_HTML_LENGTH = 300000;
+
+function capHtml(html = "") {
+  if (!html || typeof html !== "string") return "";
+  return html.length > MAX_HTML_LENGTH ? html.slice(0, MAX_HTML_LENGTH) : html;
 }
 
 // ===== FEATURE EXTRACTION =====
@@ -367,6 +378,8 @@ async function scrapeWithFirecrawl(websiteUrl) {
       faq,
       testimonials,
       socialLinks,
+      html: capHtml(html),
+      text: rawMarkdown,
       rawMarkdown,
       cleanedText,
       scrapeQuality
@@ -393,7 +406,7 @@ async function scrapeWithCheerio(websiteUrl) {
   try {
     console.log(`🔗 Scraping with Cheerio fallback: ${websiteUrl}`);
     const response = await fetch(websiteUrl, {
-      timeout: 10000,
+      signal: AbortSignal.timeout(10000),
       headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
     });
 
@@ -477,6 +490,8 @@ async function scrapeWithCheerio(websiteUrl) {
       faq,
       testimonials,
       socialLinks,
+      html: capHtml(html),
+      text: rawText,
       rawMarkdown: rawText,
       cleanedText,
       scrapeQuality
@@ -538,6 +553,8 @@ function parseScrapedHtml(html, source) {
     faq,
     testimonials,
     socialLinks,
+    html: capHtml(html),
+    text: rawText,
     rawMarkdown: rawText,
     cleanedText,
     scrapeQuality,
@@ -555,20 +572,56 @@ async function scrapeWithPlaywright(websiteUrl) {
     return null;
   }
 
+  let browser = null;
   try {
     console.log(`🧪 Scraping with Playwright: ${websiteUrl}`);
-    const browser = await chromiumModule.chromium.launch({ headless: true });
+    browser = await chromiumModule.chromium.launch({ headless: true });
     const page = await browser.newPage();
     await page.goto(websiteUrl, { waitUntil: "networkidle", timeout: 20000 });
     const html = await page.content();
-    await browser.close();
 
     console.log("✅ Playwright scrape completed");
     return parseScrapedHtml(html, "playwright");
   } catch (error) {
     console.warn("⚠️  Playwright scrape failed:", error.message);
     return null;
+  } finally {
+    if (browser) {
+      await browser.close().catch((closeError) => {
+        console.warn("⚠️  Playwright browser close error:", closeError.message);
+      });
+    }
   }
+}
+
+// ===== SCRAPER RETRY + FAILURE REPORTING =====
+
+const SCRAPE_CACHE_TTL_MS = 10 * 60 * 1000;
+const MAX_SCRAPER_RETRIES = 2;
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Run a scraper with one bounded retry. Returns { data, error, attempts } —
+ * callers keep the existing null-on-failure contract via `data`.
+ */
+async function retryScraper(fn, source, websiteUrl) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= MAX_SCRAPER_RETRIES; attempt++) {
+    try {
+      const data = await fn();
+      if (data) return { data, error: null, attempts: attempt };
+      lastError = new Error(`${source} returned no content`);
+    } catch (err) {
+      lastError = err;
+    }
+    if (attempt < MAX_SCRAPER_RETRIES) {
+      await sleep(300 * Math.pow(2, attempt - 1));
+    }
+  }
+  return { data: null, error: lastError?.message || `${source} failed`, attempts: MAX_SCRAPER_RETRIES };
 }
 
 // ===== JINA FALLBACK SCRAPER =====
@@ -581,6 +634,7 @@ async function scrapeWithJina(websiteUrl) {
     console.log(`🔍 Scraping with Jina Reader: ${websiteUrl}`);
     const response = await fetch("https://r.jina.ai/", {
       method: "POST",
+      signal: AbortSignal.timeout(25000),
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
@@ -651,6 +705,8 @@ async function scrapeWithJina(websiteUrl) {
       faq,
       testimonials,
       socialLinks,
+      html: null,
+      text: truncateString(rawMarkdown, 3000),
       rawMarkdown: truncateString(rawMarkdown, 3000),
       cleanedText,
       scrapeQuality,
@@ -662,23 +718,56 @@ async function scrapeWithJina(websiteUrl) {
 }
 
 // ===== TAVILY FALLBACK SCRAPER =====
+// Removed: the previous implementation was a placeholder that unconditionally
+// returned null (Tavily Extract SDK is not installed). A scraper slot that can
+// never produce data is worse than no slot — the chain is Jina → Firecrawl →
+// Playwright → Cheerio. If the @tavily/extract package is installed later, add
+// it here as a real implementation and register it in scrapeWebsite().
 
-async function scrapeWithTavily(websiteUrl) {
-  const apiKey = process.env.TAVILY_API_KEY;
-  if (!apiKey) return null;
+/**
+ * Run the full scraper chain. Tier 1 (Jina + Firecrawl) runs in PARALLEL —
+ * halving worst-case latency — with Jina preferred when both succeed. Tier 2
+ * (Playwright) and tier 3 (Cheerio) only run when the previous tier produced
+ * nothing. Each scraper gets one bounded retry. The whole chain is memoized per
+ * normalized URL so no two pipeline stages ever crawl the same site twice.
+ */
+async function scrapeChain(websiteUrl) {
+  const attempts = [];
 
-  try {
-    console.log(`🔎 Scraping with Tavily Extract: ${websiteUrl}`);
-    // Placeholder - replace with actual Tavily Extract SDK usage if available
-    // const client = new TavilyExtract({ apiKey });
-    // const response = await client.scrapeUrl(websiteUrl);
-    // const markdown = response.markdown || "";
-    // const html = response.html || "";
-    return null;
-  } catch (error) {
-    console.warn("⚠️  Tavily scrape failed:", error.message);
-    return null;
+  const [jinaRes, firecrawlRes] = await Promise.allSettled([
+    retryScraper(() => scrapeWithJina(websiteUrl), "jina", websiteUrl),
+    retryScraper(() => scrapeWithFirecrawl(websiteUrl), "firecrawl", websiteUrl),
+  ]);
+
+  const jina = jinaRes.status === "fulfilled" ? jinaRes.value : { data: null, error: jinaRes.reason?.message };
+  const firecrawl = firecrawlRes.status === "fulfilled" ? firecrawlRes.value : { data: null, error: firecrawlRes.reason?.message };
+  attempts.push({ source: "jina", ok: !!jina.data, error: jina.error || null });
+  attempts.push({ source: "firecrawl", ok: !!firecrawl.data, error: firecrawl.error || null });
+
+  if (jina.data) {
+    return { scrapedData: jina.data, source: "jina", attempts };
   }
+  if (firecrawl.data) {
+    return { scrapedData: firecrawl.data, source: "firecrawl", attempts };
+  }
+
+  const playwrightRes = await retryScraper(() => scrapeWithPlaywright(websiteUrl), "playwright", websiteUrl);
+  attempts.push({ source: "playwright", ok: !!playwrightRes.data, error: playwrightRes.error || null });
+  if (playwrightRes.data) {
+    return { scrapedData: playwrightRes.data, source: "playwright", attempts };
+  }
+
+  const cheerioRes = await retryScraper(() => scrapeWithCheerio(websiteUrl), "cheerio", websiteUrl);
+  attempts.push({ source: "cheerio", ok: !!cheerioRes.data, error: cheerioRes.error || null });
+  if (cheerioRes.data) {
+    return { scrapedData: cheerioRes.data, source: "cheerio", attempts };
+  }
+
+  // Throw (never cached by memoize) so a transient failure can be retried by
+  // the next caller instead of poisoning the cache for the TTL window.
+  const err = new Error("All scrapers failed");
+  err.attempts = attempts;
+  throw err;
 }
 
 export async function scrapeWebsite({ websiteUrl, productName = "Product", companyName = "", userId = null, chatId = null } = {}) {
@@ -686,42 +775,17 @@ export async function scrapeWebsite({ websiteUrl, productName = "Product", compa
     return { success: false, scrapedData: null, source: "none", error: "No website URL provided" };
   }
 
+  const key = `scrape:${cacheKeyUrl(websiteUrl)}`;
+
   try {
-    let scrapedData = null;
-    let source = "none";
+    const { scrapedData, source, attempts } = await memoize(key, SCRAPE_CACHE_TTL_MS, () => scrapeChain(websiteUrl));
 
-    // Scraper priority: Jina → Firecrawl → Playwright → Cheerio
-    const jina = await scrapeWithJina(websiteUrl);
-    if (jina) {
-      scrapedData = jina;
-      source = "jina";
-    } else {
-      const firecrawl = await scrapeWithFirecrawl(websiteUrl);
-      if (firecrawl) {
-        scrapedData = firecrawl;
-        source = "firecrawl";
-      } else {
-        const playwright = await scrapeWithPlaywright(websiteUrl);
-        if (playwright) {
-          scrapedData = playwright;
-          source = "playwright";
-        } else {
-          const cheerio = await scrapeWithCheerio(websiteUrl);
-          if (cheerio) {
-            scrapedData = cheerio;
-            source = "cheerio";
-          }
-        }
-      }
-    }
-
-    if (!scrapedData) {
-      return { success: false, scrapedData: null, source: "none", error: "All scrapers failed" };
-    }
+    // Clone so cache consumers can never mutate the shared entry.
+    const clone = structuredClone(scrapedData);
 
     console.log(`📊 Scrape completed with ${source} for ${websiteUrl}`);
 
-    // If we have chat context, save to Evidence Snapshot
+    // If we have chat context, save to Evidence Snapshot (idempotent merge)
     if (userId && chatId) {
       await createEvidenceSnapshot({
         userId,
@@ -729,36 +793,58 @@ export async function scrapeWebsite({ websiteUrl, productName = "Product", compa
         analysisId: null,
         websiteUrl,
         companyName,
-        sourceSummary: scrapedData.scrapeQuality,
+        sourceSummary: {
+          sourcesCollected: [source],
+          collectedAt: new Date().toISOString()
+        },
         websiteEvidence: {
-          title: scrapedData.title,
-          metaDescription: scrapedData.metaDescription,
-          heroText: scrapedData.heroText,
-          headings: scrapedData.headings,
-          features: scrapedData.features,
-          benefits: scrapedData.benefits,
-          pricingText: scrapedData.pricingText,
-          ctaText: scrapedData.ctaText,
-          faq: scrapedData.faq,
-          testimonials: scrapedData.testimonials,
-          socialLinks: scrapedData.socialLinks
+          title: clone.title,
+          metaDescription: clone.metaDescription,
+          heroText: clone.heroText,
+          headings: clone.headings,
+          features: clone.features,
+          benefits: clone.benefits,
+          pricingText: clone.pricingText,
+          ctaText: clone.ctaText,
+          faq: clone.faq,
+          testimonials: clone.testimonials,
+          socialLinks: clone.socialLinks
         },
         technicalSeoEvidence: {},
-        contentEvidence: { cleanedText: scrapedData.cleanedText },
+        contentEvidence: { cleanedText: clone.cleanedText },
         competitorEvidence: {},
         githubEvidence: {},
-        rawEvidence: { rawMarkdown: scrapedData.rawMarkdown }
+        rawEvidence: {
+          rawMarkdown: clone.rawMarkdown,
+          html: clone.html || null,
+          text: clone.text || null,
+          scrapeQuality: clone.scrapeQuality
+        }
       });
       console.log(`💾 EvidenceSnapshot saved for chat ${chatId}`);
     }
 
     return {
       success: true,
-      scrapedData,
+      scrapedData: clone,
       source,
       error: null,
+      attempts: attempts || [],
     };
   } catch (error) {
+    const attempts = error?.attempts;
+    const failures = attempts
+      ? attempts.map(a => `${a.source}: ${a.error || "no content"}`).join("; ")
+      : "";
+    if (attempts) {
+      return {
+        success: false,
+        scrapedData: null,
+        source: "none",
+        error: `All scrapers failed${failures ? ` (${failures})` : ""}`,
+        attempts,
+      };
+    }
     console.error("❌ Unexpected scrape error:", error);
     return { success: false, scrapedData: null, source: "none", error: error.message };
   }

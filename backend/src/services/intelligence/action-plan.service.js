@@ -196,7 +196,7 @@ export function generateActionPlan(intelligence) {
       roi: 'Quantified market opportunity for investor and strategic planning',
       impact: 'Provides TAM/SAM/SOM for investor decks and strategic planning',
       difficulty: 'High',
-      dependencies: ['Industry classification', 'Budget for industry reports ($500-$5,000)'],
+      dependencies: ['Industry classification', 'Budget for industry report access'],
       timeline: '30 days',
       owner: 'Strategy Team',
       kpis: ['Verified TAM/SAM/SOM from 2+ independent sources', 'Industry growth rate (CAGR) validation'],

@@ -51,14 +51,10 @@ export class GraphHealth {
 
   async _detectAllDuplicates() {
     const types = ['Company', 'Product', 'Competitor', 'Keyword', 'Audience', 'Industry'];
-    const allGroups = [];
-
-    for (const type of types) {
-      const groups = await this._resolver.detectDuplicates(type, 100);
-      allGroups.push(...groups);
-    }
-
-    return allGroups;
+    const groups = await Promise.all(
+      types.map(type => this._resolver.detectDuplicates(type, 100))
+    );
+    return groups.flat();
   }
 
   _avgConfidence(typeBreakdown) {

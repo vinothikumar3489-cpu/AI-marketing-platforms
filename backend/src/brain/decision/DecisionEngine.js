@@ -153,16 +153,8 @@ export class DecisionEngine extends BaseEngine {
         : await this._generateScenarios(decisionContext);
 
       if (scenarios.length === 0) {
-        const fallbackScenario = new DecisionScenario({
-          label: 'Balanced Growth',
-          description: 'A balanced, evidence-driven strategy based on the identified context and constraints',
-          action: decisionContext.goal || 'Proceed with a measured growth approach',
-          parameters: { budgetChange: 10, optimizationLevel: 0.5, channelEfficiency: 0.5, aggressiveness: 0.3 },
-          pros: ['Evidence-driven baseline', 'Balanced risk profile', 'Executable immediately'],
-          cons: ['Moderate upside', 'Requires iteration'],
-        });
-        fallbackScenario.confidence = 0.4;
-        scenarios.push(fallbackScenario);
+        logEngine(this._name, rid, elapsedMs(start), EngineStatus.FAILED, 'No decision scenarios could be generated from available evidence');
+        return { success: false, error: 'No decision scenarios could be generated from available evidence', data: null };
       }
 
       for (const scenario of scenarios) {

@@ -102,6 +102,12 @@ function extractNestedKeywords(keywordOpportunities) {
   if (keywordOpportunities.contentOpportunities) {
     allKeywords.push(...asArray(keywordOpportunities.contentOpportunities));
   }
+  if (keywordOpportunities.opportunities) {
+    allKeywords.push(...asArray(keywordOpportunities.opportunities));
+  }
+  if (keywordOpportunities.keywords) {
+    allKeywords.push(...asArray(keywordOpportunities.keywords));
+  }
   if (keywordOpportunities.clusters) {
     // Flatten clusters
     keywordOpportunities.clusters.forEach(cluster => {
@@ -201,6 +207,7 @@ export function normalizeSeoIntelligenceForConsumers(seoInfo) {
   const keywordOpportunitiesRaw = seoInfo.keywordOpportunities ??
     seoInfo.keywordIntelligence?.opportunities ??
     seoInfo.keywordIntelligence?.keywords ??
+    seoInfo.keywordIntelligence ??
     seoInfo.keywords ??
     seoInfo.keywordData ?? [];
 
@@ -260,6 +267,16 @@ export function normalizeSeoIntelligenceForConsumers(seoInfo) {
     k.difficulty === null &&
     k.cpc === null
   );
+
+  // Keywords explicitly declared in a primary bucket — even without metrics they
+  // are pipeline-prioritized, so surface them in the primary set (after measured).
+  const primaryRaw = seoInfo.primaryKeywords ??
+    seoInfo.keywordIntelligence?.primaryKeywords ??
+    keywordOpportunitiesRaw?.primaryKeywords ?? [];
+  const declaredPrimary = asArray(primaryRaw)
+    .map(normalizeKeywordItem)
+    .filter(Boolean)
+    .filter(k => !measuredKeywords.includes(k));
 
   // Normalize content gaps
   const contentGapsRaw = seoInfo.contentGaps ??
@@ -332,7 +349,7 @@ export function normalizeSeoIntelligenceForConsumers(seoInfo) {
     status: 'COMPLETED',
     measuredKeywords: measuredKeywords.slice(0, 50),
     topicCandidates: topicCandidates.slice(0, 100),
-    primaryKeywords: measuredKeywords.slice(0, 10),
+    primaryKeywords: [...measuredKeywords.slice(0, 10), ...declaredPrimary].slice(0, 10),
     secondaryKeywords: topicCandidates.slice(0, 10),
     longTailKeywords: topicCandidates.slice(0, 15),
     questionKeywords: topicCandidates.filter(k => k.keyword.startsWith('how') || k.keyword.startsWith('what') || k.keyword.startsWith('why')).slice(0, 10),

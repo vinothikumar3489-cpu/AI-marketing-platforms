@@ -37,23 +37,23 @@ export const clearAuth = () => {
 };
 
 export const fetchCurrentUser = async () => {
-  const response = await api.get<{ success: boolean; user: User }>("/api/auth/me");
+  const response = await api.get<{ success: boolean; user: User }>("/auth/me");
   const user = response.data.user;
   setAuthData(getToken() || "", user);
   return user;
 };
 
 export const fetchNotifications = async () => {
-  const response = await api.get<{ notifications: Array<{ id: string; title: string; message: string; type: string; read: boolean; createdAt: string }> }>("/api/notifications");
+  const response = await api.get<{ notifications: Array<{ id: string; title: string; message: string; type: string; read: boolean; createdAt: string }> }>("/notifications");
   return response.data.notifications || [];
 };
 
 export const loginUser = async ({ email, password }: { email: string; password: string }) => {
-  const response = await api.post<{ success: boolean; token: string; user: User }>("/api/auth/login", { email, password });
+  const response = await api.post<{ success: boolean; token: string; user: User }>("/auth/login", { email, password });
   return response.data;
 };
 
 export const registerUser = async ({ name, email, password }: { name: string; email: string; password: string }) => {
-  const response = await api.post<{ success: boolean; token: string; user: User }>("/api/auth/register", { name, email, password });
+  const response = await api.post<{ success: boolean; token: string; user: User }>("/auth/register", { name, email, password });
   return response.data;
 };

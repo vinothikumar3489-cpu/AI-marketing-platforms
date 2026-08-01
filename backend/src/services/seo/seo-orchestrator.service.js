@@ -8,6 +8,7 @@ import { generateContentGapIntelligence } from "./content-gap-engine.service.js"
 import { generateGeoIntelligence } from "./geo-intelligence.service.js";
 import { generateBlogIntelligence } from "./blog-intelligence.service.js";
 import { generateSearchEnrichment } from "./search-enrichment.service.js";
+import { generateAIVisibility } from "./ai-visibility.service.js";
 import { getSEOProviderStatus, verifyDataForSEOAtStartup, getDataForSEOStartupStatus } from "./seo-provider-router.service.js";
 import { buildSEOReport } from "./seo-report-builder.service.js";
 import { getDomainData, isDataForSEOConfigured } from "../../providers/dataforseo.service.js";
@@ -43,8 +44,12 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
         const snap = evidenceReq.snapshot;
         const webEv = snap.websiteEvidence || {};
         const contentEv = snap.contentEvidence || {};
+        const techEv = snap.technicalSeoEvidence || {};
         const txt = contentEv.cleanedText || snap.rawEvidence?.rawMarkdown || '';
-        websiteHtml = snap.rawEvidence?.rawHtml || '';
+        const schemas = contentEv.schemas && contentEv.schemas.count > 0
+          ? contentEv.schemas
+          : (webEv.schemas && webEv.schemas.count > 0 ? webEv.schemas : null);
+        websiteHtml = snap.rawEvidence?.html || snap.rawEvidence?.rawHtml || '';
         websiteData = {
           text: txt,
           url: websiteUrl,
@@ -54,16 +59,21 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
           meta: {
             title: webEv.title || '',
             description: webEv.metaDescription || '',
+            robots: techEv.robots?.exists === false ? 'disallow-all' : (techEv.robots?.blockedPaths?.length ? 'blocks-partial' : null),
+            sitemap: techEv.sitemap?.exists === false ? null : (techEv.sitemap?.url || null),
             ...(contentEv.openGraph || {}),
             ...(contentEv.twitterCard || {}),
-            ...(contentEv.structuredData ? { schema: contentEv.structuredData } : {})
+            ...(schemas ? { schema: schemas } : {})
           },
           h1: webEv.headings || [],
           headings: { h1: webEv.headings || [] },
           openGraph: contentEv.openGraph || {},
           twitterCard: contentEv.twitterCard || {},
-          schema: contentEv.structuredData || {},
-          structured: contentEv.structuredData || {}
+          schema: schemas || {},
+          structured: schemas || {},
+          robots: techEv.robots || null,
+          sitemap: techEv.sitemap || null,
+          pageSpeed: techEv.pageSpeed || null
         };
       }
     }
@@ -179,10 +189,24 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
   const searchEnrichment = await runModule('searchEnrichment', async () => {
     return await generateSearchEnrichment({
       query: identity?.productName || websiteUrl || '',
-      location: 'United States'
+      location: 'United States',
+      keywords: (kiData.primaryKeywords || []).map(k => k.keyword || k).slice(0, 5),
+      productName: identity?.productName || '',
+      websiteUrl
     });
   });
   modules.searchEnrichment = searchEnrichment;
+
+  const aiVisibility = await runModule('aiVisibility', async () => {
+    return await generateAIVisibility({
+      productName: identity?.productName || chat?.productName || '',
+      companyName: identity?.companyName || chat?.title || '',
+      domain: identity?.domain || websiteUrl || '',
+      keywords: (kiData.primaryKeywords || []).map(k => k.keyword || k).slice(0, 5),
+      websiteData
+    });
+  });
+  modules.aiVisibility = aiVisibility;
 
   const backlinkHealth = await runModule('backlinkHealth', async () => {
     if (!isDataForSEOConfigured()) return { status: 'SKIPPED', reason: 'DataForSEO not configured', data: null };
@@ -203,6 +227,8 @@ export async function generateCompleteSeoIntelligence({ chatId, userId, websiteU
     serpFeatures: searchEnrichment.data?.serpFeatures || [],
     peopleAlsoAsk: searchEnrichment.data?.peopleAlsoAsk || [],
     trendAnalysis: searchEnrichment.data?.trends || [],
+    serpAnalysis: searchEnrichment.data?.serpAnalysis || null,
+    aiVisibility: aiVisibility.data || null,
     providers: providerStatus,
     backlinkData: backlinkHealth.data || null,
     pageSpeed: techAudit.data?.pageSpeed || null,
@@ -243,14 +269,18 @@ async function runModuleTechnicalSeo(websiteData, websiteUrl) {
     openGraph: extractOpenGraph(websiteData),
     twitterCard: extractTwitterCard(websiteData),
     structuredData: extractStructuredData(websiteData),
+    schema: extractSchemaTypes(websiteData),
     images: extractImages(websiteData),
     links: extractLinks(websiteData),
+    viewport: extractViewport(websiteData),
+    hreflang: extractHreflang(websiteData),
     https: { status: websiteUrl?.startsWith('https') ? 'enabled' : 'unknown', value: websiteUrl?.startsWith('https') || null },
     mobile: { status: 'unavailable', value: null },
     performance: null,
     pageSpeed: null,
     crux: null,
-    overallScore: null
+    overallScore: null,
+    issues: { critical: [], high: [], medium: [], low: [] }
   };
 
   const pageSpeed = await runPageSpeedWithRetry(websiteUrl, 3);
@@ -264,6 +294,19 @@ async function runModuleTechnicalSeo(websiteData, websiteUrl) {
       status: 'measured'
     };
     tech.overallScore = mobilePerf ?? desktopPerf ?? null;
+  } else if (websiteData?.pageSpeed && (websiteData.pageSpeed.success || websiteData.pageSpeed.mobile || websiteData.pageSpeed.desktop)) {
+    // Fall back to PageSpeed evidence already collected in the Evidence Snapshot
+    const cached = websiteData.pageSpeed;
+    tech.pageSpeed = cached;
+    const mobilePerf = cached.mobile?.lighthouseScores?.performance ?? cached.mobile?.performance ?? null;
+    const desktopPerf = cached.desktop?.lighthouseScores?.performance ?? cached.desktop?.performance ?? null;
+    tech.performance = {
+      mobile: mobilePerf,
+      desktop: desktopPerf,
+      status: mobilePerf != null || desktopPerf != null ? 'measured_from_snapshot' : 'unavailable'
+    };
+    tech.overallScore = mobilePerf ?? desktopPerf ?? null;
+    console.log('[SEO TECHNICAL] Using PageSpeed evidence from snapshot');
   } else {
     console.log('[SEO TECHNICAL] PageSpeed unavailable, trying CrUX...');
     tech.pageSpeed = { status: 'unavailable', error: pageSpeed.error || 'PageSpeed request failed', mobile: null, desktop: null };
@@ -282,6 +325,99 @@ async function runModuleTechnicalSeo(websiteData, websiteUrl) {
     }
   }
 
+  // On-page structural flags — these drive the crawlability/metadata/schema scores
+  const meta = tech.meta || {};
+  const robotsData = tech.robots || {};
+  const sitemapData = tech.sitemap || {};
+  tech.hasTitleTag = !!meta.title;
+  tech.hasMetaDescription = !!meta.description;
+  tech.hasRobotsTxt = robotsData.exists === true || !!robotsData.content;
+  tech.hasSitemap = sitemapData.exists === true || !!sitemapData.url;
+  tech.hasViewport = tech.viewport?.status === 'measured';
+  tech.hasHreflang = (tech.hreflang?.links?.length || 0) > 0;
+  tech.titleLength = meta.title ? meta.title.length : 0;
+  tech.metaDescriptionLength = meta.description ? meta.description.length : 0;
+  tech.internalLinks = tech.links?.internal != null ? Array.from({ length: tech.links.internal }, (_, i) => i) : [];
+  tech.schemas = tech.structuredData?.types || [];
+  tech.schemaTypes = tech.schema?.types || [];
+
+  // Merge Lighthouse-verified SEO audits into the crawl evidence (measured by PageSpeed)
+  const seoAudits = tech.pageSpeed?.mobile?.seoAudits || tech.pageSpeed?.desktop?.seoAudits || null;
+  if (seoAudits) {
+    tech.hasTitleTag = seoAudits.hasTitleTag ?? tech.hasTitleTag;
+    tech.hasMetaDescription = seoAudits.hasMetaDescription ?? tech.hasMetaDescription;
+    tech.hasViewport = seoAudits.hasViewport ?? tech.hasViewport;
+    tech.hasCanonical = seoAudits.hasCanonical ?? !!tech.canonical?.url;
+    tech.hasRobotsTxt = seoAudits.hasRobotsTxt ?? tech.hasRobotsTxt;
+    tech.hasSitemap = seoAudits.hasSitemap ?? tech.hasSitemap;
+    tech.hasStructuredData = seoAudits.hasStructuredData ?? ((tech.structuredData?.count || 0) > 0);
+    tech.hasOpenGraph = seoAudits.hasOpenGraph ?? (tech.openGraph?.status === 'measured');
+    tech.hasTwitterCard = seoAudits.hasTwitterCard ?? (tech.twitterCard?.status === 'measured');
+    tech.hasCanonical = tech.hasCanonical ?? !!tech.canonical?.url;
+    tech.isOnHttps = seoAudits.isOnHttps ?? (tech.https?.status === 'enabled');
+    tech.seoAuditSource = 'PageSpeed Lighthouse';
+  }
+
+  // Evidence-driven issue classification — every entry traces to a real finding
+  if (!tech.hasTitleTag) {
+    tech.issues.critical.push({ type: 'missing_title', title: 'Missing or empty page title', severity: 'critical', evidence: 'On-page crawl of the homepage' });
+  } else if (tech.titleLength > 60) {
+    tech.issues.medium.push({ type: 'long_title', title: `Page title is ${tech.titleLength} characters (recommended ≤ 60)`, severity: 'medium', evidence: 'On-page crawl of the homepage' });
+  }
+  if (!tech.hasMetaDescription) {
+    tech.issues.high.push({ type: 'missing_description', title: 'Missing meta description', severity: 'high', evidence: 'On-page crawl of the homepage' });
+  } else if (tech.metaDescriptionLength > 160) {
+    tech.issues.low.push({ type: 'long_description', title: `Meta description is ${tech.metaDescriptionLength} characters (recommended ≤ 160)`, severity: 'low', evidence: 'On-page crawl of the homepage' });
+  }
+  if (!tech.hasCanonical && !tech.canonical?.url) {
+    tech.issues.medium.push({ type: 'no_canonical', title: 'No canonical URL specified', severity: 'medium', evidence: 'On-page crawl of the homepage' });
+  }
+  if (!tech.hasRobotsTxt) {
+    tech.issues.high.push({ type: 'no_robots_txt', title: 'No robots.txt detected', severity: 'high', evidence: robotsData.status === 'measured' ? 'Crawler evidence collection' : 'Crawl of homepage' });
+  }
+  if (!tech.hasSitemap) {
+    tech.issues.medium.push({ type: 'no_sitemap', title: 'No XML sitemap detected', severity: 'medium', evidence: sitemapData.status === 'measured' ? 'Crawler evidence collection' : 'Crawl of homepage' });
+  }
+  if ((tech.structuredData?.count || 0) === 0) {
+    tech.issues.medium.push({ type: 'no_structured_data', title: 'No structured data (Schema.org) detected', severity: 'medium', evidence: 'On-page crawl of the homepage' });
+  }
+  if (tech.openGraph?.status === 'unavailable' || !tech.openGraph?.image) {
+    tech.issues.medium.push({ type: 'no_opengraph', title: 'Open Graph tags missing or no image', severity: 'medium', evidence: 'On-page crawl of the homepage' });
+  }
+  if (tech.twitterCard?.status === 'unavailable') {
+    tech.issues.low.push({ type: 'no_twitter_card', title: 'Twitter Card tags missing', severity: 'low', evidence: 'On-page crawl of the homepage' });
+  }
+  if (tech.viewport?.status === 'unavailable') {
+    tech.issues.high.push({ type: 'no_viewport', title: 'No mobile viewport meta tag', severity: 'high', evidence: 'On-page crawl of the homepage' });
+  }
+  if ((tech.headings?.h1 || []).length === 0) {
+    tech.issues.medium.push({ type: 'no_h1', title: 'No H1 heading found', severity: 'medium', evidence: 'On-page crawl of the homepage' });
+  }
+  const imagesData = tech.images || {};
+  const altCoverage = imagesData.count > 0 ? (imagesData.withAlt / imagesData.count) * 100 : null;
+  tech.altCoverage = altCoverage != null ? Math.round(altCoverage) : null;
+  if (altCoverage != null && altCoverage < 50) {
+    tech.issues.medium.push({ type: 'poor_alt_coverage', title: `Only ${Math.round(altCoverage)}% of images have alt text`, severity: 'medium', evidence: 'On-page crawl of the homepage' });
+  }
+  if (tech.performance?.mobile != null && tech.performance.mobile < 50) {
+    tech.issues.critical.push({ type: 'poor_mobile_performance', title: `Mobile performance score is ${tech.performance.mobile}/100`, severity: 'critical', evidence: 'Lighthouse (PageSpeed Insights)' });
+  } else if (tech.performance?.mobile != null && tech.performance.mobile < 70) {
+    tech.issues.high.push({ type: 'low_mobile_performance', title: `Mobile performance score is ${tech.performance.mobile}/100`, severity: 'high', evidence: 'Lighthouse (PageSpeed Insights)' });
+  }
+  const cruxData = tech.crux || {};
+  const cruxLcp = cruxData.lcp?.p75 ?? null;
+  if (cruxLcp != null && cruxLcp > 4000) {
+    tech.issues.high.push({ type: 'poor_field_lcp', title: `Field LCP is ${Math.round(cruxLcp)}ms (poor threshold > 4.0s)`, severity: 'high', evidence: 'Chrome UX Report (real-user field data)' });
+  } else if (cruxLcp != null && cruxLcp > 2500) {
+    tech.issues.medium.push({ type: 'slow_field_lcp', title: `Field LCP is ${Math.round(cruxLcp)}ms (needs improvement > 2.5s)`, severity: 'medium', evidence: 'Chrome UX Report (real-user field data)' });
+  }
+  if ((tech.hreflang?.links?.length || 0) === 0 && (tech.hreflang?.status === 'measured')) {
+    tech.issues.low.push({ type: 'no_hreflang', title: 'No hreflang tags detected (only relevant for multilingual sites)', severity: 'low', evidence: 'On-page crawl of the homepage' });
+  }
+  if (tech.https?.status !== 'enabled') {
+    tech.issues.high.push({ type: 'no_https', title: 'Site is not served over HTTPS', severity: 'high', evidence: websiteUrl ? `Requested URL ${websiteUrl}` : 'Unavailable' });
+  }
+
   // Never leave the technical score null: estimate from on-page signals when lab data is missing
   if (tech.overallScore == null) {
     let onPage = 50;
@@ -294,11 +430,15 @@ async function runModuleTechnicalSeo(websiteData, websiteUrl) {
     if (Object.keys(tech.openGraph || {}).length > 1) onPage += 4;
     if ((tech.structuredData?.count || 0) > 0) onPage += 8;
     if (tech.https?.status === 'enabled') onPage += 4;
+    onPage -= tech.issues.critical.length * 6;
+    onPage -= tech.issues.high.length * 3;
     tech.overallScore = Math.max(0, Math.min(100, onPage));
     tech.scoreMethod = 'estimated_from_onpage_signals';
     tech.scoreNote = 'Lab performance data unavailable — score estimated from on-page technical signals';
   }
-  tech.scores = { overall: tech.overallScore, performance: tech.performance?.mobile ?? tech.performance?.lcp ? 70 : null };
+  const perfScore = (tech.performance?.mobile ?? tech.performance?.desktop ?? tech.performance?.lcp) ?? null;
+  tech.performanceScore = Number.isFinite(perfScore) ? Math.round(perfScore) : null;
+  tech.scores = { overall: tech.overallScore, overallScore: tech.overallScore, performance: tech.performanceScore, performanceScore: tech.performanceScore };
 
   return tech;
 }
@@ -345,11 +485,36 @@ function extractCanonical(data) {
 
 function extractRobots(data) {
   if (!data) return { content: null, status: 'unavailable' };
-  return { content: data.meta?.robots || data.robots || null, status: 'measured' };
+  const robotsEv = data.robots;
+  if (robotsEv && typeof robotsEv === 'object' && 'exists' in robotsEv) {
+    const blocked = (robotsEv.blockedPaths || []).length > 0;
+    return {
+      content: robotsEv.exists === false ? 'disallow-all (no robots.txt found)' : (blocked ? `blocks ${robotsEv.blockedPaths.length} path(s)` : 'allow-all'),
+      exists: robotsEv.exists,
+      blockedPaths: robotsEv.blockedPaths || [],
+      rulesSummary: robotsEv.rulesSummary || [],
+      status: robotsEv.exists !== undefined ? 'measured' : 'unavailable'
+    };
+  }
+  const fallbackContent = data.meta?.robots || data.robots || null;
+  return { content: fallbackContent, status: fallbackContent ? 'measured' : 'unavailable' };
 }
 
 function extractSitemap(data) {
   if (!data) return { url: null, status: 'unavailable' };
+  const sitemapEv = data.sitemap;
+  if (sitemapEv && typeof sitemapEv === 'object' && 'exists' in sitemapEv) {
+    const url = sitemapEv.exists === false
+      ? null
+      : (sitemapEv.url || (Array.isArray(sitemapEv.sampleUrls) && sitemapEv.sampleUrls[0]) || null);
+    return {
+      url,
+      exists: sitemapEv.exists,
+      urlCount: sitemapEv.urlCount ?? null,
+      sampleUrls: sitemapEv.sampleUrls || [],
+      status: sitemapEv.exists !== undefined ? 'measured' : 'unavailable'
+    };
+  }
   return { url: data.sitemap || data.meta?.sitemap || null, status: 'unavailable' };
 }
 
@@ -407,6 +572,62 @@ function extractStructuredData(data) {
   const items = schema.items || [];
   const count = types.length + (Array.isArray(items) ? items.length : 0);
   return { types, count, status: count > 0 ? 'measured' : 'unavailable' };
+}
+
+function extractSchemaTypes(data) {
+  if (!data) return { types: [], count: 0, validation: 'unavailable', status: 'unavailable' };
+  const schema = data.schema || data.structured || data.meta?.schema || {};
+  const types = [];
+  const seen = new Set();
+
+  const addType = (t) => {
+    if (!t || typeof t !== 'string' || seen.has(t)) return;
+    seen.add(t);
+    types.push(t);
+  };
+
+  if (Array.isArray(schema.types)) schema.types.forEach(addType);
+  if (typeof schema.type === 'string') addType(schema.type);
+  if (Array.isArray(schema.type)) schema.type.forEach(addType);
+
+  for (const item of Array.isArray(schema.items) ? schema.items : []) {
+    const t = item['@type'] || item.type || null;
+    if (Array.isArray(t)) t.forEach(addType);
+    else if (t) addType(t);
+  }
+
+  const typeDetails = types.map(t => ({
+    type: t,
+    validation: t.toLowerCase() === 'unknown' ? 'invalid' : 'recognized',
+    source: 'On-page crawl of the homepage',
+    status: 'measured'
+  }));
+
+  return {
+    types,
+    typeDetails,
+    count: types.length,
+    validation: types.length > 0 ? 'measured' : 'unavailable',
+    status: types.length > 0 ? 'measured' : 'unavailable'
+  };
+}
+
+function extractViewport(data) {
+  if (!data) return { status: 'unavailable' };
+  const meta = data.meta || {};
+  const viewport = meta.viewport || data.viewport || null;
+  return { value: viewport || null, status: viewport ? 'measured' : 'unavailable' };
+}
+
+function extractHreflang(data) {
+  if (!data) return { links: [], status: 'unavailable' };
+  const links = Array.isArray(data.hreflang)
+    ? data.hreflang
+    : (Array.isArray(data.hreflangs) ? data.hreflangs : []);
+  return {
+    links: links.map(h => (typeof h === 'string' ? { href: h } : h)),
+    status: links.length > 0 ? 'measured' : 'unavailable'
+  };
 }
 
 function extractImages(data) {

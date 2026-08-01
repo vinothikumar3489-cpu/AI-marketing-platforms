@@ -326,6 +326,92 @@ export const videoScriptSchema = z.object({
 });
 
 
+// ---------- PRESS RELEASE ----------
+export const pressReleaseSchema = z.object({
+  _type: z.string().optional(),
+  headline: z.string().min(1),
+  subheadline: z.string().nullable().optional(),
+  dateline: z.string().nullable().optional(),
+  body: z.string().min(1),
+  keyQuotes: z.array(z.object({
+    speaker: z.string(),
+    role: z.string().nullable().optional(),
+    quote: z.string().min(1),
+  })).default([]),
+  companyInfo: z.object({
+    name: z.string(),
+    description: z.string().nullable().optional(),
+    website: z.string().nullable().optional(),
+    contact: z.string().nullable().optional(),
+  }).optional(),
+  mediaContact: z.object({
+    name: z.string().nullable().optional(),
+    email: z.string().nullable().optional(),
+    phone: z.string().nullable().optional(),
+  }).optional(),
+  cta: z.string().nullable().optional(),
+  evidenceUsed,
+  claimsRequiringReview,
+});
+
+// ---------- CASE STUDY ----------
+export const caseStudySchema = z.object({
+  _type: z.string().optional(),
+  title: z.string().min(1),
+  subtitle: z.string().nullable().optional(),
+  customerName: z.string().nullable().optional(),
+  customerIndustry: z.string().nullable().optional(),
+  customerSize: z.string().nullable().optional(),
+  challenge: z.string().min(1),
+  situation: z.string().min(1),
+  solution: z.string().min(1),
+  implementation: z.string().nullable().optional(),
+  results: z.array(z.object({
+    metric: z.string(),
+    value: z.string(),
+    context: z.string().nullable().optional(),
+  })).min(1),
+  quote: z.object({
+    speaker: z.string(),
+    role: z.string().nullable().optional(),
+    text: z.string().min(1),
+  }).nullable().optional(),
+  lessonsLearned: z.array(z.string()).default([]),
+  cta: z.string().nullable().optional(),
+  evidenceUsed,
+  claimsRequiringReview,
+});
+
+// ---------- SALES PAGE ----------
+export const salesPageSchema = z.object({
+  _type: z.string().optional(),
+  headline: z.string().min(1),
+  subheadline: z.string().nullable().optional(),
+  heroSection: z.object({
+    headline: z.string(),
+    subtext: z.string().nullable().optional(),
+    cta: z.string(),
+    ctaSecondary: z.string().nullable().optional(),
+  }).optional(),
+  painPoints: z.array(z.string()).default([]),
+  solutionOverview: z.string().nullable().optional(),
+  features: z.array(z.object({
+    name: z.string(),
+    description: z.string(),
+    benefit: z.string(),
+  })).default([]),
+  socialProof: z.array(z.any()).default([]),
+  pricing: z.any().nullable().optional(),
+  faqs: z.array(z.object({
+    question: z.string(),
+    answer: z.string(),
+  })).default([]),
+  finalCta: z.string().nullable().optional(),
+  urgency: z.string().nullable().optional(),
+  evidenceUsed,
+  claimsRequiringReview,
+});
+
 export const SCHEMA_REGISTRY = {
   blog_article: { schema: blogArticleSchema, normalizer: 'blogArticle' },
   faq_page: { schema: faqPageSchema, normalizer: 'faqPage' },
@@ -334,6 +420,9 @@ export const SCHEMA_REGISTRY = {
   comparison_page: { schema: comparisonPageSchema, normalizer: 'comparisonPage' },
   feature_announcement: { schema: featureAnnouncementSchema, normalizer: 'featureAnnouncement' },
   whitepaper: { schema: whitepaperSchema, normalizer: 'whitepaper' },
+  press_release: { schema: pressReleaseSchema, normalizer: 'pressRelease' },
+  case_study: { schema: caseStudySchema, normalizer: 'caseStudy' },
+  sales_page: { schema: salesPageSchema, normalizer: 'salesPage' },
   linkedin_post: { schema: linkedInPostSchema, normalizer: 'linkedinPost' },
   instagram_post: { schema: instagramPostSchema, normalizer: 'instagramPost' },
   twitter_post: { schema: twitterPostSchema, normalizer: 'twitterPost' },

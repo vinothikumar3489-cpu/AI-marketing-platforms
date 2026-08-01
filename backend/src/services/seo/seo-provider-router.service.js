@@ -2,7 +2,7 @@ import { isSerpAPIConfigured, isSerpAPIAvailable, getSerpAPIStatus, getCachedSer
 import {
   isDataForSEOConfigured, isDataForSEOAvailable, getDataForSEOStatus, verifyDataForSEO,
   getKeywordMetrics, getKeywordSuggestions,
-  getSerpResults, getSerpCompetitors as dfsGetSerpCompetitors, getDomainData, getBacklinksSummary,
+  getSerpResults, getSerpAnalysis, getSerpCompetitors as dfsGetSerpCompetitors, getDomainData, getBacklinksSummary,
   getDataForSEOConnectionStatus
 } from "../../providers/dataforseo.service.js";
 
@@ -304,7 +304,7 @@ export async function resolveKeywordMetrics(keywords, location = 'United States'
 export async function resolveSerpData(query, options = {}) {
   return withProviderFallback(async (provider) => {
     if (provider === 'serpapi') return await comprehensiveSearch(query, options);
-    if (provider === 'dataforseo') return await getSerpResults(query, options.location || 'United States');
+    if (provider === 'dataforseo') return await getSerpAnalysis(query, options.location || 'United States');
     return { success: false, data: [] };
   }, { cachePrefix: 'serp', cacheArgs: [query, options.location, options.device] });
 }

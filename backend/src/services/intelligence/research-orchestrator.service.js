@@ -78,9 +78,29 @@ export async function collectResearchData({ websiteUrl, productName, companyName
       sources.push({ type: 'pricing_discovery', success: false });
     }
 
+    // Phase 2+3+5 run in PARALLEL: PageSpeed audit, cascading competitor
+    // discovery and market signals are all independent once the website is
+    // scraped — serializing them only added latency with no benefit.
+    console.log('[Research Orchestrator] Running PageSpeed audit + competitor discovery + market signals in parallel for:', websiteUrl);
+
+    const [pageSpeedResult, discovery, marketData] = await Promise.all([
+      getDesktopAndMobilePageSpeed(websiteUrl),
+      discoverCompetitors({
+        websiteUrl,
+        productName: productName || result.identity.domain,
+        companyName,
+        industry: null,
+        targetDomain: result.identity.domain,
+        location: 'United States',
+        html: scrapedContent?.html || null,
+        max: 12,
+        enrich: true,
+        verbose: true
+      }),
+      collectMarketSignals(websiteUrl, companyName || productName || result.identity.domain),
+    ]);
+
     // Phase 2: Technical Audit (PageSpeed - both mobile and desktop)
-    console.log('[Research Orchestrator] Running PageSpeed audit for:', websiteUrl);
-    const pageSpeedResult = await getDesktopAndMobilePageSpeed(websiteUrl);
     if (pageSpeedResult && pageSpeedResult.success) {
       result.technical = normalizeTechnicalAudit(pageSpeedResult);
       sources.push({ type: 'pagespeed', success: true });
@@ -90,19 +110,6 @@ export async function collectResearchData({ websiteUrl, productName, companyName
     }
 
     // Phase 3: Cascading Competitor Discovery (12+ sources)
-    console.log('[Research Orchestrator] Running cascading competitor discovery for:', websiteUrl);
-    const discovery = await discoverCompetitors({
-      websiteUrl,
-      productName: productName || result.identity.domain,
-      companyName,
-      industry: null,
-      targetDomain: result.identity.domain,
-      location: 'United States',
-      html: scrapedContent?.html || null,
-      max: 12,
-      enrich: true,
-      verbose: true
-    });
     if (discovery.competitors.length > 0) {
       result.competitors = discovery.competitors;
       sources.push({
@@ -133,9 +140,7 @@ export async function collectResearchData({ websiteUrl, productName, companyName
       }
     }
 
-    // Phase 5: Market/Company Signals
-    console.log('[Research Orchestrator] Collecting market signals');
-    const marketData = await collectMarketSignals(websiteUrl, companyName || productName || result.identity.domain);
+    // Phase 5: Market/Company Signals (completed in parallel above)
     if (marketData.news.length > 0 || marketData.companies.length > 0) {
       result.newsSignals = marketData.news;
       result.companySignals = marketData.companies;
@@ -338,7 +343,7 @@ export function detectTechnologyStack(html) {
  */
 export function extractPricingFromWebsite(scrapedData) {
   const pricingText = scrapedData?.pricingText || '';
-  const text = (scrapedData?.text || '') + '\n' + pricingText;
+  const text = (scrapedData?.text || scrapedData?.rawMarkdown || '') + '\n' + pricingText;
 
   const tiers = [];
   const tierPatterns = [
@@ -402,8 +407,8 @@ async function collectKeywords(url, websiteContent, competitors, productName) {
   const keywords = [];
   const candidates = [];
 
-  if (websiteContent && websiteContent.text) {
-    const text = websiteContent.text.toLowerCase();
+  if (websiteContent && (websiteContent.text || websiteContent.rawMarkdown)) {
+    const text = (websiteContent.text || websiteContent.rawMarkdown || '').toLowerCase();
     const words = text.split(/\s+/).filter(w => w.length > 3);
     const wordFreq = {};
     words.forEach(word => {
@@ -459,6 +464,7 @@ async function collectKeywords(url, websiteContent, competitors, productName) {
             intent: m?.intent ?? null,
             source: 'DataForSEO',
             confidence: 90,
+            provenance: 'measured',
           });
         });
       }
@@ -496,6 +502,7 @@ Rules:
             intent: est?.intent ?? null,
             source: 'ai_estimated',
             confidence: 30,
+            provenance: 'estimated',
             evidence: 'AI-estimated from public market knowledge (LOW confidence)',
           });
         });
@@ -517,6 +524,7 @@ Rules:
         intent: null,
         source: c.source,
         confidence: Math.min(c.freq * 5, 50),
+        provenance: 'deterministic',
       });
     }
   });

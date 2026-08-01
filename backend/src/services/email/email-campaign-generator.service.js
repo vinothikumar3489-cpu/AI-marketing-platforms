@@ -1,4 +1,4 @@
-import prisma from "../../config/prisma.js";
+﻿import prisma from "../../config/prisma.js";
 import { callAI } from "../../domains/ai/services/aiOrchestrator.service.js";
 import { sendEmail, getEmailProviderHealth } from "../providers/email/index.js";
 import brevoProvider from "../providers/brevo/brevo.provider.js";
@@ -69,7 +69,7 @@ function buildRichContext(plan, evidence, productIntelligence, seoData, campaign
     companySize: audience.companySize || audience.size || '',
     productFeatures: features.slice(0, 8),
     productCategory: product.category || product.productCategory || '',
-    productType: product.type || product.productType || 'SaaS',
+    productType: product.type || product.productType || null,
     valueProposition: product.valueProposition || product.usp || website.heroText || '',
     competitorNames: competitors.slice(0, 5).map(c => c.name || c.url || c).filter(Boolean),
     seoKeywords,
@@ -323,16 +323,10 @@ function validateEmailOutput(email, context) {
 function sanitizeEmail(email, issues, productName, companyName, context) {
   const sanitized = { ...email };
 
-  if (!sanitized.subjectLine) sanitized.subjectLine = `Introducing ${productName || 'Our Platform'} for ${context?.targetAudience || 'Your Team'}`;
-  if (!sanitized.previewText) sanitized.previewText = `See how ${productName || 'we'} helps ${context?.targetAudience || 'businesses'} solve ${(context?.audiencePainPoints || [])[0] || 'key challenges'}`;
-  if (!sanitized.plainTextBody) {
-    const features = (context?.productFeatures || []).slice(0, 3).map(f => typeof f === 'string' ? f : (f.value || f.name || f)).join(', ');
-    sanitized.plainTextBody = `Hello,\n\nAre you tired of dealing with ${(context?.audiencePainPoints || [])[0] || 'common challenges'}? You're not alone.\n\nMany ${context?.targetAudience || 'businesses'} struggle with these challenges. That's where ${productName || 'we'} come in.\n\n${productName || 'Our platform'} helps you:\n- ${features || 'Streamline operations'}\n- Save time and reduce manual work\n- Drive better results\n- Scale efficiently\n\nReady to get started with ${productName || 'our platform'}?\n\nBest regards,\nThe ${companyName || 'Team'} Team\n\nP.S. ${productName || 'Our platform'} is the solution ${context?.targetAudience || 'businesses'} need.`;
-  }
-
   const genericPatterns = [/your product/gi, /our product/gi, /this tool/gi, /our tool/gi, /the software/gi, /our software/gi, /your software/gi, /the platform/gi, /our platform/gi, /your platform/gi, /our solution/gi, /your solution/gi, /the solution/gi, /ai tool/gi, /ai platform/gi, /ai solution/gi];
   for (const pattern of genericPatterns) {
-    const replacement = productName || 'our platform';
+    const replacement = productName || null;
+    if (!replacement) continue;
     if (sanitized.plainTextBody) sanitized.plainTextBody = sanitized.plainTextBody.replace(pattern, replacement);
     if (sanitized.htmlBody) sanitized.htmlBody = sanitized.htmlBody.replace(pattern, replacement);
     if (sanitized.subjectLine) sanitized.subjectLine = sanitized.subjectLine.replace(pattern, replacement);
@@ -372,11 +366,11 @@ function buildResponsiveHTML(email) {
     if (painPoint) sections.push(`<p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#1a1a2e">${painPoint.replace(/\n/g, '<br/>')}</p>`);
     if (solution) sections.push(`<p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#1a1a2e">${solution.replace(/\n/g, '<br/>')}</p>`);
     if (featureSection) {
-      const formatted = featureSection.includes('<') ? featureSection : `<ul style="margin:0 0 16px 0;padding-left:20px">${featureSection.split('\n').filter(l => l.trim()).map(l => `<li style="margin-bottom:8px;font-size:15px;line-height:1.5;color:#1a1a2e">${l.replace(/^[-*•]\s*/, '')}</li>`).join('')}</ul>`;
+      const formatted = featureSection.includes('<') ? featureSection : `<ul style="margin:0 0 16px 0;padding-left:20px">${featureSection.split('\n').filter(l => l.trim()).map(l => `<li style="margin-bottom:8px;font-size:15px;line-height:1.5;color:#1a1a2e">${l.replace(/^[-*â€¢]\s*/, '')}</li>`).join('')}</ul>`;
       sections.push(formatted);
     }
     if (benefits) {
-      const formatted = benefits.includes('<') ? benefits : `<ul style="margin:0 0 16px 0;padding-left:20px">${benefits.split('\n').filter(l => l.trim()).map(l => `<li style="margin-bottom:8px;font-size:15px;line-height:1.5;color:#1a1a2e">${l.replace(/^[-*•]\s*/, '')}</li>`).join('')}</ul>`;
+      const formatted = benefits.includes('<') ? benefits : `<ul style="margin:0 0 16px 0;padding-left:20px">${benefits.split('\n').filter(l => l.trim()).map(l => `<li style="margin-bottom:8px;font-size:15px;line-height:1.5;color:#1a1a2e">${l.replace(/^[-*â€¢]\s*/, '')}</li>`).join('')}</ul>`;
       sections.push(formatted);
     }
     if (customerStory) sections.push(`<div style="margin:0 0 16px 0;padding:16px;background:#f8f9ff;border-left:4px solid #4f46e5;border-radius:4px"><p style="margin:0;font-size:15px;line-height:1.6;color:#1a1a2e;font-style:italic">${customerStory.replace(/\n/g, '<br/>')}</p></div>`);
@@ -458,8 +452,8 @@ function generateMarkdownBody(email) {
   if (email.opening) sections.push(`\n${email.opening}`);
   if (email.painPoint) sections.push(`\n## The Challenge\n\n${email.painPoint}`);
   if (email.solution) sections.push(`\n## The Solution\n\n${email.solution}`);
-  if (email.featureSection) sections.push(`\n## Features\n\n${email.featureSection.split('\n').filter(l => l.trim()).map(l => l.replace(/^[-*•]\s*/, '- ')).join('\n')}`);
-  if (email.benefits) sections.push(`\n## Benefits\n\n${email.benefits.split('\n').filter(l => l.trim()).map(l => l.replace(/^[-*•]\s*/, '- ')).join('\n')}`);
+  if (email.featureSection) sections.push(`\n## Features\n\n${email.featureSection.split('\n').filter(l => l.trim()).map(l => l.replace(/^[-*â€¢]\s*/, '- ')).join('\n')}`);
+  if (email.benefits) sections.push(`\n## Benefits\n\n${email.benefits.split('\n').filter(l => l.trim()).map(l => l.replace(/^[-*â€¢]\s*/, '- ')).join('\n')}`);
   if (email.customerStory) sections.push(`\n> ${email.customerStory}`);
   if (email.socialProof) sections.push(`\n${email.socialProof}`);
   if (email.cta) sections.push(`\n---\n\n**[${email.cta}](#)**`);
@@ -602,8 +596,8 @@ export async function generateEmailCampaign({ chatId, userId, planId, campaignPl
     try {
       emailData = typeof aiResult === 'string' ? JSON.parse(aiResult) : (aiResult?.data || aiResult);
     } catch (e) {
-      console.warn('[EmailCampaign] AI response parse failed, generating structured email');
-      emailData = generateFallbackEmail(context);
+      console.warn('[EmailCampaign] AI response parse failed, returning honest failure');
+      emailData = null;
     }
 
     const validation = validateEmailOutput(emailData, context);
@@ -693,42 +687,6 @@ export async function generateEmailCampaign({ chatId, userId, planId, campaignPl
     return { success: false, error: error.message };
   }
 }
-
-function generateFallbackEmail(context) {
-  const product = context.productName || 'our platform';
-  const company = context.companyName || 'our team';
-  const painPoint = context.audiencePainPoints[0] || 'common challenges';
-  const feature = context.productFeatures[0] || 'powerful features';
-  const competitor = context.competitorNames[0] || '';
-  const audience = context.targetAudience || 'businesses';
-  const testimonial = context.testimonials[0] || 'teams like yours';
-  const industry = context.industry || 'your industry';
-
-  const features = context.productFeatures.length > 0 
-    ? context.productFeatures.slice(0, 4).map(f => typeof f === 'string' ? f : (f.value || f.name || f)).join('\n- ')
-    : `${feature}\n- Streamlined workflows\n- Real-time insights\n- Seamless integrations`;
-
-  return {
-    subjectLine: `${product} Helps ${audience} Overcome ${painPoint.substring(0, 20)}`,
-    previewText: `Discover how ${product} solves ${painPoint.substring(0, 30)} for ${audience}`,
-    opening: `Are you tired of dealing with ${painPoint}? You're not alone. Many ${audience} face this exact challenge every day, wasting valuable time and resources on manual processes that could be automated.`,
-    painPoint: `The reality is that ${painPoint} costs ${audience} more than just time. It impacts your team's productivity, slows down decision-making, and ultimately affects your bottom line. Without the right ${product} solution, these challenges only grow as your organization scales.`,
-    solution: `That's where ${product} comes in. Built specifically for ${audience}, ${product} transforms how you handle ${context.productCategory || 'your workflow'} by combining powerful automation with an intuitive interface.`,
-    featureSection: `With ${product}, you get:\n- ${features}`,
-    benefits: `By using ${product}, you can:\n- Save time and reduce manual work by up to 60%\n- Improve team collaboration and communication\n- Make data-driven decisions with real-time insights\n- Scale your operations efficiently without adding headcount\n- Reduce errors and improve accuracy across your workflows`,
-    customerStory: `One ${audience} team implemented ${product} and transformed their operations. Within weeks, they were able to cut processing time in half and redirect their focus to strategic initiatives that drove real business growth.`,
-    socialProof: `${product} is trusted by innovative ${audience} to transform their ${industry} operations. Teams consistently report higher satisfaction and better outcomes after switching to ${product}.`,
-    cta: `Try ${product} Free Today`,
-    closing: `Ready to see what ${product} can do for you and your ${audience} team? Start your free trial and experience the difference firsthand.`,
-    signature: `Best regards,\nThe ${company} Team`,
-    footer: `${product} | ${company}\n&copy; ${new Date().getFullYear()} All rights reserved.\nIf you no longer wish to receive these emails, you can unsubscribe here.`,
-    ps: `P.S. Start your free trial of ${product} today and see why ${audience} are making the switch. No credit card required.`,
-    plainTextBody: `Hello,\n\nAre you tired of dealing with ${painPoint}? You're not alone.\n\nMany ${audience} struggle with these challenges every day. The reality is that ${painPoint} costs your team time, productivity, and ultimately affects your bottom line.\n\nThat's where ${product} comes in. ${product} by ${company} is designed specifically for ${audience} to help you overcome these challenges.\n\nWith ${product}, you get:\n- ${features}\n\nBy using ${product}, you can:\n- Save time and reduce manual work\n- Improve team collaboration\n- Make data-driven decisions\n- Scale your operations efficiently\n\n${testimonial ? `"${testimonial}"` : ''}\n\n${competitor ? `Unlike ${competitor}, ${product} is built specifically for ${audience} needs.` : ''}\n\nReady to transform your ${industry} operations? Try ${product} today.\n\nBest regards,\nThe ${company} Team\n\nP.S. Start your free trial of ${product} today and experience the difference. No credit card required.`,
-    htmlBody: `<html><body><p>Hello,</p><p>Are you tired of dealing with ${painPoint}? You're not alone.</p><p>Many ${audience} face this challenge. That's where ${product} comes in.</p><p><strong>${product}</strong> helps you:</p><ul><li>${features}</li></ul><p>Ready to get started?</p><p>Best regards,<br/>The ${company} Team</p><p>P.S. Try ${product} today.</p></body></html>`,
-    markdownBody: `# ${product} Helps ${audience} Overcome ${painPoint.substring(0, 20)}\n\n> Discover how ${product} solves ${painPoint.substring(0, 30)} for ${audience}\n\nAre you tired of dealing with ${painPoint}? You're not alone.\n\n## The Challenge\n\nThe reality is that ${painPoint} costs ${audience} more than just time.\n\n## The Solution\n\nThat's where ${product} comes in.\n\n## Features\n\n- ${features}\n\n## Benefits\n\n- Save time and reduce manual work\n- Improve team collaboration\n- Make data-driven decisions\n- Scale your operations efficiently\n\n> One ${audience} team implemented ${product} and transformed their operations.\n\n**[Try ${product} Free Today](#)**\n\nReady to see what ${product} can do for you?\n\nBest regards,\nThe ${company} Team\n\n---\n\n${product} | ${company}\n\n*P.S. Start your free trial of ${product} today and see why ${audience} are making the switch.*`
-  };
-}
-
 export async function sendCampaignEmail({ campaignId, itemId, recipientEmail, recipientName, companyName, requireApproval = true }) {
   try {
     const item = await prisma.emailSequenceItem.findUnique({ 

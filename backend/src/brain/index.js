@@ -132,7 +132,7 @@ function _resolveGraphDependencies(di) {
   const entityResolver = new EntityResolver(entityStore);
   di._instances.set('entityResolver', entityResolver);
 
-  const relResolver = new RelationshipResolver(entityStore, relStore);
+  const relResolver = new RelationshipResolver(entityStore, relStore, entityResolver);
   di._instances.set('relationshipResolver', relResolver);
 
   const graphTraversal = new GraphTraversal(entityStore, relStore, relResolver);

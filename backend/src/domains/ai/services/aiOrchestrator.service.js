@@ -91,6 +91,7 @@ export class AIOrchestrator {
     preferredProvider = 'gemini',
     model,
     schema = null,
+    maxTokens = 2000,
   }) {
     const available = this.getAvailableProviders();
     if (available.length === 0) {
@@ -110,9 +111,9 @@ export class AIOrchestrator {
       const prov = this._initProvider(providerName);
       if (!prov) return null;
       if (providerName === 'gemini') {
-        return await this._callGemini(prov.client, { prompt, systemPrompt, model: modelName, schema });
+        return await this._callGemini(prov.client, { prompt, systemPrompt, model: modelName, schema, maxTokens });
       }
-      return await this._callOpenAICompatible(prov.client, { prompt, systemPrompt, model: modelName, schema });
+      return await this._callOpenAICompatible(prov.client, { prompt, systemPrompt, model: modelName, schema, maxTokens });
     };
 
     let lastError;
@@ -154,15 +155,16 @@ export class AIOrchestrator {
     return { success: false, error: `All AI providers failed. Last error: ${lastError?.message || 'Unknown'}` };
   }
 
-  async _callOpenAICompatible(client, { prompt, systemPrompt, model, schema }) {
+  async _callOpenAICompatible(client, { prompt, systemPrompt, model, schema, maxTokens = 2000 }) {
     const messages = [
       { role: 'system', content: systemPrompt || 'You are a helpful assistant. Always respond with valid JSON.' },
-      { role: 'user', content: prompt + '\n\nRespond ONLY with valid JSON. No markdown, no explanation.' },
+      { role: 'user', content: prompt + (schema ? '' : '\n\nRespond ONLY with valid JSON. No markdown, no explanation.') },
     ];
     const response = await client.chat.completions.create({
       model: model || 'gemini-1.5-flash',
       messages,
-      response_format: { type: 'json_object' },
+      max_tokens: maxTokens,
+      ...(schema ? { response_format: { type: 'json_object' } } : {}),
     });
     return {
       content: response.choices[0].message.content,
@@ -173,10 +175,10 @@ export class AIOrchestrator {
     };
   }
 
-  async _callGemini(client, { prompt, systemPrompt, model, schema }) {
+  async _callGemini(client, { prompt, systemPrompt, model, schema, maxTokens = 2000 }) {
     const genModel = client.getGenerativeModel({
       model: model || 'gemini-1.5-flash',
-      generationConfig: { responseMimeType: 'application/json' },
+      generationConfig: { responseMimeType: 'application/json', maxOutputTokens: maxTokens },
     });
     const fullPrompt = `${systemPrompt || 'You are a helpful assistant. Always respond with valid JSON.'}\n\n${prompt}\n\nRespond ONLY with valid JSON. No markdown, no explanation.`;
     const result = await genModel.generateContent(fullPrompt);
@@ -308,6 +310,42 @@ export async function callAI(prompt, options = {}) {
   }
 }
 
-export async function generateProductAnalysis(data) {
-  return callAI(`Analyze product: ${JSON.stringify(data)}`);
+const GENERIC_SCHEMA_KEYS = {
+  productSummary: "",
+  uniqueValueProposition: "",
+  marketOpportunities: [],
+  targetAudience: [],
+  painPoints: [],
+  features: [],
+  benefits: [],
+  campaignIdeas: [],
+  competitorIdeas: [],
+  seoSuggestions: [],
+  recommendedChannels: [],
+  marketDiscovery: {},
+  audienceIntelligence: {},
+  confidenceBreakdown: {},
+};
+
+export async function generateProductAnalysis(productData, scrapedData) {
+  const input = productData || {};
+  const prompt = `Analyze this product and produce a JSON report. Derive every value ONLY from the product profile and scraped website evidence below. When evidence is insufficient, return empty strings or empty arrays — NEVER invent features, prices, competitors, or statistics.
+
+PRODUCT PROFILE:
+${JSON.stringify(input, null, 2)}
+
+WEBSITE EVIDENCE:
+${JSON.stringify((scrapedData || {}).features || [], null, 2)}
+${JSON.stringify((scrapedData || {}).benefits || [], null, 2)}
+${String((scrapedData || {}).cleanedText || '').slice(0, 2000)}
+
+Return valid JSON only with these EXACT fields:
+${JSON.stringify(GENERIC_SCHEMA_KEYS, null, 2)}
+
+Return valid JSON only — no markdown, no explanation.`;
+  return callAI(prompt, {
+    systemPrompt: 'You are an evidence-based product analyst. Never fabricate facts absent from the provided evidence.',
+    model: 'gemini-1.5-flash',
+    temperature: 0.2,
+  });
 }

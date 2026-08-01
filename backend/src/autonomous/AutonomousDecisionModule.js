@@ -60,7 +60,7 @@ export class AutonomousDecisionModule extends BaseAutonomousModule {
     const companyName = knowledgeData?.company?.name || baseContext.request.companyName || 'Unknown';
     const productName = knowledgeData?.product?.name || baseContext.request.productName || 'Unknown';
 
-    const goals = this._generateAutonomousGoals(knowledgeData, evidenceData, confidenceData);
+    const goals = this._generateAutonomousGoals(knowledgeData, evidenceData, confidenceData, recData);
 
     const decisions = [];
     for (const goal of goals) {
@@ -115,41 +115,31 @@ export class AutonomousDecisionModule extends BaseAutonomousModule {
     };
   }
 
-  _generateAutonomousGoals(knowledge, evidence, confidence) {
+  _generateAutonomousGoals(knowledge, evidence, confidence, recommendations) {
     const goals = [];
-    const companyName = knowledge?.company?.name || '';
 
-    if (companyName && companyName !== 'Unknown') {
-      goals.push({
-        goal: `Scale market presence for ${companyName}`,
-        constraints: [{ field: 'max_budget', operator: '<=', value: 50000 }],
-        budget: 25000,
-        timeframe: 'quarter',
-      });
-
-      goals.push({
-        goal: `Improve marketing ROI for ${companyName}`,
-        constraints: [{ field: 'min_roi', operator: '>=', value: 200 }],
-        budget: 15000,
-        timeframe: 'quarter',
-      });
-    }
-
-    if (knowledge?.product?.name && knowledge.product.name !== 'Unknown') {
-      goals.push({
-        goal: `Drive adoption of ${knowledge.product.name}`,
-        constraints: [],
-        budget: 30000,
-        timeframe: 'quarter',
+    if (recommendations?.items?.length) {
+      recommendations.items.slice(0, 5).forEach(r => {
+        const message = typeof r.message === 'string' && r.message.trim().length > 5 ? r.message.trim() : null;
+        if (!message) return;
+        goals.push({
+          goal: message,
+          constraints: [],
+          budget: null,
+          timeframe: 'month',
+          source: r.source || 'recommendations_engine',
+          priority: r.priority || null,
+        });
       });
     }
 
     if (confidence?.weakestSection?.section) {
       goals.push({
         goal: `Strengthen ${confidence.weakestSection.section.replace('_', ' ')} intelligence`,
-        constraints: [{ field: 'budget', operator: '<=', value: 10000 }],
-        budget: 5000,
+        constraints: [],
+        budget: null,
         timeframe: 'month',
+        source: 'confidence_engine',
       });
     }
 

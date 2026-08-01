@@ -3,10 +3,17 @@ import { api } from '../lib/api';
 import { normalizeFullResults } from '../lib/normalizers';
 import { useAuth } from './AuthContext';
 
+// Why a chat was created — used for telemetry and cache invalidation decisions.
+export type CreateChatReason =
+  | 'USER_CLICK_NEW_ANALYSIS'
+  | 'FIRST_ACCOUNT_BOOTSTRAP'
+  | 'ANALYSIS_RUN_NO_CHAT';
+
 type ProjectCtx = {
   chats: any[];
   selectedChatId: string;
   fullResults: any;
+  fullResultsByChat: Record<string, any>;
   loading: boolean;
   restoringChatId: string | null;
   restoreStatus: 'idle' | 'restoring' | 'restored' | 'not_found';
@@ -14,7 +21,7 @@ type ProjectCtx = {
   selectChat: (id: string) => Promise<void>;
   clearSelection: () => void;
   loadFullResults: (id?: string) => Promise<any>;
-  createChat: (title: string) => Promise<string>;
+  createChat: (title: string, reason?: CreateChatReason) => Promise<string>;
   deleteChat: (id: string) => Promise<void>;
   clearHistory: () => Promise<void>;
 };
@@ -25,6 +32,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [chats, setChats] = useState<any[]>([]);
   const [selectedChatId, setSelectedChatId] = useState(localStorage.getItem('selectedChatId') || '');
   const [fullResults, setFullResults] = useState<any>({ growth: null, seo: null, executive: null, profile: null, chat: null });
+  const [fullResultsByChat, setFullResultsByChat] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
   const [restoringChatId, setRestoringChatId] = useState<string | null>(null);
   const [restoreStatus, setRestoreStatus] = useState<'idle' | 'restoring' | 'restored' | 'not_found'>('idle');
@@ -67,11 +75,23 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     // Only clear results if switching to a different chat
     if (id !== selectedChatId) {
       console.log('[ProjectContext] Clearing results for chat switch');
+      // Preserve the outgoing chat's results in the per-chat cache
+      if (selectedChatId && fullResults) {
+        setFullResultsByChat(prev => ({ ...prev, [selectedChatId]: fullResults }));
+      }
       setFullResults({ growth: null, seo: null, executive: null, profile: null, chat: null });
     }
     
     setSelectedChatId(id);
     localStorage.setItem('selectedChatId', id);
+    
+    // Serve from cache instantly when available, then revalidate from the server
+    const cached = fullResultsByChat[id];
+    if (cached && Object.keys(cached).length > 0) {
+      console.info('[ProjectContext] Serving fullResults from cache', { chatId: id });
+      setFullResults(cached);
+      setRestoreStatus(cached?.hasGrowthWorkspace === true ? 'restored' : 'not_found');
+    }
     
     // Load results for the selected chat
     await loadFullResults(id);
@@ -126,6 +146,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       });
       
       setFullResults(normalized);
+      setFullResultsByChat(prev => ({ ...prev, [id]: normalized }));
       setRestoreStatus(hasSeoData || hasGrowthData ? 'restored' : 'not_found');
       setRestoringChatId(null);
       return normalized;
@@ -157,7 +178,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function createChat(title: string) {
+  async function createChat(title: string, reason: CreateChatReason = 'USER_CLICK_NEW_ANALYSIS') {
     if (createChatInFlightRef.current && createChatPromiseRef.current) {
       console.info('[ProjectContext createChat] request already in-flight, reusing existing promise', { title });
       return createChatPromiseRef.current;
@@ -165,7 +186,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
     createChatInFlightRef.current = true;
     const promise = (async () => {
-      console.info('[ProjectContext createChat requested]', { title, selectedChatId, pending: createChatInFlightRef.current });
+      console.info('[ProjectContext createChat requested]', { title, reason, selectedChatId, pending: createChatInFlightRef.current });
       const res: any = await api.post('/chats', { title: title || 'New Product Analysis' });
       const chat = res.chat || res.data || res;
       const id = chat.id;
@@ -225,6 +246,13 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       if (selectedChatId === id) {
         clearSelection();
       }
+      // Drop the deleted chat from the cache
+      setFullResultsByChat(prev => {
+        if (!(id in prev)) return prev;
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
 
       // Refresh chat list
       await refreshChats();
@@ -261,7 +289,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
   useEffect(() => { if (user && selectedChatId) loadFullResults(selectedChatId).catch((e) => console.warn('Initial full results load failed:', e)); }, [user, selectedChatId]);
 
-  const value = useMemo(() => ({ chats, selectedChatId, fullResults, loading, restoringChatId, restoreStatus, refreshChats, selectChat, clearSelection, loadFullResults, createChat, deleteChat, clearHistory }), [chats, selectedChatId, fullResults, loading, restoringChatId, restoreStatus]);
+  const value = useMemo(() => ({ chats, selectedChatId, fullResults, fullResultsByChat, loading, restoringChatId, restoreStatus, refreshChats, selectChat, clearSelection, loadFullResults, createChat, deleteChat, clearHistory }), [chats, selectedChatId, fullResults, fullResultsByChat, loading, restoringChatId, restoreStatus]);
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
 }
 

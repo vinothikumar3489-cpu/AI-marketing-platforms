@@ -101,14 +101,16 @@ export async function generatePptx(data) {
     swotSlide.addText('Strategic Position Assessment', { x: 0.5, y: 0.55, w: 9, h: 0.3, fontSize: 10, fontFace: FONT, color: 'C7D2FE' });
     const opportunities = arr(market?.opportunities).slice(0, 3).map(o => typeof o === 'string' ? o : o.value || o.name || o.opportunity || o);
     const risks = arr(market?.risks).slice(0, 3).map(r => typeof r === 'string' ? r : r.value || r.name || r.risk || r);
+    const strengths = arr(market?.strengths || market?.growthSignals).slice(0, 3).map(s => typeof s === 'string' ? s : s.value || s.name || s);
+    const weaknesses = arr(market?.weaknesses || market?.dataGaps).slice(0, 3).map(w => typeof w === 'string' ? w : w.value || w.name || w);
 
     const addSwotQuadrant = (x, y, w, h, title, items, bg, textColor) => {
       swotSlide.addShape(pptx.ShapeType.roundRect, { x, y, w, h: h, fill: { color: bg }, rectRadius: 0.1, line: { color: textColor, width: 1.5 } });
       swotSlide.addText(title, { x: x + 0.15, y: y + 0.08, w: w - 0.3, h: 0.4, fontSize: 15, fontFace: FONT, color: textColor, bold: true });
       swotSlide.addText(items.length > 0 ? items.map((t, i) => `${i + 1}.  ${t}`).join('\n') : 'No verified data', { x: x + 0.15, y: y + 0.5, w: w - 0.3, h: h - 0.6, fontSize: 10, fontFace: FONT, color: textColor, valign: 'top' });
     };
-    addSwotQuadrant(0.3, 1.1, 4.6, 2, 'Strengths', ['Technology infrastructure verified', 'Data-driven intelligence', 'Clear market positioning'], 'F0FDF4', '166534');
-    addSwotQuadrant(5.1, 1.1, 4.6, 2, 'Weaknesses', ['API integration gaps', 'Analytics connectivity needed', 'Performance metrics pending'], 'FEF2F2', '991B1B');
+    addSwotQuadrant(0.3, 1.1, 4.6, 2, 'Strengths', strengths.length > 0 ? strengths : ['No verified data'], 'F0FDF4', '166534');
+    addSwotQuadrant(5.1, 1.1, 4.6, 2, 'Weaknesses', weaknesses.length > 0 ? weaknesses : ['No verified data'], 'FEF2F2', '991B1B');
     addSwotQuadrant(0.3, 3.3, 4.6, 2.2, 'Opportunities', opportunities.length > 0 ? opportunities : ['Data pending — run market analysis'], 'EFF6FF', '1E40AF');
     addSwotQuadrant(5.1, 3.3, 4.6, 2.2, 'Threats', risks.length > 0 ? risks : ['Data pending — run risk assessment'], 'FFFBEB', '854D0E');
 
@@ -209,15 +211,17 @@ export async function generatePptx(data) {
       const hasPlatformComps = seo?.__raw?.competitorIntelligence?.competitors?.length > 0;
       addSectionSlide(pptx, 'Competitor SEO', `${comps.length > 0 ? comps.length : hasPlatformComps ? 'Estimated' : '0'} SEO Competitors`, C.danger);
       if (comps.length > 0) {
-        const maxScore = Math.max(...comps.map(c => c.seoAuthority || c.estimatedAuthority || 50), 1);
+        const maxScore = Math.max(...comps.map(c => c.seoAuthority || c.estimatedAuthority || 0), 1);
         comps.forEach((c, i) => {
           const y = 1.3 + i * 0.65;
           const auth = c.seoAuthority || c.estimatedAuthority || 0;
-          const barW = (auth / maxScore) * 4.5;
+          const barW = auth > 0 ? (auth / maxScore) * 4.5 : 0;
           pptx.addText(c.name || c.domain, { x: 0.5, y, w: 2.8, h: 0.45, fontSize: 11, fontFace: FONT, color: C.dark });
-          pptx.addShape(pptx.ShapeType.roundRect, { x: 3.5, y: y + 0.08, w: 4.5, h: 0.3, fill: { color: C.light }, rectRadius: 0.05 });
-          pptx.addShape(pptx.ShapeType.roundRect, { x: 3.5, y: y + 0.08, w: Math.min(barW, 4.5), h: 0.3, fill: { color: auth >= 70 ? C.secondary : auth >= 40 ? C.accent : C.danger }, rectRadius: 0.05 });
-          pptx.addText(`${auth}/100`, { x: 8.2, y, w: 1.3, h: 0.45, fontSize: 10, fontFace: FONT, color: auth >= 70 ? C.secondary : auth >= 40 ? C.accent : C.danger, bold: true });
+          if (auth > 0) {
+            pptx.addShape(pptx.ShapeType.roundRect, { x: 3.5, y: y + 0.08, w: 4.5, h: 0.3, fill: { color: C.light }, rectRadius: 0.05 });
+            pptx.addShape(pptx.ShapeType.roundRect, { x: 3.5, y: y + 0.08, w: Math.min(barW, 4.5), h: 0.3, fill: { color: auth >= 70 ? C.secondary : auth >= 40 ? C.accent : C.danger }, rectRadius: 0.05 });
+          }
+          pptx.addText(auth > 0 ? `${auth}/100` : 'N/A', { x: 8.2, y, w: 1.3, h: 0.45, fontSize: 10, fontFace: FONT, color: auth >= 70 ? C.secondary : auth >= 40 ? C.accent : C.muted, bold: true });
         });
       } else if (hasPlatformComps) {
         pptx.addText('Competitor intelligence partially available — platform-level estimates present. Connect DataForSEO for detailed SERP analysis.', { x: 0.5, y: 2, w: 9, h: 0.5, fontSize: 14, fontFace: FONT, color: C.muted, italic: true });
@@ -228,15 +232,17 @@ export async function generatePptx(data) {
       const comps = arr(competitor?.direct).slice(0, 8);
       addSectionSlide(pptx, 'Competitive Landscape', `${comps.length} Direct Competitors Identified`, C.danger);
       if (comps.length > 0) {
-        const maxScore = Math.max(...comps.map(c => c.similarityScore ?? 50), 1);
+        const maxScore = Math.max(...comps.map(c => c.similarityScore ?? 0), 1);
         comps.forEach((c, i) => {
           const y = 1.3 + i * 0.65;
-          const score = c.similarityScore ?? 50;
-          const barW = (score / maxScore) * 4.5;
+          const score = c.similarityScore ?? 0;
+          const barW = score > 0 ? (score / maxScore) * 4.5 : 0;
           pptx.addText(c.name || c.domain, { x: 0.5, y, w: 2.8, h: 0.45, fontSize: 11, fontFace: FONT, color: C.dark });
-          pptx.addShape(pptx.ShapeType.roundRect, { x: 3.5, y: y + 0.08, w: 4.5, h: 0.3, fill: { color: C.light }, rectRadius: 0.05 });
-          pptx.addShape(pptx.ShapeType.roundRect, { x: 3.5, y: y + 0.08, w: Math.min(barW, 4.5), h: 0.3, fill: { color: score >= 70 ? C.secondary : score >= 40 ? C.accent : C.danger }, rectRadius: 0.05 });
-          pptx.addText(`${score}/100`, { x: 8.2, y, w: 1.3, h: 0.45, fontSize: 10, fontFace: FONT, color: score >= 70 ? C.secondary : score >= 40 ? C.accent : C.danger, bold: true });
+          if (score > 0) {
+            pptx.addShape(pptx.ShapeType.roundRect, { x: 3.5, y: y + 0.08, w: 4.5, h: 0.3, fill: { color: C.light }, rectRadius: 0.05 });
+            pptx.addShape(pptx.ShapeType.roundRect, { x: 3.5, y: y + 0.08, w: Math.min(barW, 4.5), h: 0.3, fill: { color: score >= 70 ? C.secondary : score >= 40 ? C.accent : C.danger }, rectRadius: 0.05 });
+          }
+          pptx.addText(score > 0 ? `${score}/100` : 'N/A', { x: 8.2, y, w: 1.3, h: 0.45, fontSize: 10, fontFace: FONT, color: score >= 70 ? C.secondary : score >= 40 ? C.accent : C.muted, bold: true });
         });
       } else {
         pptx.addText('No direct competitors identified from verified sources.', { x: 0.5, y: 2, w: 9, h: 0.5, fontSize: 14, fontFace: FONT, color: C.muted, italic: true });
@@ -338,10 +344,10 @@ export async function generatePptx(data) {
         riskItems.forEach((r, i) => {
           const y = 1.8 + i * 0.55;
           const riskText = typeof r === 'string' ? r : r.value || r.name || r.risk || r.description || r;
-          const sev = r.severity || r.priority || 'Medium';
+          const sev = r.severity || r.priority || '';
           pptx.addShape(pptx.ShapeType.roundRect, { x: 5.2, y, w: 4.5, h: 0.45, fill: { color: i % 2 === 0 ? 'FEF2F2' : C.white }, rectRadius: 0.05 });
           pptx.addText(riskText, { x: 5.3, y: y + 0.02, w: 3.2, h: 0.4, fontSize: 9, fontFace: FONT, color: C.dark, valign: 'middle' });
-          pptx.addText(sev, { x: 8.7, y: y + 0.02, w: 1, h: 0.4, fontSize: 9, fontFace: FONT, color: sev === 'Critical' || sev === 'High' ? C.danger : C.accent, bold: true, valign: 'middle' });
+          pptx.addText(sev || '—', { x: 8.7, y: y + 0.02, w: 1, h: 0.4, fontSize: 9, fontFace: FONT, color: !sev ? C.muted : sev === 'Critical' || sev === 'High' ? C.danger : C.accent, bold: true, valign: 'middle' });
         });
       } else {
         pptx.addText('No risk factors recorded.', { x: 5.2, y: 1.8, w: 4.5, h: 0.5, fontSize: 11, fontFace: FONT, color: C.muted, italic: true });

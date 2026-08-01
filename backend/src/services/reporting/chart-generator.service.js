@@ -262,20 +262,26 @@ export function generateTrendChartSvg(data, options = {}) {
 
 export function generateCompetitorComparisonChart(competitors, options = {}) {
   if (!competitors || competitors.length === 0) return '';
-  const data = competitors.map(c => ({
-    label: c.name || c.domain || 'Unknown',
-    value: c.similarityScore ?? c.confidence ?? 50,
-    color: c.color
-  }));
+  const data = competitors
+    .filter(c => c.similarityScore != null || c.confidence != null)
+    .map(c => ({
+      label: c.name || c.domain || 'Unknown',
+      value: c.similarityScore ?? c.confidence ?? 0,
+      color: c.color
+    }));
+  if (data.length === 0) return '';
   return generateBarChartSvg(data, { ...options, title: options.title || 'Competitor Comparison', barColor: '#8b5cf6' });
 }
 
 export function generateChannelAllocationChart(channels, options = {}) {
   if (!channels || channels.length === 0) return '';
-  const data = channels.map(c => ({
-    label: c.name || c.channel || 'Unknown',
-    value: c.budgetAllocation ?? c.fitScore ?? 50
-  }));
+  const data = channels
+    .filter(c => c.budgetAllocation != null || c.fitScore != null)
+    .map(c => ({
+      label: c.name || c.channel || 'Unknown',
+      value: c.budgetAllocation ?? c.fitScore ?? 0
+    }));
+  if (data.length === 0) return '';
   return generatePieChartSvg(data, { ...options, title: options.title || 'Channel Budget Allocation', donut: true });
 }
 
@@ -292,9 +298,9 @@ export function generateKeywordDistributionChart(keywords, options = {}) {
 export function generateMarketShareChart(competitors, ourName, ourShare, options = {}) {
   const data = [
     { label: ourName || 'Our Company', value: ourShare || 0, color: '#6366f1' },
-    ...(competitors || []).slice(0, 5).map((c, i) => ({
+    ...(competitors || []).slice(0, 5).filter(c => c.marketShare != null || c.share != null).map((c, i) => ({
       label: c.name || c.domain || `Competitor ${i + 1}`,
-      value: Math.max(1, Math.round((ourShare || 10) * (0.5 + Math.random() * 0.5))),
+      value: c.marketShare ?? c.share,
       color: ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'][i]
     }))
   ];
@@ -305,7 +311,7 @@ export function generateGrowthMatrixChart(opportunities, options = {}) {
   if (!opportunities || opportunities.length === 0) return '';
   const data = opportunities.map(o => ({
     label: o.value || o.name || o.opportunity || 'Opportunity',
-    value: o.impact === 'High' ? 85 : o.impact === 'Medium' ? 60 : 30,
+    value: o.impact ? (o.impact === 'High' ? 85 : o.impact === 'Medium' ? 60 : 30) : 0,
     color: o.impact === 'High' ? '#059669' : o.impact === 'Medium' ? '#6366f1' : '#f59e0b'
   }));
   return generateBarChartSvg(data, { ...options, title: options.title || 'Growth Opportunity Matrix', barColor: '#059669' });
@@ -314,7 +320,7 @@ export function generateGrowthMatrixChart(opportunities, options = {}) {
 export function generateScoreRadarChart(scores, options = {}) {
   const data = Object.entries(scores || {}).map(([key, val]) => ({
     label: key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()),
-    value: typeof val === 'number' ? val : 50
+    value: typeof val === 'number' ? val : 0
   }));
   return generateRadarChartSvg(data, { ...options, title: options.title || 'Performance Scores' });
 }
